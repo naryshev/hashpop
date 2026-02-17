@@ -1,0 +1,54 @@
+version: "3.9"
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: hedera
+      POSTGRES_PASSWORD: hedera
+      POSTGRES_DB: marketplace
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hedera"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgres://hedera:hedera@db:5432/marketplace
+      MIRROR_URL: https://testnet.mirrornode.hedera.com
+      MARKETPLACE_ADDRESS: ${MARKETPLACE_ADDRESS}
+      AUCTION_HOUSE_ADDRESS: ${AUCTION_HOUSE_ADDRESS}
+      PORT: 4000
+      LOG_LEVEL: info
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
+  frontend:
+    build: ./frontend
+    environment:
+      NEXT_PUBLIC_HEDERA_RPC: ${NEXT_PUBLIC_HEDERA_RPC:-https://testnet.hashio.io/api}
+      NEXT_PUBLIC_MARKETPLACE_ADDRESS: ${NEXT_PUBLIC_MARKETPLACE_ADDRESS}
+      NEXT_PUBLIC_AUCTION_HOUSE_ADDRESS: ${NEXT_PUBLIC_AUCTION_HOUSE_ADDRESS}
+      NEXT_PUBLIC_WC_PROJECT_ID: ${NEXT_PUBLIC_WC_PROJECT_ID}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+
+volumes:
+  pgdata:

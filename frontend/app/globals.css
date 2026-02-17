@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0a0a0a;
+  --text: #e4e4e7;
+  --text-muted: #a1a1aa;
+  --border: rgba(255, 255, 255, 0.08);
+  --frost: rgba(255, 255, 255, 0.06);
+  --glow: rgba(250, 230, 210, 0.15);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", "Inter", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer components {
+  .glass {
+    @apply rounded-glass border border-white/10 bg-white/5 backdrop-blur-glass;
+  }
+  .glass-card {
+    @apply rounded-glass-lg border border-white/10 bg-gradient-to-b from-white/[0.06] to-white/[0.02] backdrop-blur-glass;
+  }
+  .btn-frost {
+    @apply rounded-glass border border-white/20 bg-white/10 backdrop-blur-sm px-4 py-2 font-medium text-chrome transition-all duration-200 hover:bg-white/15 hover:shadow-glow hover:border-white/30;
+  }
+  .btn-frost-cta {
+    @apply rounded-glass border border-white/25 bg-white/15 px-4 py-2 font-semibold text-white transition-all duration-200 hover:bg-white/20 hover:shadow-glow-hover hover:border-white/40 shadow-inner;
+  }
+  .input-frost {
+    @apply rounded-lg border border-white/10 bg-white/5 backdrop-blur-sm px-3 py-2 text-white placeholder:text-zinc-500 focus:border-white/20 focus:outline-none focus:ring-1 focus:ring-white/20 transition;
+  }
+}

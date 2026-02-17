@@ -1,0 +1,2 @@
+Add your shopping bag logo as logo.png in this folder (frontend/public/).
+The nav will use it automatically. If logo.png is missing, an SVG fallback is shown.

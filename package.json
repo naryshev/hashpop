@@ -1,0 +1,35 @@
+{
+  "name": "hedera-ebay",
+  "version": "1.0.0",
+  "private": true,
+  "engines": { "node": ">=18.0.0 <=22.x" },
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:testnet": "hardhat run deploy/deploy.ts --network hederaTestnet",
+    "authorize:escrow": "hardhat run deploy/authorize-escrow.ts --network hederaTestnet",
+    "verify": "hardhat run deploy/verify.ts",
+    "dev:backend": "npm run dev --prefix backend",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "db:seed": "npm run db:seed --prefix backend",
+    "db:migrate": "npm run db:migrate --prefix backend",
+    "dev:kill": "kill-port 4000",
+    "dev": "(npm run dev:kill || node -e \"process.exit(0)\") && concurrently -k -n backend,frontend -c magenta,yellow \"npm run dev:backend\" \"wait-on tcp:4000 && npm run dev:frontend\""
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@types/node": "^20.0.0",
+    "chai": "^4.3.0",
+    "concurrently": "^9.0.0",
+    "dotenv": "^16.3.0",
+    "hardhat": "^2.19.0",
+    "typescript": "^5.3.0",
+    "ts-node": "^10.9.0",
+    "wait-on": "^8.0.0",
+    "kill-port": "^2.0.0",
+    "@types/chai": "^4.3.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.0"
+  }
+}
