@@ -1,10 +1,9 @@
-# hbay (v1)
+# hashmart (v1)
 
-Production-ready decentralized marketplace on Hedera Hashgraph. Replicates core eBay functionality with trustless escrow, English auctions, and immutable reputation.
 
 ## 🎯 Product Goal
 
-Build a decentralized commerce marketplace where every sale, bid, and settlement is finalized on-chain using HBAR. Platform never custodies funds. All transactions are transparent and verifiable.
+Build a decentralized commerce escrow marketplace where every sale, bid, and settlement is finalized on-chain using HBAR. All transactions are transparent and verifiable.
 
 ## 📁 Project Structure
 
@@ -299,3 +298,4 @@ MIT
 ---
 
 **hbay — Built for Hedera Hashgraph. Trustless. Non-custodial. Production-ready.**
+
