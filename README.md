@@ -1,4 +1,4 @@
-# hashmart (v1)
+# hashpop (v1)
 
 
 ## 🎯 Product Goal
@@ -316,4 +316,5 @@ MIT
 ---
 
 **hbay — Built for Hedera Hashgraph. Trustless. Non-custodial. Production-ready.**
+
 
