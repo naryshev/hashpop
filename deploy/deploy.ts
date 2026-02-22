@@ -5,7 +5,12 @@ dotenv.config();
 
 async function main() {
   const [deployer] = await ethers.getSigners();
+  const platformFeeBps = Number(process.env.PLATFORM_FEE_BPS || "300");
+  if (!Number.isInteger(platformFeeBps) || platformFeeBps < 0 || platformFeeBps > 1000) {
+    throw new Error("PLATFORM_FEE_BPS must be an integer between 0 and 1000");
+  }
   console.log("Deploying contracts with account:", deployer.address);
+  console.log("Platform fee (bps):", platformFeeBps);
 
   // Deploy Escrow
   const Escrow = await ethers.getContractFactory("Escrow");
@@ -28,7 +33,7 @@ async function main() {
     await escrow.getAddress(),
     await treasury.getAddress(),
     await reputation.getAddress(),
-    300 // 3% platform fee
+    platformFeeBps
   );
   console.log("Marketplace deployed to:", await marketplace.getAddress());
 
@@ -37,7 +42,7 @@ async function main() {
   const auctionHouse = await AuctionHouse.deploy(
     await escrow.getAddress(),
     await treasury.getAddress(),
-    300 // 3% platform fee
+    platformFeeBps
   );
   console.log("AuctionHouse deployed to:", await auctionHouse.getAddress());
 

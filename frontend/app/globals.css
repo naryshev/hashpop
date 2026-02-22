@@ -34,4 +34,26 @@ body {
   .input-frost {
     @apply rounded-lg border border-white/10 bg-white/5 backdrop-blur-sm px-3 py-2 text-white placeholder:text-zinc-500 focus:border-white/20 focus:outline-none focus:ring-1 focus:ring-white/20 transition;
   }
+  /* Selects: light gray background + white text; dropdown options match so they're visible */
+  select.input-frost {
+    background-color: rgb(63 63 69);
+    color: rgb(255 255 255);
+  }
+  select.input-frost option {
+    background-color: rgb(63 63 69);
+    color: rgb(255 255 255);
+  }
+  select.input-frost option:checked {
+    background-color: rgb(82 82 91);
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }

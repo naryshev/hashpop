@@ -4,17 +4,18 @@
  */
 
 import { keccak256, encodePacked, toHex } from "viem";
+import { getApiUrl } from "./apiUrl";
+import { stringToBytes32Hex } from "./bytes32";
 
-function apiUrl(relayPath: string): string {
-  const base = (typeof window !== "undefined" ? process.env.NEXT_PUBLIC_API_URL : process.env.NEXT_PUBLIC_API_URL) || "";
+function relayUrl(relayPath: string): string {
+  const base = getApiUrl().replace(/\/$/, "");
   const p = relayPath.startsWith("/") ? relayPath : `/${relayPath}`;
-  return base ? `${base.replace(/\/$/, "")}/api/relay${p}` : `/api/relay${p}`;
+  return `${base}/api/relay${p}`;
 }
 
-/** Listing id as bytes32 hex (same as BuyButton formatId). */
 export function listingIdToBytes32(listingId: string): `0x${string}` {
-  const hex = Buffer.from(listingId).toString("hex").padEnd(64, "0").slice(0, 64);
-  return `0x${hex}` as `0x${string}`;
+  if (listingId.startsWith("0x") && listingId.length === 66) return listingId.toLowerCase() as `0x${string}`;
+  return stringToBytes32Hex(listingId);
 }
 
 export function auctionIdToBytes32(auctionId: string): `0x${string}` {
@@ -67,7 +68,7 @@ export type RelayBuyParams = {
 };
 
 export async function relayBuy(params: RelayBuyParams): Promise<{ txHash: string }> {
-  const res = await fetch(apiUrl("/relay/buy"), {
+  const res = await fetch(relayUrl("/relay/buy"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -95,7 +96,7 @@ export type RelayConfirmReceiptParams = {
 };
 
 export async function relayConfirmReceipt(params: RelayConfirmReceiptParams): Promise<{ txHash: string }> {
-  const res = await fetch(apiUrl("/relay/confirm-receipt"), {
+  const res = await fetch(relayUrl("/relay/confirm-receipt"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -123,7 +124,7 @@ export type RelayPlaceBidParams = {
 };
 
 export async function relayPlaceBid(params: RelayPlaceBidParams): Promise<{ txHash: string }> {
-  const res = await fetch(apiUrl("/relay/place-bid"), {
+  const res = await fetch(relayUrl("/relay/place-bid"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -144,7 +145,7 @@ export async function relayPlaceBid(params: RelayPlaceBidParams): Promise<{ txHa
 
 /** Resolve Hedera account ID (0.0.XXXXX) to EVM alias (0x...) via backend. */
 export async function fetchAccountAlias(accountId: string): Promise<`0x${string}`> {
-  const res = await fetch(apiUrl(`/account-alias?accountId=${encodeURIComponent(accountId)}`));
+  const res = await fetch(relayUrl(`/account-alias?accountId=${encodeURIComponent(accountId)}`));
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(err.error || "Failed to resolve account alias");

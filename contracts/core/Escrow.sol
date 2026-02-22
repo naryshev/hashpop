@@ -7,6 +7,10 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./Roles.sol";
 import "./HederaAccountService.sol";
 
+interface IMarketplaceCompletion {
+    function completeListing(bytes32 listingId) external;
+}
+
 /**
  * @title Escrow
  * @notice Trustless escrow for buyer protection. Funds locked until completion or timeout.
@@ -32,6 +36,7 @@ contract Escrow is ReentrancyGuard, Pausable, AccessControl, Roles {
 
     mapping(bytes32 => EscrowData) public escrows;
     uint256 public constant ESCROW_TIMEOUT = 7 days;
+    address public marketplaceCallback;
 
     event EscrowCreated(bytes32 indexed listingId, address indexed buyer, address indexed seller, uint256 amount);
     event EscrowConfirmed(bytes32 indexed listingId, address indexed buyer);
@@ -48,6 +53,10 @@ contract Escrow is ReentrancyGuard, Pausable, AccessControl, Roles {
      */
     function setMarketplace(address marketplace) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _grantRole(MARKETPLACE_ROLE, marketplace);
+        // Keep the first marketplace address as completion callback target.
+        if (marketplaceCallback == address(0)) {
+            marketplaceCallback = marketplace;
+        }
     }
 
     /**
@@ -88,6 +97,9 @@ contract Escrow is ReentrancyGuard, Pausable, AccessControl, Roles {
 
         (bool success, ) = escrow.seller.call{value: amount}("");
         require(success, "Transfer failed");
+        if (marketplaceCallback != address(0)) {
+            IMarketplaceCompletion(marketplaceCallback).completeListing(listingId);
+        }
 
         emit EscrowConfirmed(listingId, msg.sender);
         emit EscrowCompleted(listingId, escrow.seller, amount);
@@ -123,6 +135,9 @@ contract Escrow is ReentrancyGuard, Pausable, AccessControl, Roles {
 
         (bool success, ) = escrow.seller.call{value: amount}("");
         require(success, "Transfer failed");
+        if (marketplaceCallback != address(0)) {
+            IMarketplaceCompletion(marketplaceCallback).completeListing(listingId);
+        }
 
         emit EscrowConfirmed(listingId, buyerAlias);
         emit EscrowCompleted(listingId, escrow.seller, amount);
@@ -154,12 +169,18 @@ contract Escrow is ReentrancyGuard, Pausable, AccessControl, Roles {
             escrow.state = EscrowState.COMPLETE;
             (bool success, ) = escrow.buyer.call{value: amount}("");
             require(success, "Refund failed");
+            if (marketplaceCallback != address(0)) {
+                IMarketplaceCompletion(marketplaceCallback).completeListing(listingId);
+            }
             emit EscrowRefunded(listingId, escrow.buyer, amount);
         } else if (escrow.state == EscrowState.AWAITING_CONFIRMATION) {
             // Buyer silent: pay seller
             escrow.state = EscrowState.COMPLETE;
             (bool success, ) = escrow.seller.call{value: amount}("");
             require(success, "Transfer failed");
+            if (marketplaceCallback != address(0)) {
+                IMarketplaceCompletion(marketplaceCallback).completeListing(listingId);
+            }
             emit EscrowCompleted(listingId, escrow.seller, amount);
         }
     }

@@ -39,5 +39,8 @@ coverage.json
 # Prisma
 backend/prisma/migrations/
 
+# Indexer state (persisted so wipe is not undone on restart)
+backend/.indexer-state.json
+
 # Docker
 docker-compose.override.yml

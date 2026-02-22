@@ -1,31 +1,71 @@
 "use client";
 
-import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useState } from "react";
 import { marketplaceAbi, marketplaceAddress } from "../lib/contracts";
-import { stringToBytes32Hex } from "../lib/bytes32";
+import { stringToBytes32Hex, generateTimeBasedId } from "../lib/bytes32";
 import { parseEther } from "viem";
+import { useRobustContractWrite } from "./useRobustContractWrite";
 
-export function useCreateListing() {
-  const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
-    hash,
-  });
+import { getApiUrl } from "../lib/apiUrl";
 
-  const create = (id: string, price: string) => {
+type UseCreateListingOptions = {
+  imageUrlRef?: React.MutableRefObject<string | null>;
+  mediaUrlsRef?: React.MutableRefObject<string[]>;
+  titleRef?: React.MutableRefObject<string | null>;
+  subtitleRef?: React.MutableRefObject<string | null>;
+  descriptionRef?: React.MutableRefObject<string | null>;
+  categoryRef?: React.MutableRefObject<string | null>;
+  conditionRef?: React.MutableRefObject<string | null>;
+  yearOfProductionRef?: React.MutableRefObject<string | null>;
+};
+
+export function useCreateListing(options?: UseCreateListingOptions) {
+  const { imageUrlRef, mediaUrlsRef, titleRef, subtitleRef, descriptionRef, categoryRef, conditionRef, yearOfProductionRef } = options || {};
+  const { send, isPending, error, lastHash } = useRobustContractWrite();
+  const [isSuccess, setIsSuccess] = useState(false);
+
+  const create = async (price: string): Promise<string> => {
+    setIsSuccess(false);
+    const id = generateTimeBasedId("lst");
     const idBytes = stringToBytes32Hex(id);
-    writeContract({
+    const txHash = await send({
       address: marketplaceAddress,
       abi: marketplaceAbi,
       functionName: "createListing",
       args: [idBytes, parseEther(price)],
     });
+    const imageUrl = imageUrlRef?.current ?? undefined;
+    const mediaUrls = mediaUrlsRef?.current ?? undefined;
+    const title = titleRef?.current ?? undefined;
+    const subtitle = subtitleRef?.current ?? undefined;
+    const description = descriptionRef?.current ?? undefined;
+    const category = categoryRef?.current ?? undefined;
+    const condition = conditionRef?.current ?? undefined;
+    const yearOfProduction = yearOfProductionRef?.current ?? undefined;
+    await fetch(`${getApiUrl()}/api/sync-listing`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        txHash,
+        ...(imageUrl && { imageUrl }),
+        ...(mediaUrls?.length && { mediaUrls }),
+        ...(title && { title }),
+        ...(subtitle && { subtitle }),
+        ...(description && { description }),
+        ...(category && { category }),
+        ...(condition && { condition }),
+        ...(yearOfProduction && { yearOfProduction }),
+      }),
+    }).catch(() => {});
+    setIsSuccess(true);
+    return idBytes;
   };
 
   return {
     create,
-    isPending: isPending || isConfirming,
+    isPending,
     isSuccess,
     error,
-    hash,
+    hash: lastHash,
   };
 }

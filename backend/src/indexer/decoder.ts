@@ -4,6 +4,7 @@ import { ethers } from "ethers";
 const ITEM_LISTED = ethers.id("ItemListed(bytes32,address,uint256)").toLowerCase();
 const ITEM_PURCHASED = ethers.id("ItemPurchased(bytes32,address,address,uint256)").toLowerCase();
 const LISTING_CANCELLED = ethers.id("ListingCancelled(bytes32,address)").toLowerCase();
+const PRICE_UPDATED = ethers.id("PriceUpdated(bytes32,uint256)").toLowerCase();
 const AUCTION_CREATED = ethers
   .id("AuctionCreated(bytes32,address,uint256,uint256,uint256)")
   .toLowerCase();
@@ -89,6 +90,14 @@ export function decodeEvents(event: any): any | null {
       type: "ListingCancelled",
       listingId: topicAt(event, 1),
       seller: addressFromTopic(topicAt(event, 2)),
+    };
+  }
+
+  if (t0 === PRICE_UPDATED) {
+    return {
+      type: "PriceUpdated",
+      listingId: topicAt(event, 1),
+      newPrice: uint256FromData(data),
     };
   }
 

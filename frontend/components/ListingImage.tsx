@@ -1,12 +1,29 @@
 "use client";
 
+import { useState } from "react";
+import { resolveListingImageUrl } from "../lib/listingImageUrl";
+
 type ListingImageProps = {
   className?: string;
   aspectRatio?: "square" | "video";
+  imageUrl?: string | null;
 };
 
-export function ListingImage({ className = "", aspectRatio = "square" }: ListingImageProps) {
+export function ListingImage({ className = "", aspectRatio = "square", imageUrl }: ListingImageProps) {
+  const [imgError, setImgError] = useState(false);
   const ratioClass = aspectRatio === "video" ? "aspect-video" : "aspect-square";
+  const resolvedUrl = resolveListingImageUrl(imageUrl);
+
+  if (resolvedUrl && !imgError) {
+    return (
+      <img
+        src={resolvedUrl}
+        alt="Listing"
+        className={`rounded-glass-lg border border-white/10 object-cover w-full h-full ${ratioClass} ${className}`}
+        onError={() => setImgError(true)}
+      />
+    );
+  }
 
   return (
     <div

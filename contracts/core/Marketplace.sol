@@ -32,7 +32,15 @@ contract Marketplace is ReentrancyGuard, Pausable, AccessControl, Roles {
         bytes32 escrowId;
     }
 
+    struct Offer {
+        address buyer;
+        uint256 amount;
+        bool active;
+    }
+
     mapping(bytes32 => Listing) public listings;
+    mapping(bytes32 => mapping(address => Offer)) public offers;
+    mapping(bytes32 => address) public activeOfferBuyer;
     Escrow public escrow;
     Treasury public treasury;
     Reputation public reputation;
@@ -41,6 +49,11 @@ contract Marketplace is ReentrancyGuard, Pausable, AccessControl, Roles {
     event ItemListed(bytes32 indexed listingId, address indexed seller, uint256 price);
     event ItemPurchased(bytes32 indexed listingId, address indexed buyer, address indexed seller, uint256 price);
     event ListingCancelled(bytes32 indexed listingId, address indexed seller);
+    event PriceUpdated(bytes32 indexed listingId, uint256 newPrice);
+    event OfferMade(bytes32 indexed listingId, address indexed buyer, uint256 amount);
+    event OfferAccepted(bytes32 indexed listingId, address indexed buyer, uint256 amount);
+    event OfferRejected(bytes32 indexed listingId, address indexed buyer, uint256 amount);
+    event OfferCancelled(bytes32 indexed listingId, address indexed buyer, uint256 amount);
 
     constructor(
         address _escrow,
@@ -91,6 +104,7 @@ contract Marketplace is ReentrancyGuard, Pausable, AccessControl, Roles {
         require(msg.value == listing.price, "Price mismatch");
         require(msg.sender != listing.seller, "Cannot buy own");
 
+        _refundActiveOfferIfAny(listingId);
         listing.status = ListingStatus.LOCKED;
         listing.escrowId = listingId;
 
@@ -150,15 +164,120 @@ contract Marketplace is ReentrancyGuard, Pausable, AccessControl, Roles {
         require(listing.seller == msg.sender, "Not seller");
         require(listing.status == ListingStatus.LISTED, "Cannot cancel");
 
+        _refundActiveOfferIfAny(listingId);
         listing.status = ListingStatus.CANCELLED;
 
         emit ListingCancelled(listingId, msg.sender);
     }
 
     /**
+     * @notice Seller updates the price of an active listing.
+     */
+    function updateListingPrice(bytes32 listingId, uint256 newPrice) external whenNotPaused {
+        Listing storage listing = listings[listingId];
+        require(listing.seller == msg.sender, "Not seller");
+        require(listing.status == ListingStatus.LISTED, "Not listed");
+        require(newPrice > 0, "Invalid price");
+
+        listing.price = newPrice;
+        emit PriceUpdated(listingId, newPrice);
+    }
+
+    /**
+     * @notice Buyer makes an offer by locking HBAR in the contract.
+     * @dev Exactly one active offer is allowed per listing to ensure clean refund semantics.
+     */
+    function makeOffer(bytes32 listingId) external payable whenNotPaused nonReentrant {
+        Listing storage listing = listings[listingId];
+        require(listing.status == ListingStatus.LISTED, "Not listed");
+        require(msg.sender != listing.seller, "Cannot offer own");
+        require(msg.value > 0, "Invalid offer");
+        require(activeOfferBuyer[listingId] == address(0), "Active offer exists");
+
+        offers[listingId][msg.sender] = Offer({
+            buyer: msg.sender,
+            amount: msg.value,
+            active: true
+        });
+        activeOfferBuyer[listingId] = msg.sender;
+
+        emit OfferMade(listingId, msg.sender, msg.value);
+    }
+
+    /**
+     * @notice Seller accepts an active offer and routes funds into escrow.
+     */
+    function acceptOffer(bytes32 listingId, address buyer) external whenNotPaused nonReentrant {
+        Listing storage listing = listings[listingId];
+        require(listing.seller == msg.sender, "Not seller");
+        require(listing.status == ListingStatus.LISTED, "Not listed");
+        require(activeOfferBuyer[listingId] == buyer, "Offer not active");
+
+        Offer storage offer = offers[listingId][buyer];
+        require(offer.active, "Offer not active");
+        require(offer.amount > 0, "Invalid offer");
+
+        uint256 amount = offer.amount;
+        offer.active = false;
+        offer.amount = 0;
+        activeOfferBuyer[listingId] = address(0);
+
+        listing.status = ListingStatus.LOCKED;
+        listing.escrowId = listingId;
+
+        escrow.createEscrow{value: amount}(listingId, buyer, listing.seller, amount);
+
+        emit OfferAccepted(listingId, buyer, amount);
+        emit ItemPurchased(listingId, buyer, listing.seller, amount);
+    }
+
+    /**
+     * @notice Seller rejects an active offer and refunds buyer.
+     */
+    function rejectOffer(bytes32 listingId, address buyer) external whenNotPaused nonReentrant {
+        Listing storage listing = listings[listingId];
+        require(listing.seller == msg.sender, "Not seller");
+        require(listing.status == ListingStatus.LISTED, "Not listed");
+        require(activeOfferBuyer[listingId] == buyer, "Offer not active");
+
+        Offer storage offer = offers[listingId][buyer];
+        require(offer.active, "Offer not active");
+        uint256 amount = offer.amount;
+
+        offer.active = false;
+        offer.amount = 0;
+        activeOfferBuyer[listingId] = address(0);
+
+        (bool success, ) = buyer.call{value: amount}("");
+        require(success, "Offer refund failed");
+
+        emit OfferRejected(listingId, buyer, amount);
+    }
+
+    /**
+     * @notice Buyer cancels their own active offer and gets refunded.
+     */
+    function cancelOffer(bytes32 listingId) external whenNotPaused nonReentrant {
+        require(activeOfferBuyer[listingId] == msg.sender, "Offer not active");
+        Offer storage offer = offers[listingId][msg.sender];
+        require(offer.active, "Offer not active");
+
+        uint256 amount = offer.amount;
+        offer.active = false;
+        offer.amount = 0;
+        activeOfferBuyer[listingId] = address(0);
+
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "Offer refund failed");
+
+        emit OfferCancelled(listingId, msg.sender, amount);
+    }
+
+    /**
      * @notice Mark listing as completed after escrow resolution.
      */
     function completeListing(bytes32 listingId) external {
+        require(msg.sender == address(escrow), "Not escrow");
         Listing storage listing = listings[listingId];
         require(listing.status == ListingStatus.LOCKED, "Not locked");
         // Only escrow can call this via completion callback
@@ -171,5 +290,25 @@ contract Marketplace is ReentrancyGuard, Pausable, AccessControl, Roles {
 
     function unpause() external onlyRole(PAUSER_ROLE) {
         _unpause();
+    }
+
+    function _refundActiveOfferIfAny(bytes32 listingId) internal {
+        address buyer = activeOfferBuyer[listingId];
+        if (buyer == address(0)) return;
+
+        Offer storage offer = offers[listingId][buyer];
+        if (!offer.active || offer.amount == 0) {
+            activeOfferBuyer[listingId] = address(0);
+            return;
+        }
+
+        uint256 amount = offer.amount;
+        offer.active = false;
+        offer.amount = 0;
+        activeOfferBuyer[listingId] = address(0);
+
+        (bool success, ) = buyer.call{value: amount}("");
+        require(success, "Offer refund failed");
+        emit OfferCancelled(listingId, buyer, amount);
     }
 }

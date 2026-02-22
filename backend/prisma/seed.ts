@@ -1,30 +1,21 @@
+import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 
-const prisma = new PrismaClient();
+const connectionString = process.env.DATABASE_URL || "postgres://hedera:hedera@localhost:5432/marketplace";
+const adapter = new PrismaPg({ connectionString });
+const prisma = new PrismaClient({ adapter });
 
-function stringToBytes32Hex(s: string): string {
-  const hex = Buffer.from(s, "utf8").toString("hex");
-  return "0x" + hex.padEnd(64, "0");
-}
-
+/**
+ * Seed = wipe marketplace only. Add listings manually or extend this script to create data.
+ */
 async function main() {
-  const seller = "0xf765d0042429cbcda59fb0b3c31b64bf7a551b65";
-
-  const listings = [
-    { id: stringToBytes32Hex("SAMPLE1"), price: "1.5", title: "Sample Listing 1" },
-    { id: stringToBytes32Hex("SAMPLE2"), price: "2.0", title: "Sample Listing 2" },
-    { id: stringToBytes32Hex("SAMPLE3"), price: "0.5", title: "Sample Listing 3" },
-  ];
-
-  for (const { id, price, title: _ } of listings) {
-    await prisma.listing.upsert({
-      where: { id },
-      create: { id, seller, price, status: "LISTED" },
-      update: { seller, price, status: "LISTED" },
-    });
-  }
-
-  console.log("Seeded", listings.length, "test listings.");
+  await prisma.sale.deleteMany({});
+  await prisma.bid.deleteMany({});
+  await prisma.wishlistItem.deleteMany({});
+  await prisma.listing.deleteMany({});
+  await prisma.auction.deleteMany({});
+  console.log("Marketplace wiped (listings, auctions, bids, sales, wishlist). Add listings manually.");
 }
 
 main()

@@ -2,6 +2,19 @@ import { Abi } from "viem";
 
 export const marketplaceAbi: Abi = [
   {
+    name: "listings",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "listingId", type: "bytes32" }],
+    outputs: [
+      { name: "seller", type: "address" },
+      { name: "price", type: "uint256" },
+      { name: "createdAt", type: "uint256" },
+      { name: "status", type: "uint8" },
+      { name: "escrowId", type: "bytes32" },
+    ],
+  },
+  {
     name: "createListing",
     type: "function",
     stateMutability: "nonpayable",
@@ -20,6 +33,50 @@ export const marketplaceAbi: Abi = [
   },
   {
     name: "cancelListing",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "listingId", type: "bytes32" }],
+    outputs: [],
+  },
+  {
+    name: "updateListingPrice",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "listingId", type: "bytes32" },
+      { name: "newPrice", type: "uint256" },
+    ],
+    outputs: [],
+  },
+  {
+    name: "makeOffer",
+    type: "function",
+    stateMutability: "payable",
+    inputs: [{ name: "listingId", type: "bytes32" }],
+    outputs: [],
+  },
+  {
+    name: "acceptOffer",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "listingId", type: "bytes32" },
+      { name: "buyer", type: "address" },
+    ],
+    outputs: [],
+  },
+  {
+    name: "rejectOffer",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "listingId", type: "bytes32" },
+      { name: "buyer", type: "address" },
+    ],
+    outputs: [],
+  },
+  {
+    name: "cancelOffer",
     type: "function",
     stateMutability: "nonpayable",
     inputs: [{ name: "listingId", type: "bytes32" }],
@@ -56,5 +113,23 @@ export const auctionHouseAbi: Abi = [
   },
 ];
 
+export const escrowAbi: Abi = [
+  {
+    name: "confirmShipment",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "listingId", type: "bytes32" }],
+    outputs: [],
+  },
+  {
+    name: "confirmReceipt",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "listingId", type: "bytes32" }],
+    outputs: [],
+  },
+];
+
 export const marketplaceAddress = (process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS || "0x0000000000000000000000000000000000000000") as `0x${string}`;
 export const auctionHouseAddress = (process.env.NEXT_PUBLIC_AUCTION_HOUSE_ADDRESS || "0x0000000000000000000000000000000000000000") as `0x${string}`;
+export const escrowAddress = (process.env.NEXT_PUBLIC_ESCROW_ADDRESS || "0x0000000000000000000000000000000000000000") as `0x${string}`;

@@ -1,20 +1,33 @@
 "use client";
 
-import { useState } from "react";
-import { useWriteContract } from "wagmi";
+import { useState, useMemo } from "react";
+import { useChainId } from "wagmi";
 import { parseEther } from "viem";
 import { auctionHouseAbi, auctionHouseAddress } from "../lib/contracts";
-import {
-  auctionIdToBytes32,
-  placeBidMessageHash,
-  defaultDeadline,
-  relayPlaceBid,
-  fetchAccountAlias,
-} from "../lib/ed25519Relay";
+import { getTransactionErrorMessage } from "../lib/transactionError";
+import { auctionIdToBytes32, placeBidMessageHash, defaultDeadline, relayPlaceBid, fetchAccountAlias } from "../lib/ed25519Relay";
+import { useRobustContractWrite } from "../hooks/useRobustContractWrite";
+import { useHashpackWallet } from "../lib/hashpackWallet";
 
 export function BidPanel({ auctionId }: { auctionId: string }) {
   const [amount, setAmount] = useState("0.1");
-  const { writeContract, isPending, error } = useWriteContract();
+  const idBytes = useMemo(() => auctionIdToBytes32(auctionId), [auctionId]);
+  let bidAmountWei = 0n;
+  try {
+    bidAmountWei = parseEther(amount || "0");
+  } catch {
+    bidAmountWei = 0n;
+  }
+
+  const { address } = useHashpackWallet();
+  const chainId = useChainId();
+  const isWrongNetwork = false;
+
+  const { send, isPending, error: writeError } = useRobustContractWrite();
+  const isConfirming = false;
+  const isSuccess = false;
+  const displayError = writeError;
+  const errorMessage = getTransactionErrorMessage(displayError, { chainId });
 
   const [ed25519Open, setEd25519Open] = useState(false);
   const [accountIdOrAlias, setAccountIdOrAlias] = useState("");
@@ -22,19 +35,15 @@ export function BidPanel({ auctionId }: { auctionId: string }) {
   const [ed25519Status, setEd25519Status] = useState<"idle" | "loading" | "error" | "success">("idle");
   const [ed25519Error, setEd25519Error] = useState("");
 
-  const submit = () => {
-    const idBytes = formatId(auctionId);
-    writeContract({
-      address: auctionHouseAddress,
-      abi: auctionHouseAbi,
-      functionName: "placeBid",
-      args: [idBytes],
-      value: parseEther(amount),
-    });
+  const submit = async () => {
+    await send({
+        address: auctionHouseAddress,
+        abi: auctionHouseAbi,
+        functionName: "placeBid",
+        args: [idBytes],
+        value: bidAmountWei,
+      });
   };
-
-  const bidAmountWei = parseEther(amount);
-  const idBytes = auctionIdToBytes32(auctionId);
   const deadline = defaultDeadline();
   const messageHash = placeBidMessageHash(idBytes, bidAmountWei, deadline);
 
@@ -77,6 +86,8 @@ export function BidPanel({ auctionId }: { auctionId: string }) {
     }
   };
 
+  const canBid = bidAmountWei > 0n && !isWrongNetwork;
+
   return (
     <div className="glass-card p-4 space-y-3">
       <h3 className="text-lg font-semibold text-white">Place Bid</h3>
@@ -88,14 +99,21 @@ export function BidPanel({ auctionId }: { auctionId: string }) {
           className="input-frost mt-1 w-full"
         />
       </label>
+      <p className="text-sm text-silver">
+        {canBid ? `You will send ${amount} HBAR. Confirm in your wallet.` : "Enter a valid amount (e.g. 0.1)."}
+      </p>
       <button
-        onClick={submit}
-        disabled={isPending}
+        onClick={() => void submit()}
+        disabled={!canBid || isPending || isConfirming}
         className="btn-frost-cta w-full disabled:opacity-60"
       >
-        {isPending ? "Submitting..." : "Place Bid (ECDSA)"}
+        {isPending ? "Confirm in wallet…" : isConfirming ? "Processing…" : isSuccess ? "Bid placed!" : "Place Bid"}
       </button>
-      {error && <p className="text-sm text-rose-400">{error.message}</p>}
+      {errorMessage && (
+        <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2">
+          <p className="text-sm text-red-300/90 break-words">{errorMessage}</p>
+        </div>
+      )}
 
       <div>
         <button
@@ -137,9 +155,4 @@ export function BidPanel({ auctionId }: { auctionId: string }) {
       </div>
     </div>
   );
-}
-
-function formatId(id: string): `0x${string}` {
-  const hex = Buffer.from(id).toString("hex").padEnd(64, "0").slice(0, 64);
-  return `0x${hex}` as `0x${string}`;
 }

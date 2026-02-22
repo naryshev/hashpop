@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ListingImage } from "../components/ListingImage";
-
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+import { ListingMedia } from "../components/ListingMedia";
+import { formatPriceForDisplay } from "../lib/formatPrice";
+import { formatHbarWithUsd } from "../lib/hbarUsd";
+import { useHbarUsd } from "../hooks/useHbarUsd";
+import { WishlistButton } from "../components/WishlistButton";
+import { getApiUrl } from "../lib/apiUrl";
 
 function formatListingId(id: string): string {
   if (!id || !id.startsWith("0x") || id.length !== 66) return id;
@@ -22,44 +25,113 @@ function formatListingId(id: string): string {
 
 export default function Home() {
   const [listings, setListings] = useState<any[]>([]);
+  const usdRate = useHbarUsd();
 
-  useEffect(() => {
-    fetch(`${apiUrl}/api/listings`)
+  const fetchListings = useCallback(() => {
+    fetch(`${getApiUrl()}/api/listings`)
       .then((res) => res.json())
-      .then((data) => setListings((data.listings || []).slice(0, 6)))
+      .then((data: { listings?: any[] }) => {
+        const list = (data.listings || []).map((l: any) => ({ ...l, itemType: "listing" as const }));
+        setListings(list.sort((a, b) => new Date((b.createdAt as string) || 0).getTime() - new Date((a.createdAt as string) || 0).getTime()).slice(0, 6));
+      })
       .catch(() => setListings([]));
   }, []);
 
-  return (
-    <main className="p-6 space-y-6">
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white">hbay</h1>
-          <p className="text-sm text-silver mt-1">Trustless marketplace on Hedera Hashgraph</p>
-        </div>
+  useEffect(() => {
+    fetchListings();
+  }, [fetchListings]);
 
-        <section className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+  useEffect(() => {
+    const onFocus = () => fetchListings();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [fetchListings]);
+
+  return (
+    <main className="min-h-screen">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl sm:text-2xl font-bold text-white">Latest listings</h2>
+            <Link href="/marketplace" className="text-sm text-chrome hover:text-white font-medium">
+              See all
+            </Link>
+          </div>
+
           {listings.length === 0 ? (
-            <p className="text-silver col-span-full">
+            <p className="text-silver py-8">
               No listings yet. <Link href="/marketplace" className="text-chrome hover:text-white underline">View marketplace</Link> or <Link href="/create" className="text-chrome hover:text-white underline">create one</Link>.
             </p>
           ) : (
-            listings.map((listing) => (
-              <Link
-                key={listing.id}
-                href={`/listing/${encodeURIComponent(listing.id)}`}
-                className="glass-card overflow-hidden transition-all duration-200 hover:border-white/20 hover:shadow-glow"
-              >
-                <ListingImage className="w-full" />
-                <div className="p-4">
-                  <p className="text-sm text-silver">Listing #{formatListingId(listing.id)}</p>
-                  <h2 className="text-lg font-medium text-white mt-1">
-                    {formatListingId(listing.id) || "Untitled"}
-                  </h2>
-                  <p className="text-chrome mt-2 font-medium">{listing.price} HBAR</p>
+            <>
+              {/* Mobile: compact carousel with heart */}
+              <div className="sm:hidden -mx-4 overflow-x-auto overflow-y-hidden scroll-smooth snap-x snap-mandatory scrollbar-hide">
+                <div className="flex gap-3 px-4 pb-2" style={{ minWidth: "min-content" }}>
+                  {listings.map((item: any) => (
+                    <Link
+                      key={`${item.itemType || "listing"}-${item.id}`}
+                      href={`/listing/${encodeURIComponent(item.id)}`}
+                      className="flex-shrink-0 w-[140px] snap-start glass-card overflow-hidden transition-all duration-200 active:border-white/20 relative"
+                    >
+                      <div className="relative">
+                        <ListingMedia
+                          listing={item}
+                          className="w-full rounded-t-lg object-cover"
+                          aspectRatio="square"
+                          navigation="arrows"
+                          cardSize
+                          compactHeight="88px"
+                        />
+                        <div className="absolute top-2 right-2">
+                          <WishlistButton itemId={item.id} itemType={item.itemType || "listing"} compact />
+                        </div>
+                      </div>
+                      <div className="p-2 min-h-0">
+                        <h2 className="text-sm font-medium text-white truncate leading-tight">
+                          {item.title || formatListingId(item.id) || "Untitled"}
+                        </h2>
+                        <p className="text-chrome text-xs font-medium mt-0.5">
+                          {formatHbarWithUsd(formatPriceForDisplay(item.price || item.reservePrice || "0"), usdRate)}
+                        </p>
+                      </div>
+                    </Link>
+                  ))}
                 </div>
-              </Link>
-            ))
+              </div>
+
+              {/* Desktop: grid with heart on each card (eBay-style) */}
+              <div className="hidden sm:grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+                {listings.map((item: any) => (
+                  <Link
+                    key={`${item.itemType || "listing"}-${item.id}`}
+                    href={`/listing/${encodeURIComponent(item.id)}`}
+                    className="glass-card overflow-hidden transition-all duration-200 hover:border-white/20 hover:shadow-glow rounded-xl"
+                  >
+                    <div className="relative bg-white/5">
+                      <ListingMedia
+                        listing={item}
+                        className="w-full"
+                        aspectRatio="square"
+                        navigation="arrows"
+                        cardSize
+                        compactHeight="160px"
+                      />
+                      <div className="absolute top-2 right-2">
+                        <WishlistButton itemId={item.id} itemType={item.itemType || "listing"} compact />
+                      </div>
+                    </div>
+                    <div className="p-3">
+                      <h2 className="text-sm font-medium text-white line-clamp-2 leading-tight min-h-[2.5rem]">
+                        {item.title || formatListingId(item.id) || "Untitled"}
+                      </h2>
+                      <p className="text-chrome font-semibold mt-1">
+                        {formatHbarWithUsd(formatPriceForDisplay(item.price || item.reservePrice || "0"), usdRate)}
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </>
           )}
         </section>
       </div>

@@ -114,8 +114,11 @@ cd ../backend && npm install
 Create `.env` in root:
 
 ```env
+HEDERA_TESTNET_OPERATOR=your_private_key
+# fallback (still supported)
 PRIVATE_KEY=your_private_key
 HEDERA_TESTNET_RPC=https://testnet.hashio.io/api
+PLATFORM_FEE_BPS=300
 ```
 
 Create `frontend/.env.local`:
@@ -125,6 +128,9 @@ NEXT_PUBLIC_HEDERA_RPC=https://testnet.hashio.io/api
 NEXT_PUBLIC_MARKETPLACE_ADDRESS=0x...
 NEXT_PUBLIC_AUCTION_HOUSE_ADDRESS=0x...
 NEXT_PUBLIC_WC_PROJECT_ID=your_walletconnect_project_id
+NEXT_PUBLIC_FEATURE_OFFERS=true
+NEXT_PUBLIC_FEATURE_MESSAGING_HCS_SEAM=true
+NEXT_PUBLIC_FEATURE_RATINGS=true
 ```
 
 Create `backend/.env`:
@@ -134,16 +140,28 @@ DATABASE_URL=postgres://hedera:hedera@localhost:5432/marketplace
 MIRROR_URL=https://testnet.mirrornode.hedera.com
 MARKETPLACE_ADDRESS=0x...
 AUCTION_HOUSE_ADDRESS=0x...
+FEATURE_OFFERS=true
+FEATURE_HCS_SEAM=true
+FEATURE_RATINGS=true
 ```
 
 **Where each value comes from:**
 
 | Env variable | Source |
 |--------------|--------|
-| `PRIVATE_KEY` (root `.env`) | Hedera Portal wallet — export private key (64 hex, no `0x`) |
+| `HEDERA_TESTNET_OPERATOR` (root `.env`) | Hedera Portal wallet — export private key (64 hex, with/without `0x`) |
+| `PLATFORM_FEE_BPS` | Optional deployment fee config (default `300` = 3%). |
 | `NEXT_PUBLIC_WC_PROJECT_ID` | WalletConnect Cloud → your project’s Project ID |
 | `MARKETPLACE_ADDRESS` / `AUCTION_HOUSE_ADDRESS` / `ESCROW_ADDRESS` | Output of `npm run deploy:testnet` (paste into frontend and backend env) |
 | `RELAYER_PRIVATE_KEY` | Optional. Any ECDSA testnet wallet with HBAR; used to relay ED25519 buy/bid txs. |
+
+### Testnet debug tips
+
+- If transactions fail with insufficient balance, fund wallets from faucet:
+  - https://portal.hedera.com/faucet
+  - https://www.hashpack.app/faucet
+- If wallet confirmation expires, reconnect HashPack and retry quickly.
+- If UI price looks stale after editing, refresh once; on-chain/mirror sync can lag briefly.
 
 ### 3. Deploy Contracts
 

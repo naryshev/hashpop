@@ -7,26 +7,45 @@ datasource db {
 }
 
 model Listing {
-  id          String   @id
-  seller      String
-  price       String
-  status      String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  sales       Sale[]
+  id                 String   @id
+  seller             String
+  price              String
+  status             String
+  title              String?
+  subtitle           String?
+  description        String?
+  category           String?
+  condition          String?
+  yearOfProduction   String?
+  originalBox        String?
+  originalPapers     String?
+  imageUrl           String?
+  mediaUrls          String[] @default([])
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  sales              Sale[]
 }
 
 model Auction {
-  id          String   @id
-  seller      String
-  reservePrice String
-  startTime   BigInt
-  endTime     BigInt
-  status      String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  bids        Bid[]
-  sales       Sale[]
+  id                 String   @id
+  seller             String
+  reservePrice       String
+  startTime          BigInt
+  endTime            BigInt
+  status             String
+  title              String?
+  subtitle           String?
+  description        String?
+  imageUrl           String?
+  mediaUrls          String[] @default([])
+  condition          String?
+  yearOfProduction   String?
+  originalBox        String?
+  originalPapers     String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  bids               Bid[]
+  sales              Sale[]
 }
 
 model Bid {
@@ -61,4 +80,39 @@ model User {
   reputationScore   Int      @default(50)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+}
+
+model Rating {
+  id              String   @id @default(cuid())
+  reviewerAddress String
+  ratedAddress    String
+  saleId          String
+  listingId       String?
+  auctionId       String?
+  score           Int
+  comment         String?
+  createdAt       DateTime @default(now())
+
+  @@index([ratedAddress])
+  @@index([reviewerAddress])
+  @@unique([reviewerAddress, saleId])
+}
+
+model Message {
+  id          String   @id @default(cuid())
+  fromAddress String
+  toAddress   String
+  body        String
+  listingId   String?
+  createdAt   DateTime @default(now())
+}
+
+model WishlistItem {
+  id         String   @id @default(cuid())
+  userAddress String
+  itemId     String
+  itemType   String   // "listing" | "auction"
+  createdAt  DateTime @default(now())
+  @@unique([userAddress, itemId])
+  @@index([userAddress])
 }
