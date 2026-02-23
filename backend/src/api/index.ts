@@ -75,6 +75,20 @@ function isUsableContractAddress(address: string | undefined): address is string
   return !!address && /^0x[0-9a-fA-F]{40}$/.test(address) && !/^0x0{40}$/i.test(address);
 }
 
+const s3PublicBase = process.env.S3_PUBLIC_URL?.replace(/\/$/, "") ?? "";
+
+function rewriteMediaUrlForClient(url: string | null | undefined): string | null | undefined {
+  if (!url || !s3PublicBase) return url;
+  const m = url.match(/^https?:\/\/(?:localhost|127\.0\.0\.1):4000\/uploads\/([^?#]+)(?:[?#].*)?$/i);
+  if (!m?.[1]) return url;
+  return `${s3PublicBase}/uploads/${m[1]}`;
+}
+
+function rewriteMediaUrlsForClient(urls: string[] | null | undefined): string[] | undefined {
+  if (!Array.isArray(urls)) return undefined;
+  return urls.map((u) => rewriteMediaUrlForClient(u) ?? u);
+}
+
 const ESCROW_ABI_VIEW = [
   "function escrows(bytes32) view returns (address buyer, address seller, uint256 amount, uint256 createdAt, uint256 timeoutAt, uint8 state)",
 ];
@@ -278,10 +292,17 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       res.json({
         listings: listings.map((l) => ({
           ...l,
+          imageUrl: rewriteMediaUrlForClient(l.imageUrl),
+          mediaUrls: rewriteMediaUrlsForClient((l as any).mediaUrls) ?? (l as any).mediaUrls,
           status: listingStatusOverrides.get(l.id) ?? l.status,
           price: listingPriceOverrides.get(l.id) ?? toHbarForClient(l.price),
         })),
-        auctions: auctions.map((a) => ({ ...a, reservePrice: toHbarForClient(a.reservePrice) })),
+        auctions: auctions.map((a) => ({
+          ...a,
+          imageUrl: rewriteMediaUrlForClient(a.imageUrl),
+          mediaUrls: rewriteMediaUrlsForClient((a as any).mediaUrls) ?? (a as any).mediaUrls,
+          reservePrice: toHbarForClient(a.reservePrice),
+        })),
       });
     } catch (err: unknown) {
       log.error({ err }, "Failed to fetch listings");
@@ -812,6 +833,8 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       res.json({
         listing: {
           ...listing,
+          imageUrl: rewriteMediaUrlForClient((listing as any).imageUrl),
+          mediaUrls: rewriteMediaUrlsForClient((listing as any).mediaUrls) ?? (listing as any).mediaUrls,
           status: onChainStatus ?? listing.status,
           price: priceForClient,
         },
@@ -918,7 +941,13 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         where: { id },
         data: update,
       });
-      res.json({ listing: updated });
+      res.json({
+        listing: {
+          ...updated,
+          imageUrl: rewriteMediaUrlForClient((updated as any).imageUrl),
+          mediaUrls: rewriteMediaUrlsForClient((updated as any).mediaUrls) ?? (updated as any).mediaUrls,
+        },
+      });
     } catch (err) {
       log.error({ err }, "Failed to update listing");
       res.status(500).json({ error: err instanceof Error ? err.message : "Internal server error" });
@@ -936,6 +965,8 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       res.json({
         auction: {
           ...auction,
+          imageUrl: rewriteMediaUrlForClient((auction as any).imageUrl),
+          mediaUrls: rewriteMediaUrlsForClient((auction as any).mediaUrls) ?? (auction as any).mediaUrls,
           reservePrice: toHbarForClient(auction.reservePrice),
         },
       });
@@ -981,7 +1012,13 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         where: { id },
         data: update,
       });
-      res.json({ auction: updated });
+      res.json({
+        auction: {
+          ...updated,
+          imageUrl: rewriteMediaUrlForClient((updated as any).imageUrl),
+          mediaUrls: rewriteMediaUrlsForClient((updated as any).mediaUrls) ?? (updated as any).mediaUrls,
+        },
+      });
     } catch (err) {
       log.error({ err }, "Failed to update auction");
       res.status(500).json({ error: err instanceof Error ? err.message : "Internal server error" });
@@ -1017,10 +1054,32 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         }),
       ]);
       res.json({
-        active: activeListings.map((l) => ({ ...l, price: toHbarForClient(l.price), itemType: "listing" as const })),
-        archived: archivedListings.map((l) => ({ ...l, price: toHbarForClient(l.price), itemType: "listing" as const })),
-        activeAuctions: activeAuctions.map((a) => ({ ...a, reservePrice: toHbarForClient(a.reservePrice) })),
-        archivedAuctions: archivedAuctions.map((a) => ({ ...a, reservePrice: toHbarForClient(a.reservePrice) })),
+        active: activeListings.map((l) => ({
+          ...l,
+          imageUrl: rewriteMediaUrlForClient((l as any).imageUrl),
+          mediaUrls: rewriteMediaUrlsForClient((l as any).mediaUrls) ?? (l as any).mediaUrls,
+          price: toHbarForClient(l.price),
+          itemType: "listing" as const,
+        })),
+        archived: archivedListings.map((l) => ({
+          ...l,
+          imageUrl: rewriteMediaUrlForClient((l as any).imageUrl),
+          mediaUrls: rewriteMediaUrlsForClient((l as any).mediaUrls) ?? (l as any).mediaUrls,
+          price: toHbarForClient(l.price),
+          itemType: "listing" as const,
+        })),
+        activeAuctions: activeAuctions.map((a) => ({
+          ...a,
+          imageUrl: rewriteMediaUrlForClient((a as any).imageUrl),
+          mediaUrls: rewriteMediaUrlsForClient((a as any).mediaUrls) ?? (a as any).mediaUrls,
+          reservePrice: toHbarForClient(a.reservePrice),
+        })),
+        archivedAuctions: archivedAuctions.map((a) => ({
+          ...a,
+          imageUrl: rewriteMediaUrlForClient((a as any).imageUrl),
+          mediaUrls: rewriteMediaUrlsForClient((a as any).mediaUrls) ?? (a as any).mediaUrls,
+          reservePrice: toHbarForClient(a.reservePrice),
+        })),
       });
     } catch (err) {
       log.error({ err }, "Failed to fetch user listings");
@@ -1058,7 +1117,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
                 id: s.listing.id,
                 title: s.listing.title,
                 status: s.listing.status,
-                imageUrl: s.listing.imageUrl,
+                imageUrl: rewriteMediaUrlForClient(s.listing.imageUrl),
               }
             : null,
           auction: s.auction
@@ -1066,7 +1125,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
                 id: s.auction.id,
                 title: s.auction.title,
                 status: s.auction.status,
-                imageUrl: s.auction.imageUrl,
+                imageUrl: rewriteMediaUrlForClient(s.auction.imageUrl),
               }
             : null,
         })),
