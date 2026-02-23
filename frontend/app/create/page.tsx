@@ -3,13 +3,14 @@
 import { useRef, useState, useMemo, useCallback, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useChainId } from "wagmi";
 import { useCreateListing } from "../../hooks/useCreateListing";
 import { CategorySearch } from "../../components/CategorySearch";
 import { compressImage } from "../../lib/compressImage";
 import { formatPriceForDisplay } from "../../lib/formatPrice";
 import { getTransactionErrorMessage } from "../../lib/transactionError";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
+import { ConnectWalletButton } from "../../components/ConnectWalletButton";
+import { activeHederaChain } from "../../lib/hederaChains";
 
 import { getApiUrl } from "../../lib/apiUrl";
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB
@@ -45,6 +46,7 @@ function CreatePageContent() {
   const [category, setCategory] = useState("");
   const [condition, setCondition] = useState("");
   const [yearOfProduction, setYearOfProduction] = useState("");
+  const [requireEscrow, setRequireEscrow] = useState(false);
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -54,11 +56,12 @@ function CreatePageContent() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { address, connect, isConnecting } = useHashpackWallet();
-  const chainId = useChainId();
+  const { address } = useHashpackWallet();
+  const chainId = activeHederaChain.id;
 
   const imageUrlRef = useRef<string | null>(null);
   const mediaUrlsRef = useRef<string[]>([]);
+  const requireEscrowRef = useRef<boolean>(false);
   const titleRef = useRef<string | null>(null);
   const subtitleRef = useRef<string | null>(null);
   const descriptionRef = useRef<string | null>(null);
@@ -69,6 +72,7 @@ function CreatePageContent() {
   const { create, isPending: listingPending, isSuccess: listingSuccess, error: listingError } = useCreateListing({
     imageUrlRef,
     mediaUrlsRef,
+    requireEscrowRef,
     titleRef,
     subtitleRef,
     descriptionRef,
@@ -227,6 +231,7 @@ function CreatePageContent() {
     categoryRef.current = category.trim() || null;
     conditionRef.current = condition.trim() || null;
     yearOfProductionRef.current = yearOfProduction.trim() || null;
+    requireEscrowRef.current = requireEscrow;
 
     if (!price || Number(price) <= 0) {
       setSubmitError("Enter a price.");
@@ -255,7 +260,8 @@ function CreatePageContent() {
       createdListingIdRef.current = listingId;
       setCreatedListingId(listingId);
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "Create listing failed");
+      const friendly = getTransactionErrorMessage(err, { chainId });
+      setSubmitError(friendly || (err instanceof Error ? err.message : "Create listing failed"));
     }
   };
 
@@ -295,14 +301,7 @@ function CreatePageContent() {
       {!walletConnected && (
         <div className="rounded-lg border-2 border-chrome/50 bg-chrome/10 p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <p className="text-white font-medium">Connect your wallet to create a listing.</p>
-          <button
-            type="button"
-            onClick={() => void connect()}
-            disabled={isConnecting}
-            className="btn-frost-cta shrink-0 ring-2 ring-chrome/70 ring-offset-2 ring-offset-[var(--bg)] shadow-glow-hover disabled:opacity-50"
-          >
-            {isConnecting ? "Connecting…" : "Connect wallet"}
-          </button>
+          <ConnectWalletButton className="btn-frost-cta shrink-0 ring-2 ring-chrome/70 ring-offset-2 ring-offset-[var(--bg)] shadow-glow-hover disabled:opacity-50" />
         </div>
       )}
 
@@ -497,6 +496,20 @@ function CreatePageContent() {
           />
         </label>
 
+        <label className="flex items-start gap-3 rounded-lg border border-white/10 bg-white/5 p-3">
+          <input
+            type="checkbox"
+            checked={requireEscrow}
+            onChange={(e) => setRequireEscrow(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span className="text-sm text-silver">
+            <span className="text-white font-medium">Require escrow + shipping proof</span>
+            <br />
+            Enable this for shippable items. Buyer payment remains in escrow until seller provides shipment proof and buyer confirms receipt.
+          </span>
+        </label>
+
         {walletConnected ? (
         <button
             onClick={handleSubmit}
@@ -506,14 +519,7 @@ function CreatePageContent() {
             {isPending ? "Confirm in wallet…" : "Create listing"}
           </button>
         ) : (
-          <button
-            type="button"
-            onClick={() => void connect()}
-            disabled={isConnecting}
-            className="btn-frost-cta w-full ring-2 ring-chrome/70 ring-offset-2 ring-offset-[var(--bg)]"
-          >
-            {isConnecting ? "Connecting…" : "Connect wallet"}
-        </button>
+          <ConnectWalletButton className="btn-frost-cta w-full ring-2 ring-chrome/70 ring-offset-2 ring-offset-[var(--bg)] disabled:opacity-50 disabled:cursor-not-allowed" />
         )}
 
         {listingSuccess && !(createdListingIdRef.current ?? createdListingId) && (

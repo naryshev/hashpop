@@ -188,9 +188,14 @@ async function handleEvent(event: any, prisma: PrismaClient, log: Logger) {
           amount: event.price.toString(),
         },
       });
+      const listingRow = await prisma.listing.findUnique({
+        where: { id: purchListingId },
+        select: { requireEscrow: true },
+      });
+      const nextStatus = listingRow?.requireEscrow ? "LOCKED" : "SOLD";
       await prisma.listing.update({
         where: { id: purchListingId },
-        data: { status: "LOCKED" },
+        data: { status: nextStatus },
       });
       break;
     }

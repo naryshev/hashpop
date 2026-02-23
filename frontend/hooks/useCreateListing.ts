@@ -3,14 +3,16 @@
 import { useState } from "react";
 import { marketplaceAbi, marketplaceAddress } from "../lib/contracts";
 import { stringToBytes32Hex, generateTimeBasedId } from "../lib/bytes32";
-import { parseEther } from "viem";
+import { parseUnits } from "viem";
 import { useRobustContractWrite } from "./useRobustContractWrite";
+import { useHashpackWallet } from "../lib/hashpackWallet";
 
 import { getApiUrl } from "../lib/apiUrl";
 
 type UseCreateListingOptions = {
   imageUrlRef?: React.MutableRefObject<string | null>;
   mediaUrlsRef?: React.MutableRefObject<string[]>;
+  requireEscrowRef?: React.MutableRefObject<boolean>;
   titleRef?: React.MutableRefObject<string | null>;
   subtitleRef?: React.MutableRefObject<string | null>;
   descriptionRef?: React.MutableRefObject<string | null>;
@@ -20,8 +22,9 @@ type UseCreateListingOptions = {
 };
 
 export function useCreateListing(options?: UseCreateListingOptions) {
-  const { imageUrlRef, mediaUrlsRef, titleRef, subtitleRef, descriptionRef, categoryRef, conditionRef, yearOfProductionRef } = options || {};
+  const { imageUrlRef, mediaUrlsRef, requireEscrowRef, titleRef, subtitleRef, descriptionRef, categoryRef, conditionRef, yearOfProductionRef } = options || {};
   const { send, isPending, error, lastHash } = useRobustContractWrite();
+  const { address } = useHashpackWallet();
   const [isSuccess, setIsSuccess] = useState(false);
 
   const create = async (price: string): Promise<string> => {
@@ -32,11 +35,12 @@ export function useCreateListing(options?: UseCreateListingOptions) {
       address: marketplaceAddress,
       abi: marketplaceAbi,
       functionName: "createListing",
-      args: [idBytes, parseEther(price)],
+      args: [idBytes, parseUnits(price, 8), !!requireEscrowRef?.current],
     });
     const imageUrl = imageUrlRef?.current ?? undefined;
     const mediaUrls = mediaUrlsRef?.current ?? undefined;
     const title = titleRef?.current ?? undefined;
+    const requireEscrow = requireEscrowRef?.current ?? false;
     const subtitle = subtitleRef?.current ?? undefined;
     const description = descriptionRef?.current ?? undefined;
     const category = categoryRef?.current ?? undefined;
@@ -47,6 +51,10 @@ export function useCreateListing(options?: UseCreateListingOptions) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         txHash,
+        listingId: idBytes,
+        seller: address,
+        price,
+        requireEscrow,
         ...(imageUrl && { imageUrl }),
         ...(mediaUrls?.length && { mediaUrls }),
         ...(title && { title }),

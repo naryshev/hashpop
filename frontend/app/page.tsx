@@ -23,28 +23,46 @@ function formatListingId(id: string): string {
   }
 }
 
+function isSoldStatus(status?: string): boolean {
+  return !!status && status !== "LISTED";
+}
+
 export default function Home() {
   const [listings, setListings] = useState<any[]>([]);
+  const [listingsError, setListingsError] = useState<string | null>(null);
   const usdRate = useHbarUsd();
 
   const fetchListings = useCallback(() => {
+    setListingsError(null);
     fetch(`${getApiUrl()}/api/listings`)
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) {
+          return res.json().then((body: { error?: string }) => {
+            throw new Error(body?.error || (res.status === 503 ? "Backend or database unavailable." : "Failed to load listings."));
+          }).catch((e: Error) => {
+            if (e instanceof SyntaxError) throw new Error(res.status === 503 ? "Backend or database unavailable." : "Failed to load listings.");
+            throw e;
+          });
+        }
+        return res.json();
+      })
       .then((data: { listings?: any[] }) => {
         const list = (data.listings || []).map((l: any) => ({ ...l, itemType: "listing" as const }));
-        setListings(list.sort((a, b) => new Date((b.createdAt as string) || 0).getTime() - new Date((a.createdAt as string) || 0).getTime()).slice(0, 6));
+        setListings(list.sort((a, b) => {
+          const aSold = isSoldStatus(a.status);
+          const bSold = isSoldStatus(b.status);
+          if (aSold !== bSold) return aSold ? 1 : -1;
+          return new Date((b.createdAt as string) || 0).getTime() - new Date((a.createdAt as string) || 0).getTime();
+        }).slice(0, 6));
       })
-      .catch(() => setListings([]));
+      .catch((e) => {
+        setListings([]);
+        setListingsError(e instanceof Error ? e.message : "Failed to load listings.");
+      });
   }, []);
 
   useEffect(() => {
     fetchListings();
-  }, [fetchListings]);
-
-  useEffect(() => {
-    const onFocus = () => fetchListings();
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
   }, [fetchListings]);
 
   return (
@@ -58,7 +76,11 @@ export default function Home() {
             </Link>
           </div>
 
-          {listings.length === 0 ? (
+          {listingsError ? (
+            <p className="text-amber-400/90 py-8 text-sm">
+              {listingsError} Ensure the backend is running and PostgreSQL is up (e.g. <code className="text-chrome">docker compose up -d db</code>).
+            </p>
+          ) : listings.length === 0 ? (
             <p className="text-silver py-8">
               No listings yet. <Link href="/marketplace" className="text-chrome hover:text-white underline">View marketplace</Link> or <Link href="/create" className="text-chrome hover:text-white underline">create one</Link>.
             </p>
@@ -85,6 +107,9 @@ export default function Home() {
                         <div className="absolute top-2 right-2">
                           <WishlistButton itemId={item.id} itemType={item.itemType || "listing"} compact />
                         </div>
+                        <span className={`absolute top-2 left-2 rounded-full px-2 py-0.5 text-[10px] font-semibold border ${isSoldStatus(item.status) ? "bg-rose-500/20 border-rose-400/40 text-rose-200" : "bg-emerald-500/20 border-emerald-400/40 text-emerald-200"}`}>
+                          {isSoldStatus(item.status) ? "SOLD" : "ACTIVE"}
+                        </span>
                       </div>
                       <div className="p-2 min-h-0">
                         <h2 className="text-sm font-medium text-white truncate leading-tight">
@@ -119,6 +144,9 @@ export default function Home() {
                       <div className="absolute top-2 right-2">
                         <WishlistButton itemId={item.id} itemType={item.itemType || "listing"} compact />
                       </div>
+                      <span className={`absolute top-2 left-2 rounded-full px-2 py-0.5 text-[10px] font-semibold border ${isSoldStatus(item.status) ? "bg-rose-500/20 border-rose-400/40 text-rose-200" : "bg-emerald-500/20 border-emerald-400/40 text-emerald-200"}`}>
+                        {isSoldStatus(item.status) ? "SOLD" : "ACTIVE"}
+                      </span>
                     </div>
                     <div className="p-3">
                       <h2 className="text-sm font-medium text-white line-clamp-2 leading-tight min-h-[2.5rem]">

@@ -12,6 +12,7 @@ export const marketplaceAbi: Abi = [
       { name: "createdAt", type: "uint256" },
       { name: "status", type: "uint8" },
       { name: "escrowId", type: "bytes32" },
+      { name: "requireEscrow", type: "bool" },
     ],
   },
   {
@@ -20,7 +21,8 @@ export const marketplaceAbi: Abi = [
     stateMutability: "nonpayable",
     inputs: [
       { name: "listingId", type: "bytes32" },
-      { name: "price", type: "uint256" }
+      { name: "price", type: "uint256" },
+      { name: "requireEscrow", type: "bool" },
     ],
     outputs: [],
   },

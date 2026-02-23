@@ -6,11 +6,10 @@ import Link from "next/link";
 import { BuyButton } from "../../../components/BuyButton";
 import { EscrowPanel } from "../../../components/EscrowPanel";
 import { AddressDisplay } from "../../../components/AddressDisplay";
-import { formatPriceWeiToHbar, formatPriceForDisplay } from "../../../lib/formatPrice";
+import { formatContractAmountToHbar, formatPriceForDisplay } from "../../../lib/formatPrice";
 import { formatHbarWithUsd } from "../../../lib/hbarUsd";
 import { useHbarUsd } from "../../../hooks/useHbarUsd";
 import { formatListingDate } from "../../../lib/formatDate";
-import { useChainId } from "wagmi";
 import { useCancelListing } from "../../../hooks/useCancelListing";
 import { getTransactionErrorMessage } from "../../../lib/transactionError";
 import { useUpdateListingPrice } from "../../../hooks/useUpdateListingPrice";
@@ -18,9 +17,11 @@ import { useRobustContractWrite } from "../../../hooks/useRobustContractWrite";
 import { compressImage } from "../../../lib/compressImage";
 import { marketplaceAbi, marketplaceAddress } from "../../../lib/contracts";
 import { listingIdToBytes32 } from "../../../lib/bytes32";
-import { useReadContract } from "wagmi";
-import { parseEther } from "viem";
+import { parseUnits } from "viem";
 import { useHashpackWallet } from "../../../lib/hashpackWallet";
+import { ConnectWalletButton } from "../../../components/ConnectWalletButton";
+import { activeHederaChain } from "../../../lib/hederaChains";
+import { readListingCompat } from "../../../lib/marketplaceRead";
 
 import { getApiUrl } from "../../../lib/apiUrl";
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024;
@@ -45,6 +46,11 @@ type Listing = {
   seller: string;
   price: string;
   status: string;
+  requireEscrow?: boolean;
+  trackingNumber?: string | null;
+  trackingCarrier?: string | null;
+  shippedAt?: string | null;
+  exchangeConfirmedAt?: string | null;
   title?: string | null;
   subtitle?: string | null;
   description?: string | null;
@@ -59,7 +65,6 @@ type Listing = {
 };
 
 export default function ListingPage() {
-  type ListingTuple = readonly [string, bigint, bigint, number, `0x${string}`];
   const params = useParams();
   const id = (params.id as string) || "";
   const [listing, setListing] = useState<Listing | null>(null);
@@ -86,8 +91,8 @@ export default function ListingPage() {
   const [inWishlist, setInWishlist] = useState(false);
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const router = useRouter();
-  const { address, connect, isConnecting } = useHashpackWallet();
-  const chainId = useChainId();
+  const { address } = useHashpackWallet();
+  const chainId = activeHederaChain.id;
   const { cancel, isPending: cancelPending, isSuccess: cancelSuccess, hash: cancelTxHash } = useCancelListing();
   const { updatePriceOnChain, isPending: priceUpdatePending } = useUpdateListingPrice();
   const { send: sendOffer, isPending: offerPending } = useRobustContractWrite();
@@ -97,12 +102,7 @@ export default function ListingPage() {
   const item = listing;
 
   const listingIdBytes = useMemo(() => (listing?.id ? listingIdToBytes32(listing.id) : undefined), [listing?.id]);
-  const { data: onChainListing } = useReadContract({
-    address: listing?.id ? marketplaceAddress : undefined,
-    abi: marketplaceAbi,
-    functionName: "listings",
-    args: listingIdBytes ? [listingIdBytes] : undefined,
-  });
+  const [onChainListing, setOnChainListing] = useState<{ price: bigint; status: number } | undefined>(undefined);
   function parsePriceWei(raw: unknown): bigint {
     if (raw == null) return 0n;
     if (typeof raw === "bigint") return raw;
@@ -113,9 +113,25 @@ export default function ListingPage() {
     if (o?.value != null) return BigInt(o.value);
     return 0n;
   }
-  const onChainListingTuple = onChainListing as ListingTuple | undefined;
-  const onChainPriceWei = parsePriceWei(onChainListingTuple?.[1]);
-  const onChainPriceHbar = onChainPriceWei > 0n ? formatPriceWeiToHbar(onChainPriceWei.toString()) : null;
+  useEffect(() => {
+    if (!listing?.id || !listingIdBytes) {
+      setOnChainListing(undefined);
+      return;
+    }
+    let cancelled = false;
+    void readListingCompat(listingIdBytes)
+      .then((data) => {
+        if (!cancelled) setOnChainListing({ price: data.price, status: data.status });
+      })
+      .catch(() => {
+        if (!cancelled) setOnChainListing(undefined);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [listing?.id, listingIdBytes]);
+  const onChainPriceWei = parsePriceWei(onChainListing?.price);
+  const onChainPriceHbar = onChainPriceWei > 0n ? formatContractAmountToHbar(onChainPriceWei.toString()) : null;
   const apiPriceHbar = listing?.price ? formatPriceForDisplay(listing.price) : null;
   const priceMismatch =
     apiPriceHbar != null &&
@@ -154,14 +170,6 @@ export default function ListingPage() {
     }
     fetchListing(0);
   }, [id, fetchListing]);
-
-  useEffect(() => {
-    const onFocus = () => {
-      if (id && listing) fetchListing(0);
-    };
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, [id, listing, fetchListing]);
 
   useEffect(() => {
     if (listing) {
@@ -263,7 +271,10 @@ export default function ListingPage() {
   const displayId = formatListingId(id);
   const displayTitle = listing?.title || displayId || "Untitled";
   const isSeller = address && item?.seller && address.toLowerCase() === item.seller.toLowerCase();
-  const isListed = listing?.status === "LISTED";
+  const onChainStatusNum = Number(onChainListing?.status ?? -1);
+  const isListedOnChain = onChainStatusNum === -1 ? null : onChainStatusNum === 1;
+  const isListed = listing?.status === "LISTED" && (isListedOnChain == null ? true : isListedOnChain);
+  const isLockedOnChain = onChainStatusNum === 2;
 
   const existingMediaUrls = item
     ? (item.mediaUrls?.length ? item.mediaUrls : item.imageUrl ? [item.imageUrl] : [])
@@ -304,7 +315,11 @@ export default function ListingPage() {
           const syncRes = await fetch(`${getApiUrl()}/api/sync-price-update`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ txHash: priceUpdateTxHash }),
+            body: JSON.stringify({
+              txHash: priceUpdateTxHash,
+              listingId: listing.id,
+              newPrice: newPriceDisplay,
+            }),
           }).catch(() => null);
           if (!syncRes?.ok) {
             priceSyncFailed = true;
@@ -411,7 +426,7 @@ export default function ListingPage() {
           abi: marketplaceAbi,
           functionName: "makeOffer",
           args: [listingIdToBytes32(listing.id)],
-          value: parseEther(suggestHbar.trim()),
+          value: parseUnits(suggestHbar.trim(), 8),
         });
         setSuggestSuccess(true);
         setTimeout(() => {
@@ -646,8 +661,15 @@ export default function ListingPage() {
             </button>
           </div>
 
-          {listing && listing.status === "LOCKED" && (
-            <EscrowPanel listingId={listing.id} sellerAddress={listing.seller} />
+          {listing && (listing.status === "LOCKED" || isLockedOnChain) && (
+            <EscrowPanel
+              listingId={listing.id}
+              sellerAddress={listing.seller}
+              requireEscrow={!!listing.requireEscrow}
+              trackingNumber={listing.trackingNumber ?? null}
+              trackingCarrier={listing.trackingCarrier ?? null}
+              onEscrowUpdated={() => fetchListing(0, false)}
+            />
           )}
           {listing && isListed && !isSeller && (
             walletConnected ? (
@@ -655,16 +677,14 @@ export default function ListingPage() {
             ) : (
               <div className="glass-card p-4 rounded-lg border border-white/10">
                 <p className="text-silver text-sm mb-3">Connect your wallet to buy this listing.</p>
-                <button
-                  type="button"
-                  onClick={() => void connect()}
-                  disabled={isConnecting}
-                  className="btn-frost-cta w-full disabled:opacity-50"
-                >
-                  {isConnecting ? "Connecting…" : "Connect wallet"}
-                </button>
+                <ConnectWalletButton className="btn-frost-cta w-full disabled:opacity-50" />
               </div>
             )
+          )}
+          {listing && !isListed && !isSeller && (
+            <div className="glass-card p-4 rounded-lg border border-white/10">
+              <p className="text-silver text-sm">This listing is no longer available for purchase.</p>
+            </div>
           )}
           {listing && isListed && isSeller && (
             <div className="glass-card p-4 rounded-lg border border-white/10">
@@ -756,7 +776,7 @@ export default function ListingPage() {
                     if (!msgRes.ok) {
                       // ignore non-OK status; navigation still opens conversation view
                     }
-                    router.push(`/dashboard?inbox=1&openThread=${encodeURIComponent(item.seller)}&listingId=${encodeURIComponent(id)}`);
+                    router.push(`/messages?openThread=${encodeURIComponent(item.seller)}&listingId=${encodeURIComponent(id)}`);
                   } catch {
                     // ignore
                   }

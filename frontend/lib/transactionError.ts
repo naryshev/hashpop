@@ -73,14 +73,29 @@ export function getTransactionErrorMessage(
         "Wallet request expired before approval. Reconnect your wallet, reopen the transaction flow, and approve promptly in HashPack."
       );
     }
+    if (/must have been frozen before calculating the hash|try calling [`'"]?freeze/i.test(combined)) {
+      return clean(
+        "Wallet transaction was not finalized correctly before signing. Please retry. If it repeats, disconnect/reconnect HashPack and try again."
+      );
+    }
+    if (/body\.data was not set in the protobuf/i.test(combined)) {
+      return clean(
+        "Wallet transaction payload was malformed before signing. Please retry once. If it repeats, disconnect/reconnect HashPack and refresh the page."
+      );
+    }
     if (/not seller/i.test(combined)) {
       return clean(
         "Only the listing seller can perform this action. Reconnect the wallet that created this listing and try again."
       );
     }
-    if (/list(ing)? is locked/i.test(combined)) {
+    if (/\blisting is locked\b|\blocked in escrow\b/i.test(combined)) {
       return clean(
         "This listing is locked in escrow and cannot be edited or deleted until the transaction is completed."
+      );
+    }
+    if (/\blist is locked\b/i.test(combined)) {
+      return clean(
+        "Wallet transaction payload became immutable before signing. Please retry. If it keeps happening, reconnect HashPack and try again."
       );
     }
     if (/price mismatch/i.test(combined)) {

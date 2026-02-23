@@ -59,11 +59,33 @@ function hexToBytes(hex: string): Uint8Array {
   return bytes;
 }
 
-function weiToTinybar(wei: bigint): bigint {
-  if (wei % WEI_PER_TINYBAR !== 0n) {
-    throw new Error("Payable value must resolve to whole tinybars.");
+function normalizePayableToTinybar(value: bigint): bigint {
+  // Legacy callers may still pass wei-like amounts (1 HBAR = 1e18).
+  // Current Hedera flows pass tinybar directly (1 HBAR = 1e8).
+  const looksLikeWei = value >= 10n ** 15n && value % WEI_PER_TINYBAR === 0n;
+  return looksLikeWei ? value / WEI_PER_TINYBAR : value;
+}
+
+function isZeroAddress(address: string): boolean {
+  return /^0x0{40}$/i.test(address);
+}
+
+function pickSingleNodeAccountId(sdk: any, client: any, network: "mainnet" | "testnet") {
+  const configuredNodes = client?.network ? Object.values(client.network) : [];
+  for (const node of configuredNodes) {
+    try {
+      if (node && typeof node.toString === "function") {
+        return sdk.AccountId.fromString(node.toString());
+      }
+      if (typeof node === "string") {
+        return sdk.AccountId.fromString(node);
+      }
+    } catch {
+      // try next
+    }
   }
-  return wei / WEI_PER_TINYBAR;
+  // Conservative fallback if client network map is unavailable.
+  return sdk.AccountId.fromString(network === "mainnet" ? "0.0.3" : "0.0.3");
 }
 
 class TransactionRevertError extends Error {
@@ -77,7 +99,7 @@ class TransactionRevertError extends Error {
 }
 
 export function useHashpackContractWrite() {
-  const { hashconnect, accountId, isConnected, refreshAccountData } = useHashpackWallet();
+  const { hashconnect, accountId, isConnected, refreshAccountData, network } = useHashpackWallet();
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [lastHash, setLastHash] = useState<string | null>(null);
@@ -113,6 +135,13 @@ export function useHashpackContractWrite() {
         safeSetError(noClientError);
         throw noClientError;
       }
+      if (!request.address || !/^0x[0-9a-fA-F]{40}$/.test(request.address) || isZeroAddress(request.address)) {
+        const addrError = new Error(
+          "Contract address is not configured. Set deployed contract addresses in frontend/.env.local (NEXT_PUBLIC_MARKETPLACE_ADDRESS / NEXT_PUBLIC_AUCTION_HOUSE_ADDRESS / NEXT_PUBLIC_ESCROW_ADDRESS)."
+        );
+        safeSetError(addrError);
+        throw addrError;
+      }
 
       inFlightRef.current = true;
       safeSetPending(true);
@@ -135,20 +164,89 @@ export function useHashpackContractWrite() {
               .setGas(request.gas ?? DEFAULT_GAS_LIMIT)
               .setFunctionParameters(hexToBytes(functionData));
             if (request.value && request.value > 0n) {
-              const tinybar = weiToTinybar(request.value);
+              const tinybar = normalizePayableToTinybar(request.value);
               tx.setPayableAmount(sdk.Hbar.fromTinybars(tinybar.toString()));
             }
+            const isPayableRequest = !!request.value && request.value > 0n;
 
+            // Prefer signer.call() so HashConnect controls tx population/freeze/signing lifecycle.
+            // This avoids intermittent "list is locked" errors from pre-populated transaction internals.
             txId = txIdObj.toString();
-            const receipt = await (hashconnect as any).sendTransaction(accountObj, tx);
-            const status = receipt.status;
-            if (status !== sdk.Status.Success) {
+            const signer = (hashconnect as any).getSigner?.(accountObj as any);
+            const freezeClient =
+              (signer && typeof signer.getClient === "function" ? signer.getClient() : null) ??
+              (network === "mainnet" ? sdk.Client.forMainnet() : sdk.Client.forTestnet());
+            // HashPack signing requires exactly one node account id on the transaction.
+            if (freezeClient && typeof (tx as any).setNodeAccountIds === "function") {
+              const singleNode = pickSingleNodeAccountId(sdk, freezeClient, network);
+              (tx as any).setNodeAccountIds([singleNode]);
+            }
+            if (freezeClient && typeof (tx as any).isFrozen === "function" && !(tx as any).isFrozen()) {
+              tx.freezeWith(freezeClient);
+            }
+            let receipt: any;
+            if (!isPayableRequest && signer && typeof signer.call === "function") {
+              receipt = await signer.call(tx as any);
+              txId =
+                tx.transactionId?.toString?.() ??
+                receipt?.transactionId?.toString?.() ??
+                txId;
+            } else if (isPayableRequest && signer && typeof signer.signTransaction === "function" && freezeClient) {
+              // For payable calls, sign with HashPack then execute via Hedera client.
+              // This avoids WalletConnect protobuf payload issues and preserves msg.value.
+              const signedTx = await signer.signTransaction(tx as any);
+              const txResponse = await (signedTx as any).execute(freezeClient);
+              txId =
+                txResponse?.transactionId?.toString?.() ??
+                tx.transactionId?.toString?.() ??
+                txId;
+              receipt = await txResponse.getReceipt(freezeClient);
+            } else {
+              // Fallback for older HashConnect behavior
+              receipt = await (hashconnect as any).sendTransaction(accountObj as any, tx as any);
+              txId =
+                tx.transactionId?.toString?.() ??
+                receipt?.transactionId?.toString?.() ??
+                txId;
+            }
+            let status = receipt?.status;
+            // Some wallet paths can return a transaction response-like object.
+            // If status is missing, try to resolve a receipt before checking status.
+            if (
+              (status == null || typeof status === "undefined") &&
+              receipt &&
+              typeof receipt.getReceipt === "function"
+            ) {
+              try {
+                const responseReceipt = await receipt.getReceipt();
+                if (responseReceipt) {
+                  receipt = responseReceipt;
+                  status = responseReceipt.status;
+                  txId =
+                    txId ??
+                    responseReceipt?.transactionId?.toString?.() ??
+                    tx.transactionId?.toString?.() ??
+                    null;
+                }
+              } catch {
+                // leave as-is; handled by status check below
+              }
+            }
+            const statusText = status?.toString?.() ?? "";
+            if (!status && txId) {
+              // HashPack can occasionally return without immediate status even though the tx was submitted.
+              // Treat as submitted and let subsequent reads/indexer confirm final state.
+              if (txId) safeSetLastHash(txId);
+              await refreshAccountData().catch(() => {});
+              break;
+            }
+            if (!status || statusText !== sdk.Status.Success.toString()) {
               throw new TransactionRevertError(
-                txId,
-                `Transaction failed with Hedera status ${status.toString()}. Transaction ID: ${txId}.`
+                txId || "unknown",
+                `Transaction failed with Hedera status ${statusText || "UNKNOWN"}.${txId ? ` Transaction ID: ${txId}.` : ""}`
               );
             }
-            safeSetLastHash(txId);
+            if (txId) safeSetLastHash(txId);
             await refreshAccountData().catch(() => {});
             break;
           } catch (e) {
@@ -161,6 +259,8 @@ export function useHashpackContractWrite() {
         }
 
         if (!txId) {
+          // Some wallet flows return successful receipt but not tx id; surface a non-blocking placeholder.
+          if (!lastError) return "submitted";
           const fallback = lastError || new Error("Failed to submit transaction.");
           safeSetError(fallback);
           throw fallback;
@@ -171,7 +271,7 @@ export function useHashpackContractWrite() {
         safeSetPending(false);
       }
     },
-    [accountId, hashconnect, isConnected, refreshAccountData]
+    [accountId, hashconnect, isConnected, network, refreshAccountData]
   );
 
   return { send, isPending, error, lastHash };

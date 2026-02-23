@@ -5,14 +5,13 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { AccountMenu } from "./AccountMenu";
 
-/** hbay logo in eBay-style multi-color (red, blue, yellow, green) */
-function HbayLogo() {
+/** Hashpop logo wordmark with red-blue-green accent palette. */
+function HashpopLogo() {
   return (
-    <Link href="/" className="flex items-center gap-2 font-bold text-2xl tracking-tight" aria-label="hbay home">
-      <span className="text-[#e53238]">h</span>
-      <span className="text-[#0064d2]">b</span>
-      <span className="text-[#f5af02]">a</span>
-      <span className="text-[#86b817]">y</span>
+    <Link href="/" className="font-bold text-2xl tracking-tight" aria-label="Hashpop home">
+      <span className="bg-[linear-gradient(100deg,#ff2f3d_0%,#ff8f00_32%,#13a0ff_62%,#6ddf85_100%)] bg-clip-text text-transparent">
+        Hashpop
+      </span>
     </Link>
   );
 }
@@ -36,16 +35,14 @@ const CATEGORY_LINKS = [
   { href: "/marketplace", label: "Jewelry & watches", query: "category=Jewelry" },
 ];
 
-/** My hbay dropdown: retained items from screenshot (excluded Saved Feed, Saved Searches, Saved Sellers, Payments, My Garage, My Collection, PSA Vault) */
+/** My Hashpop dropdown links. */
 const MY_HBAY_LINKS = [
   { href: "/dashboard", label: "Summary" },
-  { href: "/dashboard", label: "Bids/Offers" },
-  { href: "/dashboard", label: "Watchlist" },
-  { href: "/dashboard", label: "Purchase History" },
-  { href: "/marketplace", label: "Buy Again" },
-  { href: "/dashboard", label: "Selling" },
-  { href: "/dashboard", label: "Preferences" },
-  { href: "/dashboard?inbox=1", label: "Messages" },
+  { href: "/offers", label: "Bids/Offers" },
+  { href: "/watchlist", label: "Watchlist" },
+  { href: "/purchases", label: "Purchase History" },
+  { href: "/selling", label: "Selling" },
+  { href: "/messages", label: "Messages" },
 ];
 
 export function HomeHeader() {
@@ -90,7 +87,7 @@ export function HomeHeader() {
           </div>
           <div className="flex items-center gap-4">
             <Link href="/create" className="text-silver hover:text-white font-medium">Sell</Link>
-            <Link href="/dashboard" className="text-silver hover:text-white">Watchlist</Link>
+            <Link href="/watchlist" className="text-silver hover:text-white">Watchlist</Link>
             <div
               ref={myHbayRef}
               className="relative inline-block"
@@ -104,7 +101,7 @@ export function HomeHeader() {
                 aria-expanded={myHbayOpen}
                 aria-haspopup="true"
               >
-                My hbay
+                My Hashpop
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
@@ -162,8 +159,8 @@ export function HomeHeader() {
                     </Link>
                   ))}
                   <Link href="/create" onClick={() => setMobileOpen(false)} className="block py-2 text-silver hover:text-white text-sm font-medium">Sell</Link>
-                  <Link href="/dashboard" onClick={() => setMobileOpen(false)} className="block py-2 text-silver hover:text-white text-sm">Watchlist</Link>
-                  <p className="pt-2 pb-1 px-0 text-xs font-medium text-silver/80">My hbay</p>
+                  <Link href="/watchlist" onClick={() => setMobileOpen(false)} className="block py-2 text-silver hover:text-white text-sm">Watchlist</Link>
+                  <p className="pt-2 pb-1 px-0 text-xs font-medium text-silver/80">My Hashpop</p>
                   {MY_HBAY_LINKS.map(({ href, label }) => (
                     <Link key={label} href={href} onClick={() => setMobileOpen(false)} className="block py-1.5 pl-3 text-silver hover:text-white text-sm">
                       {label}
@@ -192,7 +189,7 @@ export function HomeHeader() {
               </div>
             )}
           </div>
-          <HbayLogo />
+          <HashpopLogo />
           {isHome && (
             <button type="button" className="hidden sm:flex items-center gap-1 text-sm text-silver hover:text-white border border-white/10 rounded-lg px-3 py-2">
               Shop by category

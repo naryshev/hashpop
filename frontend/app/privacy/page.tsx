@@ -1,8 +1,8 @@
 import Link from "next/link";
 
 export const metadata = {
-  title: "Privacy Policy | hbay",
-  description: "Privacy Policy for hbay marketplace.",
+  title: "Privacy Policy | Hashpop",
+  description: "Privacy Policy for Hashpop marketplace.",
 };
 
 export default function PrivacyPage() {
@@ -16,7 +16,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-lg font-semibold text-white mt-6 mb-2">1. Agreement by use</h2>
             <p>
-              By using hbay (&quot;the Service&quot;), you agree to this Privacy Policy. If you do not agree, do not use
+              By using Hashpop (&quot;the Service&quot;), you agree to this Privacy Policy. If you do not agree, do not use
               the Service.
             </p>
           </section>

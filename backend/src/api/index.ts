@@ -41,20 +41,81 @@ function weiToHbar(wei: bigint | string): string {
   return fracStr === "0" ? whole.toString() : `${whole}.${fracStr}`;
 }
 
+/** Tinybar (8 decimals) to HBAR string for storage/display. */
+function tinybarToHbar(tinybar: bigint | string): string {
+  const tb = typeof tinybar === "string" ? BigInt(tinybar) : tinybar;
+  if (tb === 0n) return "0";
+  const div = 10n ** 8n;
+  const whole = tb / div;
+  const frac = tb % div;
+  const fracStr = frac.toString().padStart(8, "0").replace(/0+$/, "") || "0";
+  return fracStr === "0" ? whole.toString() : `${whole}.${fracStr}`;
+}
+
+/** Convert on-chain amount to HBAR (supports legacy wei and current tinybar units). */
+function chainAmountToHbar(amount: bigint | string): string {
+  const n = typeof amount === "string" ? BigInt(amount) : amount;
+  if (n >= 10n ** 15n) return weiToHbar(n);
+  return tinybarToHbar(n);
+}
+
 /** If value looks like wei (long digit string), convert to HBAR; else return as-is. */
 function toHbarForClient(value: string | null | undefined): string {
   if (value == null || value === "") return "";
   const s = String(value).trim();
-  if (s.length > 15 && /^\d+$/.test(s)) return weiToHbar(s);
+  if (/^\d+$/.test(s)) {
+    const n = BigInt(s);
+    if (n >= 10n ** 15n) return weiToHbar(n);
+    if (s.length > 8) return tinybarToHbar(n);
+  }
   return s;
+}
+
+function isUsableContractAddress(address: string | undefined): address is string {
+  return !!address && /^0x[0-9a-fA-F]{40}$/.test(address) && !/^0x0{40}$/i.test(address);
 }
 
 const ESCROW_ABI_VIEW = [
   "function escrows(bytes32) view returns (address buyer, address seller, uint256 amount, uint256 createdAt, uint256 timeoutAt, uint8 state)",
 ];
-const MARKETPLACE_ABI_VIEW = [
-  "function listings(bytes32) view returns (address seller, uint256 price, uint256 createdAt, uint8 status, bytes32 escrowId)",
-];
+const MARKETPLACE_LISTINGS_VIEW_V2 = "function listings(bytes32) view returns (address seller, uint256 price, uint256 createdAt, uint8 status, bytes32 escrowId, bool requireEscrow)";
+const MARKETPLACE_LISTINGS_VIEW_V1 = "function listings(bytes32) view returns (address seller, uint256 price, uint256 createdAt, uint8 status, bytes32 escrowId)";
+
+type MarketplaceListingView = {
+  seller: string;
+  price: bigint;
+  status: number;
+};
+
+async function readMarketplaceListingCompat(
+  provider: ethers.JsonRpcProvider,
+  marketplaceAddr: string,
+  listingId: string
+): Promise<MarketplaceListingView> {
+  const ifaceV2 = new ethers.Interface([MARKETPLACE_LISTINGS_VIEW_V2]);
+  const ifaceV1 = new ethers.Interface([MARKETPLACE_LISTINGS_VIEW_V1]);
+  const calldata = ifaceV2.encodeFunctionData("listings", [listingId]);
+  const raw = await provider.call({
+    to: marketplaceAddr,
+    data: calldata,
+  });
+
+  try {
+    const out = ifaceV2.decodeFunctionResult("listings", raw);
+    return {
+      seller: String(out[0]),
+      price: BigInt(out[1]?.toString?.() ?? "0"),
+      status: Number(out[3] ?? 0),
+    };
+  } catch {
+    const out = ifaceV1.decodeFunctionResult("listings", raw);
+    return {
+      seller: String(out[0]),
+      price: BigInt(out[1]?.toString?.() ?? "0"),
+      status: Number(out[3] ?? 0),
+    };
+  }
+}
 
 function imageFilename(originalname: string): string {
   const ext = (path.extname(originalname) || ".jpg").toLowerCase().slice(0, 5);
@@ -62,12 +123,6 @@ function imageFilename(originalname: string): string {
   return `listing-${Date.now()}-${Math.random().toString(36).slice(2, 10)}${safe}`;
 }
 
-function deriveMessageTopicId(addressA: string, addressB: string, listingId?: string | null): string {
-  const [left, right] = [addressA.toLowerCase(), addressB.toLowerCase()].sort();
-  const scope = listingId?.trim() || "global";
-  const key = `${left}:${right}:${scope}`;
-  return `hcs-sim-${ethers.keccak256(ethers.toUtf8Bytes(key)).slice(2, 18)}`;
-}
 function mediaFilename(originalname: string): string {
   const ext = (path.extname(originalname) || ".jpg").toLowerCase().slice(0, 8);
   const safe = /^\.(jpe?g|png|gif|webp|mp4|webm|mov)$/.test(ext) ? ext : ".bin";
@@ -156,9 +211,15 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     try {
       const [listings, auctions] = await Promise.all([
         prisma.listing.findMany({
-          where: { status: "LISTED" },
+          where: {
+            status: { in: ["LISTED", "SOLD", "LOCKED", "COMPLETED"] },
+            OR: [
+              { imageUrl: { not: null } },
+              { mediaUrls: { isEmpty: false } },
+            ],
+          },
           orderBy: { createdAt: "desc" },
-          take: 50,
+          take: 100,
         }),
         prisma.auction.findMany({
           where: { status: "ACTIVE" },
@@ -167,31 +228,49 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         }),
       ]);
       let listingPriceOverrides = new Map<string, string>();
+      let listingStatusOverrides = new Map<string, string>();
       const marketplaceAddr = process.env.MARKETPLACE_ADDRESS;
       const rpcUrl = process.env.HEDERA_RPC_URL;
-      if (marketplaceAddr && rpcUrl && listings.length > 0) {
+      if (isUsableContractAddress(marketplaceAddr) && rpcUrl && listings.length > 0) {
         try {
           const provider = new ethers.JsonRpcProvider(rpcUrl);
-          const contract = new ethers.Contract(marketplaceAddr, MARKETPLACE_ABI_VIEW, provider);
           const overrides = await Promise.all(
             listings.map(async (l) => {
               try {
-                const data = await contract.listings(l.id);
-                const [seller, price, , status] = data;
-                const priceStr = price != null ? price.toString() : "";
-                const isListed = Number(status) === 1;
-                const hasSeller = seller && seller !== ethers.ZeroAddress;
-                const priceWei = BigInt(priceStr || "0");
-                if (priceStr && priceStr !== "0" && isListed && hasSeller && priceWei >= 10n ** 15n) {
-                  return [l.id, weiToHbar(priceStr)] as const;
+                const data = await readMarketplaceListingCompat(provider, marketplaceAddr, l.id);
+                const priceStr = data.price.toString();
+                const statusNum = Number(data.status);
+                const hasSeller = data.seller && data.seller !== ethers.ZeroAddress;
+                const chainAmount = BigInt(priceStr || "0");
+                const statusText =
+                  statusNum === 1
+                    ? "LISTED"
+                    : statusNum === 2
+                      ? "LOCKED"
+                      : statusNum === 3
+                        ? "SOLD"
+                        : statusNum === 4
+                          ? "CANCELLED"
+                          : null;
+                if (priceStr && priceStr !== "0" && hasSeller && chainAmount > 0n) {
+                  return [l.id, chainAmountToHbar(priceStr), statusText] as const;
                 }
+                return [l.id, null, statusText] as const;
               } catch {
                 // ignore per-listing on-chain read errors
               }
               return null;
             })
           );
-          listingPriceOverrides = new Map(overrides.filter((x): x is readonly [string, string] => x !== null));
+          const pricePairs: Array<[string, string]> = [];
+          const statusPairs: Array<[string, string]> = [];
+          for (const o of overrides as Array<readonly [string, string | null, string | null] | null>) {
+            if (!o) continue;
+            if (o[1] != null) pricePairs.push([o[0], o[1]]);
+            if (o[2] != null) statusPairs.push([o[0], o[2]]);
+          }
+          listingPriceOverrides = new Map(pricePairs);
+          listingStatusOverrides = new Map(statusPairs);
         } catch (e) {
           log.warn({ err: e }, "Could not read on-chain listing prices for /listings");
         }
@@ -199,12 +278,18 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       res.json({
         listings: listings.map((l) => ({
           ...l,
+          status: listingStatusOverrides.get(l.id) ?? l.status,
           price: listingPriceOverrides.get(l.id) ?? toHbarForClient(l.price),
         })),
         auctions: auctions.map((a) => ({ ...a, reservePrice: toHbarForClient(a.reservePrice) })),
       });
-    } catch (err) {
+    } catch (err: unknown) {
       log.error({ err }, "Failed to fetch listings");
+      const code = err && typeof err === "object" && "code" in err ? (err as { code?: string }).code : undefined;
+      if (code === "ECONNREFUSED" || (err && typeof err === "object" && "message" in err && String((err as Error).message).includes("connect"))) {
+        res.status(503).json({ error: "Database unavailable. Start PostgreSQL (e.g. docker compose up -d db) and run backend migrations." });
+        return;
+      }
       res.status(500).json({ error: "Internal server error" });
     }
   });
@@ -215,8 +300,12 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
    * without waiting for the indexer (Mirror/RPC can be slow or limited on Hedera).
    */
   router.post("/sync-listing", async (req, res) => {
-    const { txHash, imageUrl, mediaUrls, title, subtitle, description, category, condition, yearOfProduction } = (req.body || {}) as {
+    const { txHash, listingId, seller, price, requireEscrow, imageUrl, mediaUrls, title, subtitle, description, category, condition, yearOfProduction } = (req.body || {}) as {
       txHash?: string;
+      listingId?: string;
+      seller?: string;
+      price?: string;
+      requireEscrow?: boolean;
       imageUrl?: string;
       mediaUrls?: string[];
       title?: string;
@@ -226,17 +315,97 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       condition?: string;
       yearOfProduction?: string;
     };
+    const fallbackListingId =
+      typeof listingId === "string" && listingId.trim()
+        ? normalizeListingId(listingId.trim())
+        : null;
+    const fallbackSeller =
+      typeof seller === "string" && /^0x[0-9a-fA-F]{40}$/.test(seller.trim())
+        ? seller.trim().toLowerCase()
+        : null;
+    const fallbackPrice =
+      typeof price === "string" && price.trim()
+        ? price.trim()
+        : null;
+    const canFallbackUpsert = !!(fallbackListingId && fallbackSeller && fallbackPrice);
+
+    const imageUrlStr = typeof imageUrl === "string" && imageUrl ? imageUrl : null;
+    const mediaList =
+      Array.isArray(mediaUrls) && mediaUrls.length > 0
+        ? mediaUrls.filter((u): u is string => typeof u === "string" && u.length > 0)
+        : imageUrlStr
+          ? [imageUrlStr]
+          : [];
+    const titleStr = typeof title === "string" && title.trim() ? title.trim() : null;
+    const subtitleStr = typeof subtitle === "string" && subtitle.trim() ? subtitle.trim() : null;
+    const descriptionStr = typeof description === "string" && description.trim() ? description.trim() : null;
+    const categoryStr = typeof category === "string" && category.trim() ? category.trim() : null;
+    const conditionStr = typeof condition === "string" && condition.trim() ? condition.trim() : null;
+    const yearStr = typeof yearOfProduction === "string" && yearOfProduction.trim() ? yearOfProduction.trim() : null;
+    const requireEscrowBool = !!requireEscrow;
+
+    const upsertFallbackListing = async () => {
+      if (!canFallbackUpsert) return null;
+      const fallbackUpdateData: any = {
+        status: "LISTED",
+        price: fallbackPrice!,
+        requireEscrow: requireEscrowBool,
+        ...(imageUrlStr != null && { imageUrl: imageUrlStr }),
+        ...(mediaList.length > 0 && { mediaUrls: mediaList }),
+        ...(titleStr != null && { title: titleStr }),
+        ...(subtitleStr != null && { subtitle: subtitleStr }),
+        ...(descriptionStr != null && { description: descriptionStr }),
+        ...(categoryStr != null && { category: categoryStr }),
+        ...(conditionStr != null && { condition: conditionStr }),
+        ...(yearStr != null && { yearOfProduction: yearStr }),
+      };
+      const fallbackCreateData: any = {
+        id: fallbackListingId!,
+        seller: fallbackSeller!,
+        price: fallbackPrice!,
+        status: "LISTED",
+        requireEscrow: requireEscrowBool,
+        ...(imageUrlStr != null && { imageUrl: imageUrlStr }),
+        ...(mediaList.length > 0 && { mediaUrls: mediaList }),
+        ...(titleStr != null && { title: titleStr }),
+        ...(subtitleStr != null && { subtitle: subtitleStr }),
+        ...(descriptionStr != null && { description: descriptionStr }),
+        ...(categoryStr != null && { category: categoryStr }),
+        ...(conditionStr != null && { condition: conditionStr }),
+        ...(yearStr != null && { yearOfProduction: yearStr }),
+      };
+      await prisma.listing.upsert({
+        where: { id: fallbackListingId! },
+        update: fallbackUpdateData,
+        create: fallbackCreateData,
+      });
+      log.info({ listingId: fallbackListingId, seller: fallbackSeller, txHash }, "Synced listing via fallback upsert");
+      return fallbackListingId;
+    };
+
     if (!txHash || typeof txHash !== "string") {
+      if (canFallbackUpsert) {
+        const id = await upsertFallbackListing();
+        return res.json({ ok: true, listingId: id, source: "fallback" });
+      }
       return res.status(400).json({ error: "txHash required" });
     }
     const rpcUrl = process.env.HEDERA_RPC_URL;
     if (!rpcUrl) {
+      if (canFallbackUpsert) {
+        const id = await upsertFallbackListing();
+        return res.json({ ok: true, listingId: id, source: "fallback" });
+      }
       return res.status(503).json({ error: "HEDERA_RPC_URL not set" });
     }
     try {
       const provider = new ethers.JsonRpcProvider(rpcUrl);
       const receipt = await provider.getTransactionReceipt(txHash);
       if (!receipt || !receipt.logs?.length) {
+        if (canFallbackUpsert) {
+          const id = await upsertFallbackListing();
+          return res.json({ ok: true, listingId: id, source: "fallback" });
+        }
         return res.status(404).json({ error: "Transaction or logs not found" });
       }
       for (const logEntry of receipt.logs) {
@@ -244,55 +413,54 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         if (decoded?.type !== "ItemListed") continue;
         const listingId = normalizeListingId(decoded.listingId);
         const seller = (decoded.seller || "").toLowerCase();
-        const imageUrlStr = typeof imageUrl === "string" && imageUrl ? imageUrl : null;
-        const mediaList =
-          Array.isArray(mediaUrls) && mediaUrls.length > 0
-            ? mediaUrls.filter((u): u is string => typeof u === "string" && u.length > 0)
-            : imageUrlStr
-              ? [imageUrlStr]
-              : [];
-        const titleStr = typeof title === "string" && title.trim() ? title.trim() : null;
-        const subtitleStr = typeof subtitle === "string" && subtitle.trim() ? subtitle.trim() : null;
-        const descriptionStr = typeof description === "string" && description.trim() ? description.trim() : null;
-        const categoryStr = typeof category === "string" && category.trim() ? category.trim() : null;
-        const conditionStr = typeof condition === "string" && condition.trim() ? condition.trim() : null;
-        const yearStr = typeof yearOfProduction === "string" && yearOfProduction.trim() ? yearOfProduction.trim() : null;
-        const priceHbar = weiToHbar(decoded.price);
+        const priceHbar = chainAmountToHbar(decoded.price);
+        const updateData: any = {
+          status: "LISTED",
+          price: priceHbar,
+          requireEscrow: requireEscrowBool,
+          ...(imageUrlStr != null && { imageUrl: imageUrlStr }),
+          ...(mediaList.length > 0 && { mediaUrls: mediaList }),
+          ...(titleStr != null && { title: titleStr }),
+          ...(subtitleStr != null && { subtitle: subtitleStr }),
+          ...(descriptionStr != null && { description: descriptionStr }),
+          ...(categoryStr != null && { category: categoryStr }),
+          ...(conditionStr != null && { condition: conditionStr }),
+          ...(yearStr != null && { yearOfProduction: yearStr }),
+        };
+        const createData: any = {
+          id: listingId,
+          seller,
+          price: priceHbar,
+          status: "LISTED",
+          requireEscrow: requireEscrowBool,
+          ...(imageUrlStr != null && { imageUrl: imageUrlStr }),
+          ...(mediaList.length > 0 && { mediaUrls: mediaList }),
+          ...(titleStr != null && { title: titleStr }),
+          ...(subtitleStr != null && { subtitle: subtitleStr }),
+          ...(descriptionStr != null && { description: descriptionStr }),
+          ...(categoryStr != null && { category: categoryStr }),
+          ...(conditionStr != null && { condition: conditionStr }),
+          ...(yearStr != null && { yearOfProduction: yearStr }),
+        };
         await prisma.listing.upsert({
           where: { id: listingId },
-          update: {
-            status: "LISTED",
-            price: priceHbar,
-            ...(imageUrlStr != null && { imageUrl: imageUrlStr }),
-            ...(mediaList.length > 0 && { mediaUrls: mediaList }),
-            ...(titleStr != null && { title: titleStr }),
-            ...(subtitleStr != null && { subtitle: subtitleStr }),
-            ...(descriptionStr != null && { description: descriptionStr }),
-            ...(categoryStr != null && { category: categoryStr }),
-            ...(conditionStr != null && { condition: conditionStr }),
-            ...(yearStr != null && { yearOfProduction: yearStr }),
-          },
-          create: {
-            id: listingId,
-            seller,
-            price: priceHbar,
-            status: "LISTED",
-            ...(imageUrlStr != null && { imageUrl: imageUrlStr }),
-            ...(mediaList.length > 0 && { mediaUrls: mediaList }),
-            ...(titleStr != null && { title: titleStr }),
-            ...(subtitleStr != null && { subtitle: subtitleStr }),
-            ...(descriptionStr != null && { description: descriptionStr }),
-            ...(categoryStr != null && { category: categoryStr }),
-            ...(conditionStr != null && { condition: conditionStr }),
-            ...(yearStr != null && { yearOfProduction: yearStr }),
-          },
+          update: updateData,
+          create: createData,
         });
         log.info({ listingId, seller, txHash }, "Synced listing from tx");
         return res.json({ ok: true, listingId });
       }
+      if (canFallbackUpsert) {
+        const id = await upsertFallbackListing();
+        return res.json({ ok: true, listingId: id, source: "fallback" });
+      }
       return res.status(404).json({ error: "No ItemListed event in transaction" });
     } catch (err: any) {
       log.error({ err, txHash }, "Sync listing failed");
+      if (canFallbackUpsert) {
+        const id = await upsertFallbackListing();
+        return res.json({ ok: true, listingId: id, source: "fallback" });
+      }
       return res.status(500).json({ error: err.message || "Sync failed" });
     }
   });
@@ -301,25 +469,59 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
    * Sync a listing price update from tx so the latest on-chain price is reflected immediately.
    */
   router.post("/sync-price-update", async (req, res) => {
-    const { txHash } = (req.body || {}) as { txHash?: string };
+    const { txHash, listingId, newPrice } = (req.body || {}) as {
+      txHash?: string;
+      listingId?: string;
+      newPrice?: string;
+    };
+    const fallbackListingId =
+      typeof listingId === "string" && listingId.trim()
+        ? normalizeListingId(listingId.trim())
+        : null;
+    const fallbackPrice =
+      typeof newPrice === "string" && newPrice.trim()
+        ? newPrice.trim()
+        : null;
+    const canFallbackUpdate = !!(fallbackListingId && fallbackPrice);
+
+    const applyFallbackPrice = async () => {
+      if (!canFallbackUpdate) return false;
+      const result = await prisma.listing.updateMany({
+        where: { id: fallbackListingId! },
+        data: { price: fallbackPrice! },
+      });
+      if (result.count === 0) return false;
+      log.info({ listingId: fallbackListingId, txHash }, "Synced listing price via fallback update");
+      return true;
+    };
+
     if (!txHash || typeof txHash !== "string") {
+      if (await applyFallbackPrice()) {
+        return res.json({ ok: true, listingId: fallbackListingId, price: fallbackPrice, source: "fallback" });
+      }
       return res.status(400).json({ error: "txHash required" });
     }
     const rpcUrl = process.env.HEDERA_RPC_URL;
     if (!rpcUrl) {
+      if (await applyFallbackPrice()) {
+        return res.json({ ok: true, listingId: fallbackListingId, price: fallbackPrice, source: "fallback" });
+      }
       return res.status(503).json({ error: "HEDERA_RPC_URL not set" });
     }
     try {
       const provider = new ethers.JsonRpcProvider(rpcUrl);
       const receipt = await provider.getTransactionReceipt(txHash);
       if (!receipt?.logs?.length) {
+        if (await applyFallbackPrice()) {
+          return res.json({ ok: true, listingId: fallbackListingId, price: fallbackPrice, source: "fallback" });
+        }
         return res.status(404).json({ error: "Transaction or logs not found" });
       }
       for (const logEntry of receipt.logs) {
         const decoded = decodeEvents(logEntry);
         if (decoded?.type !== "PriceUpdated") continue;
         const listingId = normalizeListingId(decoded.listingId);
-        const newPriceHbar = weiToHbar(decoded.newPrice);
+        const newPriceHbar = chainAmountToHbar(decoded.newPrice);
         const result = await prisma.listing.updateMany({
           where: { id: listingId },
           data: { price: newPriceHbar },
@@ -331,9 +533,15 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         log.info({ listingId, txHash }, "Synced listing price update from tx");
         return res.json({ ok: true, listingId, price: newPriceHbar });
       }
+      if (await applyFallbackPrice()) {
+        return res.json({ ok: true, listingId: fallbackListingId, price: fallbackPrice, source: "fallback" });
+      }
       return res.status(404).json({ error: "No PriceUpdated event in transaction" });
     } catch (err: any) {
       log.error({ err, txHash }, "Sync price update failed");
+      if (await applyFallbackPrice()) {
+        return res.json({ ok: true, listingId: fallbackListingId, price: fallbackPrice, source: "fallback" });
+      }
       return res.status(500).json({ error: err.message || "Sync failed" });
     }
   });
@@ -370,6 +578,119 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       return res.status(404).json({ error: "No ListingCancelled event in transaction" });
     } catch (err: any) {
       log.error({ err, txHash }, "Sync cancel failed");
+      return res.status(500).json({ error: err.message || "Sync failed" });
+    }
+  });
+
+  /**
+   * Sync a listing purchase from tx so sold state appears immediately.
+   */
+  router.post("/sync-purchase", async (req, res) => {
+    const { txHash, listingId } = (req.body || {}) as { txHash?: string; listingId?: string };
+    const fallbackListingId =
+      typeof listingId === "string" && listingId.trim()
+        ? normalizeListingId(listingId.trim())
+        : null;
+
+    const applyFallbackPurchaseStatus = async () => {
+      if (!fallbackListingId) return false;
+      const row = await prisma.listing.findUnique({
+        where: { id: fallbackListingId },
+        select: { requireEscrow: true },
+      });
+      const nextStatus = row?.requireEscrow ? "LOCKED" : "SOLD";
+      const updated = await prisma.listing.updateMany({
+        where: { id: fallbackListingId },
+        data: { status: nextStatus },
+      });
+      if (updated.count === 0) return false;
+      log.info({ listingId: fallbackListingId, txHash, nextStatus }, "Synced purchase via fallback update");
+      return true;
+    };
+
+    if (!txHash || typeof txHash !== "string") {
+      if (await applyFallbackPurchaseStatus()) {
+        return res.json({ ok: true, listingId: fallbackListingId, source: "fallback" });
+      }
+      return res.status(400).json({ error: "txHash required" });
+    }
+
+    const rpcUrl = process.env.HEDERA_RPC_URL;
+    if (!rpcUrl) {
+      if (await applyFallbackPurchaseStatus()) {
+        return res.json({ ok: true, listingId: fallbackListingId, source: "fallback" });
+      }
+      return res.status(503).json({ error: "HEDERA_RPC_URL not set" });
+    }
+    try {
+      const provider = new ethers.JsonRpcProvider(rpcUrl);
+      const receipt = await provider.getTransactionReceipt(txHash);
+      if (!receipt?.logs?.length) {
+        if (await applyFallbackPurchaseStatus()) {
+          return res.json({ ok: true, listingId: fallbackListingId, source: "fallback" });
+        }
+        return res.status(404).json({ error: "Transaction or logs not found" });
+      }
+      for (const logEntry of receipt.logs) {
+        const decoded = decodeEvents(logEntry);
+        if (decoded?.type !== "ItemPurchased") continue;
+        const purchasedId = normalizeListingId(decoded.listingId);
+        const listingRow = await prisma.listing.findUnique({
+          where: { id: purchasedId },
+          select: { requireEscrow: true },
+        });
+        const nextStatus = listingRow?.requireEscrow ? "LOCKED" : "SOLD";
+        await prisma.listing.updateMany({
+          where: { id: purchasedId },
+          data: { status: nextStatus },
+        });
+        log.info({ listingId: purchasedId, txHash, nextStatus }, "Synced purchase from tx");
+        return res.json({ ok: true, listingId: purchasedId, status: nextStatus });
+      }
+      if (await applyFallbackPurchaseStatus()) {
+        return res.json({ ok: true, listingId: fallbackListingId, source: "fallback" });
+      }
+      return res.status(404).json({ error: "No ItemPurchased event in transaction" });
+    } catch (err: any) {
+      log.error({ err, txHash }, "Sync purchase failed");
+      if (await applyFallbackPurchaseStatus()) {
+        return res.json({ ok: true, listingId: fallbackListingId, source: "fallback" });
+      }
+      return res.status(500).json({ error: err.message || "Sync failed" });
+    }
+  });
+
+  /**
+   * Sync escrow completion state from chain.
+   * Marks listing SOLD once escrow is COMPLETE.
+   */
+  router.post("/sync-escrow-complete", async (req, res) => {
+    const { listingId } = (req.body || {}) as { listingId?: string };
+    const normalizedId = typeof listingId === "string" && listingId.trim() ? normalizeListingId(listingId.trim()) : null;
+    if (!normalizedId) return res.status(400).json({ error: "listingId required" });
+
+    const escrowAddr = process.env.ESCROW_ADDRESS;
+    const rpcUrl = process.env.HEDERA_RPC_URL;
+    if (!escrowAddr || !rpcUrl) {
+      return res.status(503).json({ error: "Escrow/RPC not configured" });
+    }
+
+    try {
+      const provider = new ethers.JsonRpcProvider(rpcUrl);
+      const contract = new ethers.Contract(escrowAddr, ESCROW_ABI_VIEW, provider);
+      const data = await contract.escrows(listingIdToBytes32(normalizedId));
+      const [, , , , , stateNum] = data;
+      const isComplete = Number(stateNum) === 2;
+      if (!isComplete) {
+        return res.status(409).json({ error: "Escrow is not complete yet" });
+      }
+      await prisma.listing.updateMany({
+        where: { id: normalizedId },
+        data: { status: "SOLD", exchangeConfirmedAt: new Date() } as any,
+      });
+      return res.json({ ok: true, listingId: normalizedId, status: "SOLD" });
+    } catch (err: any) {
+      log.error({ err, listingId: normalizedId }, "Sync escrow complete failed");
       return res.status(500).json({ error: err.message || "Sync failed" });
     }
   });
@@ -457,19 +778,28 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       if (!listing) return res.status(404).json({ error: "Listing not found" });
 
       let onChainPrice: string | null = null;
+      let onChainStatus: string | null = null;
       const marketplaceAddr = process.env.MARKETPLACE_ADDRESS;
       const rpcUrl = process.env.HEDERA_RPC_URL;
-      if (marketplaceAddr && rpcUrl) {
+      if (isUsableContractAddress(marketplaceAddr) && rpcUrl) {
         try {
           const provider = new ethers.JsonRpcProvider(rpcUrl);
-          const contract = new ethers.Contract(marketplaceAddr, MARKETPLACE_ABI_VIEW, provider);
-          const data = await contract.listings(id);
-          const [seller, price, , status] = data;
-          const priceStr = price != null ? price.toString() : "";
-          const isListed = Number(status) === 1;
-          const hasSeller = seller && seller !== ethers.ZeroAddress;
-          const priceWei = BigInt(priceStr || "0");
-          if (priceStr && priceStr !== "0" && isListed && hasSeller && priceWei >= 10n ** 15n) {
+          const data = await readMarketplaceListingCompat(provider, marketplaceAddr, id);
+          const priceStr = data.price.toString();
+          const statusNum = Number(data.status);
+          const hasSeller = data.seller && data.seller !== ethers.ZeroAddress;
+          const chainAmount = BigInt(priceStr || "0");
+          onChainStatus =
+            statusNum === 1
+              ? "LISTED"
+              : statusNum === 2
+                ? "LOCKED"
+                : statusNum === 3
+                  ? "SOLD"
+                  : statusNum === 4
+                    ? "CANCELLED"
+                    : null;
+          if (priceStr && priceStr !== "0" && hasSeller && chainAmount > 0n) {
             onChainPrice = priceStr;
           }
         } catch (e) {
@@ -477,11 +807,12 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         }
       }
 
-      const priceForClient = onChainPrice ? weiToHbar(onChainPrice) : toHbarForClient(listing.price);
+      const priceForClient = onChainPrice ? chainAmountToHbar(onChainPrice) : toHbarForClient(listing.price);
 
       res.json({
         listing: {
           ...listing,
+          status: onChainStatus ?? listing.status,
           price: priceForClient,
         },
       });
@@ -530,7 +861,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
   router.patch("/listing/:id", async (req, res) => {
     try {
       const id = normalizeListingId(req.params.id ?? "");
-      const { title, subtitle, description, category, condition, yearOfProduction, imageUrl, mediaUrls, sellerAddress } = (req.body || {}) as {
+      const { title, subtitle, description, category, condition, yearOfProduction, imageUrl, mediaUrls, sellerAddress, trackingNumber, trackingCarrier, requireEscrow } = (req.body || {}) as {
         title?: string;
         subtitle?: string;
         description?: string;
@@ -540,6 +871,9 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         imageUrl?: string;
         mediaUrls?: string[];
         sellerAddress?: string;
+        trackingNumber?: string;
+        trackingCarrier?: string;
+        requireEscrow?: boolean;
       };
       const listing = await prisma.listing.findUnique({ where: { id } });
       if (!listing) return res.status(404).json({ error: "Listing not found" });
@@ -547,7 +881,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       if (sellerLower !== listing.seller.toLowerCase()) {
         return res.status(403).json({ error: "Only the seller can edit this listing" });
       }
-      const update: { title?: string | null; subtitle?: string | null; description?: string | null; category?: string | null; condition?: string | null; yearOfProduction?: string | null; price?: string; imageUrl?: string | null; mediaUrls?: string[] } = {};
+      const update: { title?: string | null; subtitle?: string | null; description?: string | null; category?: string | null; condition?: string | null; yearOfProduction?: string | null; price?: string; imageUrl?: string | null; mediaUrls?: string[]; trackingNumber?: string | null; trackingCarrier?: string | null; shippedAt?: Date | null; requireEscrow?: boolean } = {};
       if (title !== undefined) update.title = title === "" ? null : title;
       if (subtitle !== undefined) update.subtitle = subtitle === "" ? null : subtitle;
       if (description !== undefined) update.description = description === "" ? null : description;
@@ -567,6 +901,18 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
               ? [record.imageUrl]
               : [];
         update.mediaUrls = [...existing, imageUrl];
+      }
+      if (trackingNumber !== undefined) {
+        const tn = String(trackingNumber || "").trim();
+        update.trackingNumber = tn || null;
+        update.shippedAt = tn ? new Date() : null;
+      }
+      if (trackingCarrier !== undefined) {
+        const tc = String(trackingCarrier || "").trim();
+        update.trackingCarrier = tc || null;
+      }
+      if (requireEscrow !== undefined) {
+        update.requireEscrow = !!requireEscrow;
       }
       const updated = await prisma.listing.update({
         where: { id },
@@ -654,7 +1000,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         prisma.listing.findMany({
           where: {
             seller: addrLower,
-            status: { in: ["CANCELLED", "LOCKED", "COMPLETED"] },
+            status: { in: ["CANCELLED", "LOCKED", "COMPLETED", "SOLD"] },
           },
           orderBy: { updatedAt: "desc" },
         }),
@@ -678,6 +1024,55 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       });
     } catch (err) {
       log.error({ err }, "Failed to fetch user listings");
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  router.get("/user/:address/purchases", async (req, res) => {
+    try {
+      const { address } = req.params;
+      const addrLower = address?.toLowerCase() ?? "";
+      const sales = await prisma.sale.findMany({
+        where: {
+          OR: [{ buyer: addrLower }, { seller: addrLower }],
+        },
+        include: {
+          listing: true,
+          auction: true,
+        },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+      });
+      res.json({
+        purchases: sales.map((s) => ({
+          id: s.id,
+          listingId: s.listingId,
+          auctionId: s.auctionId,
+          buyer: s.buyer,
+          seller: s.seller,
+          amount: toHbarForClient(s.amount),
+          createdAt: s.createdAt,
+          role: s.buyer.toLowerCase() === addrLower ? "buyer" : "seller",
+          listing: s.listing
+            ? {
+                id: s.listing.id,
+                title: s.listing.title,
+                status: s.listing.status,
+                imageUrl: s.listing.imageUrl,
+              }
+            : null,
+          auction: s.auction
+            ? {
+                id: s.auction.id,
+                title: s.auction.title,
+                status: s.auction.status,
+                imageUrl: s.auction.imageUrl,
+              }
+            : null,
+        })),
+      });
+    } catch (err) {
+      log.error({ err }, "Failed to fetch purchases");
       res.status(500).json({ error: "Internal server error" });
     }
   });
@@ -750,6 +1145,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         create: {
           id: addrLower,
           address: addrLower,
+          reputationScore: 0,
         },
       });
       res.json({ ok: true, address: addrLower });
@@ -772,16 +1168,28 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       const text = typeof body === "string" ? body.trim() : "";
       if (!from || !to) return res.status(400).json({ error: "fromAddress and toAddress required" });
       if (!text) return res.status(400).json({ error: "body required" });
+      const listingInput = typeof listingId === "string" ? listingId.trim() : "";
+      const normalizedListingId = listingInput
+        ? (listingInput.startsWith("0x") && listingInput.length === 66 ? normalizeListingId(listingInput) : listingIdToBytes32(listingInput))
+        : "";
+      if (!normalizedListingId) return res.status(400).json({ error: "listingId required" });
+      if (from === to) return res.status(400).json({ error: "Cannot message yourself" });
+      const listing = await prisma.listing.findUnique({ where: { id: normalizedListingId } });
+      if (!listing) return res.status(404).json({ error: "Listing not found" });
+      const seller = listing.seller.toLowerCase();
+      const isSellerBuyerThread = (from === seller && to !== seller) || (to === seller && from !== seller);
+      if (!isSellerBuyerThread) {
+        return res.status(403).json({ error: "Messages are private seller-buyer threads only" });
+      }
       const msg = await prisma.message.create({
         data: {
           fromAddress: from,
           toAddress: to,
           body: text,
-          listingId: listingId?.trim() || null,
+          listingId: normalizedListingId,
         },
       });
-      const topicId = deriveMessageTopicId(from, to, listingId?.trim() || null);
-      res.status(201).json({ message: msg, topicId });
+      res.status(201).json({ message: msg });
     } catch (err) {
       log.error({ err }, "Failed to create message");
       res.status(500).json({ error: "Internal server error" });
@@ -793,13 +1201,27 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       const address = (req.query.address as string)?.trim()?.toLowerCase();
       if (!address) return res.status(400).json({ error: "address required" });
       const messages = await prisma.message.findMany({
-        where: { OR: [{ fromAddress: address }, { toAddress: address }] },
+        where: {
+          OR: [{ fromAddress: address }, { toAddress: address }],
+          listingId: { not: null },
+        },
         orderBy: { createdAt: "desc" },
       });
+      const listingIds = Array.from(new Set(messages.map((m) => m.listingId).filter((v): v is string => !!v)));
+      const listingRows = await prisma.listing.findMany({
+        where: { id: { in: listingIds } },
+        select: { id: true, seller: true },
+      });
+      const listingSellerById = new Map(listingRows.map((l) => [l.id, l.seller.toLowerCase()]));
       const seen = new Map<string, { last: typeof messages[0]; preview: string }>();
       for (const m of messages) {
+        if (!m.listingId) continue;
+        const seller = listingSellerById.get(m.listingId);
+        if (!seller) continue;
+        const isSellerBuyerThread = (m.fromAddress === seller && m.toAddress !== seller) || (m.toAddress === seller && m.fromAddress !== seller);
+        if (!isSellerBuyerThread) continue;
         const other = m.fromAddress === address ? m.toAddress : m.fromAddress;
-        const key = `${other}-${m.listingId ?? ""}`;
+        const key = `${other}-${m.listingId}`;
         if (!seen.has(key)) seen.set(key, { last: m, preview: m.body.slice(0, 80) });
       }
       const conversations = Array.from(seen.entries()).map(([key, v]) => {
@@ -809,7 +1231,6 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         return {
           otherAddress,
           listingId,
-          topicId: deriveMessageTopicId(address, otherAddress, listingId),
           lastMessage: v.last,
           preview: v.preview,
         };
@@ -828,20 +1249,31 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     try {
       const address = (req.query.address as string)?.trim()?.toLowerCase();
       const other = (req.query.other as string)?.trim()?.toLowerCase();
-      const listingId = (req.query.listingId as string)?.trim() || undefined;
+      const listingIdRaw = (req.query.listingId as string)?.trim() || "";
+      const listingId = listingIdRaw
+        ? (listingIdRaw.startsWith("0x") && listingIdRaw.length === 66 ? normalizeListingId(listingIdRaw) : listingIdToBytes32(listingIdRaw))
+        : "";
       if (!address || !other) return res.status(400).json({ error: "address and other required" });
+      if (!listingId) return res.status(400).json({ error: "listingId required" });
+      const listing = await prisma.listing.findUnique({ where: { id: listingId } });
+      if (!listing) return res.status(404).json({ error: "Listing not found" });
+      const seller = listing.seller.toLowerCase();
+      const isSellerBuyerThread = (address === seller && other !== seller) || (other === seller && address !== seller);
+      if (!isSellerBuyerThread) {
+        return res.status(403).json({ error: "Only listing buyer/seller can view this thread" });
+      }
       const where = {
         OR: [
           { fromAddress: address, toAddress: other },
           { fromAddress: other, toAddress: address },
         ],
-        ...(listingId && { listingId }),
+        listingId,
       };
       const messages = await prisma.message.findMany({
         where,
         orderBy: { createdAt: "asc" },
       });
-      res.json({ messages, topicId: deriveMessageTopicId(address, other, listingId ?? null) });
+      res.json({ messages });
     } catch (err) {
       log.error({ err }, "Failed to fetch thread");
       res.status(500).json({ error: "Internal server error" });
@@ -887,7 +1319,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         return res.status(400).json({ error: "signature is required" });
       }
 
-      const message = `hashmart.rate:${saleRef}:${rated}:${ratingScore}`;
+      const message = `hashpop.rate:${saleRef}:${rated}:${ratingScore}`;
       let recovered = "";
       try {
         recovered = ethers.verifyMessage(message, signature).toLowerCase();
@@ -974,7 +1406,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         where: { address: addrLower },
       });
 
-      const [activeListings, totalSalesFromSales, ratingAgg] = await Promise.all([
+      const [activeListings, totalSalesFromSales, ratingAgg, completedBuys] = await Promise.all([
         prisma.listing.count({
           where: { status: "LISTED", seller: addrLower },
         }),
@@ -986,16 +1418,34 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           _count: { _all: true },
           _avg: { score: true },
         }),
+        prisma.sale.count({
+          where: {
+            buyer: addrLower,
+            OR: [
+              { listing: { is: { status: "COMPLETED" } } },
+              { auction: { is: { status: "SETTLED" } } },
+            ],
+          },
+        }),
       ]);
+
+      const ratingCount = ratingAgg._count._all ?? 0;
+      const ratingAverage = ratingAgg._avg.score ?? null;
+      // Reputation comes only from:
+      // 1) completed purchases, and
+      // 2) received ratings after completed sales.
+      const reputationFromBuys = completedBuys;
+      const reputationFromRatings = ratingAverage == null ? 0 : Math.round(ratingAverage * 10);
+      const computedReputation = reputationFromBuys + reputationFromRatings;
 
       if (!user) {
         return res.json({
           address,
           totalSales: totalSalesFromSales,
           activeListings,
-          reputation: "N/A",
-          ratingCount: ratingAgg._count._all ?? 0,
-          ratingAverage: ratingAgg._avg.score ?? null,
+          reputation: 0,
+          ratingCount,
+          ratingAverage,
         });
       }
 
@@ -1003,10 +1453,10 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         address: user.address,
         totalSales: user.totalSales ?? totalSalesFromSales,
         activeListings,
-        reputation: user.reputationScore,
+        reputation: computedReputation,
         successful: user.successfulCompletions,
-        ratingCount: ratingAgg._count._all ?? 0,
-        ratingAverage: ratingAgg._avg.score ?? null,
+        ratingCount,
+        ratingAverage,
       });
     } catch (err) {
       log.error({ err }, "Failed to fetch user");

@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useChainId } from "wagmi";
 import { parseEther } from "viem";
 import { auctionHouseAbi, auctionHouseAddress } from "../lib/contracts";
 import { getTransactionErrorMessage } from "../lib/transactionError";
 import { auctionIdToBytes32, placeBidMessageHash, defaultDeadline, relayPlaceBid, fetchAccountAlias } from "../lib/ed25519Relay";
 import { useRobustContractWrite } from "../hooks/useRobustContractWrite";
 import { useHashpackWallet } from "../lib/hashpackWallet";
+import { activeHederaChain } from "../lib/hederaChains";
 
 export function BidPanel({ auctionId }: { auctionId: string }) {
   const [amount, setAmount] = useState("0.1");
@@ -20,7 +20,7 @@ export function BidPanel({ auctionId }: { auctionId: string }) {
   }
 
   const { address } = useHashpackWallet();
-  const chainId = useChainId();
+  const chainId = activeHederaChain.id;
   const isWrongNetwork = false;
 
   const { send, isPending, error: writeError } = useRobustContractWrite();

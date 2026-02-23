@@ -11,6 +11,11 @@ model Listing {
   seller             String
   price              String
   status             String
+  requireEscrow      Boolean  @default(false)
+  trackingNumber     String?
+  trackingCarrier    String?
+  shippedAt          DateTime?
+  exchangeConfirmedAt DateTime?
   title              String?
   subtitle           String?
   description        String?
@@ -77,7 +82,7 @@ model User {
   successfulCompletions Int @default(0)
   refunds           Int      @default(0)
   timeouts          Int      @default(0)
-  reputationScore   Int      @default(50)
+  reputationScore   Int      @default(0)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 }

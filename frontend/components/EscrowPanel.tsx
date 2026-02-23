@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useChainId } from "wagmi";
 import { escrowAbi, escrowAddress } from "../lib/contracts";
-import { formatPriceWeiToHbar } from "../lib/formatPrice";
+import { formatContractAmountToHbar } from "../lib/formatPrice";
 import { formatHbarWithUsd } from "../lib/hbarUsd";
 import { useHbarUsd } from "../hooks/useHbarUsd";
 import { getApiUrl } from "../lib/apiUrl";
@@ -11,6 +10,7 @@ import { getTransactionErrorMessage } from "../lib/transactionError";
 import { AddressDisplay } from "./AddressDisplay";
 import { useRobustContractWrite } from "../hooks/useRobustContractWrite";
 import { useHashpackWallet } from "../lib/hashpackWallet";
+import { activeHederaChain } from "../lib/hederaChains";
 
 function toBytes32(listingId: string): `0x${string}` {
   if (listingId.startsWith("0x") && listingId.length === 66) return listingId as `0x${string}`;
@@ -34,15 +34,27 @@ type EscrowData = {
 export function EscrowPanel({
   listingId,
   sellerAddress,
+  requireEscrow,
+  trackingNumber,
+  trackingCarrier,
+  onEscrowUpdated,
 }: {
   listingId: string;
   sellerAddress: string;
+  requireEscrow: boolean;
+  trackingNumber?: string | null;
+  trackingCarrier?: string | null;
+  onEscrowUpdated?: () => void;
 }) {
   const { address } = useHashpackWallet();
-  const chainId = useChainId();
+  const chainId = activeHederaChain.id;
   const [escrow, setEscrow] = useState<EscrowData | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [trackingInput, setTrackingInput] = useState(trackingNumber ?? "");
+  const [carrierInput, setCarrierInput] = useState(trackingCarrier ?? "");
+  const [trackingSaveError, setTrackingSaveError] = useState<string | null>(null);
+  const [trackingSaving, setTrackingSaving] = useState(false);
   const usdRate = useHbarUsd();
 
   const idBytes = useMemo(() => toBytes32(listingId), [listingId]);
@@ -87,10 +99,48 @@ export function EscrowPanel({
       .finally(() => setLoading(false));
   }, [listingId, shipSuccess, receiptSuccess]);
 
+  useEffect(() => {
+    setTrackingInput(trackingNumber ?? "");
+  }, [trackingNumber]);
+
+  useEffect(() => {
+    setCarrierInput(trackingCarrier ?? "");
+  }, [trackingCarrier]);
+
   const isSeller = address && sellerAddress && address.toLowerCase() === sellerAddress.toLowerCase();
   const isBuyer = address && escrow && address.toLowerCase() === escrow.buyer.toLowerCase();
 
   const confirmShipment = async () => {
+    if (requireEscrow && !trackingInput.trim()) {
+      setTrackingSaveError("Tracking number is required before marking as shipped.");
+      return;
+    }
+    if (requireEscrow) {
+      setTrackingSaving(true);
+      setTrackingSaveError(null);
+      try {
+        const res = await fetch(`${getApiUrl()}/api/listing/${encodeURIComponent(listingId)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sellerAddress: address,
+            trackingNumber: trackingInput.trim(),
+            trackingCarrier: carrierInput.trim() || undefined,
+          }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body?.error || "Failed to save tracking details.");
+        }
+        onEscrowUpdated?.();
+      } catch (e) {
+        setTrackingSaveError(e instanceof Error ? e.message : "Failed to save tracking details.");
+        setTrackingSaving(false);
+        return;
+      } finally {
+        setTrackingSaving(false);
+      }
+    }
     await sendConfirmShipment({
       address: escrowAddress,
       abi: escrowAbi,
@@ -106,6 +156,12 @@ export function EscrowPanel({
       functionName: "confirmReceipt",
       args: [idBytes],
     });
+    await fetch(`${getApiUrl()}/api/sync-escrow-complete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ listingId }),
+    }).catch(() => {});
+    onEscrowUpdated?.();
   };
 
   const displayError = shipError ?? receiptError;
@@ -145,7 +201,7 @@ export function EscrowPanel({
           Status: <span className="text-white font-medium">{stateLabel}</span>
         </p>
         <p className="text-silver mt-1">
-          Amount: <span className="text-chrome">{formatHbarWithUsd(formatPriceWeiToHbar(escrow.amount), usdRate)}</span>
+          Amount: <span className="text-chrome">{formatHbarWithUsd(formatContractAmountToHbar(escrow.amount), usdRate)}</span>
         </p>
         <p className="text-silver mt-0.5 text-xs">
           Buyer: <AddressDisplay address={escrow.buyer} className="text-chrome" />
@@ -160,14 +216,31 @@ export function EscrowPanel({
           <p className="text-sm text-silver mb-2">
             You are the seller. After you ship the item, mark it as shipped so the buyer can confirm receipt and release payment.
           </p>
+          {requireEscrow && (
+            <div className="space-y-2 mb-3">
+              <input
+                value={trackingInput}
+                onChange={(e) => setTrackingInput(e.target.value)}
+                placeholder="Tracking number"
+                className="input-frost w-full text-sm"
+              />
+              <input
+                value={carrierInput}
+                onChange={(e) => setCarrierInput(e.target.value)}
+                placeholder="Carrier (optional)"
+                className="input-frost w-full text-sm"
+              />
+            </div>
+          )}
           <button
             type="button"
             onClick={() => void confirmShipment()}
-            disabled={shipPending || shipConfirming}
+            disabled={shipPending || shipConfirming || trackingSaving || (requireEscrow && !trackingInput.trim())}
             className="btn-frost-cta w-full disabled:opacity-60"
           >
-            {shipPending || shipConfirming ? "Confirm in wallet…" : "Mark as shipped (proof of shipment)"}
+            {shipPending || shipConfirming || trackingSaving ? "Confirm in wallet…" : "Mark as shipped (proof of shipment)"}
           </button>
+          {trackingSaveError && <p className="text-xs text-rose-300 mt-2">{trackingSaveError}</p>}
         </div>
       )}
 
@@ -194,10 +267,16 @@ export function EscrowPanel({
         <p className="text-sm text-silver">Only the buyer can confirm receipt.</p>
       )}
       {escrow.state === "AWAITING_CONFIRMATION" && isSeller && (
-        <p className="text-sm text-silver">Waiting for the buyer to confirm receipt. Payment will then be released to you.</p>
+        <div className="text-sm text-silver space-y-1">
+          <p>Waiting for the buyer to confirm receipt. Payment will then be released to you.</p>
+          {trackingNumber && <p className="text-xs text-chrome">Tracking: {trackingNumber}{trackingCarrier ? ` (${trackingCarrier})` : ""}</p>}
+        </div>
       )}
       {escrow.state === "AWAITING_SHIPMENT" && isBuyer && (
-        <p className="text-sm text-silver">Waiting for the seller to mark the item as shipped. After that, you can confirm receipt to complete.</p>
+        <div className="text-sm text-silver space-y-1">
+          <p>Waiting for the seller to mark the item as shipped. After that, you can confirm receipt to complete.</p>
+          {trackingNumber && <p className="text-xs text-chrome">Tracking: {trackingNumber}{trackingCarrier ? ` (${trackingCarrier})` : ""}</p>}
+        </div>
       )}
 
       {escrow.state === "COMPLETE" && (

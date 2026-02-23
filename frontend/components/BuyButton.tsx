@@ -1,31 +1,27 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { useChainId, useReadContract, usePublicClient } from "wagmi";
 import { marketplaceAbi, marketplaceAddress } from "../lib/contracts";
-import { formatPriceWeiToHbar } from "../lib/formatPrice";
+import { formatContractAmountToHbar } from "../lib/formatPrice";
 import { formatHbarWithUsd } from "../lib/hbarUsd";
 import { getTransactionErrorMessage } from "../lib/transactionError";
 import { useHbarUsd } from "../hooks/useHbarUsd";
 import { listingIdToBytes32 } from "../lib/bytes32";
 import { useRobustContractWrite } from "../hooks/useRobustContractWrite";
 import { useHashpackWallet } from "../lib/hashpackWallet";
+import { activeHederaChain } from "../lib/hederaChains";
+import { parseUnits } from "viem";
+import { readListingCompat } from "../lib/marketplaceRead";
+import { getApiUrl } from "../lib/apiUrl";
 
 export function BuyButton({ listingId, price: _price }: { listingId: string; price: string }) {
-  type ListingTuple = readonly [string, bigint, bigint, number, `0x${string}`];
   const idBytes = useMemo(() => listingIdToBytes32(listingId), [listingId]);
 
   const { address } = useHashpackWallet();
-  const chainId = useChainId();
-  const publicClient = usePublicClient();
+  const chainId = activeHederaChain.id;
   const isWrongNetwork = false;
-
-  const { data: onChainListing } = useReadContract({
-    address: marketplaceAddress,
-    abi: marketplaceAbi,
-    functionName: "listings",
-    args: [idBytes],
-  });
+  const [onChainListing, setOnChainListing] = useState<{ price: bigint; status: number } | undefined>(undefined);
+  const [chainReadFailed, setChainReadFailed] = useState(false);
 
   function parsePriceWei(raw: unknown): bigint {
     if (raw == null) return 0n;
@@ -38,9 +34,28 @@ export function BuyButton({ listingId, price: _price }: { listingId: string; pri
     if (typeof o.toString === "function") return BigInt(o.toString());
     return 0n;
   }
-  const listingTuple = onChainListing as ListingTuple | undefined;
-  const priceWei = parsePriceWei(listingTuple?.[1]);
+  useEffect(() => {
+    let cancelled = false;
+    void readListingCompat(idBytes)
+      .then((data) => {
+        if (!cancelled) {
+          setOnChainListing({ price: data.price, status: data.status });
+          setChainReadFailed(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setOnChainListing(undefined);
+          setChainReadFailed(true);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [idBytes]);
+  const priceWei = parsePriceWei(onChainListing?.price);
   const hasPrice = priceWei > 0n;
+  const isLegacyWeiListing = priceWei >= 10n ** 15n;
 
   const { send, isPending, error: writeError } = useRobustContractWrite();
   const isConfirming = false;
@@ -60,32 +75,44 @@ export function BuyButton({ listingId, price: _price }: { listingId: string; pri
       setActionError(null);
       setBuyAttempted(true);
       // Read the latest on-chain listing at click-time to avoid stale cached price mismatches.
-      const latest = await publicClient?.readContract({
-        address: marketplaceAddress,
-        abi: marketplaceAbi,
-        functionName: "listings",
-        args: [idBytes],
-      });
-      const latestTuple = latest as ListingTuple | undefined;
-      const latestPrice = parsePriceWei(latestTuple?.[1]);
-      const latestStatus = Number(latestTuple?.[3] ?? 0);
+      let latestPrice = 0n;
+      let latestStatus = 0;
+      try {
+        const latest = await readListingCompat(idBytes);
+        latestPrice = parsePriceWei(latest.price);
+        latestStatus = Number(latest.status ?? 0);
+      } catch {
+        // Legacy fallback: use API-provided price if live read fails.
+        latestPrice = parseUnits(String(_price || "0"), 8);
+        latestStatus = 1;
+      }
       if (latestStatus !== 1 || latestPrice <= 0n) {
         throw new Error("Listing is no longer available to buy. Please refresh.");
       }
-      await send({
+      if (latestPrice >= 10n ** 15n) {
+        throw new Error(
+          "This listing uses a legacy on-chain price format and cannot be purchased as-is. Ask the seller to edit price and save again, or recreate the listing."
+        );
+      }
+      const txHash = await send({
         address: marketplaceAddress,
         abi: marketplaceAbi,
         functionName: "buyNow",
         args: [idBytes],
         value: latestPrice,
       });
+      await fetch(`${getApiUrl()}/api/sync-purchase`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ txHash, listingId }),
+      }).catch(() => {});
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Unable to prepare buy transaction. Please refresh and retry.";
       setActionError(msg);
     }
   };
 
-  const priceHbar = hasPrice ? formatPriceWeiToHbar(priceWei.toString()) : "—";
+  const priceHbar = hasPrice ? formatContractAmountToHbar(priceWei.toString()) : "—";
   const usdRate = useHbarUsd();
   const priceWithUsd = formatHbarWithUsd(priceHbar, usdRate);
 
@@ -99,26 +126,21 @@ export function BuyButton({ listingId, price: _price }: { listingId: string; pri
       <p className="text-sm text-silver mb-3">
         {hasPrice
           ? `You will send ${priceWithUsd} on Hedera Testnet. Confirm in your wallet (HashPack supports this).`
-          : "Loading price from chain…"}
+          : chainReadFailed
+            ? "Could not read chain price quickly. We will use the latest known listing price at checkout."
+            : "Loading price from chain…"}
       </p>
-      {hasPrice && (
-        <p className="text-xs text-zinc-500 mb-1">
-          <a
-            href="https://docs.hashpack.app/dapp-developers/walletconnect"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-chrome hover:text-white underline"
-          >
-            Paying with HashPack? See WalletConnect & supported transactions →
-          </a>
+      {isLegacyWeiListing && (
+        <p className="text-xs text-amber-300/90 mb-1">
+          This listing was created with a legacy price unit and cannot be bought yet. The seller needs to edit the price and save, or relist.
         </p>
       )}
       <button
         onClick={() => {
-          if (!hasPrice || isWrongNetwork || isPending || isConfirming) return;
+          if (!hasPrice || isLegacyWeiListing || isWrongNetwork || isPending || isConfirming) return;
           void buy();
         }}
-        disabled={!hasPrice || isPending || isConfirming || isWrongNetwork}
+        disabled={( !hasPrice && !chainReadFailed ) || isLegacyWeiListing || isPending || isConfirming || isWrongNetwork}
         className="btn-frost-cta w-full disabled:opacity-60"
       >
         {isPending ? "Confirm in wallet…" : "Buy Now"}

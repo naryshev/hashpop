@@ -1,8 +1,8 @@
 import Link from "next/link";
 
 export const metadata = {
-  title: "Terms of Service | hbay",
-  description: "Terms of Service for hbay marketplace.",
+  title: "Terms of Service | Hashpop",
+  description: "Terms of Service for Hashpop marketplace.",
 };
 
 export default function TermsPage() {
@@ -16,7 +16,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-semibold text-white mt-6 mb-2">1. Agreement by use</h2>
             <p>
-              By accessing or using hbay (&quot;the Service&quot;), you agree to be bound by these Terms of Service.
+              By accessing or using Hashpop (&quot;the Service&quot;), you agree to be bound by these Terms of Service.
               If you do not agree, do not use the Service.
             </p>
           </section>
@@ -24,7 +24,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-semibold text-white mt-6 mb-2">2. Description of the Service</h2>
             <p>
-              hbay is a decentralized marketplace where users can list, browse, buy, and bid on items. Listings and
+              Hashpop is a decentralized marketplace where users can list, browse, buy, and bid on items. Listings and
               listings are created by users and are recorded on a blockchain (Hedera). We provide a web interface and
               backend to sync and display that data; we do not take custody of your assets.
             </p>

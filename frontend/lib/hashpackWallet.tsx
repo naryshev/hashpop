@@ -1,13 +1,20 @@
 "use client";
 
+/**
+ * HashConnect wallet integration.
+ * All Hedera wallet functionality (connect, disconnect, send transactions, sign)
+ * is implemented via the HashConnect SDK (https://hashpack.app / hashconnect package),
+ * which connects this dApp to HashPack and other compatible wallets.
+ */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import type { MutableRefObject } from "react";
+import type { HashConnect } from "hashconnect";
 import { activeHederaChain } from "./hederaChains";
 
 type HederaNetwork = "mainnet" | "testnet";
-type HashConnectInstance = any;
 
 type HashpackWalletContextValue = {
-  hashconnect: HashConnectInstance | null;
+  hashconnect: HashConnect | null;
   address: `0x${string}` | null;
   accountId: string | null;
   balanceTinybar: bigint | null;
@@ -23,8 +30,12 @@ type HashpackWalletContextValue = {
 
 const HashpackWalletContext = createContext<HashpackWalletContextValue | null>(null);
 
-const CONNECT_TIMEOUT_MS = 120_000;
-const EXTENSION_WAIT_MS = 8_000;
+const EXTENSION_WAIT_MS = 10_000;
+const PAIRING_WAIT_MS = 120_000; // Time for user to approve in HashPack (extension or modal)
+
+let sharedHashconnect: HashConnect | null = null;
+let sharedHashconnectInitPromise: Promise<HashConnect> | null = null;
+let sharedHashconnectKey: string | null = null;
 
 function getNetwork(): HederaNetwork {
   return activeHederaChain.id === 295 ? "mainnet" : "testnet";
@@ -78,8 +89,57 @@ function accountIdToLongZeroAddress(accountId: string): `0x${string}` {
   return `0x${(shardHex + realmHex + numHex).toLowerCase()}` as `0x${string}`;
 }
 
+function waitForPairing(connectWaitRef: MutableRefObject<((value: void | PromiseLike<void>) => void) | null>, timeoutMs: number): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      connectWaitRef.current = null;
+      reject(new Error("Timed out waiting for wallet approval."));
+    }, timeoutMs);
+    connectWaitRef.current = () => {
+      clearTimeout(timeout);
+      resolve();
+    };
+  });
+}
+
+async function getOrCreateHashConnect(network: HederaNetwork, projectId: string): Promise<HashConnect> {
+  const key = `${network}:${projectId}`;
+  if (sharedHashconnect && sharedHashconnectKey === key) return sharedHashconnect;
+  if (sharedHashconnectInitPromise && sharedHashconnectKey === key) return sharedHashconnectInitPromise;
+
+  sharedHashconnectKey = key;
+  sharedHashconnectInitPromise = (async () => {
+    const [{ HashConnect }, sdk] = await Promise.all([
+      import("hashconnect"),
+      import("@hashgraph/sdk"),
+    ]);
+    const ledgerId = network === "mainnet" ? sdk.LedgerId.MAINNET : sdk.LedgerId.TESTNET;
+    const metadata = {
+      name: "Hashpop",
+      description: "Hashpop marketplace - HashConnect wallet (HashPack)",
+      icons: ["https://hashpack.app/favicon.ico"],
+      url: typeof window !== "undefined" ? window.location.origin : "http://localhost:3000",
+    };
+    const hc = new HashConnect(ledgerId, projectId, metadata, false);
+    await hc.init();
+    sharedHashconnect = hc;
+    return hc;
+  })();
+
+  try {
+    const hc = await sharedHashconnectInitPromise;
+    return hc;
+  } catch (e) {
+    sharedHashconnect = null;
+    sharedHashconnectKey = null;
+    throw e;
+  } finally {
+    sharedHashconnectInitPromise = null;
+  }
+}
+
 export function HashpackWalletProvider({ children }: { children: React.ReactNode }) {
-  const [hashconnect, setHashconnect] = useState<HashConnectInstance | null>(null);
+  const [hashconnect, setHashconnect] = useState<HashConnect | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [accountId, setAccountId] = useState<string | null>(null);
   const [address, setAddress] = useState<`0x${string}` | null>(null);
@@ -88,7 +148,8 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
   const [error, setError] = useState<string | null>(null);
   const network = getNetwork();
   const connectWaitRef = useRef<((value: void | PromiseLike<void>) => void) | null>(null);
-  const initPromiseRef = useRef<Promise<HashConnectInstance> | null>(null);
+  const initPromiseRef = useRef<Promise<HashConnect | null> | null>(null);
+  const connectInFlightRef = useRef(false);
 
   const refreshAccountData = useCallback(async () => {
     if (!accountId) return;
@@ -110,19 +171,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
 
     initPromiseRef.current = (async () => {
       try {
-        const [{ HashConnect }, sdk] = await Promise.all([
-          import("hashconnect"),
-          import("@hashgraph/sdk"),
-        ]);
-        const ledgerId = network === "mainnet" ? sdk.LedgerId.MAINNET : sdk.LedgerId.TESTNET;
-        const metadata = {
-          name: "hbay",
-          description: "Hedera marketplace - HashPack native wallet flow",
-          icons: ["https://hashpack.app/favicon.ico"],
-          url: typeof window !== "undefined" ? window.location.origin : "http://localhost:3000",
-        };
-
-        const hc = new HashConnect(ledgerId, projectId, metadata, false);
+        const hc = await getOrCreateHashConnect(network, projectId);
         hc.pairingEvent.on(async (session: { accountIds: string[] }) => {
           if (!mounted) return;
           const first = session.accountIds[0] ?? null;
@@ -145,22 +194,22 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
           setBalanceTinybar(null);
         });
 
-        await hc.init();
-        if (!mounted) return;
+        if (!mounted) return null;
         setHashconnect(hc);
         setIsReady(true);
         const first = hc.connectedAccountIds[0]?.toString() ?? null;
         if (first) {
           setAccountId(first);
           const mirrorData = await fetchMirrorAccount(first, network);
-          if (!mounted) return;
+          if (!mounted) return null;
           setAddress(mirrorData.evmAddress ?? accountIdToLongZeroAddress(first));
           setBalanceTinybar(mirrorData.balanceTinybar);
         }
         return hc;
       } catch (e) {
-        if (!mounted) return;
-        setError(e instanceof Error ? e.message : "Failed to initialize HashPack connection");
+        if (!mounted) return null;
+        const msg = e instanceof Error ? e.message : "Failed to initialize HashPack connection";
+        setError(msg + " Try a private/incognito window or disable browser extensions (e.g. MetaMask) that use SES.");
         setIsReady(true);
         throw e;
       }
@@ -173,6 +222,8 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
   }, [network]);
 
   const connect = useCallback(async () => {
+    if (connectInFlightRef.current) return;
+    connectInFlightRef.current = true;
     let hc = hashconnect;
     if (!hc && initPromiseRef.current) {
       try {
@@ -189,29 +240,45 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
     setError(null);
     try {
       if ((hc.connectedAccountIds?.length ?? 0) > 0) return;
-      // Extension-first flow: trigger the internal extension pairing path when available.
-      const maybeConnectToExtension = (hc as { connectToExtension?: () => Promise<unknown> }).connectToExtension;
+
+      const extensionOnly = process.env.NEXT_PUBLIC_HASHPACK_EXTENSION_ONLY === "true";
+      const maybeConnectToExtension = (hc as unknown as { connectToExtension?: () => Promise<unknown> }).connectToExtension;
+
+      // 1) Try HashPack browser extension first (no modal).
       if (typeof maybeConnectToExtension === "function") {
         await maybeConnectToExtension.call(hc).catch(() => {});
+        try {
+          await waitForPairing(connectWaitRef, EXTENSION_WAIT_MS);
+          return;
+        } catch {
+          // Fall through to modal unless extension-only mode is enabled.
+        }
       }
 
-      // Do not open WalletConnect modal; wait for extension pairing event.
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          connectWaitRef.current = null;
-          reject(new Error("No response from HashPack extension. Open HashPack, unlock it, and click Connect again."));
-        }, EXTENSION_WAIT_MS);
-        connectWaitRef.current = () => {
-          clearTimeout(timeout);
-          resolve();
-        };
-      });
+      if (extensionOnly) {
+        setError("HashPack extension-only mode is enabled and extension pairing failed. Ensure HashPack extension is installed, unlocked, and on this profile.");
+        return;
+      }
+
+      // 2) Fallback to HashConnect pairing modal (QR / deep link).
+      const openModal = (hc as { openPairingModal?: (theme?: string) => Promise<void> }).openPairingModal;
+      if (typeof openModal !== "function") {
+        setError("HashConnect pairing not available. Try refreshing or use a private window.");
+        return;
+      }
+      const modalErr = await openModal.call(hc, "dark").then(() => null).catch((err: unknown) => err);
+      if (modalErr) {
+        setError("Could not open wallet pairing. Try a private/incognito window or disable browser extensions.");
+        return;
+      }
+      await waitForPairing(connectWaitRef, PAIRING_WAIT_MS);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Wallet connection failed.";
       setError(msg);
       return;
     } finally {
       setIsConnecting(false);
+      connectInFlightRef.current = false;
     }
   }, [hashconnect]);
 

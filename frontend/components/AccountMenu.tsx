@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { AddressDisplay } from "./AddressDisplay";
 import { useHashpackWallet } from "../lib/hashpackWallet";
+import { ConnectWalletButton } from "./ConnectWalletButton";
 
 import { getApiUrl } from "../lib/apiUrl";
 
@@ -21,7 +22,7 @@ export function AccountMenu() {
   const [reputation, setReputation] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const { address, isConnected, connect, disconnect, isReady, isConnecting, balanceTinybar } = useHashpackWallet();
+  const { address, isConnected, disconnect, isReady, isConnecting, error, balanceTinybar } = useHashpackWallet();
   const hbarFormatted = formatHbarFromTinybar(balanceTinybar);
 
   useEffect(() => setMounted(true), []);
@@ -58,14 +59,12 @@ export function AccountMenu() {
     return (
       <div className="flex items-center gap-1 text-sm text-silver">
         Hi{" "}
-        <button
-          type="button"
-          onClick={() => void connect()}
-          disabled={!isReady || isConnecting}
-          className="underline text-white hover:text-chrome disabled:opacity-50"
+        <ConnectWalletButton
+          className="underline text-white hover:text-chrome disabled:opacity-50 bg-transparent border-0 p-0 min-w-0 shadow-none"
         >
-          {!isReady ? "Loading…" : "Sign In"}
-        </button>
+          {!isReady ? "Loading…" : isConnecting ? "Connecting…" : "Sign In"}
+        </ConnectWalletButton>
+        {error && <span className="hidden lg:inline text-[11px] text-amber-400/90 max-w-[280px] truncate" title={error}>({error})</span>}
       </div>
     );
   }

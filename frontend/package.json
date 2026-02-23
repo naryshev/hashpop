@@ -1,5 +1,5 @@
 {
-  "name": "hbay-frontend",
+  "name": "hashpop-frontend",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@hashgraph/hethers": "^1.2.6",
-    "@hashgraph/sdk": "^2.80.0",
+    "@hashgraph/sdk": "2.41.0",
     "@tanstack/react-query": "^5.59.10",
     "browser-image-compression": "^2.0.2",
     "classnames": "^2.5.1",
@@ -20,8 +20,7 @@
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "tailwindcss": "^3.4.7",
-    "viem": "^2.22.4",
-    "wagmi": "^2.10.5"
+    "viem": "^2.22.4"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
-import { parseEther } from "viem";
+import { parseUnits } from "viem";
 import { marketplaceAbi, marketplaceAddress } from "../lib/contracts";
 import { listingIdToBytes32 } from "../lib/bytes32";
 import { useRobustContractWrite } from "./useRobustContractWrite";
@@ -24,7 +24,7 @@ export function useUpdateListingPrice() {
           address: marketplaceAddress,
           abi: marketplaceAbi,
           functionName: "updateListingPrice",
-          args: [idBytes, parseEther(priceHbar.trim())],
+          args: [idBytes, parseUnits(priceHbar.trim(), 8)],
         });
       } catch (e) {
         throw (e instanceof Error ? e : new Error(String(e)));

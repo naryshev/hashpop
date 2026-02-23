@@ -23,33 +23,51 @@ function formatListingId(id: string): string {
   }
 }
 
-type ListingItem = { id: string; price?: string; title?: string | null; seller?: string; imageUrl?: string | null; mediaUrls?: string[]; createdAt?: string; itemType: "listing" };
+type ListingItem = { id: string; price?: string; title?: string | null; seller?: string; imageUrl?: string | null; mediaUrls?: string[]; createdAt?: string; status?: string; itemType: "listing" };
+
+function isSoldStatus(status?: string): boolean {
+  return !!status && status !== "LISTED";
+}
 
 export default function MarketplacePage() {
   const [items, setItems] = useState<ListingItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [listingsError, setListingsError] = useState<string | null>(null);
   const usdRate = useHbarUsd();
 
   const fetchListings = useCallback(() => {
     setLoading(true);
+    setListingsError(null);
     fetch(`${getApiUrl()}/api/listings`)
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) {
+          return res.json().then((body: { error?: string }) => {
+            throw new Error(body?.error || (res.status === 503 ? "Backend or database unavailable." : "Failed to load listings."));
+          }).catch((e: Error) => {
+            if (e instanceof SyntaxError) throw new Error(res.status === 503 ? "Backend or database unavailable." : "Failed to load listings.");
+            throw e;
+          });
+        }
+        return res.json();
+      })
       .then((data: { listings?: any[] }) => {
         const list = (data.listings || []).map((l: any) => ({ ...l, itemType: "listing" as const }));
-        setItems(list.sort((a, b) => new Date((b.createdAt as string) || 0).getTime() - new Date((a.createdAt as string) || 0).getTime()));
+        setItems(list.sort((a, b) => {
+          const aSold = isSoldStatus(a.status);
+          const bSold = isSoldStatus(b.status);
+          if (aSold !== bSold) return aSold ? 1 : -1;
+          return new Date((b.createdAt as string) || 0).getTime() - new Date((a.createdAt as string) || 0).getTime();
+        }));
       })
-      .catch(() => setItems([]))
+      .catch((e) => {
+        setItems([]);
+        setListingsError(e instanceof Error ? e.message : "Failed to load listings.");
+      })
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
     fetchListings();
-  }, [fetchListings]);
-
-  useEffect(() => {
-    const onFocus = () => fetchListings();
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
   }, [fetchListings]);
 
   return (
@@ -61,6 +79,10 @@ export default function MarketplacePage() {
         </div>
         {loading ? (
           <p className="text-silver">Loading listings…</p>
+        ) : listingsError ? (
+          <p className="text-amber-400/90 text-sm">
+            {listingsError} Ensure the backend is running and PostgreSQL is up (e.g. <code className="text-chrome">docker compose up -d db</code>).
+          </p>
         ) : items.length === 0 ? (
           <p className="text-silver">No listings found. Create one to get started!</p>
         ) : (
@@ -74,14 +96,19 @@ export default function MarketplacePage() {
                     href={`/listing/${encodeURIComponent(item.id)}`}
                     className="flex-shrink-0 w-[140px] snap-start glass-card overflow-hidden transition-all duration-200 active:border-white/20"
                   >
-                    <ListingMedia
-                      listing={item}
-                      className="w-full rounded-t-lg object-cover"
-                      aspectRatio="square"
-                      navigation="arrows"
-                      cardSize
-                      compactHeight="88px"
-                    />
+                    <div className="relative">
+                      <ListingMedia
+                        listing={item}
+                        className="w-full rounded-t-lg object-cover"
+                        aspectRatio="square"
+                        navigation="arrows"
+                        cardSize
+                        compactHeight="88px"
+                      />
+                      <span className={`absolute top-2 left-2 rounded-full px-2 py-0.5 text-[10px] font-semibold border ${isSoldStatus(item.status) ? "bg-rose-500/20 border-rose-400/40 text-rose-200" : "bg-emerald-500/20 border-emerald-400/40 text-emerald-200"}`}>
+                        {isSoldStatus(item.status) ? "SOLD" : "ACTIVE"}
+                      </span>
+                    </div>
                     <div className="p-2 min-h-0">
                       <h2 className="text-sm font-medium text-white truncate leading-tight">
                         {item.title || formatListingId(item.id) || "Untitled"}
@@ -114,6 +141,9 @@ export default function MarketplacePage() {
                     <div className="absolute top-2 right-2">
                       <WishlistButton itemId={item.id} itemType={item.itemType} compact />
                     </div>
+                    <span className={`absolute top-2 left-2 rounded-full px-2 py-0.5 text-[10px] font-semibold border ${isSoldStatus(item.status) ? "bg-rose-500/20 border-rose-400/40 text-rose-200" : "bg-emerald-500/20 border-emerald-400/40 text-emerald-200"}`}>
+                      {isSoldStatus(item.status) ? "SOLD" : "ACTIVE"}
+                    </span>
                   </div>
                   <div className="p-3">
                     <h2 className="text-sm font-medium text-white line-clamp-2 leading-tight min-h-[2.5rem]">

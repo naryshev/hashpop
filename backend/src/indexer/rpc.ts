@@ -2,7 +2,7 @@ import { ethers } from "ethers";
 import type { Logger } from "pino";
 import { EXPECTED_TOPIC0_ITEM_LISTED } from "./decoder";
 
-const RPC_URL = process.env.HEDERA_RPC_URL;
+const RPC_URL = process.env.HEDERA_RPC_URL || "https://testnet.hashio.io/api";
 
 /** Hedera RPC often limits eth_getLogs to ~5 blocks. Use small chunk. */
 const BLOCK_CHUNK = 5;
@@ -45,9 +45,11 @@ export async function fetchItemListedLogsFromRpc(
       : err instanceof Error
         ? err.message
         : "RPC request failed";
-    const isTimeout = typeof msg === "string" && (msg.includes("504") || msg.includes("timeout") || msg.includes("TIMEOUT"));
+    const isRetryable = typeof msg === "string" && (
+      msg.includes("504") || msg.includes("502") || msg.includes("timeout") || msg.includes("TIMEOUT") || msg.includes("Bad Gateway")
+    );
     if (log) {
-      log[isTimeout ? "warn" : "error"]({ err: msg }, "RPC getLogs failed, skipping this cycle");
+      log[isRetryable ? "warn" : "error"]({ err: msg }, "RPC getLogs failed, skipping this cycle");
     } else {
       console.warn("RPC getLogs failed:", msg);
     }

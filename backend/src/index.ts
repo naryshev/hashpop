@@ -14,7 +14,13 @@ const uploadsDir = path.join(process.cwd(), "uploads");
 fs.mkdirSync(uploadsDir, { recursive: true });
 const log = pino({ level: process.env.LOG_LEVEL || "info" });
 
-const connectionString = process.env.DATABASE_URL || "postgres://hedera:hedera@localhost:5432/marketplace";
+// Use verify-full for SSL URLs to avoid pg/node-postgres security warning (Neon, etc.)
+let connectionString = process.env.DATABASE_URL || "postgres://hedera:hedera@localhost:5432/marketplace";
+if (connectionString.includes("sslmode=require") && !connectionString.includes("sslmode=verify-full")) {
+  connectionString = connectionString.replace("sslmode=require", "sslmode=verify-full");
+} else if (connectionString.includes("neon.tech") && !connectionString.includes("sslmode=")) {
+  connectionString += (connectionString.includes("?") ? "&" : "?") + "sslmode=verify-full";
+}
 const adapter = new PrismaPg({ connectionString });
 const prisma = new PrismaClient({ adapter });
 

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AddressDisplay } from "./AddressDisplay";
 import { useHashpackWallet } from "../lib/hashpackWallet";
+import { ConnectWalletButton } from "./ConnectWalletButton";
 
 const HASHPACK_CONNECT_URL = "https://docs.hashpack.app/dapp-developers/hashconnect";
 
@@ -19,7 +20,6 @@ export function WalletButton() {
   const {
     address,
     isConnected,
-    connect,
     disconnect,
     isReady,
     isConnecting,
@@ -63,22 +63,19 @@ export function WalletButton() {
     );
   }
 
-  const handleConnect = async () => {
-    try {
-      await connect();
-    } catch {
-      // error shown in UI
-    }
-  };
-
   return (
     <div className="flex flex-col items-end gap-1">
       {error && (
         <span
-          className="text-xs text-amber-400 max-w-[220px] text-right"
+          className="text-xs text-amber-400 max-w-[260px] text-right"
           title={error}
         >
           {error}
+        </span>
+      )}
+      {error && (
+        <span className="text-xs text-silver/80 max-w-[260px] text-right">
+          Tip: Open in incognito or disable extensions if Connect still fails.
         </span>
       )}
       <a
@@ -89,13 +86,9 @@ export function WalletButton() {
       >
         HashPack connect docs →
       </a>
-      <button
-        onClick={() => void handleConnect()}
-        disabled={!isReady || isConnecting}
-        className="btn-frost-cta disabled:opacity-50 disabled:cursor-not-allowed"
-      >
+      <ConnectWalletButton className="btn-frost-cta disabled:opacity-50 disabled:cursor-not-allowed">
         {!isReady ? "Loading wallet…" : isConnecting ? "Connecting…" : "Connect Wallet"}
-      </button>
+      </ConnectWalletButton>
     </div>
   );
 }

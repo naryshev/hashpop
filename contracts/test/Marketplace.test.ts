@@ -31,7 +31,7 @@ describe("Marketplace", function () {
       await escrow.getAddress(),
       await treasury.getAddress(),
       await reputation.getAddress(),
-      300 // 3% fee
+      300 // 3% fee for other flows; direct non-escrow uses fixed 2%
     );
     await marketplace.waitForDeployment();
     await escrow.setMarketplace(await marketplace.getAddress());
@@ -41,7 +41,7 @@ describe("Marketplace", function () {
     const listingId = ethers.encodeBytes32String("LIST1");
     const price = ethers.parseEther("1.0");
 
-    await expect(marketplace.connect(seller).createListing(listingId, price))
+    await expect(marketplace.connect(seller).createListing(listingId, price, true))
       .to.emit(marketplace, "ItemListed")
       .withArgs(listingId, seller.address, price);
   });
@@ -50,7 +50,7 @@ describe("Marketplace", function () {
     const listingId = ethers.encodeBytes32String("LIST1");
     const price = ethers.parseEther("1.0");
 
-    await marketplace.connect(seller).createListing(listingId, price);
+    await marketplace.connect(seller).createListing(listingId, price, true);
     await expect(
       marketplace.connect(buyer).buyNow(listingId, { value: price })
     )
@@ -58,12 +58,32 @@ describe("Marketplace", function () {
       .withArgs(listingId, buyer.address, seller.address, price);
   });
 
+  it("Should settle immediately without escrow and take 2% fee", async function () {
+    const listingId = ethers.encodeBytes32String("LIST_DIRECT");
+    const price = ethers.parseEther("1.0");
+    const fee = (price * 200n) / 10000n;
+    const sellerAmount = price - fee;
+
+    await marketplace.connect(seller).createListing(listingId, price, false);
+    const sellerBefore = await ethers.provider.getBalance(seller.address);
+    const treasuryBefore = await ethers.provider.getBalance(await treasury.getAddress());
+
+    await expect(marketplace.connect(buyer).buyNow(listingId, { value: price }))
+      .to.emit(marketplace, "ItemPurchased")
+      .withArgs(listingId, buyer.address, seller.address, price);
+
+    const listing = await marketplace.listings(listingId);
+    expect(Number(listing.status)).to.equal(3); // COMPLETED
+    expect(await ethers.provider.getBalance(await treasury.getAddress())).to.equal(treasuryBefore + fee);
+    expect(await ethers.provider.getBalance(seller.address)).to.equal(sellerBefore + sellerAmount);
+  });
+
   it("Should update listing price and emit PriceUpdated", async function () {
     const listingId = ethers.encodeBytes32String("LIST2");
     const initialPrice = ethers.parseEther("1.0");
     const newPrice = ethers.parseEther("1.5");
 
-    await marketplace.connect(seller).createListing(listingId, initialPrice);
+    await marketplace.connect(seller).createListing(listingId, initialPrice, true);
     await expect(marketplace.connect(seller).updateListingPrice(listingId, newPrice))
       .to.emit(marketplace, "PriceUpdated")
       .withArgs(listingId, newPrice);
@@ -77,7 +97,7 @@ describe("Marketplace", function () {
     const initialPrice = ethers.parseEther("1.0");
     const newPrice = ethers.parseEther("2.0");
 
-    await marketplace.connect(seller).createListing(listingId, initialPrice);
+    await marketplace.connect(seller).createListing(listingId, initialPrice, true);
     await expect(
       marketplace.connect(buyer).updateListingPrice(listingId, newPrice)
     ).to.be.revertedWith("Not seller");
@@ -88,7 +108,7 @@ describe("Marketplace", function () {
     const initialPrice = ethers.parseEther("1.0");
     const newPrice = ethers.parseEther("1.4");
 
-    await marketplace.connect(seller).createListing(listingId, initialPrice);
+    await marketplace.connect(seller).createListing(listingId, initialPrice, true);
     await marketplace.connect(seller).updateListingPrice(listingId, newPrice);
 
     await expect(
@@ -101,7 +121,7 @@ describe("Marketplace", function () {
     const price = ethers.parseEther("1.0");
     const secondBuyer = owner;
 
-    await marketplace.connect(seller).createListing(listingId, price);
+    await marketplace.connect(seller).createListing(listingId, price, true);
     await marketplace.connect(buyer).buyNow(listingId, { value: price });
 
     await expect(
@@ -115,7 +135,7 @@ describe("Marketplace", function () {
 
     const marketplaceRole = await escrow.MARKETPLACE_ROLE();
     await escrow.revokeRole(marketplaceRole, await marketplace.getAddress());
-    await marketplace.connect(seller).createListing(listingId, price);
+    await marketplace.connect(seller).createListing(listingId, price, true);
 
     await expect(
       marketplace.connect(buyer).buyNow(listingId, { value: price })
@@ -131,7 +151,7 @@ describe("Marketplace", function () {
     const price = ethers.parseEther("1.0");
     const offerAmount = ethers.parseEther("0.8");
 
-    await marketplace.connect(seller).createListing(listingId, price);
+    await marketplace.connect(seller).createListing(listingId, price, true);
     await expect(marketplace.connect(buyer).makeOffer(listingId, { value: offerAmount }))
       .to.emit(marketplace, "OfferMade")
       .withArgs(listingId, buyer.address, offerAmount);
@@ -146,7 +166,7 @@ describe("Marketplace", function () {
     const price = ethers.parseEther("1.0");
     const offerAmount = ethers.parseEther("0.75");
 
-    await marketplace.connect(seller).createListing(listingId, price);
+    await marketplace.connect(seller).createListing(listingId, price, true);
     await marketplace.connect(buyer).makeOffer(listingId, { value: offerAmount });
 
     await expect(marketplace.connect(seller).acceptOffer(listingId, buyer.address))
@@ -162,7 +182,7 @@ describe("Marketplace", function () {
     const price = ethers.parseEther("1.0");
     const offerAmount = ethers.parseEther("0.7");
 
-    await marketplace.connect(seller).createListing(listingId, price);
+    await marketplace.connect(seller).createListing(listingId, price, true);
     await marketplace.connect(buyer).makeOffer(listingId, { value: offerAmount });
 
     await expect(marketplace.connect(seller).rejectOffer(listingId, buyer.address))
@@ -175,7 +195,7 @@ describe("Marketplace", function () {
     const price = ethers.parseEther("1.0");
     const offerAmount = ethers.parseEther("0.6");
 
-    await marketplace.connect(seller).createListing(listingId, price);
+    await marketplace.connect(seller).createListing(listingId, price, true);
     await marketplace.connect(buyer).makeOffer(listingId, { value: offerAmount });
 
     await expect(
@@ -187,7 +207,7 @@ describe("Marketplace", function () {
     const listingId = ethers.encodeBytes32String("LIST11");
     const price = ethers.parseEther("1.0");
 
-    await marketplace.connect(seller).createListing(listingId, price);
+    await marketplace.connect(seller).createListing(listingId, price, true);
     await marketplace.connect(buyer).buyNow(listingId, { value: price });
     await escrow.connect(seller).confirmShipment(listingId);
     await escrow.connect(buyer).confirmReceipt(listingId);

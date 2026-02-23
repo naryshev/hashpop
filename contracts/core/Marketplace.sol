@@ -30,6 +30,7 @@ contract Marketplace is ReentrancyGuard, Pausable, AccessControl, Roles {
         uint256 createdAt;
         ListingStatus status;
         bytes32 escrowId;
+        bool requireEscrow;
     }
 
     struct Offer {
@@ -45,6 +46,7 @@ contract Marketplace is ReentrancyGuard, Pausable, AccessControl, Roles {
     Treasury public treasury;
     Reputation public reputation;
     uint16 public platformFeeBps;
+    uint16 public constant DIRECT_SALE_FEE_BPS = 200; // 2%
 
     event ItemListed(bytes32 indexed listingId, address indexed seller, uint256 price);
     event ItemPurchased(bytes32 indexed listingId, address indexed buyer, address indexed seller, uint256 price);
@@ -80,7 +82,7 @@ contract Marketplace is ReentrancyGuard, Pausable, AccessControl, Roles {
     /**
      * @notice Create a fixed-price listing.
      */
-    function createListing(bytes32 listingId, uint256 price) external whenNotPaused {
+    function createListing(bytes32 listingId, uint256 price, bool requireEscrow) external whenNotPaused {
         require(listings[listingId].status == ListingStatus.NONE, "Listing exists");
         require(price > 0, "Invalid price");
 
@@ -89,14 +91,17 @@ contract Marketplace is ReentrancyGuard, Pausable, AccessControl, Roles {
             price: price,
             createdAt: block.timestamp,
             status: ListingStatus.LISTED,
-            escrowId: bytes32(0)
+            escrowId: bytes32(0),
+            requireEscrow: requireEscrow
         });
 
         emit ItemListed(listingId, msg.sender, price);
     }
 
     /**
-     * @notice Buy item at listed price. Creates escrow.
+     * @notice Buy item at listed price.
+     * @dev If listing.requireEscrow is true, funds go into escrow.
+     *      Otherwise, payment settles immediately: 2% fee to treasury, remainder to seller.
      */
     function buyNow(bytes32 listingId) external payable whenNotPaused nonReentrant {
         Listing storage listing = listings[listingId];
@@ -105,11 +110,13 @@ contract Marketplace is ReentrancyGuard, Pausable, AccessControl, Roles {
         require(msg.sender != listing.seller, "Cannot buy own");
 
         _refundActiveOfferIfAny(listingId);
-        listing.status = ListingStatus.LOCKED;
-        listing.escrowId = listingId;
-
-        // Create escrow
-        escrow.createEscrow{value: msg.value}(listingId, msg.sender, listing.seller, msg.value);
+        if (listing.requireEscrow) {
+            listing.status = ListingStatus.LOCKED;
+            listing.escrowId = listingId;
+            escrow.createEscrow{value: msg.value}(listingId, msg.sender, listing.seller, msg.value);
+        } else {
+            _settleDirectSale(listing, msg.value);
+        }
 
         emit ItemPurchased(listingId, msg.sender, listing.seller, listing.price);
     }
@@ -148,10 +155,13 @@ contract Marketplace is ReentrancyGuard, Pausable, AccessControl, Roles {
             "Invalid ED25519 signature"
         );
 
-        listing.status = ListingStatus.LOCKED;
-        listing.escrowId = listingId;
-
-        escrow.createEscrow{value: msg.value}(listingId, buyerAlias, listing.seller, msg.value);
+        if (listing.requireEscrow) {
+            listing.status = ListingStatus.LOCKED;
+            listing.escrowId = listingId;
+            escrow.createEscrow{value: msg.value}(listingId, buyerAlias, listing.seller, msg.value);
+        } else {
+            _settleDirectSale(listing, msg.value);
+        }
 
         emit ItemPurchased(listingId, buyerAlias, listing.seller, listing.price);
     }
@@ -205,7 +215,8 @@ contract Marketplace is ReentrancyGuard, Pausable, AccessControl, Roles {
     }
 
     /**
-     * @notice Seller accepts an active offer and routes funds into escrow.
+     * @notice Seller accepts an active offer.
+     * @dev If requireEscrow is false, settles immediately with 2% fee.
      */
     function acceptOffer(bytes32 listingId, address buyer) external whenNotPaused nonReentrant {
         Listing storage listing = listings[listingId];
@@ -222,10 +233,13 @@ contract Marketplace is ReentrancyGuard, Pausable, AccessControl, Roles {
         offer.amount = 0;
         activeOfferBuyer[listingId] = address(0);
 
-        listing.status = ListingStatus.LOCKED;
-        listing.escrowId = listingId;
-
-        escrow.createEscrow{value: amount}(listingId, buyer, listing.seller, amount);
+        if (listing.requireEscrow) {
+            listing.status = ListingStatus.LOCKED;
+            listing.escrowId = listingId;
+            escrow.createEscrow{value: amount}(listingId, buyer, listing.seller, amount);
+        } else {
+            _settleDirectSale(listing, amount);
+        }
 
         emit OfferAccepted(listingId, buyer, amount);
         emit ItemPurchased(listingId, buyer, listing.seller, amount);
@@ -310,5 +324,17 @@ contract Marketplace is ReentrancyGuard, Pausable, AccessControl, Roles {
         (bool success, ) = buyer.call{value: amount}("");
         require(success, "Offer refund failed");
         emit OfferCancelled(listingId, buyer, amount);
+    }
+
+    function _settleDirectSale(Listing storage listing, uint256 amount) internal {
+        uint256 fee = (amount * DIRECT_SALE_FEE_BPS) / 10000;
+        uint256 sellerAmount = amount - fee;
+        listing.status = ListingStatus.COMPLETED;
+        listing.escrowId = bytes32(0);
+        if (fee > 0) {
+            treasury.collectFee{value: fee}();
+        }
+        (bool sellerPaid, ) = listing.seller.call{value: sellerAmount}("");
+        require(sellerPaid, "Seller payout failed");
     }
 }
