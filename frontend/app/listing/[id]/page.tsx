@@ -65,6 +65,16 @@ type Listing = {
 };
 
 export default function ListingPage() {
+  const accountIdToLongZeroAddress = (value: string): `0x${string}` => {
+    const [shardRaw, realmRaw, numRaw] = value.split(".");
+    const shard = BigInt(shardRaw || "0");
+    const realm = BigInt(realmRaw || "0");
+    const num = BigInt(numRaw || "0");
+    const shardHex = shard.toString(16).padStart(8, "0");
+    const realmHex = realm.toString(16).padStart(16, "0");
+    const numHex = num.toString(16).padStart(16, "0");
+    return `0x${(shardHex + realmHex + numHex).toLowerCase()}` as `0x${string}`;
+  };
   const params = useParams();
   const id = (params.id as string) || "";
   const [listing, setListing] = useState<Listing | null>(null);
@@ -96,7 +106,7 @@ export default function ListingPage() {
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const [reportMessage, setReportMessage] = useState<string | null>(null);
   const router = useRouter();
-  const { address } = useHashpackWallet();
+  const { address, accountId } = useHashpackWallet();
   const chainId = activeHederaChain.id;
   const { cancel, isPending: cancelPending, isSuccess: cancelSuccess, hash: cancelTxHash } = useCancelListing();
   const { updatePriceOnChain, isPending: priceUpdatePending } = useUpdateListingPrice();
@@ -314,7 +324,11 @@ export default function ListingPage() {
 
   const displayId = formatListingId(id);
   const displayTitle = listing?.title || displayId || "Untitled";
-  const isSeller = address && item?.seller && address.toLowerCase() === item.seller.toLowerCase();
+  const walletAddressCandidates = [
+    address?.toLowerCase(),
+    accountId ? accountIdToLongZeroAddress(accountId).toLowerCase() : null,
+  ].filter((v): v is string => !!v);
+  const isSeller = !!item?.seller && walletAddressCandidates.includes(item.seller.toLowerCase());
   const onChainStatusNum = Number(onChainListing?.status ?? -1);
   const isListedOnChain = onChainStatusNum === -1 ? null : onChainStatusNum === 1;
   const isListed = listing?.status === "LISTED" && (isListedOnChain == null ? true : isListedOnChain);
@@ -398,7 +412,8 @@ export default function ListingPage() {
       }
       const mediaUrls = keptUrls.length > 0 || newUrls.length > 0 ? [...keptUrls, ...newUrls] : undefined;
       const body: Record<string, unknown> = {
-        sellerAddress: address,
+        // Use canonical DB seller value to avoid alias/long-zero mismatch on backend ownership check.
+        sellerAddress: listing.seller || address,
         title: editTitle.trim() || undefined,
         subtitle: editSubtitle.trim() || undefined,
         description: editDescription.trim() || undefined,
