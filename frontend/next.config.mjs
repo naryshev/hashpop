@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  swcMinify: false,
   webpack: (config, { isServer }) => {
     // Stub so @metamask/sdk (pulled in by wagmi/connectors) doesn't break the build
     config.resolve.fallback = {
