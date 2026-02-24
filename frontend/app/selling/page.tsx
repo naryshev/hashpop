@@ -65,7 +65,15 @@ export default function SellingPage() {
                             </Link>
                             <p className="text-xs text-silver mt-0.5">{formatListingDate(row.createdAt)}</p>
                           </div>
-                          <span className="text-chrome shrink-0">{formatHbarWithUsd(formatPriceForDisplay(row.price || "0"), usdRate)}</span>
+                          <div className="shrink-0 flex items-center gap-2">
+                            <span className="text-chrome">{formatHbarWithUsd(formatPriceForDisplay(row.price || "0"), usdRate)}</span>
+                            <Link
+                              href={`/listing/${encodeURIComponent(row.id)}`}
+                              className="btn-frost-cta px-3 py-1.5 text-xs border-white/20"
+                            >
+                              Edit
+                            </Link>
+                          </div>
                         </li>
                       ))}
                     </ul>
@@ -89,7 +97,15 @@ export default function SellingPage() {
                               {formatListingDate(row.updatedAt ?? row.createdAt)} · {row.status}
                             </p>
                           </div>
-                          <span className="text-chrome shrink-0">{formatHbarWithUsd(formatPriceForDisplay(row.price || "0"), usdRate)}</span>
+                          <div className="shrink-0 flex items-center gap-2">
+                            <span className="text-chrome">{formatHbarWithUsd(formatPriceForDisplay(row.price || "0"), usdRate)}</span>
+                            <Link
+                              href={`/listing/${encodeURIComponent(row.id)}`}
+                              className="btn-frost px-3 py-1.5 text-xs border-white/20"
+                            >
+                              View
+                            </Link>
+                          </div>
                         </li>
                       ))}
                     </ul>

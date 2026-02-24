@@ -230,10 +230,8 @@ export default function ListingPage() {
   }, [editError, priceUpdateFailedBanner, listing?.id, id]);
 
   useEffect(() => {
-    const onChainStatus = Number(onChainListing?.status ?? -1);
-    const listed = listing?.status === "LISTED" && (onChainStatus === -1 ? true : onChainStatus === 1);
-    if (!listed && editing) setEditing(false);
-  }, [listing?.status, onChainListing?.status, editing]);
+    if (listing?.status !== "LISTED" && editing) setEditing(false);
+  }, [listing?.status, editing]);
 
   const toggleWishlist = async () => {
     if (!address || !id || wishlistLoading) return;
@@ -320,6 +318,7 @@ export default function ListingPage() {
   const onChainStatusNum = Number(onChainListing?.status ?? -1);
   const isListedOnChain = onChainStatusNum === -1 ? null : onChainStatusNum === 1;
   const isListed = listing?.status === "LISTED" && (isListedOnChain == null ? true : isListedOnChain);
+  const isSellerActiveListing = listing?.status === "LISTED";
   const isLockedOnChain = onChainStatusNum === 2;
 
   const existingMediaUrls = item
@@ -675,7 +674,7 @@ export default function ListingPage() {
               </>
             )}
           </div>
-          {isSeller && isListed && editing && (
+          {isSeller && isSellerActiveListing && editing && (
             <div className="glass-card p-4 space-y-3">
               <h3 className="text-white font-medium">Edit listing</h3>
               <label className="block">
@@ -865,7 +864,7 @@ export default function ListingPage() {
             <p className="text-silver text-sm flex items-center gap-2">
               <AddressDisplay address={item!.seller} className="text-chrome font-mono text-xs" />
             </p>
-            {isSeller && isListed && !editing && (
+            {isSeller && isSellerActiveListing && !editing && (
               <button
                 type="button"
                 onClick={() => setEditing(true)}
