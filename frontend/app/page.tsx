@@ -23,8 +23,38 @@ function formatListingId(id: string): string {
   }
 }
 
-function isSoldStatus(status?: string): boolean {
-  return !!status && status !== "LISTED";
+function normalizeListingStatus(status?: string): string {
+  return String(status || "").trim().toUpperCase();
+}
+
+function isActiveStatus(status?: string): boolean {
+  return normalizeListingStatus(status) === "LISTED";
+}
+
+function getStatusBadge(status?: string): { label: string; className: string } {
+  const normalized = normalizeListingStatus(status);
+  if (normalized === "LISTED") {
+    return {
+      label: "ACTIVE",
+      className: "bg-emerald-500/20 border-emerald-400/40 text-emerald-200",
+    };
+  }
+  if (normalized === "LOCKED") {
+    return {
+      label: "LOCKED",
+      className: "bg-amber-500/20 border-amber-400/40 text-amber-200",
+    };
+  }
+  if (normalized === "CANCELLED") {
+    return {
+      label: "CANCELLED",
+      className: "bg-zinc-500/20 border-zinc-300/40 text-zinc-200",
+    };
+  }
+  return {
+    label: "SOLD",
+    className: "bg-rose-500/20 border-rose-400/40 text-rose-200",
+  };
 }
 
 export default function Home() {
@@ -49,9 +79,9 @@ export default function Home() {
       .then((data: { listings?: any[] }) => {
         const list = (data.listings || []).map((l: any) => ({ ...l, itemType: "listing" as const }));
         setListings(list.sort((a, b) => {
-          const aSold = isSoldStatus(a.status);
-          const bSold = isSoldStatus(b.status);
-          if (aSold !== bSold) return aSold ? 1 : -1;
+          const aActive = isActiveStatus(a.status);
+          const bActive = isActiveStatus(b.status);
+          if (aActive !== bActive) return aActive ? -1 : 1;
           return new Date((b.createdAt as string) || 0).getTime() - new Date((a.createdAt as string) || 0).getTime();
         }).slice(0, 6));
       })
@@ -107,8 +137,8 @@ export default function Home() {
                         <div className="absolute top-2 right-2">
                           <WishlistButton itemId={item.id} itemType={item.itemType || "listing"} compact />
                         </div>
-                        <span className={`absolute top-2 left-2 rounded-full px-2 py-0.5 text-[10px] font-semibold border ${isSoldStatus(item.status) ? "bg-rose-500/20 border-rose-400/40 text-rose-200" : "bg-emerald-500/20 border-emerald-400/40 text-emerald-200"}`}>
-                          {isSoldStatus(item.status) ? "SOLD" : "ACTIVE"}
+                        <span className={`absolute top-2 left-2 rounded-full px-2 py-0.5 text-[10px] font-semibold border ${getStatusBadge(item.status).className}`}>
+                          {getStatusBadge(item.status).label}
                         </span>
                       </div>
                       <div className="p-2 min-h-0">
@@ -144,8 +174,8 @@ export default function Home() {
                       <div className="absolute top-2 right-2">
                         <WishlistButton itemId={item.id} itemType={item.itemType || "listing"} compact />
                       </div>
-                      <span className={`absolute top-2 left-2 rounded-full px-2 py-0.5 text-[10px] font-semibold border ${isSoldStatus(item.status) ? "bg-rose-500/20 border-rose-400/40 text-rose-200" : "bg-emerald-500/20 border-emerald-400/40 text-emerald-200"}`}>
-                        {isSoldStatus(item.status) ? "SOLD" : "ACTIVE"}
+                      <span className={`absolute top-2 left-2 rounded-full px-2 py-0.5 text-[10px] font-semibold border ${getStatusBadge(item.status).className}`}>
+                        {getStatusBadge(item.status).label}
                       </span>
                     </div>
                     <div className="p-3">

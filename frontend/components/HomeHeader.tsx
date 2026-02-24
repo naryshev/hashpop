@@ -58,14 +58,20 @@ export function HomeHeader() {
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [myHbayOpen, setMyHbayOpen] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
+  const [postedWithin, setPostedWithin] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
   const myHbayRef = useRef<HTMLDivElement>(null);
+  const advancedRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       const target = e.target as Node;
       if (menuRef.current && !menuRef.current.contains(target)) setMobileOpen(false);
       if (myHbayRef.current && !myHbayRef.current.contains(target)) setMyHbayOpen(false);
+      if (advancedRef.current && !advancedRef.current.contains(target)) setAdvancedOpen(false);
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -76,6 +82,19 @@ export function HomeHeader() {
     setMobileOpen(false);
     if (searchQuery.trim()) router.push(`/marketplace?q=${encodeURIComponent(searchQuery.trim())}`);
     else router.push("/marketplace");
+  };
+
+  const handleAdvancedApply = (e: React.FormEvent) => {
+    e.preventDefault();
+    const params = new URLSearchParams();
+    const q = searchQuery.trim();
+    if (q) params.set("q", q);
+    if (minPrice.trim()) params.set("minPrice", minPrice.trim());
+    if (maxPrice.trim()) params.set("maxPrice", maxPrice.trim());
+    if (postedWithin) params.set("postedWithin", postedWithin);
+    const qs = params.toString();
+    router.push(qs ? `/marketplace?${qs}` : "/marketplace");
+    setAdvancedOpen(false);
   };
 
   return (
@@ -219,7 +238,84 @@ export function HomeHeader() {
               </select>
             </div>
             <button type="submit" className="btn-frost-cta text-sm py-2.5 px-4 shrink-0">Search</button>
-            <Link href="/marketplace" className="hidden sm:block text-sm text-silver hover:text-white shrink-0">Advanced</Link>
+            <div ref={advancedRef} className="hidden sm:block relative shrink-0">
+              <button
+                type="button"
+                onClick={() => setAdvancedOpen((o) => !o)}
+                className="text-sm text-silver hover:text-white"
+              >
+                Advanced
+              </button>
+              {advancedOpen && (
+                <div className="absolute right-0 mt-2 w-[320px] rounded-xl border border-white/10 bg-[var(--bg)] shadow-xl p-4 z-50">
+                  <form onSubmit={handleAdvancedApply} className="space-y-3">
+                    <p className="text-white text-sm font-medium">Advanced Search</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="block">
+                        <span className="text-xs text-silver">Min price (HBAR)</span>
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          value={minPrice}
+                          onChange={(e) => setMinPrice(e.target.value)}
+                          className="input-frost mt-1 w-full text-sm"
+                          placeholder="0"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-xs text-silver">Max price (HBAR)</span>
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          value={maxPrice}
+                          onChange={(e) => setMaxPrice(e.target.value)}
+                          className="input-frost mt-1 w-full text-sm"
+                          placeholder="100"
+                        />
+                      </label>
+                    </div>
+                    <label className="block">
+                      <span className="text-xs text-silver">Posted within</span>
+                      <select
+                        value={postedWithin}
+                        onChange={(e) => setPostedWithin(e.target.value)}
+                        className="input-frost mt-1 w-full text-sm"
+                      >
+                        <option value="">Any time</option>
+                        <option value="1d">Last day</option>
+                        <option value="1w">Last week</option>
+                        <option value="1m">Last month</option>
+                        <option value="3m">Last 3 months</option>
+                        <option value="6m">Last 6 months</option>
+                        <option value="1y">Last year</option>
+                        <option value="2y">Last 2 years</option>
+                      </select>
+                    </label>
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMinPrice("");
+                          setMaxPrice("");
+                          setPostedWithin("");
+                          setAdvancedOpen(false);
+                          const q = searchQuery.trim();
+                          router.push(q ? `/marketplace?q=${encodeURIComponent(q)}` : "/marketplace");
+                        }}
+                        className="btn-frost border-white/20 text-xs px-3 py-2"
+                      >
+                        Reset
+                      </button>
+                      <button type="submit" className="btn-frost-cta text-xs px-3 py-2">
+                        Apply filters
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+            </div>
           </form>
         </div>
       </div>

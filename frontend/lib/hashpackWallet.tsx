@@ -364,6 +364,24 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
       }
       const modalErr = await openModal.call(hc, "dark").then(() => null).catch((err: unknown) => err);
       if (modalErr) {
+        const modalMsg =
+          modalErr instanceof Error
+            ? modalErr.message
+            : typeof modalErr === "string"
+              ? modalErr
+              : "";
+        if (/pairing already exists/i.test(modalMsg)) {
+          // Recover from stale WC sessions by resetting connector storage and requesting a fresh pairing.
+          await hc.disconnect().catch(() => {});
+          clearWalletConnectorStorage();
+          const retryErr = await openModal.call(hc, "dark").then(() => null).catch((err: unknown) => err);
+          if (retryErr) {
+            setError("Pairing session already existed. We reset stale pairing data, but opening a new pairing still failed. Please try again.");
+            return;
+          }
+          await waitForPairing(connectWaitRef, PAIRING_WAIT_MS);
+          return;
+        }
         setError("Could not open wallet pairing. Try a private/incognito window or disable browser extensions.");
         return;
       }
