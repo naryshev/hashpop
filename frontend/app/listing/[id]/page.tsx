@@ -316,6 +316,10 @@ export default function ListingPage() {
   const isListed = listing?.status === "LISTED" && (isListedOnChain == null ? true : isListedOnChain);
   const isLockedOnChain = onChainStatusNum === 2;
 
+  useEffect(() => {
+    if (!isListed && editing) setEditing(false);
+  }, [isListed, editing]);
+
   const existingMediaUrls = item
     ? (item.mediaUrls?.length ? item.mediaUrls : item.imageUrl ? [item.imageUrl] : [])
     : [];
@@ -669,12 +673,7 @@ export default function ListingPage() {
               </>
             )}
           </div>
-          {isSeller && isListed && !editing && (
-            <button type="button" onClick={() => setEditing(true)} className="btn-frost-cta w-full border-white/20 text-silver hover:text-white">
-              Edit listing
-            </button>
-          )}
-          {isSeller && editing && (
+          {isSeller && isListed && editing && (
             <div className="glass-card p-4 space-y-3">
               <h3 className="text-white font-medium">Edit listing</h3>
               <label className="block">
@@ -773,7 +772,11 @@ export default function ListingPage() {
             </button>
           </div>
 
-          {listing && (listing.status === "LOCKED" || isLockedOnChain) && (
+          {listing && (
+            listing.status === "LOCKED" ||
+            isLockedOnChain ||
+            (!isListed && !!listing.requireEscrow)
+          ) && (
             <EscrowPanel
               listingId={listing.id}
               sellerAddress={listing.seller}
@@ -860,17 +863,25 @@ export default function ListingPage() {
             <p className="text-silver text-sm flex items-center gap-2">
               <AddressDisplay address={item!.seller} className="text-chrome font-mono text-xs" />
             </p>
-            {!isListed ? (
-              isSeller ? (
-                walletConnected ? (
-                  <Link href={`/create?duplicate=${encodeURIComponent(id)}`} className="btn-frost-cta w-full mt-2 inline-block text-center border-white/20">
-                    Duplicate listing
-                  </Link>
-                ) : (
-                  <div className="rounded-lg border border-white/20 bg-white/5 px-4 py-3 text-center text-silver text-sm mt-2">Connect wallet to duplicate</div>
-                )
-              ) : null
-            ) : (
+            {isSeller && isListed && !editing && (
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="btn-frost-cta w-full mt-2 border-white/20 text-silver hover:text-white"
+              >
+                Edit listing
+              </button>
+            )}
+            {isSeller && (
+              walletConnected ? (
+                <Link href={`/create?duplicate=${encodeURIComponent(id)}`} className="btn-frost-cta w-full mt-2 inline-block text-center border-white/20">
+                  Duplicate listing
+                </Link>
+              ) : (
+                <div className="rounded-lg border border-white/20 bg-white/5 px-4 py-3 text-center text-silver text-sm mt-2">Connect wallet to duplicate</div>
+              )
+            )}
+            {(!isSeller || isListed) && (
               <button
                 type="button"
                 disabled={!walletConnected}
