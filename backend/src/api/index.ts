@@ -76,6 +76,11 @@ function isUsableContractAddress(address: string | undefined): address is string
 }
 
 const s3PublicBase = process.env.S3_PUBLIC_URL?.replace(/\/$/, "") ?? "";
+const listingReportWebhookUrl = process.env.DISCORD_REPORT_WEBHOOK_URL?.trim() ?? "";
+const listingReportMentionRoleId = process.env.DISCORD_REPORT_MENTION_ROLE_ID?.trim() ?? "";
+const REPORT_WINDOW_MS = 10 * 60 * 1000;
+const REPORT_MAX_PER_WINDOW = 5;
+const listingReportRate = new Map<string, number[]>();
 
 function rewriteMediaUrlForClient(url: string | null | undefined): string | null | undefined {
   if (!url || !s3PublicBase) return url;
@@ -87,6 +92,18 @@ function rewriteMediaUrlForClient(url: string | null | undefined): string | null
 function rewriteMediaUrlsForClient(urls: string[] | null | undefined): string[] | undefined {
   if (!Array.isArray(urls)) return undefined;
   return urls.map((u) => rewriteMediaUrlForClient(u) ?? u);
+}
+
+function isReportRateLimited(key: string): boolean {
+  const now = Date.now();
+  const recent = (listingReportRate.get(key) ?? []).filter((ts) => now - ts < REPORT_WINDOW_MS);
+  if (recent.length >= REPORT_MAX_PER_WINDOW) {
+    listingReportRate.set(key, recent);
+    return true;
+  }
+  recent.push(now);
+  listingReportRate.set(key, recent);
+  return false;
 }
 
 const ESCROW_ABI_VIEW = [
@@ -842,6 +859,75 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     } catch (err) {
       log.error({ err }, "Failed to fetch listing");
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  router.post("/listing/:id/report", async (req, res) => {
+    try {
+      if (!listingReportWebhookUrl) {
+        return res.status(503).json({ error: "Reporting is not configured yet." });
+      }
+      const id = normalizeListingId(req.params.id ?? "");
+      const { reporterAddress, reason, details } = (req.body || {}) as {
+        reporterAddress?: string;
+        reason?: string;
+        details?: string;
+      };
+      const reporter = (reporterAddress || "").trim().toLowerCase();
+      if (!/^0x[0-9a-f]{40}$/.test(reporter)) {
+        return res.status(400).json({ error: "Valid reporterAddress is required." });
+      }
+      const allowedReasons = new Set(["scam", "counterfeit", "prohibited", "abuse", "other"]);
+      const reportReason = String(reason || "").trim().toLowerCase();
+      if (!allowedReasons.has(reportReason)) {
+        return res.status(400).json({ error: "Invalid report reason." });
+      }
+      const reportDetails = typeof details === "string" ? details.trim().slice(0, 1000) : "";
+      const listing = await prisma.listing.findUnique({ where: { id } });
+      if (!listing) return res.status(404).json({ error: "Listing not found" });
+      if (listing.seller.toLowerCase() === reporter) {
+        return res.status(400).json({ error: "You cannot report your own listing." });
+      }
+      const originIpRaw = String((req.headers["x-forwarded-for"] || req.socket.remoteAddress || req.ip || "")).split(",")[0]?.trim();
+      const rateKey = `${reporter}:${originIpRaw || "ip-unknown"}`;
+      if (isReportRateLimited(rateKey)) {
+        return res.status(429).json({ error: "Too many reports right now. Please try again shortly." });
+      }
+
+      const listingUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://hashpop.io"}/listing/${encodeURIComponent(id)}`;
+      const mentionPrefix = listingReportMentionRoleId ? `<@&${listingReportMentionRoleId}> ` : "";
+      const payload = {
+        content: `${mentionPrefix}New listing report submitted`,
+        embeds: [
+          {
+            title: "Listing report",
+            color: 0xff4d4f,
+            fields: [
+              { name: "Listing", value: id, inline: false },
+              { name: "Reason", value: reportReason, inline: true },
+              { name: "Reporter", value: reporter, inline: true },
+              { name: "Seller", value: listing.seller.toLowerCase(), inline: true },
+              { name: "Listing URL", value: listingUrl, inline: false },
+              { name: "Details", value: reportDetails || "No additional details provided.", inline: false },
+            ],
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      };
+      const discordRes = await fetch(listingReportWebhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!discordRes.ok) {
+        const text = await discordRes.text().catch(() => "");
+        log.error({ status: discordRes.status, body: text }, "Discord report webhook failed");
+        return res.status(502).json({ error: "Could not forward report to moderation channel." });
+      }
+      return res.json({ ok: true });
+    } catch (err) {
+      log.error({ err }, "Failed to report listing");
+      return res.status(500).json({ error: "Internal server error" });
     }
   });
 

@@ -90,6 +90,11 @@ export default function ListingPage() {
   const [suggestError, setSuggestError] = useState<string | null>(null);
   const [inWishlist, setInWishlist] = useState(false);
   const [wishlistLoading, setWishlistLoading] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState("scam");
+  const [reportDetails, setReportDetails] = useState("");
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [reportMessage, setReportMessage] = useState<string | null>(null);
   const router = useRouter();
   const { address } = useHashpackWallet();
   const chainId = activeHederaChain.id;
@@ -242,6 +247,41 @@ export default function ListingPage() {
       }
     } finally {
       setWishlistLoading(false);
+    }
+  };
+
+  const submitReport = async () => {
+    if (!listing || !address) {
+      setReportMessage("Connect your wallet before reporting.");
+      return;
+    }
+    if (address.toLowerCase() === listing.seller.toLowerCase()) {
+      setReportMessage("You cannot report your own listing.");
+      return;
+    }
+    setReportSubmitting(true);
+    setReportMessage(null);
+    try {
+      const res = await fetch(`${getApiUrl()}/api/listing/${encodeURIComponent(listing.id)}/report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reporterAddress: address.toLowerCase(),
+          reason: reportReason,
+          details: reportDetails.trim(),
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body?.error || "Could not send report.");
+      }
+      setReportMessage("Report submitted. Our moderation team has been notified.");
+      setReportDetails("");
+      setTimeout(() => setReportOpen(false), 1200);
+    } catch (e) {
+      setReportMessage(e instanceof Error ? e.message : "Could not send report.");
+    } finally {
+      setReportSubmitting(false);
     }
   };
 
@@ -462,6 +502,65 @@ export default function ListingPage() {
         </div>
       )}
 
+      {reportOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="glass-card p-6 w-full max-w-md space-y-4">
+            <h2 className="text-lg font-semibold text-white">Report listing</h2>
+            <p className="text-sm text-silver">This report is sent to the moderation team on Discord.</p>
+            <label className="block">
+              <span className="text-xs text-silver">Reason</span>
+              <select
+                value={reportReason}
+                onChange={(e) => setReportReason(e.target.value)}
+                className="input-frost mt-1 w-full"
+              >
+                <option value="scam">Scam / fraud</option>
+                <option value="counterfeit">Counterfeit item</option>
+                <option value="prohibited">Prohibited item</option>
+                <option value="abuse">Abusive content</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-xs text-silver">Details (optional)</span>
+              <textarea
+                value={reportDetails}
+                onChange={(e) => setReportDetails(e.target.value)}
+                className="input-frost mt-1 w-full min-h-[90px] resize-y"
+                maxLength={1000}
+                placeholder="Add any useful context for moderators."
+              />
+            </label>
+            {reportMessage && (
+              <p className={`text-sm ${reportMessage.toLowerCase().includes("submitted") ? "text-emerald-300" : "text-rose-300"}`}>
+                {reportMessage}
+              </p>
+            )}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (reportSubmitting) return;
+                  setReportOpen(false);
+                  setReportMessage(null);
+                }}
+                className="btn-frost flex-1 border-white/20"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => { void submitReport(); }}
+                disabled={reportSubmitting || !walletConnected}
+                className="btn-frost-cta flex-1 disabled:opacity-60"
+              >
+                {reportSubmitting ? "Sending…" : "Send report"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {(suggestSending || suggestSuccess) && (
         <div
           className={`fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity duration-500 ${suggestFadeOut ? "opacity-0" : "opacity-100"}`}
@@ -554,8 +653,21 @@ export default function ListingPage() {
             <Link href="/create" className="text-chrome hover:text-white underline inline-flex items-center gap-1">
               Create a listing now
             </Link>
-            <span className="text-white/40">|</span>
-            <button type="button" className="text-silver hover:text-rose-300 underline">Report listing</button>
+            {!isSeller && (
+              <>
+                <span className="text-white/40">|</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReportOpen(true);
+                    setReportMessage(null);
+                  }}
+                  className="text-silver hover:text-rose-300 underline"
+                >
+                  Report listing
+                </button>
+              </>
+            )}
           </div>
           {isSeller && isListed && !editing && (
             <button type="button" onClick={() => setEditing(true)} className="btn-frost-cta w-full border-white/20 text-silver hover:text-white">
@@ -749,13 +861,15 @@ export default function ListingPage() {
               <AddressDisplay address={item!.seller} className="text-chrome font-mono text-xs" />
             </p>
             {!isListed ? (
-              walletConnected ? (
-                <Link href={`/create?duplicate=${encodeURIComponent(id)}`} className="btn-frost-cta w-full mt-2 inline-block text-center border-white/20">
-                  Duplicate listing
-                </Link>
-              ) : (
-                <div className="rounded-lg border border-white/20 bg-white/5 px-4 py-3 text-center text-silver text-sm mt-2">Connect wallet to duplicate</div>
-              )
+              isSeller ? (
+                walletConnected ? (
+                  <Link href={`/create?duplicate=${encodeURIComponent(id)}`} className="btn-frost-cta w-full mt-2 inline-block text-center border-white/20">
+                    Duplicate listing
+                  </Link>
+                ) : (
+                  <div className="rounded-lg border border-white/20 bg-white/5 px-4 py-3 text-center text-silver text-sm mt-2">Connect wallet to duplicate</div>
+                )
+              ) : null
             ) : (
               <button
                 type="button"
