@@ -10,6 +10,7 @@ import { formatPriceForDisplay } from "../../lib/formatPrice";
 import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { getApiUrl } from "../../lib/apiUrl";
+import { canonicalizeCategory } from "../../lib/categories";
 
 function formatListingId(id: string): string {
   if (!id || !id.startsWith("0x") || id.length !== 66) return id;
@@ -47,14 +48,34 @@ function isSoldStatus(status?: string): boolean {
 function MarketplacePageContent() {
   const searchParams = useSearchParams();
   const query = searchParams.get("q")?.trim() ?? "";
+  const categoryQuery = canonicalizeCategory(searchParams.get("category")?.trim() ?? "");
   const [items, setItems] = useState<ListingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [listingsError, setListingsError] = useState<string | null>(null);
   const usdRate = useHbarUsd();
 
   const filteredItems = useMemo(() => {
-    if (!query) return items;
-    const fuse = new Fuse(items, {
+    let categoryMatched = items;
+    if (categoryQuery) {
+      const normalizedCategory = categoryQuery.toLowerCase();
+      const strict = items.filter(
+        (item) => canonicalizeCategory(item.category ?? "").toLowerCase() === normalizedCategory
+      );
+      if (strict.length > 0) {
+        categoryMatched = strict;
+      } else {
+        const catFuse = new Fuse(items, {
+          includeScore: true,
+          threshold: 0.3,
+          ignoreLocation: true,
+          keys: [{ name: "category", weight: 1 }],
+        });
+        categoryMatched = catFuse.search(categoryQuery).map((r) => r.item);
+      }
+    }
+
+    if (!query) return categoryMatched;
+    const fuse = new Fuse(categoryMatched, {
       includeScore: true,
       threshold: 0.38,
       ignoreLocation: true,
@@ -66,7 +87,7 @@ function MarketplacePageContent() {
       ],
     });
     return fuse.search(query).map((r) => r.item);
-  }, [items, query]);
+  }, [items, query, categoryQuery]);
 
   const fetchListings = useCallback(() => {
     setLoading(true);
@@ -118,7 +139,13 @@ function MarketplacePageContent() {
           </p>
         ) : filteredItems.length === 0 ? (
           <p className="text-silver">
-            {query ? `No listings matched "${query}".` : "No listings found. Create one to get started!"}
+            {query && categoryQuery
+              ? `No listings matched "${query}" in ${categoryQuery}.`
+              : query
+                ? `No listings matched "${query}".`
+                : categoryQuery
+                  ? `No listings found in ${categoryQuery}.`
+                  : "No listings found. Create one to get started!"}
           </p>
         ) : (
           <>

@@ -430,7 +430,7 @@ function CreatePageContent() {
         </div>
 
         <label className="block">
-          <span className="text-sm text-silver">Price (HBAR)</span>
+          <span className="text-sm text-silver">Price (HBAR) <span className="text-rose-400">*</span></span>
           <input
             type="number"
             step="any"
@@ -477,7 +477,7 @@ function CreatePageContent() {
           <CategorySearch
             value={category}
             onChange={setCategory}
-            placeholder="Search categories (e.g. electronics, furniture, bikes)…"
+            placeholder="Search categories (e.g. watches, cars, software)…"
           />
         </label>
 

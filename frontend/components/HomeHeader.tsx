@@ -26,13 +26,19 @@ const TOP_LINKS = [
 
 const CATEGORY_LINKS = [
   { href: "/dashboard", label: "Saved", query: "wishlist" },
-  { href: "/marketplace", label: "Electronics", query: "category=Electronics" },
-  { href: "/marketplace", label: "Collectibles", query: "category=Collectibles" },
-  { href: "/marketplace", label: "Home & garden", query: "category=Farm & Garden" },
-  { href: "/marketplace", label: "Clothing & accessories", query: "category=Clothes & Accessories" },
-  { href: "/marketplace", label: "Toys", query: "category=Toys & Games" },
-  { href: "/marketplace", label: "Sporting goods", query: "category=Sporting" },
-  { href: "/marketplace", label: "Jewelry & watches", query: "category=Jewelry" },
+  { href: "/marketplace", label: "Watches", query: "category=Watches" },
+  { href: "/marketplace", label: "Cars", query: "category=Cars" },
+  { href: "/marketplace", label: "Computers", query: "category=Computers" },
+  { href: "/marketplace", label: "Shoes", query: "category=Shoes" },
+  { href: "/marketplace", label: "Clothes", query: "category=Clothes" },
+  { href: "/marketplace", label: "Accessories", query: "category=Accessories" },
+  { href: "/marketplace", label: "Food products", query: "category=Food%20Products" },
+  { href: "/marketplace", label: "Precious metals", query: "category=Precious%20Metals" },
+  { href: "/marketplace", label: "Digital goods", query: "category=Digital%20Goods" },
+  { href: "/marketplace", label: "Electronic items", query: "category=Electronic%20Items" },
+  { href: "/marketplace", label: "Software", query: "category=Software" },
+  { href: "/marketplace", label: "Access codes", query: "category=Access%20Codes" },
+  { href: "/marketplace", label: "Paper media", query: "category=Paper%20Media" },
 ];
 
 /** My Hashpop dropdown links. */

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { searchCategories } from "../lib/categories";
+import { canonicalizeCategory, searchCategories } from "../lib/categories";
 
 type CategorySearchProps = {
   value: string;
@@ -46,8 +46,9 @@ export function CategorySearch({ value, onChange, placeholder = "Search categori
   }, []);
 
   const handleSelect = (category: string) => {
-    onChange(category);
-    setQuery(category);
+    const normalized = canonicalizeCategory(category);
+    onChange(normalized);
+    setQuery(normalized);
     setOpen(false);
   };
 
