@@ -21,7 +21,7 @@ const TOP_LINKS = [
   { href: "/marketplace", label: "Daily Deals" },
   { href: "/terms", label: "Terms" },
   { href: "/privacy", label: "Privacy" },
-  { href: "/marketplace", label: "Help & Contact" },
+  { href: "/support", label: "Help & Contact" },
 ];
 
 const CATEGORY_LINKS = [
