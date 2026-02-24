@@ -229,6 +229,12 @@ export default function ListingPage() {
     if (!editError && !priceUpdateFailedBanner) return;
   }, [editError, priceUpdateFailedBanner, listing?.id, id]);
 
+  useEffect(() => {
+    const onChainStatus = Number(onChainListing?.status ?? -1);
+    const listed = listing?.status === "LISTED" && (onChainStatus === -1 ? true : onChainStatus === 1);
+    if (!listed && editing) setEditing(false);
+  }, [listing?.status, onChainListing?.status, editing]);
+
   const toggleWishlist = async () => {
     if (!address || !id || wishlistLoading) return;
     setWishlistLoading(true);
@@ -315,10 +321,6 @@ export default function ListingPage() {
   const isListedOnChain = onChainStatusNum === -1 ? null : onChainStatusNum === 1;
   const isListed = listing?.status === "LISTED" && (isListedOnChain == null ? true : isListedOnChain);
   const isLockedOnChain = onChainStatusNum === 2;
-
-  useEffect(() => {
-    if (!isListed && editing) setEditing(false);
-  }, [isListed, editing]);
 
   const existingMediaUrls = item
     ? (item.mediaUrls?.length ? item.mediaUrls : item.imageUrl ? [item.imageUrl] : [])
