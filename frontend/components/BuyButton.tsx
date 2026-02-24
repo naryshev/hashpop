@@ -13,6 +13,7 @@ import { activeHederaChain } from "../lib/hederaChains";
 import { parseUnits } from "viem";
 import { readListingCompat } from "../lib/marketplaceRead";
 import { getApiUrl } from "../lib/apiUrl";
+import { getTransactionExplorerUrl } from "../lib/explorer";
 
 export function BuyButton({ listingId, price: _price }: { listingId: string; price: string }) {
   const idBytes = useMemo(() => listingIdToBytes32(listingId), [listingId]);
@@ -59,12 +60,14 @@ export function BuyButton({ listingId, price: _price }: { listingId: string; pri
 
   const { send, isPending, error: writeError } = useRobustContractWrite();
   const isConfirming = false;
-  const isSuccess = false;
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [lastTxId, setLastTxId] = useState<string | null>(null);
 
   const [buyAttempted, setBuyAttempted] = useState(false);
   const displayError = writeError;
   const [actionError, setActionError] = useState<string | null>(null);
   const errorMessage = actionError ?? getTransactionErrorMessage(displayError, { chainId });
+  const explorerUrl = getTransactionExplorerUrl(lastTxId, chainId);
 
   useEffect(() => {
     if (!errorMessage && !isSuccess) return;
@@ -72,6 +75,8 @@ export function BuyButton({ listingId, price: _price }: { listingId: string; pri
 
   const buy = async () => {
     try {
+      setIsSuccess(false);
+      setLastTxId(null);
       setActionError(null);
       setBuyAttempted(true);
       // Read the latest on-chain listing at click-time to avoid stale cached price mismatches.
@@ -101,11 +106,13 @@ export function BuyButton({ listingId, price: _price }: { listingId: string; pri
         args: [idBytes],
         value: latestPrice,
       });
+      setLastTxId(txHash);
       await fetch(`${getApiUrl()}/api/sync-purchase`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ txHash, listingId }),
       }).catch(() => {});
+      setIsSuccess(true);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Unable to prepare buy transaction. Please refresh and retry.";
       setActionError(msg);
@@ -145,6 +152,21 @@ export function BuyButton({ listingId, price: _price }: { listingId: string; pri
       >
         {isPending ? "Confirm in wallet…" : "Buy Now"}
       </button>
+      {isSuccess && (
+        <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 space-y-2">
+          <p className="text-sm text-emerald-200">Purchase submitted and synced. You can verify this transaction on-chain.</p>
+          {explorerUrl && (
+            <a
+              href={explorerUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-emerald-100 hover:text-white underline"
+            >
+              View transaction on HashScan
+            </a>
+          )}
+        </div>
+      )}
       {errorMessage && (
         <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 space-y-2">
           <p className="text-sm text-red-300/90 break-words">{errorMessage}</p>

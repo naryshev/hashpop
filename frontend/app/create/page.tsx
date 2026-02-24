@@ -11,6 +11,7 @@ import { getTransactionErrorMessage } from "../../lib/transactionError";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
 import { ConnectWalletButton } from "../../components/ConnectWalletButton";
 import { activeHederaChain } from "../../lib/hederaChains";
+import { getTransactionExplorerUrl } from "../../lib/explorer";
 
 import { getApiUrl } from "../../lib/apiUrl";
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB
@@ -69,7 +70,7 @@ function CreatePageContent() {
   const conditionRef = useRef<string | null>(null);
   const yearOfProductionRef = useRef<string | null>(null);
 
-  const { create, isPending: listingPending, isSuccess: listingSuccess, error: listingError } = useCreateListing({
+  const { create, isPending: listingPending, isSuccess: listingSuccess, error: listingError, hash: lastTxId } = useCreateListing({
     imageUrlRef,
     mediaUrlsRef,
     requireEscrowRef,
@@ -83,6 +84,7 @@ function CreatePageContent() {
   const isPending = listingPending;
   const isSuccess = listingSuccess;
   const error = listingError;
+  const transactionExplorerUrl = getTransactionExplorerUrl(lastTxId, chainId);
   const walletConnected = !!address;
 
   useEffect(() => {
@@ -279,6 +281,16 @@ function CreatePageContent() {
             <div className="w-12 h-12 mx-auto rounded-full border-2 border-emerald-400 border-t-transparent animate-spin" />
             <p className="text-lg font-semibold text-white">Listing created</p>
             <p className="text-sm text-silver">Redirecting to your listing…</p>
+            {transactionExplorerUrl && (
+              <a
+                href={transactionExplorerUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-emerald-200 hover:text-white underline"
+              >
+                View transaction on HashScan
+              </a>
+            )}
             <div className="flex flex-col sm:flex-row gap-2 justify-center pt-2">
               <Link
                 href={`/listing/${encodeURIComponent(createdListingIdRef.current ?? createdListingId ?? "")}`}
