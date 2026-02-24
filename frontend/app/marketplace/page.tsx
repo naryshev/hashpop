@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import Fuse from "fuse.js";
 import { ListingMedia } from "../../components/ListingMedia";
 import { WishlistButton } from "../../components/WishlistButton";
 import { formatPriceForDisplay } from "../../lib/formatPrice";
@@ -23,17 +25,48 @@ function formatListingId(id: string): string {
   }
 }
 
-type ListingItem = { id: string; price?: string; title?: string | null; seller?: string; imageUrl?: string | null; mediaUrls?: string[]; createdAt?: string; status?: string; itemType: "listing" };
+type ListingItem = {
+  id: string;
+  price?: string;
+  title?: string | null;
+  subtitle?: string | null;
+  description?: string | null;
+  category?: string | null;
+  seller?: string;
+  imageUrl?: string | null;
+  mediaUrls?: string[];
+  createdAt?: string;
+  status?: string;
+  itemType: "listing";
+};
 
 function isSoldStatus(status?: string): boolean {
   return !!status && status !== "LISTED";
 }
 
-export default function MarketplacePage() {
+function MarketplacePageContent() {
+  const searchParams = useSearchParams();
+  const query = searchParams.get("q")?.trim() ?? "";
   const [items, setItems] = useState<ListingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [listingsError, setListingsError] = useState<string | null>(null);
   const usdRate = useHbarUsd();
+
+  const filteredItems = useMemo(() => {
+    if (!query) return items;
+    const fuse = new Fuse(items, {
+      includeScore: true,
+      threshold: 0.38,
+      ignoreLocation: true,
+      keys: [
+        { name: "title", weight: 0.5 },
+        { name: "subtitle", weight: 0.15 },
+        { name: "description", weight: 0.2 },
+        { name: "category", weight: 0.15 },
+      ],
+    });
+    return fuse.search(query).map((r) => r.item);
+  }, [items, query]);
 
   const fetchListings = useCallback(() => {
     setLoading(true);
@@ -83,14 +116,16 @@ export default function MarketplacePage() {
           <p className="text-amber-400/90 text-sm">
             {listingsError} Ensure the backend is running and PostgreSQL is up (e.g. <code className="text-chrome">docker compose up -d db</code>).
           </p>
-        ) : items.length === 0 ? (
-          <p className="text-silver">No listings found. Create one to get started!</p>
+        ) : filteredItems.length === 0 ? (
+          <p className="text-silver">
+            {query ? `No listings matched "${query}".` : "No listings found. Create one to get started!"}
+          </p>
         ) : (
           <>
             {/* Mobile: compact carousel */}
             <div className="sm:hidden -mx-4 overflow-x-auto overflow-y-hidden scroll-smooth snap-x snap-mandatory scrollbar-hide">
               <div className="flex gap-3 px-4 pb-2" style={{ minWidth: "min-content" }}>
-                {items.map((item) => (
+                {filteredItems.map((item) => (
                   <Link
                     key={`${item.itemType}-${item.id}`}
                     href={`/listing/${encodeURIComponent(item.id)}`}
@@ -123,7 +158,7 @@ export default function MarketplacePage() {
             </div>
             {/* Desktop: grid */}
             <div className="hidden sm:grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
-              {items.map((item) => (
+              {filteredItems.map((item) => (
                 <Link
                   key={`${item.itemType}-${item.id}`}
                   href={`/listing/${encodeURIComponent(item.id)}`}
@@ -160,5 +195,13 @@ export default function MarketplacePage() {
         )}
       </div>
     </main>
+  );
+}
+
+export default function MarketplacePage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen"><div className="max-w-6xl mx-auto px-4 sm:px-6 py-6"><p className="text-silver">Loading listings…</p></div></main>}>
+      <MarketplacePageContent />
+    </Suspense>
   );
 }

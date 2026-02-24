@@ -9,7 +9,7 @@
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
     "db:seed": "prisma db seed",
-    "clear-listings": "ts-node -r dotenv/config scripts/clear-listings.ts",
+    "clear-listings": "node scripts/clear-listings.js",
     "migrate-media-urls": "node scripts/migrate-media-urls.js"
   },
   "dependencies": {
