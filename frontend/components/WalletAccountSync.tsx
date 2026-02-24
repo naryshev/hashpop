@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useHashpackWallet } from "../lib/hashpackWallet";
 
 import { getApiUrl } from "../lib/apiUrl";
@@ -10,8 +11,22 @@ import { getApiUrl } from "../lib/apiUrl";
  * so the user can view, sell, buy, and bid.
  */
 export function WalletAccountSync() {
-  const { address } = useHashpackWallet();
+  const { address, accountId } = useHashpackWallet();
+  const queryClient = useQueryClient();
   const registered = useRef<Set<string>>(new Set());
+  const previousWalletKey = useRef<string | null>(null);
+
+  useEffect(() => {
+    const currentWalletKey = address && accountId ? `${address.toLowerCase()}::${accountId}` : null;
+    const prev = previousWalletKey.current;
+    if (prev !== null && prev !== currentWalletKey) {
+      registered.current.clear();
+      queryClient.clear();
+      // Broadcast wallet-state transition so pages can optionally drop local ephemeral UI state.
+      window.dispatchEvent(new CustomEvent("hashpop:wallet-changed"));
+    }
+    previousWalletKey.current = currentWalletKey;
+  }, [address, accountId, queryClient]);
 
   useEffect(() => {
     if (!address) return;

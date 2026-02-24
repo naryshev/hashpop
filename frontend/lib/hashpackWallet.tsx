@@ -36,6 +36,7 @@ const PAIRING_WAIT_MS = 120_000; // Time for user to approve in HashPack (extens
 let sharedHashconnect: HashConnect | null = null;
 let sharedHashconnectInitPromise: Promise<HashConnect> | null = null;
 let sharedHashconnectKey: string | null = null;
+const WALLET_SESSION_STORAGE_KEY = "hashpop.wallet.session.v1";
 
 function getNetwork(): HederaNetwork {
   return activeHederaChain.id === 295 ? "mainnet" : "testnet";
@@ -45,6 +46,81 @@ function getMirrorBase(network: HederaNetwork): string {
   return network === "mainnet"
     ? "https://mainnet.mirrornode.hedera.com"
     : "https://testnet.mirrornode.hedera.com";
+}
+
+type StoredWalletSession = {
+  network: HederaNetwork;
+  accountId: string;
+  address?: `0x${string}`;
+};
+
+function readStoredWalletSession(network: HederaNetwork): StoredWalletSession | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(WALLET_SESSION_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StoredWalletSession;
+    if (!parsed || parsed.network !== network || !parsed.accountId) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function persistWalletSession(session: StoredWalletSession): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(WALLET_SESSION_STORAGE_KEY, JSON.stringify(session));
+  } catch {
+    // Ignore storage errors.
+  }
+}
+
+function clearWalletSessionStorage(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(WALLET_SESSION_STORAGE_KEY);
+  } catch {
+    // Ignore storage errors.
+  }
+}
+
+function clearWalletConnectorStorage(): void {
+  if (typeof window === "undefined") return;
+  const patterns = [
+    "hashpop.wallet.",
+    "hashconnect",
+    "hashpack",
+    "walletconnect",
+    "wc@",
+    "wc:",
+  ];
+  try {
+    const localKeys: string[] = [];
+    for (let i = 0; i < window.localStorage.length; i += 1) {
+      const key = window.localStorage.key(i);
+      if (key) localKeys.push(key);
+    }
+    for (const key of localKeys) {
+      const k = key.toLowerCase();
+      if (patterns.some((p) => k.includes(p))) {
+        window.localStorage.removeItem(key);
+      }
+    }
+    const sessionKeys: string[] = [];
+    for (let i = 0; i < window.sessionStorage.length; i += 1) {
+      const key = window.sessionStorage.key(i);
+      if (key) sessionKeys.push(key);
+    }
+    for (const key of sessionKeys) {
+      const k = key.toLowerCase();
+      if (patterns.some((p) => k.includes(p))) {
+        window.sessionStorage.removeItem(key);
+      }
+    }
+  } catch {
+    // Ignore storage errors.
+  }
 }
 
 async function fetchMirrorAccount(accountId: string, network: HederaNetwork): Promise<{
@@ -151,6 +227,15 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
   const initPromiseRef = useRef<Promise<HashConnect | null> | null>(null);
   const connectInFlightRef = useRef(false);
 
+  const resetWalletState = useCallback((clearConnectorData = false) => {
+    setAccountId(null);
+    setAddress(null);
+    setBalanceTinybar(null);
+    setError(null);
+    clearWalletSessionStorage();
+    if (clearConnectorData) clearWalletConnectorStorage();
+  }, []);
+
   const refreshAccountData = useCallback(async () => {
     if (!accountId) return;
     const mirrorData = await fetchMirrorAccount(accountId, network);
@@ -162,6 +247,11 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
     let mounted = true;
     setIsReady(false);
     setHashconnect(null);
+    const restored = readStoredWalletSession(network);
+    if (restored) {
+      setAccountId(restored.accountId);
+      setAddress(restored.address ?? accountIdToLongZeroAddress(restored.accountId));
+    }
     const projectId = process.env.NEXT_PUBLIC_WC_PROJECT_ID?.trim();
     if (!projectId) {
       setError("Missing NEXT_PUBLIC_WC_PROJECT_ID. Add it to frontend/.env.local.");
@@ -182,16 +272,18 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
           if (first) {
             const mirrorData = await fetchMirrorAccount(first, network);
             if (!mounted) return;
-            setAddress(mirrorData.evmAddress ?? accountIdToLongZeroAddress(first));
+            const normalized = mirrorData.evmAddress ?? accountIdToLongZeroAddress(first);
+            setAddress(normalized);
             setBalanceTinybar(mirrorData.balanceTinybar);
+            persistWalletSession({ network, accountId: first, address: normalized });
+          } else {
+            resetWalletState();
           }
         });
 
         hc.disconnectionEvent.on(() => {
           if (!mounted) return;
-          setAccountId(null);
-          setAddress(null);
-          setBalanceTinybar(null);
+          resetWalletState(true);
         });
 
         if (!mounted) return null;
@@ -202,8 +294,12 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
           setAccountId(first);
           const mirrorData = await fetchMirrorAccount(first, network);
           if (!mounted) return null;
-          setAddress(mirrorData.evmAddress ?? accountIdToLongZeroAddress(first));
+          const normalized = mirrorData.evmAddress ?? accountIdToLongZeroAddress(first);
+          setAddress(normalized);
           setBalanceTinybar(mirrorData.balanceTinybar);
+          persistWalletSession({ network, accountId: first, address: normalized });
+        } else {
+          resetWalletState();
         }
         return hc;
       } catch (e) {
@@ -219,7 +315,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
       mounted = false;
       initPromiseRef.current = null;
     };
-  }, [network]);
+  }, [network, resetWalletState]);
 
   const connect = useCallback(async () => {
     if (connectInFlightRef.current) return;
@@ -283,12 +379,14 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
   }, [hashconnect]);
 
   const disconnect = useCallback(async () => {
-    if (!hashconnect) return;
-    await hashconnect.disconnect();
-    setAccountId(null);
-    setAddress(null);
-    setBalanceTinybar(null);
-  }, [hashconnect]);
+    try {
+      if (hashconnect) {
+        await hashconnect.disconnect();
+      }
+    } finally {
+      resetWalletState(true);
+    }
+  }, [hashconnect, resetWalletState]);
 
   const value = useMemo<HashpackWalletContextValue>(
     () => ({
