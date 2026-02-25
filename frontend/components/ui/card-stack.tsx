@@ -178,7 +178,7 @@ export function CardStack<T extends CardStackItem>({
                     height: cardHeight,
                     zIndex,
                     transformStyle: "preserve-3d",
-                    touchAction: isActive ? "pan-y" : "auto",
+                    touchAction: isActive ? "none" : "auto",
                   }}
                   initial={
                     reduceMotion

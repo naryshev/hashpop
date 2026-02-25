@@ -92,22 +92,19 @@ export default function Home() {
   const usdRate = useHbarUsd();
   const [cardWidth, setCardWidth] = useState(520);
   const [cardHeight, setCardHeight] = useState(360);
-  const [carouselMinHeight, setCarouselMinHeight] = useState(0);
 
   useEffect(() => {
     const handleResize = () => {
       const width = window.innerWidth;
       const height = window.innerHeight;
       if (width < 640) {
-        // Mobile: much larger cards and page scrolls
-        const cw = Math.min(360, width - 32);
-        const ch = Math.min(440, Math.round(height * 0.62));
+        // Mobile: smaller cards so entire fixed hero fits in one screen
+        const cw = Math.min(300, width - 36);
+        const ch = Math.min(310, Math.round(height * 0.42));
         setCardWidth(cw);
         setCardHeight(ch);
-        setCarouselMinHeight(ch + 140);
         return;
       }
-      setCarouselMinHeight(0);
       if (width < 1024) {
         setCardWidth(390);
         setCardHeight(340);
@@ -176,15 +173,15 @@ export default function Home() {
 
   return (
     <main
-      className="min-h-screen overflow-y-auto overflow-x-hidden md:h-screen md:overflow-hidden"
+      className="h-screen overflow-hidden"
       style={{
         backgroundColor: "#071b38",
       }}
     >
-      <section className="relative flex min-h-full w-full flex-col overflow-visible bg-[#0a2247] p-4 shadow-[0_24px_70px_rgba(0,0,0,0.35)] sm:p-6 md:h-full md:overflow-hidden">
+      <section className="relative flex h-full w-full flex-col overflow-hidden bg-[#0a2247] p-4 shadow-[0_24px_70px_rgba(0,0,0,0.35)] sm:p-6">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_115%,rgba(69,232,145,0.36),transparent_45%)]" />
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,rgba(72,170,255,0.18),transparent_42%)]" />
-          <div className="relative z-10 flex min-h-full flex-col md:h-full">
+          <div className="relative z-10 flex h-full flex-col">
             <div className="flex items-start justify-center sm:justify-start">
               <Link href="/" className="relative inline-block" aria-label="Hashpop home">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -209,8 +206,7 @@ export default function Home() {
             </div>
 
             <div
-              className="mt-1 flex-1 min-h-0 flex flex-col sm:mt-3 md:min-h-0"
-              style={carouselMinHeight > 0 ? { minHeight: carouselMinHeight } : undefined}
+              className="mt-1 flex-1 min-h-0 flex flex-col sm:mt-3"
             >
               {listingsLoading ? (
                 <div className="flex h-full min-h-[330px] items-center justify-center">
@@ -262,18 +258,16 @@ export default function Home() {
                         </div>
                       </div>
                     );
-                    if (active && item.href) {
-                      return (
-                        <Link
-                          href={item.href}
-                          className="block h-full w-full"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {cardContent}
-                        </Link>
-                      );
-                    }
-                    return cardContent;
+                    return (
+                      <div
+                        className={active && item.href ? "h-full w-full cursor-pointer" : "h-full w-full"}
+                        onClick={() => {
+                          if (active && item.href) router.push(item.href);
+                        }}
+                      >
+                        {cardContent}
+                      </div>
+                    );
                   }}
                 />
               ) : (

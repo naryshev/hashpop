@@ -19,7 +19,7 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
       <QueryClientProvider client={qc}>
         <WalletAccountSync />
         <HomeHeader />
-        <div className={isHome ? "h-screen overflow-y-auto overflow-x-hidden flex flex-col md:overflow-hidden" : "min-h-screen pb-20 md:pb-0 flex flex-col"}>
+        <div className={isHome ? "h-screen overflow-hidden flex flex-col" : "min-h-screen pb-20 md:pb-0 flex flex-col"}>
           {children}
           {!isHome && <Footer />}
         </div>
