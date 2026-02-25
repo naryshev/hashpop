@@ -115,6 +115,18 @@ export function CardStack<T extends CardStackItem>({
     if (e.key === "ArrowRight") next();
   };
 
+  const triggerSwipe = React.useCallback(
+    (offsetX: number, velocityX: number) => {
+      if (reduceMotion) return;
+      // Keep thresholds low so mobile swipes reliably advance cards.
+      const distanceThreshold = Math.max(12, Math.round(cardWidth * 0.06));
+      const velocityThreshold = 120;
+      if (offsetX > distanceThreshold || velocityX > velocityThreshold) prev();
+      else if (offsetX < -distanceThreshold || velocityX < -velocityThreshold) next();
+    },
+    [cardWidth, next, prev, reduceMotion]
+  );
+
   React.useEffect(() => {
     if (!autoAdvance || reduceMotion || !len || (pauseOnHover && hovering)) return;
     const id = window.setInterval(() => {
@@ -152,16 +164,19 @@ export function CardStack<T extends CardStackItem>({
                 ? {
                     drag: "x" as const,
                     dragConstraints: { left: 0, right: 0 },
-                    dragElastic: 0.25,
+                    dragElastic: 0.35,
+                    dragMomentum: false,
                     onDragEnd: (
                       _e: unknown,
                       info: { offset: { x: number }; velocity: { x: number } }
                     ) => {
-                      if (reduceMotion) return;
-                      const threshold = Math.min(70, Math.round(cardWidth * 0.14));
-                      const velocityThreshold = 280;
-                      if (info.offset.x > threshold || info.velocity.x > velocityThreshold) prev();
-                      else if (info.offset.x < -threshold || info.velocity.x < -velocityThreshold) next();
+                      triggerSwipe(info.offset.x, info.velocity.x);
+                    },
+                    onPanEnd: (
+                      _e: unknown,
+                      info: { offset: { x: number }; velocity: { x: number } }
+                    ) => {
+                      triggerSwipe(info.offset.x, info.velocity.x);
                     },
                   }
                 : {};
@@ -178,7 +193,7 @@ export function CardStack<T extends CardStackItem>({
                     height: cardHeight,
                     zIndex,
                     transformStyle: "preserve-3d",
-                    touchAction: isActive ? "none" : "auto",
+                    touchAction: isActive ? "pan-y" : "auto",
                   }}
                   initial={
                     reduceMotion
