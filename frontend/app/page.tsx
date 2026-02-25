@@ -4,12 +4,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ListingMedia } from "../components/ListingMedia";
+import { ConnectWalletButton } from "../components/ConnectWalletButton";
 import { formatPriceForDisplay } from "../lib/formatPrice";
 import { formatHbarWithUsd } from "../lib/hbarUsd";
 import { useHbarUsd } from "../hooks/useHbarUsd";
 import { getApiUrl } from "../lib/apiUrl";
 import { CardStack, type CardStackItem } from "../components/ui/card-stack";
-import { MorphButton } from "../components/ui/morph-button";
 import { Sparkles } from "lucide-react";
 
 function formatListingId(id: string): string {
@@ -100,9 +100,9 @@ export default function Home() {
       const height = window.innerHeight;
       setIsMobileViewport(width < 640);
       if (width < 640) {
-        // Mobile: smaller cards so entire fixed hero fits in one screen
-        const cw = Math.min(300, width - 36);
-        const ch = Math.min(310, Math.round(height * 0.42));
+        // Mobile: keep all hero content (including CTA + dots) inside one viewport.
+        const cw = Math.min(270, width - 44);
+        const ch = Math.min(250, Math.round(height * 0.32));
         setCardWidth(cw);
         setCardHeight(ch);
         return;
@@ -207,6 +207,12 @@ export default function Home() {
               </p>
             </div>
 
+            <div className="mt-3 flex justify-center">
+              <ConnectWalletButton className="btn-frost-cta h-12 border-emerald-200/70 px-6 text-sm font-extrabold uppercase tracking-[0.08em] disabled:opacity-60">
+                Connect Wallet
+              </ConnectWalletButton>
+            </div>
+
             <div
               className="mt-1 flex-1 min-h-0 flex flex-col sm:mt-3"
             >
@@ -279,13 +285,6 @@ export default function Home() {
               )}
             </div>
 
-            <div className="mt-3 flex justify-center">
-              <MorphButton
-                text="Browse Listings"
-                onClick={() => router.push("/marketplace")}
-                className="h-12 border-emerald-200/70 text-sm font-extrabold uppercase tracking-[0.08em]"
-              />
-            </div>
             {listingsError ? (
               <p className="mt-2 text-center text-xs text-amber-300/95">
                 {listingsError} Ensure backend and database are running.

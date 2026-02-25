@@ -220,39 +220,37 @@ function MarketplacePageContent() {
           </p>
         ) : (
           <>
-            {/* Mobile: compact carousel */}
-            <div className="sm:hidden -mx-4 overflow-x-auto overflow-y-hidden scroll-smooth snap-x snap-mandatory scrollbar-hide">
-              <div className="flex gap-3 px-4 pb-2" style={{ minWidth: "min-content" }}>
-                {filteredItems.map((item) => (
-                  <Link
-                    key={`${item.itemType}-${item.id}`}
-                    href={`/listing/${encodeURIComponent(item.id)}`}
-                    className="flex-shrink-0 w-[140px] snap-start glass-card overflow-hidden transition-all duration-200 active:border-white/20"
-                  >
-                    <div className="relative">
-                      <ListingMedia
-                        listing={item}
-                        className="w-full rounded-t-lg object-cover"
-                        aspectRatio="square"
-                        navigation="arrows"
-                        cardSize
-                        compactHeight="88px"
-                      />
-                      <span className={`absolute top-2 left-2 rounded-full px-2 py-0.5 text-[10px] font-semibold border ${getStatusBadge(item.status).className}`}>
-                        {getStatusBadge(item.status).label}
-                      </span>
-                    </div>
-                    <div className="p-2 min-h-0">
-                      <h2 className="text-sm font-medium text-white truncate leading-tight">
-                        {item.title || formatListingId(item.id) || "Untitled"}
-                      </h2>
-                      <p className="text-chrome text-xs font-medium mt-0.5">
-                        {formatHbarWithUsd(formatPriceForDisplay(item.price || "0"), usdRate)}
-                      </p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
+            {/* Mobile: vertical list (temporary until richer inventory) */}
+            <div className="sm:hidden space-y-3">
+              {filteredItems.map((item) => (
+                <Link
+                  key={`${item.itemType}-${item.id}`}
+                  href={`/listing/${encodeURIComponent(item.id)}`}
+                  className="block glass-card overflow-hidden transition-all duration-200 active:border-white/20 rounded-xl"
+                >
+                  <div className="relative bg-white/5">
+                    <ListingMedia
+                      listing={item}
+                      className="w-full"
+                      aspectRatio="square"
+                      navigation="arrows"
+                      cardSize
+                      compactHeight="160px"
+                    />
+                    <span className={`absolute top-2 left-2 rounded-full px-2 py-0.5 text-[10px] font-semibold border ${getStatusBadge(item.status).className}`}>
+                      {getStatusBadge(item.status).label}
+                    </span>
+                  </div>
+                  <div className="p-3">
+                    <h2 className="text-sm font-medium text-white line-clamp-2 leading-tight">
+                      {item.title || formatListingId(item.id) || "Untitled"}
+                    </h2>
+                    <p className="text-chrome font-semibold mt-1">
+                      {formatHbarWithUsd(formatPriceForDisplay(item.price || "0"), usdRate)}
+                    </p>
+                  </div>
+                </Link>
+              ))}
             </div>
             {/* Desktop: grid */}
             <div className="hidden sm:grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">

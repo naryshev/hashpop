@@ -87,6 +87,9 @@ export function CardStack<T extends CardStackItem>({
   const lastDragAtRef = React.useRef(0);
   const [draggingId, setDraggingId] = React.useState<string | number | null>(null);
   const [panX, setPanX] = React.useState(0);
+  const touchStartXRef = React.useRef(0);
+  const touchStartYRef = React.useRef(0);
+  const touchStartAtRef = React.useRef(0);
 
   React.useEffect(() => {
     setActive((a) => wrapIndex(a, len));
@@ -146,7 +149,7 @@ export function CardStack<T extends CardStackItem>({
 
   return (
     <div className={cn("w-full", className)} onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)}>
-      <div className="relative w-full" style={{ height: Math.max(380, cardHeight + 80) }} tabIndex={0} onKeyDown={onKeyDown}>
+      <div className="relative w-full" style={{ height: Math.max(300, cardHeight + 70) }} tabIndex={0} onKeyDown={onKeyDown}>
         <div className="pointer-events-none absolute inset-x-0 top-6 mx-auto h-48 w-[70%] rounded-full bg-black/25 blur-3xl" aria-hidden />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 mx-auto h-40 w-[76%] rounded-full bg-black/35 blur-3xl" aria-hidden />
 
@@ -179,7 +182,7 @@ export function CardStack<T extends CardStackItem>({
                     zIndex,
                     transformStyle: "preserve-3d",
                     touchAction: isActive ? "none" : "auto",
-                    cursor: isActive ? (draggingId === item.id ? "grabbing" : "grab") : "pointer",
+                    cursor: draggingId === item.id ? "grabbing" : "grab",
                   }}
                   initial={
                     reduceMotion
@@ -215,6 +218,35 @@ export function CardStack<T extends CardStackItem>({
                     setDraggingId(null);
                     lastDragAtRef.current = Date.now();
                     triggerSwipe(info.offset.x, info.velocity.x);
+                    setPanX(0);
+                  }}
+                  onTouchStart={(e) => {
+                    if (!isActive) return;
+                    const t = e.touches[0];
+                    if (!t) return;
+                    touchStartXRef.current = t.clientX;
+                    touchStartYRef.current = t.clientY;
+                    touchStartAtRef.current = Date.now();
+                    setDraggingId(item.id);
+                  }}
+                  onTouchMove={(e) => {
+                    if (!isActive) return;
+                    const t = e.touches[0];
+                    if (!t) return;
+                    const dx = t.clientX - touchStartXRef.current;
+                    const dy = t.clientY - touchStartYRef.current;
+                    // Prefer horizontal gesture capture when horizontal intent is clear.
+                    if (Math.abs(dx) > Math.abs(dy)) e.preventDefault();
+                    const maxPan = cardWidth * 0.4;
+                    setPanX(Math.max(-maxPan, Math.min(maxPan, dx)));
+                  }}
+                  onTouchEnd={() => {
+                    if (!isActive) return;
+                    const elapsed = Math.max(1, Date.now() - touchStartAtRef.current);
+                    const velocityX = (panX / elapsed) * 1000;
+                    setDraggingId(null);
+                    lastDragAtRef.current = Date.now();
+                    triggerSwipe(panX, velocityX);
                     setPanX(0);
                   }}
                   onClick={() => {
