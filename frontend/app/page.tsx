@@ -194,16 +194,16 @@ export default function Home() {
                   height={128}
                   decoding="async"
                   fetchPriority="high"
-                  className="relative h-20 w-auto max-h-24 bg-transparent object-contain object-left drop-shadow-[0_12px_24px_rgba(0,0,0,0.35)] sm:h-24"
+                  className="relative h-24 w-auto max-h-28 bg-transparent object-contain object-left drop-shadow-[0_12px_24px_rgba(0,0,0,0.35)] sm:h-24"
                 />
               </Link>
             </div>
 
             <div className="mt-4 text-center sm:mt-5">
-              <p className="text-xs uppercase tracking-[0.2em] text-emerald-200/85">Trade • Collect • Verify</p>
-              <h1 className="mt-2 text-2xl font-black text-white sm:text-4xl">Trade Verifiably on the Hashgraph</h1>
+              <p className="text-xs uppercase tracking-[0.2em] text-emerald-200/85">Verify • Trade • Collect</p>
+              <h1 className="mt-2 text-2xl font-black text-white sm:text-4xl">Trade Verifiably on Hashpop</h1>
               <p className="mx-auto mt-2 max-w-2xl text-sm text-silver sm:text-base">
-                Swipe through featured listings.
+                Swipe through featured listings powered by the Hashgraph.
               </p>
             </div>
 
