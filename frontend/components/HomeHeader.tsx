@@ -8,10 +8,12 @@ import { AccountMenu } from "./AccountMenu";
 /** Hashpop logo wordmark with red-blue-green accent palette. */
 function HashpopLogo() {
   return (
-    <Link href="/marketplace" className="font-bold text-2xl tracking-tight" aria-label="Hashpop marketplace">
+    <Link href="/marketplace" className="inline-flex items-center gap-1.5 font-bold text-2xl tracking-tight" aria-label="Hashpop marketplace">
       <span className="bg-[linear-gradient(100deg,#ff2f3d_0%,#ff8f00_32%,#13a0ff_62%,#6ddf85_100%)] bg-clip-text text-transparent">
         Hashpop
       </span>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/hashpop-cart-3d.PNG" alt="" aria-hidden className="h-7 w-auto object-contain" />
     </Link>
   );
 }
@@ -56,20 +58,17 @@ export function HomeHeader() {
   const pathname = usePathname();
   const isHome = pathname === "/";
   const [searchQuery, setSearchQuery] = useState("");
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [myHbayOpen, setMyHbayOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
   const [postedWithin, setPostedWithin] = useState("");
-  const menuRef = useRef<HTMLDivElement>(null);
   const myHbayRef = useRef<HTMLDivElement>(null);
   const advancedRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       const target = e.target as Node;
-      if (menuRef.current && !menuRef.current.contains(target)) setMobileOpen(false);
       if (myHbayRef.current && !myHbayRef.current.contains(target)) setMyHbayOpen(false);
       if (advancedRef.current && !advancedRef.current.contains(target)) setAdvancedOpen(false);
     }
@@ -79,7 +78,6 @@ export function HomeHeader() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setMobileOpen(false);
     if (searchQuery.trim()) router.push(`/marketplace?q=${encodeURIComponent(searchQuery.trim())}`);
     else router.push("/marketplace");
   };
@@ -156,66 +154,40 @@ export function HomeHeader() {
 
       {/* Main nav: logo + search + mobile hamburger */}
       <div className="max-w-6xl mx-auto px-4 py-3 md:py-4">
-        <div className="flex items-center gap-3 md:gap-4">
-          {/* Mobile menu button — touch-friendly for iOS Safari */}
-          <div className="md:hidden relative" ref={menuRef}>
-            <button
-              type="button"
-              onClick={() => setMobileOpen((o) => !o)}
-              onTouchEnd={(e) => {
-                e.preventDefault();
-                setMobileOpen((o) => !o);
-              }}
-              className="min-w-[44px] min-h-[44px] p-2 rounded-lg text-silver hover:text-white hover:bg-white/10 cursor-pointer touch-manipulation flex items-center justify-center"
-              style={{ WebkitTapHighlightColor: "transparent" }}
-              aria-label="Menu"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
-            {mobileOpen && (
-              <div className="absolute top-full left-0 mt-1 w-[280px] rounded-lg border border-white/10 bg-[var(--bg)] shadow-xl py-3 z-50">
-                <div className="px-4 py-2 border-b border-white/10">
-                  <AccountMenu />
-                </div>
-                <div className="px-4 py-2 space-y-1">
-                  {TOP_LINKS.map(({ href, label }) => (
-                    <Link key={label} href={href} onClick={() => setMobileOpen(false)} className="block py-2 text-silver hover:text-white text-sm">
-                      {label}
-                    </Link>
-                  ))}
-                  <Link href="/create" onClick={() => setMobileOpen(false)} className="block py-2 text-silver hover:text-white text-sm font-medium">Sell</Link>
-                  <Link href="/watchlist" onClick={() => setMobileOpen(false)} className="block py-2 text-silver hover:text-white text-sm">Watchlist</Link>
-                  <p className="pt-2 pb-1 px-0 text-xs font-medium text-silver/80">My Hashpop</p>
-                  {MY_HBAY_LINKS.map(({ href, label }) => (
-                    <Link key={label} href={href} onClick={() => setMobileOpen(false)} className="block py-1.5 pl-3 text-silver hover:text-white text-sm">
-                      {label}
-                    </Link>
-                  ))}
-                </div>
-                <form onSubmit={handleSearch} className="px-4 py-2 border-t border-white/10">
-                  <input
-                    type="search"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search for anything"
-                    className="input-frost w-full text-sm"
-                  />
-                  <button type="submit" className="btn-frost-cta w-full mt-2 text-sm py-2">Search</button>
-                </form>
-                {isHome && (
-                  <div className="px-4 py-2 border-t border-white/10 flex flex-wrap gap-2">
-                    {CATEGORY_LINKS.map(({ href, label, query }) => (
-                      <Link key={label} href={query ? `${href}?${query}` : href} onClick={() => setMobileOpen(false)} className="text-xs text-silver hover:text-white">
-                        {label}
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+        {/* Mobile top nav (eBay-like) */}
+        <div className="md:hidden space-y-3">
+          <div className="flex items-center justify-between">
+            <Link href="/marketplace" className="text-3xl font-extrabold tracking-tight" aria-label="Hashpop marketplace">
+              <span className="bg-[linear-gradient(100deg,#ff2f3d_0%,#ff8f00_32%,#13a0ff_62%,#6ddf85_100%)] bg-clip-text text-transparent">
+                hashpop
+              </span>
+            </Link>
+            <Link href="/selling" className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/10 p-2.5" aria-label="Selling">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/hashpop-cart-3d.PNG" alt="Hashpop cart" className="h-6 w-auto object-contain" />
+            </Link>
           </div>
+          <form onSubmit={handleSearch} className="flex items-center gap-2">
+            <div className="flex min-w-0 flex-1 items-center rounded-full border border-white/10 bg-white/5 px-3">
+              <svg className="h-5 w-5 text-silver" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M16 10.5A5.5 5.5 0 115 10.5a5.5 5.5 0 0111 0z" />
+              </svg>
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search for anything"
+                className="flex-1 bg-transparent py-2.5 pl-2 text-white placeholder:text-zinc-500 focus:outline-none text-sm"
+              />
+              <svg className="h-5 w-5 text-silver" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+              </svg>
+            </div>
+          </form>
+        </div>
+
+        {/* Desktop main nav */}
+        <div className="hidden md:flex items-center gap-3 md:gap-4">
           <HashpopLogo />
           {isHome && (
             <button type="button" className="hidden sm:flex items-center gap-1 text-sm text-silver hover:text-white border border-white/10 rounded-lg px-3 py-2">

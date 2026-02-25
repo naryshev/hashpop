@@ -5,9 +5,10 @@ import { usePathname } from "next/navigation";
 
 const links = [
   { href: "/", label: "Home", icon: "home" },
-  { href: "/marketplace", label: "Browse", icon: "browse" },
-  { href: "/create", label: "Sell", icon: "sell" },
-  { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
+  { href: "/dashboard", label: "My Hashpop", icon: "dashboard" },
+  { href: "/marketplace", label: "Search", icon: "search" },
+  { href: "/messages", label: "Alerts", icon: "bell" },
+  { href: "/selling", label: "Selling", icon: "sell" },
 ];
 
 function Icon({ name }: { name: string }) {
@@ -31,6 +32,18 @@ function Icon({ name }: { name: string }) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
         </svg>
       );
+    case "search":
+      return (
+        <svg className={c} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M16 10.5A5.5 5.5 0 115 10.5a5.5 5.5 0 0111 0z" />
+        </svg>
+      );
+    case "bell":
+      return (
+        <svg className={c} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+        </svg>
+      );
     case "dashboard":
       return (
         <svg className={c} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -47,22 +60,22 @@ export function BottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-30 md:hidden border-t border-white/10 bg-black/90 backdrop-blur-[20px] safe-area-pb"
+      className="fixed bottom-2 left-1/2 z-30 w-[calc(100%-16px)] max-w-md -translate-x-1/2 rounded-3xl border border-white/10 bg-black/90 shadow-[0_16px_30px_rgba(0,0,0,0.45)] backdrop-blur-[20px] md:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0)" }}
     >
-      <div className="flex items-center justify-around max-w-6xl mx-auto">
+      <div className="grid grid-cols-5 items-center">
         {links.map(({ href, label, icon }) => {
           const isActive = pathname === href || (href !== "/" && pathname.startsWith(href));
           return (
             <Link
               key={href}
               href={href}
-              className={`flex flex-col items-center justify-center gap-0.5 py-3 px-4 min-w-[64px] transition-colors ${
+              className={`flex flex-col items-center justify-center gap-0.5 py-2.5 px-1 transition-colors ${
                 isActive ? "text-chrome" : "text-silver hover:text-white"
               }`}
             >
               <Icon name={icon} />
-              <span className="text-xs font-medium">{label}</span>
+              <span className="text-[11px] font-medium">{label}</span>
             </Link>
           );
         })}

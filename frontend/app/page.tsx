@@ -185,16 +185,16 @@ export default function Home() {
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,rgba(72,170,255,0.18),transparent_42%)]" />
           <div className="relative z-10 flex h-full flex-col">
             <div className="flex items-start justify-center sm:justify-start">
-              <Link href="/" className="relative inline-block" aria-label="Hashpop home">
+              <Link href="/" className="inline-block" aria-label="Hashpop home">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="/hashpop-cart-3d.PNG"
                   alt="Hashpop cart logo"
-                  width={64}
-                  height={64}
+                  width={128}
+                  height={128}
                   decoding="async"
                   fetchPriority="high"
-                  className="relative h-14 w-auto max-h-16 bg-transparent object-contain object-left drop-shadow-[0_12px_24px_rgba(0,0,0,0.35)] sm:h-16"
+                  className="relative h-20 w-auto max-h-24 bg-transparent object-contain object-left drop-shadow-[0_12px_24px_rgba(0,0,0,0.35)] sm:h-24"
                 />
               </Link>
             </div>

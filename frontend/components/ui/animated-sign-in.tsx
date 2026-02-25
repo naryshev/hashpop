@@ -1,47 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Moon, Sun, Wallet } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { Wallet } from "lucide-react";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
 
 export default function AnimatedSignIn() {
-  const router = useRouter();
-  const { connect, isConnected, isConnecting, isReady, error } = useHashpackWallet();
-  const [isDarkMode, setIsDarkMode] = useState(true);
-
-  useEffect(() => {
-    if (isConnected) router.replace("/marketplace");
-  }, [isConnected, router]);
-
-  useEffect(() => {
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    setIsDarkMode(prefersDark);
-    document.documentElement.classList.toggle("dark-mode", prefersDark);
-  }, []);
-
-  const toggleDarkMode = () => {
-    setIsDarkMode((prev) => {
-      const next = !prev;
-      document.documentElement.classList.toggle("dark-mode", next);
-      return next;
-    });
-  };
+  const { connect, isConnecting, isReady, error } = useHashpackWallet();
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#071b38]">
       <div className="pointer-events-none absolute -top-28 left-1/2 h-80 w-80 -translate-x-1/2 rounded-full bg-cyan-400/20 blur-3xl" />
       <div className="pointer-events-none absolute bottom-[-100px] left-[-80px] h-72 w-72 rounded-full bg-emerald-400/20 blur-3xl" />
       <div className="pointer-events-none absolute bottom-[-110px] right-[-90px] h-72 w-72 rounded-full bg-indigo-500/20 blur-3xl" />
-
-      <button
-        type="button"
-        onClick={toggleDarkMode}
-        className="absolute right-5 top-5 z-10 rounded-full border border-white/20 bg-white/10 p-2 text-white transition hover:bg-white/20"
-        aria-label="Toggle theme"
-      >
-        {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
-      </button>
 
       <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-5xl items-center justify-center px-4 py-8">
         <div className="w-full max-w-md rounded-2xl border border-white/15 bg-white/10 p-6 backdrop-blur-xl sm:p-8">

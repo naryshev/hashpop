@@ -13,17 +13,19 @@ const qc = new QueryClient();
 export function ClientProviders({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isHome = pathname === "/";
+  const isSignIn = pathname === "/signin";
+  const isFullscreenRoute = isHome;
 
   return (
     <HashpackWalletProvider>
       <QueryClientProvider client={qc}>
         <WalletAccountSync />
-        <HomeHeader />
-        <div className={isHome ? "h-screen overflow-hidden flex flex-col" : "min-h-screen pb-20 md:pb-0 flex flex-col"}>
+        {!isSignIn && <HomeHeader />}
+        <div className={isFullscreenRoute ? "h-screen overflow-hidden flex flex-col" : "min-h-screen pb-20 md:pb-0 flex flex-col"}>
           {children}
-          {!isHome && <Footer />}
+          {!isFullscreenRoute && !isSignIn && <Footer />}
         </div>
-        {!isHome && <BottomNav />}
+        {!isFullscreenRoute && <BottomNav />}
       </QueryClientProvider>
     </HashpackWalletProvider>
   );
