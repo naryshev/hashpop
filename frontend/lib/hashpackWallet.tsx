@@ -63,11 +63,20 @@ function isMobileBrowser(): boolean {
 function openHashPackMobileDeepLink(pairingUri: string): void {
   if (typeof window === "undefined" || !pairingUri) return;
   const encoded = encodeURIComponent(pairingUri);
-  // Try app scheme first, then universal links as fallback.
+  // App deep link only so the browser stays on hashpop.io.
   window.location.href = `hashpack://wc?uri=${encoded}`;
-  window.setTimeout(() => {
-    window.location.href = `https://hashpack.app/wc?uri=${encoded}`;
-  }, 800);
+}
+
+async function getPairingUri(hc: HashConnect): Promise<string | null> {
+  const direct = (hc as unknown as { pairingString?: string }).pairingString;
+  if (direct && direct.startsWith("wc:")) return direct;
+  const generate = (hc as unknown as { generatePairingString?: () => Promise<{ uri?: string }> }).generatePairingString;
+  if (typeof generate === "function") {
+    const data = await generate.call(hc).catch(() => null);
+    const uri = data?.uri;
+    if (uri && uri.startsWith("wc:")) return uri;
+  }
+  return null;
 }
 
 function readStoredWalletSession(network: HederaNetwork): StoredWalletSession | null {
@@ -374,7 +383,19 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
         return;
       }
 
-      // 2) Fallback to HashConnect pairing modal (QR / deep link).
+      // 2) Mobile: skip modal entirely to avoid QR popup and open HashPack directly.
+      if (mobileBrowser) {
+        const pairingUri = await getPairingUri(hc);
+        if (!pairingUri) {
+          setError("Could not create a wallet pairing URI on mobile. Try refreshing and connecting again.");
+          return;
+        }
+        openHashPackMobileDeepLink(pairingUri);
+        await waitForPairing(connectWaitRef, PAIRING_WAIT_MS);
+        return;
+      }
+
+      // 3) Desktop fallback to HashConnect pairing modal (QR / deep link).
       const openModal = (hc as { openPairingModal?: (theme?: unknown) => Promise<void> }).openPairingModal;
       if (typeof openModal !== "function") {
         setError("HashConnect pairing not available. Try refreshing or use a private window.");
@@ -406,12 +427,6 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
             : "Could not open wallet pairing. Try a private/incognito window or disable browser extensions."
         );
         return;
-      }
-      if (mobileBrowser) {
-        const pairingUri = (hc as unknown as { pairingString?: string }).pairingString;
-        if (pairingUri && pairingUri.startsWith("wc:")) {
-          openHashPackMobileDeepLink(pairingUri);
-        }
       }
       await waitForPairing(connectWaitRef, PAIRING_WAIT_MS);
     } catch (e) {
