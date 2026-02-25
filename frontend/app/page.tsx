@@ -231,7 +231,7 @@ export default function Home() {
                   renderCard={(item, { active }) => {
                     const cardContent = (
                       <div className="relative h-full w-full overflow-hidden rounded-2xl border border-white/15">
-                        <div className="absolute inset-0">
+                        <div className="absolute inset-0 pointer-events-none">
                           {item.listing ? (
                             <ListingMedia
                               listing={item.listing}

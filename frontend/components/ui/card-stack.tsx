@@ -120,8 +120,8 @@ export function CardStack<T extends CardStackItem>({
     (offsetX: number, velocityX: number) => {
       if (reduceMotion) return;
       // Keep thresholds low so mobile swipes reliably advance cards.
-      const distanceThreshold = Math.max(12, Math.round(cardWidth * 0.06));
-      const velocityThreshold = 120;
+      const distanceThreshold = Math.max(10, Math.round(cardWidth * 0.04));
+      const velocityThreshold = 90;
       if (offsetX > distanceThreshold || velocityX > velocityThreshold) prev();
       else if (offsetX < -distanceThreshold || velocityX < -velocityThreshold) next();
     },
@@ -164,7 +164,8 @@ export function CardStack<T extends CardStackItem>({
               const dragProps = isActive
                 ? {
                     drag: "x" as const,
-                    dragConstraints: { left: 0, right: 0 },
+                    dragDirectionLock: true,
+                    dragSnapToOrigin: true,
                     dragElastic: 0.35,
                     dragMomentum: false,
                     onDragStart: () => {
