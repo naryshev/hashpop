@@ -85,6 +85,7 @@ export function CardStack<T extends CardStackItem>({
   const [active, setActive] = React.useState(() => wrapIndex(initialIndex, len));
   const [hovering, setHovering] = React.useState(false);
   const lastDragAtRef = React.useRef(0);
+  const [draggingId, setDraggingId] = React.useState<string | number | null>(null);
 
   React.useEffect(() => {
     setActive((a) => wrapIndex(a, len));
@@ -170,18 +171,21 @@ export function CardStack<T extends CardStackItem>({
                     dragMomentum: false,
                     onDragStart: () => {
                       lastDragAtRef.current = Date.now();
+                      setDraggingId(item.id);
                     },
                     onDragEnd: (
                       _e: unknown,
                       info: { offset: { x: number }; velocity: { x: number } }
                     ) => {
                       lastDragAtRef.current = Date.now();
+                      setDraggingId(null);
                       triggerSwipe(info.offset.x, info.velocity.x);
                     },
                     onPanEnd: (
                       _e: unknown,
                       info: { offset: { x: number }; velocity: { x: number } }
                     ) => {
+                      setDraggingId(null);
                       triggerSwipe(info.offset.x, info.velocity.x);
                     },
                   }
@@ -191,8 +195,7 @@ export function CardStack<T extends CardStackItem>({
                 <motion.div
                   key={item.id}
                   className={cn(
-                    "absolute bottom-0 overflow-hidden rounded-2xl border-4 border-black/10 shadow-xl will-change-transform select-none touch-manipulation",
-                    isActive ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
+                    "absolute bottom-0 overflow-hidden rounded-2xl border-4 border-black/10 shadow-xl will-change-transform select-none touch-manipulation"
                   )}
                   style={{
                     width: cardWidth,
@@ -200,6 +203,7 @@ export function CardStack<T extends CardStackItem>({
                     zIndex,
                     transformStyle: "preserve-3d",
                     touchAction: isActive ? "pan-y" : "auto",
+                    cursor: isActive ? (draggingId === item.id ? "grabbing" : "grab") : "pointer",
                   }}
                   initial={
                     reduceMotion
