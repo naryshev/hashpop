@@ -7,6 +7,7 @@ type ConnectWalletButtonProps = {
   className?: string;
   children?: React.ReactNode;
   "data-testid"?: string;
+  onPress?: () => void;
 };
 
 /**
@@ -17,6 +18,7 @@ export function ConnectWalletButton({
   className = "btn-frost-cta disabled:opacity-50 disabled:cursor-not-allowed",
   children,
   "data-testid": dataTestId = "connect-wallet-button",
+  onPress,
 }: ConnectWalletButtonProps) {
   const router = useRouter();
   const { isConnecting, isReady } = useHashpackWallet();
@@ -26,6 +28,7 @@ export function ConnectWalletButton({
     if (process.env.NODE_ENV !== "production") {
       console.debug("[wallet] connect button clicked");
     }
+    onPress?.();
     router.push("/signin");
   };
 

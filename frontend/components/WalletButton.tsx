@@ -15,7 +15,11 @@ function formatHbarFromTinybar(value: bigint | null): string {
   return num.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 4 });
 }
 
-export function WalletButton() {
+type WalletButtonProps = {
+  onConnectPress?: () => void;
+};
+
+export function WalletButton({ onConnectPress }: WalletButtonProps) {
   const [mounted, setMounted] = useState(false);
   const {
     address,
@@ -86,7 +90,10 @@ export function WalletButton() {
       >
         HashPack connect docs →
       </a>
-      <ConnectWalletButton className="btn-frost-cta disabled:opacity-50 disabled:cursor-not-allowed">
+      <ConnectWalletButton
+        className="btn-frost-cta disabled:opacity-50 disabled:cursor-not-allowed"
+        onPress={onConnectPress}
+      >
         {!isReady ? "Loading wallet…" : isConnecting ? "Connecting…" : "Connect Wallet"}
       </ConnectWalletButton>
     </div>

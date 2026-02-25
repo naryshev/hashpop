@@ -109,7 +109,7 @@ export function Nav() {
             })}
           </div>
           <div className="p-4 border-t border-white/10">
-            {mounted && <WalletButton />}
+            {mounted && <WalletButton onConnectPress={closeMenu} />}
           </div>
         </div>
       </div>

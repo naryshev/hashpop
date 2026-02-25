@@ -97,9 +97,25 @@ export default function Home() {
 
   return (
     <main className="min-h-screen">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-        <section>
-          <div className="flex items-center justify-between mb-4">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        <section className="rounded-2xl border border-white/15 bg-gradient-to-br from-[#5865F2]/25 via-[#0d1222] to-[#0f4f76]/35 p-6 sm:p-8">
+          <p className="text-xs uppercase tracking-[0.2em] text-indigo-200/90">Hashpop Marketplace</p>
+          <h1 className="mt-2 text-2xl sm:text-3xl font-bold text-white">Discover the latest listings</h1>
+          <p className="mt-3 max-w-2xl text-silver">
+            Browse active drops, trending collectibles, and fresh listings from the Hashpop community.
+          </p>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <Link href="/marketplace" className="btn-frost-cta">
+              Explore marketplace
+            </Link>
+            <Link href="/create" className="btn-frost border-white/20">
+              Create listing
+            </Link>
+          </div>
+        </section>
+
+        <section className="glass-card rounded-2xl border border-white/10 p-4 sm:p-5">
+          <div className="mb-4 flex items-center justify-between">
             <h2 className="text-xl sm:text-2xl font-bold text-white">Latest listings</h2>
             <Link href="/marketplace" className="text-sm text-chrome hover:text-white font-medium">
               See all
