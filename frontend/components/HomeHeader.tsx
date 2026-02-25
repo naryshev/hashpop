@@ -8,7 +8,7 @@ import { AccountMenu } from "./AccountMenu";
 /** Hashpop logo wordmark with red-blue-green accent palette. */
 function HashpopLogo() {
   return (
-    <Link href="/" className="font-bold text-2xl tracking-tight" aria-label="Hashpop home">
+    <Link href="/marketplace" className="font-bold text-2xl tracking-tight" aria-label="Hashpop marketplace">
       <span className="bg-[linear-gradient(100deg,#ff2f3d_0%,#ff8f00_32%,#13a0ff_62%,#6ddf85_100%)] bg-clip-text text-transparent">
         Hashpop
       </span>
@@ -96,6 +96,8 @@ export function HomeHeader() {
     router.push(qs ? `/marketplace?${qs}` : "/marketplace");
     setAdvancedOpen(false);
   };
+
+  if (isHome) return null;
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-[var(--bg)] backdrop-blur-[20px]">

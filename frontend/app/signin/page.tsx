@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
+import { MorphButton } from "../../components/ui/morph-button";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -24,14 +25,13 @@ export default function SignInPage() {
               Connect a wallet to continue.
             </p>
 
-            <button
-              type="button"
+            <MorphButton
               onClick={() => void connect()}
               disabled={!isReady || isConnecting}
-              className="btn-frost-cta mt-6 w-full disabled:opacity-50"
-            >
-              {!isReady ? "Loading wallet..." : isConnecting ? "Connecting..." : "Continue with HashPack"}
-            </button>
+              className="mt-6 w-full"
+              text={!isReady ? "Loading wallet..." : isConnecting ? "Connecting..." : "Continue with HashPack"}
+              isLoading={isConnecting}
+            />
 
             {error && (
               <p className="mt-3 text-center text-xs text-amber-300">{error}</p>

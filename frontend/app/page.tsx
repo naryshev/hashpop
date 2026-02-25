@@ -1,13 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ListingMedia } from "../components/ListingMedia";
 import { formatPriceForDisplay } from "../lib/formatPrice";
 import { formatHbarWithUsd } from "../lib/hbarUsd";
 import { useHbarUsd } from "../hooks/useHbarUsd";
-import { WishlistButton } from "../components/WishlistButton";
 import { getApiUrl } from "../lib/apiUrl";
+import { CardStack, type CardStackItem } from "../components/ui/card-stack";
+import { MorphButton } from "../components/ui/morph-button";
+import { Sparkles } from "lucide-react";
 
 function formatListingId(id: string): string {
   if (!id || !id.startsWith("0x") || id.length !== 66) return id;
@@ -31,38 +34,95 @@ function isActiveStatus(status?: string): boolean {
   return normalizeListingStatus(status) === "LISTED";
 }
 
-function getStatusBadge(status?: string): { label: string; className: string } {
+function getStatusBadge(status?: string): { label: string; className: string; glowClass: string } {
   const normalized = normalizeListingStatus(status);
   if (normalized === "LISTED") {
     return {
       label: "ACTIVE",
       className: "bg-emerald-500/20 border-emerald-400/40 text-emerald-200",
+      glowClass: "shadow-[0_0_24px_rgba(52,211,153,0.32)]",
     };
   }
   if (normalized === "LOCKED") {
     return {
       label: "LOCKED",
       className: "bg-amber-500/20 border-amber-400/40 text-amber-200",
+      glowClass: "shadow-[0_0_24px_rgba(251,191,36,0.3)]",
     };
   }
   if (normalized === "CANCELLED") {
     return {
       label: "CANCELLED",
       className: "bg-zinc-500/20 border-zinc-300/40 text-zinc-200",
+      glowClass: "shadow-[0_0_24px_rgba(161,161,170,0.28)]",
     };
   }
   return {
     label: "SOLD",
     className: "bg-rose-500/20 border-rose-400/40 text-rose-200",
+    glowClass: "shadow-[0_0_24px_rgba(251,113,133,0.28)]",
   };
 }
 
+type ListingRecord = {
+  id: string;
+  title?: string;
+  description?: string;
+  createdAt?: string;
+  price?: string | number;
+  reservePrice?: string | number;
+  status?: string;
+  imageUrl?: string | null;
+  mediaUrls?: string[] | null;
+  itemType?: "listing";
+};
+
+type HomeStackItem = CardStackItem & {
+  listing?: ListingRecord;
+  statusClass?: string;
+  statusLabel?: string;
+  priceLabel?: string;
+};
+
 export default function Home() {
-  const [listings, setListings] = useState<any[]>([]);
+  const router = useRouter();
+  const [listings, setListings] = useState<ListingRecord[]>([]);
   const [listingsError, setListingsError] = useState<string | null>(null);
+  const [listingsLoading, setListingsLoading] = useState(true);
   const usdRate = useHbarUsd();
+  const [cardWidth, setCardWidth] = useState(520);
+  const [cardHeight, setCardHeight] = useState(360);
+  const [carouselMinHeight, setCarouselMinHeight] = useState(0);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      if (width < 640) {
+        // Mobile: much larger cards and page scrolls
+        const cw = Math.min(360, width - 32);
+        const ch = Math.min(440, Math.round(height * 0.62));
+        setCardWidth(cw);
+        setCardHeight(ch);
+        setCarouselMinHeight(ch + 140);
+        return;
+      }
+      setCarouselMinHeight(0);
+      if (width < 1024) {
+        setCardWidth(390);
+        setCardHeight(340);
+        return;
+      }
+      setCardWidth(520);
+      setCardHeight(360);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const fetchListings = useCallback(() => {
+    setListingsLoading(true);
     setListingsError(null);
     fetch(`${getApiUrl()}/api/listings`)
       .then((res) => {
@@ -76,18 +136,21 @@ export default function Home() {
         }
         return res.json();
       })
-      .then((data: { listings?: any[] }) => {
-        const list = (data.listings || []).map((l: any) => ({ ...l, itemType: "listing" as const }));
+      .then((data: { listings?: ListingRecord[] }) => {
+        const list = (data.listings || []).map((l) => ({ ...l, itemType: "listing" as const }));
         setListings(list.sort((a, b) => {
           const aActive = isActiveStatus(a.status);
           const bActive = isActiveStatus(b.status);
           if (aActive !== bActive) return aActive ? -1 : 1;
           return new Date((b.createdAt as string) || 0).getTime() - new Date((a.createdAt as string) || 0).getTime();
-        }).slice(0, 6));
+        }).slice(0, 8));
       })
       .catch((e) => {
         setListings([]);
         setListingsError(e instanceof Error ? e.message : "Failed to load listings.");
+      })
+      .finally(() => {
+        setListingsLoading(false);
       });
   }, []);
 
@@ -95,120 +158,140 @@ export default function Home() {
     fetchListings();
   }, [fetchListings]);
 
+  const stackItems = useMemo<HomeStackItem[]>(() => {
+    return listings.map((item) => {
+      const badge = getStatusBadge(item.status);
+      return {
+        id: item.id,
+        title: item.title || formatListingId(item.id) || "Untitled",
+        description: "Tap to view listing details",
+        href: `/listing/${encodeURIComponent(item.id)}`,
+        listing: item,
+        statusLabel: badge.label,
+        statusClass: `${badge.className} ${badge.glowClass}`,
+        priceLabel: formatHbarWithUsd(formatPriceForDisplay(String(item.price ?? item.reservePrice ?? "0")), usdRate),
+      };
+    });
+  }, [listings, usdRate]);
+
   return (
-    <main className="min-h-screen">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-        <section className="rounded-2xl border border-white/15 bg-gradient-to-br from-[#5865F2]/25 via-[#0d1222] to-[#0f4f76]/35 p-6 sm:p-8">
-          <p className="text-xs uppercase tracking-[0.2em] text-indigo-200/90">Hashpop Marketplace</p>
-          <h1 className="mt-2 text-2xl sm:text-3xl font-bold text-white">Discover the latest listings</h1>
-          <p className="mt-3 max-w-2xl text-silver">
-            Browse active drops, trending collectibles, and fresh listings from the Hashpop community.
-          </p>
-          <div className="mt-5 flex flex-wrap gap-3">
-            <Link href="/marketplace" className="btn-frost-cta">
-              Explore marketplace
-            </Link>
-            <Link href="/create" className="btn-frost border-white/20">
-              Create listing
-            </Link>
-          </div>
-        </section>
+    <main
+      className="min-h-screen overflow-y-auto overflow-x-hidden md:h-screen md:overflow-hidden"
+      style={{
+        backgroundColor: "#071b38",
+      }}
+    >
+      <section className="relative flex min-h-full w-full flex-col overflow-visible bg-[#0a2247] p-4 shadow-[0_24px_70px_rgba(0,0,0,0.35)] sm:p-6 md:h-full md:overflow-hidden">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_115%,rgba(69,232,145,0.36),transparent_45%)]" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,rgba(72,170,255,0.18),transparent_42%)]" />
+          <div className="relative z-10 flex min-h-full flex-col md:h-full">
+            <div className="flex items-start justify-center sm:justify-start">
+              <Link href="/" className="relative inline-block" aria-label="Hashpop home">
+                <img
+                  src="/hashpop-cart-3d.png"
+                  alt="Hashpop cart logo"
+                  className="relative h-14 w-auto bg-transparent object-contain drop-shadow-[0_12px_24px_rgba(0,0,0,0.35)] sm:h-16"
+                />
+              </Link>
+            </div>
 
-        <section className="glass-card rounded-2xl border border-white/10 p-4 sm:p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-xl sm:text-2xl font-bold text-white">Latest listings</h2>
-            <Link href="/marketplace" className="text-sm text-chrome hover:text-white font-medium">
-              See all
-            </Link>
-          </div>
+            <div className="mt-4 text-center sm:mt-5">
+              <p className="text-xs uppercase tracking-[0.2em] text-emerald-200/85">Trade • Collect • Verify</p>
+              <h1 className="mt-2 text-2xl font-black text-white sm:text-4xl">Trade Verifiably on the Hashgraph</h1>
+              <p className="mx-auto mt-2 max-w-2xl text-sm text-silver sm:text-base">
+                Swipe through featured listings.
+              </p>
+            </div>
 
-          {listingsError ? (
-            <p className="text-amber-400/90 py-8 text-sm">
-              {listingsError} Ensure the backend is running and PostgreSQL is up (e.g. <code className="text-chrome">docker compose up -d db</code>).
-            </p>
-          ) : listings.length === 0 ? (
-            <p className="text-silver py-8">
-              No listings yet. <Link href="/marketplace" className="text-chrome hover:text-white underline">View marketplace</Link> or <Link href="/create" className="text-chrome hover:text-white underline">create one</Link>.
-            </p>
-          ) : (
-            <>
-              {/* Mobile: compact carousel with heart */}
-              <div className="sm:hidden -mx-4 overflow-x-auto overflow-y-hidden scroll-smooth snap-x snap-mandatory scrollbar-hide">
-                <div className="flex gap-3 px-4 pb-2" style={{ minWidth: "min-content" }}>
-                  {listings.map((item: any) => (
-                    <Link
-                      key={`${item.itemType || "listing"}-${item.id}`}
-                      href={`/listing/${encodeURIComponent(item.id)}`}
-                      className="flex-shrink-0 w-[140px] snap-start glass-card overflow-hidden transition-all duration-200 active:border-white/20 relative"
-                    >
-                      <div className="relative">
-                        <ListingMedia
-                          listing={item}
-                          className="w-full rounded-t-lg object-cover"
-                          aspectRatio="square"
-                          navigation="arrows"
-                          cardSize
-                          compactHeight="88px"
-                        />
-                        <div className="absolute top-2 right-2">
-                          <WishlistButton itemId={item.id} itemType={item.itemType || "listing"} compact />
-                        </div>
-                        <span className={`absolute top-2 left-2 rounded-full px-2 py-0.5 text-[10px] font-semibold border ${getStatusBadge(item.status).className}`}>
-                          {getStatusBadge(item.status).label}
-                        </span>
-                      </div>
-                      <div className="p-2 min-h-0">
-                        <h2 className="text-sm font-medium text-white truncate leading-tight">
-                          {item.title || formatListingId(item.id) || "Untitled"}
-                        </h2>
-                        <p className="text-chrome text-xs font-medium mt-0.5">
-                          {formatHbarWithUsd(formatPriceForDisplay(item.price || item.reservePrice || "0"), usdRate)}
-                        </p>
-                      </div>
-                    </Link>
-                  ))}
+            <div
+              className="mt-3 flex-1 min-h-0 flex flex-col md:min-h-0"
+              style={carouselMinHeight > 0 ? { minHeight: carouselMinHeight } : undefined}
+            >
+              {listingsLoading ? (
+                <div className="flex h-full min-h-[330px] items-center justify-center">
+                  <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/40 border-t-transparent" aria-label="Loading listings" />
                 </div>
-              </div>
-
-              {/* Desktop: grid with heart on each card (eBay-style) */}
-              <div className="hidden sm:grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
-                {listings.map((item: any) => (
-                  <Link
-                    key={`${item.itemType || "listing"}-${item.id}`}
-                    href={`/listing/${encodeURIComponent(item.id)}`}
-                    className="glass-card overflow-hidden transition-all duration-200 hover:border-white/20 hover:shadow-glow rounded-xl"
-                  >
-                    <div className="relative bg-white/5">
-                      <ListingMedia
-                        listing={item}
-                        className="w-full"
-                        aspectRatio="square"
-                        navigation="arrows"
-                        cardSize
-                        compactHeight="160px"
-                      />
-                      <div className="absolute top-2 right-2">
-                        <WishlistButton itemId={item.id} itemType={item.itemType || "listing"} compact />
+              ) : stackItems.length > 0 ? (
+                <CardStack
+                  items={stackItems}
+                  cardWidth={cardWidth}
+                  cardHeight={cardHeight}
+                  initialIndex={0}
+                  autoAdvance
+                  intervalMs={2500}
+                  pauseOnHover
+                  showDots
+                  maxVisible={7}
+                  overlap={0.5}
+                  spreadDeg={52}
+                  className="mx-auto"
+                  renderCard={(item, { active }) => {
+                    const cardContent = (
+                      <div className="relative h-full w-full overflow-hidden rounded-2xl border border-white/15">
+                        <div className="absolute inset-0">
+                          {item.listing ? (
+                            <ListingMedia
+                              listing={item.listing}
+                              className="h-full w-full object-cover"
+                              navigation="arrows"
+                              cardSize
+                              compactHeight="100%"
+                            />
+                          ) : null}
+                        </div>
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-black/5" />
+                        {item.statusLabel && item.statusClass ? (
+                          <span className={`absolute left-4 top-4 rounded-full border px-2 py-0.5 text-[10px] font-bold tracking-wide ${item.statusClass}`}>
+                            {item.statusLabel}
+                          </span>
+                        ) : null}
+                        <div className="absolute inset-x-0 bottom-0 p-4">
+                          <h2 className="line-clamp-2 text-base font-bold text-white sm:text-lg">{item.title}</h2>
+                          <p className="mt-1 line-clamp-2 text-xs text-white/85">{item.description}</p>
+                          {item.priceLabel ? (
+                            <p className="mt-2 inline-flex items-center gap-1 rounded-full border border-cyan-300/30 bg-cyan-400/10 px-2.5 py-1 text-xs font-semibold text-cyan-100">
+                              <Sparkles className="h-3 w-3" />
+                              {item.priceLabel}
+                            </p>
+                          ) : null}
+                        </div>
                       </div>
-                      <span className={`absolute top-2 left-2 rounded-full px-2 py-0.5 text-[10px] font-semibold border ${getStatusBadge(item.status).className}`}>
-                        {getStatusBadge(item.status).label}
-                      </span>
-                    </div>
-                    <div className="p-3">
-                      <h2 className="text-sm font-medium text-white line-clamp-2 leading-tight min-h-[2.5rem]">
-                        {item.title || formatListingId(item.id) || "Untitled"}
-                      </h2>
-                      <p className="text-chrome font-semibold mt-1">
-                        {formatHbarWithUsd(formatPriceForDisplay(item.price || item.reservePrice || "0"), usdRate)}
-                      </p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </>
-          )}
-        </section>
-      </div>
+                    );
+                    if (active && item.href) {
+                      return (
+                        <Link
+                          href={item.href}
+                          className="block h-full w-full"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {cardContent}
+                        </Link>
+                      );
+                    }
+                    return cardContent;
+                  }}
+                />
+              ) : (
+                <div className="flex h-full min-h-[330px] items-center justify-center">
+                  <p className="text-sm text-silver">No listings found in marketplace yet.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-3 flex justify-center">
+              <MorphButton
+                text="Browse Listings"
+                onClick={() => router.push("/marketplace")}
+                className="h-12 border-emerald-200/70 text-sm font-extrabold uppercase tracking-[0.08em]"
+              />
+            </div>
+            {listingsError ? (
+              <p className="mt-2 text-center text-xs text-amber-300/95">
+                {listingsError} Ensure backend and database are running.
+              </p>
+            ) : null}
+          </div>
+      </section>
     </main>
   );
 }

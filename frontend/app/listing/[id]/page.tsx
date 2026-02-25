@@ -612,7 +612,7 @@ export default function ListingPage() {
 
       {isSeller && priceMismatch && apiPriceHbar && onChainPriceHbar && Number(apiPriceHbar) < Number(onChainPriceHbar) && (
         <div className="mb-4 rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-          <strong>Complete the price update:</strong> Your listing is set to {apiPriceHbar} HBAR but buyers still see {onChainPriceHbar} HBAR. Click &quot;Edit listing&quot;, set the price to {apiPriceHbar} HBAR, then &quot;Save&quot; and <strong>approve the transaction in HashPack</strong> when the modal appears to update the price on chain.
+          <strong>Complete the price update:</strong> Your listing is set to {apiPriceHbar} HBAR but buyers still see {onChainPriceHbar} HBAR. Click &quot;Configure&quot;, set the price to {apiPriceHbar} HBAR, then &quot;Save&quot; and <strong>approve the transaction in HashPack</strong> when the modal appears to update the price on chain.
         </div>
       )}
 
@@ -691,7 +691,7 @@ export default function ListingPage() {
           </div>
           {isSeller && isSellerActiveListing && editing && (
             <div className="glass-card p-4 space-y-3">
-              <h3 className="text-white font-medium">Edit listing</h3>
+              <h3 className="text-white font-medium">Configure</h3>
               <label className="block">
                 <span className="text-xs text-silver">Title</span>
                 <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="input-frost mt-1 w-full text-sm" />
@@ -880,13 +880,23 @@ export default function ListingPage() {
               <AddressDisplay address={item!.seller} className="text-chrome font-mono text-xs" />
             </p>
             {isSeller && isSellerActiveListing && !editing && (
-              <button
-                type="button"
-                onClick={() => setEditing(true)}
-                className="btn-frost-cta w-full mt-2 border-white/20 text-silver hover:text-white"
-              >
-                Edit listing
-              </button>
+              <div className="flex gap-2 mt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditing(true)}
+                  className="btn-frost-cta flex-1 border-white/20 text-silver hover:text-white"
+                >
+                  Configure
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void cancel(listing.id)}
+                  disabled={cancelPending}
+                  className="btn-frost-cta flex-1 border-rose-500/50 text-rose-300 hover:bg-rose-500/20 disabled:opacity-60"
+                >
+                  {cancelPending ? "Confirm in wallet" : "Delete"}
+                </button>
+              </div>
             )}
             {isSeller && (
               walletConnected ? (
@@ -929,11 +939,6 @@ export default function ListingPage() {
             )}
           </div>
 
-          {listing && isListed && isSeller && (
-            <button type="button" onClick={() => { void cancel(listing.id); }} disabled={cancelPending} className="btn-frost-cta w-full border-rose-500/50 text-rose-300 hover:bg-rose-500/20 disabled:opacity-60">
-              {cancelPending ? "Confirm in wallet" : "Delete listing"}
-            </button>
-          )}
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { AccountSidebar } from "../../components/AccountSidebar";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
@@ -9,6 +9,7 @@ import { formatPriceForDisplay } from "../../lib/formatPrice";
 import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { formatListingDate } from "../../lib/formatDate";
+import { useCancelListing } from "../../hooks/useCancelListing";
 
 export default function SellingPage() {
   const { address } = useHashpackWallet();
@@ -16,15 +17,11 @@ export default function SellingPage() {
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<any[]>([]);
   const [archived, setArchived] = useState<any[]>([]);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const { cancel, isPending: cancelPending, isSuccess: cancelSuccess, hash: cancelTxHash } = useCancelListing();
 
-  useEffect(() => {
-    if (!address) {
-      setActive([]);
-      setArchived([]);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
+  const fetchListings = useCallback(() => {
+    if (!address) return;
     fetch(`${getApiUrl()}/api/user/${address}/listings`)
       .then((res) => res.ok ? res.json() : Promise.reject())
       .then((data: { active?: any[]; archived?: any[] }) => {
@@ -37,6 +34,28 @@ export default function SellingPage() {
       })
       .finally(() => setLoading(false));
   }, [address]);
+
+  useEffect(() => {
+    if (!address) {
+      setActive([]);
+      setArchived([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    fetchListings();
+  }, [address, fetchListings]);
+
+  useEffect(() => {
+    if (!cancelSuccess || !cancelTxHash) return;
+    fetch(`${getApiUrl()}/api/sync-cancel`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ txHash: cancelTxHash }),
+    }).catch(() => {});
+    setCancellingId(null);
+    fetchListings();
+  }, [cancelSuccess, cancelTxHash, fetchListings]);
 
   return (
     <main className="min-h-screen">
@@ -71,8 +90,19 @@ export default function SellingPage() {
                               href={`/listing/${encodeURIComponent(row.id)}`}
                               className="btn-frost-cta px-3 py-1.5 text-xs border-white/20"
                             >
-                              Edit
+                              Configure
                             </Link>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCancellingId(row.id);
+                                void cancel(row.id);
+                              }}
+                              disabled={cancelPending}
+                              className="btn-frost px-3 py-1.5 text-xs border-rose-500/50 text-rose-300 hover:bg-rose-500/20 disabled:opacity-60"
+                            >
+                              {cancelPending && cancellingId === row.id ? "Confirm in wallet" : "Delete"}
+                            </button>
                           </div>
                         </li>
                       ))}
