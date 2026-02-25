@@ -84,6 +84,7 @@ export function CardStack<T extends CardStackItem>({
   const len = items.length;
   const [active, setActive] = React.useState(() => wrapIndex(initialIndex, len));
   const [hovering, setHovering] = React.useState(false);
+  const lastDragAtRef = React.useRef(0);
 
   React.useEffect(() => {
     setActive((a) => wrapIndex(a, len));
@@ -166,10 +167,14 @@ export function CardStack<T extends CardStackItem>({
                     dragConstraints: { left: 0, right: 0 },
                     dragElastic: 0.35,
                     dragMomentum: false,
+                    onDragStart: () => {
+                      lastDragAtRef.current = Date.now();
+                    },
                     onDragEnd: (
                       _e: unknown,
                       info: { offset: { x: number }; velocity: { x: number } }
                     ) => {
+                      lastDragAtRef.current = Date.now();
                       triggerSwipe(info.offset.x, info.velocity.x);
                     },
                     onPanEnd: (
@@ -209,7 +214,11 @@ export function CardStack<T extends CardStackItem>({
                   }
                   animate={{ opacity: 1, x, y: y + lift, rotateZ, rotateX, scale }}
                   transition={{ type: "spring", stiffness: springStiffness, damping: springDamping }}
-                  onClick={() => setActive(i)}
+                  onClick={() => {
+                    // iOS can emit a click right after drag end; ignore that so swipe advances persist.
+                    if (Date.now() - lastDragAtRef.current < 280) return;
+                    setActive(i);
+                  }}
                   {...dragProps}
                 >
                   <div className="h-full w-full" style={{ transform: `translateZ(${z}px)`, transformStyle: "preserve-3d" }}>

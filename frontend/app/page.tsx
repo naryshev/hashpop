@@ -92,11 +92,13 @@ export default function Home() {
   const usdRate = useHbarUsd();
   const [cardWidth, setCardWidth] = useState(520);
   const [cardHeight, setCardHeight] = useState(360);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
       const width = window.innerWidth;
       const height = window.innerHeight;
+      setIsMobileViewport(width < 640);
       if (width < 640) {
         // Mobile: smaller cards so entire fixed hero fits in one screen
         const cw = Math.min(300, width - 36);
@@ -218,7 +220,7 @@ export default function Home() {
                   cardWidth={cardWidth}
                   cardHeight={cardHeight}
                   initialIndex={0}
-                  autoAdvance
+                  autoAdvance={!isMobileViewport}
                   intervalMs={2500}
                   pauseOnHover
                   showDots
