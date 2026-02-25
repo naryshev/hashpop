@@ -152,15 +152,16 @@ export function CardStack<T extends CardStackItem>({
                 ? {
                     drag: "x" as const,
                     dragConstraints: { left: 0, right: 0 },
-                    dragElastic: 0.18,
+                    dragElastic: 0.25,
                     onDragEnd: (
                       _e: unknown,
                       info: { offset: { x: number }; velocity: { x: number } }
                     ) => {
                       if (reduceMotion) return;
-                      const threshold = Math.min(160, cardWidth * 0.22);
-                      if (info.offset.x > threshold || info.velocity.x > 650) prev();
-                      else if (info.offset.x < -threshold || info.velocity.x < -650) next();
+                      const threshold = Math.min(70, Math.round(cardWidth * 0.14));
+                      const velocityThreshold = 280;
+                      if (info.offset.x > threshold || info.velocity.x > velocityThreshold) prev();
+                      else if (info.offset.x < -threshold || info.velocity.x < -velocityThreshold) next();
                     },
                   }
                 : {};
@@ -169,10 +170,16 @@ export function CardStack<T extends CardStackItem>({
                 <motion.div
                   key={item.id}
                   className={cn(
-                    "absolute bottom-0 overflow-hidden rounded-2xl border-4 border-black/10 shadow-xl will-change-transform select-none",
+                    "absolute bottom-0 overflow-hidden rounded-2xl border-4 border-black/10 shadow-xl will-change-transform select-none touch-manipulation",
                     isActive ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
                   )}
-                  style={{ width: cardWidth, height: cardHeight, zIndex, transformStyle: "preserve-3d" }}
+                  style={{
+                    width: cardWidth,
+                    height: cardHeight,
+                    zIndex,
+                    transformStyle: "preserve-3d",
+                    touchAction: isActive ? "pan-x" : "auto",
+                  }}
                   initial={
                     reduceMotion
                       ? false
