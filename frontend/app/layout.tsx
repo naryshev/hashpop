@@ -6,9 +6,9 @@ export const metadata = {
   title: "Hashpop",
   description: "Hashpop marketplace on Hedera",
   icons: {
-    icon: "/favicon.png",
-    shortcut: "/favicon.png",
-    apple: "/favicon.png",
+    icon: "/hashpop-cart-3d.PNG",
+    shortcut: "/hashpop-cart-3d.PNG",
+    apple: "/hashpop-cart-3d.PNG",
   },
 };
 
