@@ -209,7 +209,7 @@ export default function Home() {
             </div>
 
             <div
-              className="mt-3 flex-1 min-h-0 flex flex-col md:min-h-0"
+              className="mt-1 flex-1 min-h-0 flex flex-col sm:mt-3 md:min-h-0"
               style={carouselMinHeight > 0 ? { minHeight: carouselMinHeight } : undefined}
             >
               {listingsLoading ? (
@@ -229,7 +229,7 @@ export default function Home() {
                   maxVisible={7}
                   overlap={0.5}
                   spreadDeg={52}
-                  className="mx-auto"
+                  className="mx-auto -mt-4 sm:mt-0"
                   renderCard={(item, { active }) => {
                     const cardContent = (
                       <div className="relative h-full w-full overflow-hidden rounded-2xl border border-white/15">
