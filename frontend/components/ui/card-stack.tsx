@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion, type PanInfo } from "framer-motion";
 
 function cn(...classes: Array<string | undefined | null | false>) {
   return classes.filter(Boolean).join(" ");
@@ -86,6 +86,7 @@ export function CardStack<T extends CardStackItem>({
   const [hovering, setHovering] = React.useState(false);
   const lastDragAtRef = React.useRef(0);
   const [draggingId, setDraggingId] = React.useState<string | number | null>(null);
+  const [panX, setPanX] = React.useState(0);
 
   React.useEffect(() => {
     setActive((a) => wrapIndex(a, len));
@@ -120,14 +121,18 @@ export function CardStack<T extends CardStackItem>({
   const triggerSwipe = React.useCallback(
     (offsetX: number, velocityX: number) => {
       if (reduceMotion) return;
-      // Keep thresholds low so mobile swipes reliably advance cards.
-      const distanceThreshold = Math.max(10, Math.round(cardWidth * 0.04));
-      const velocityThreshold = 90;
+      // Dedicated gesture thresholds for smooth, reliable swipe-to-next behavior.
+      const distanceThreshold = Math.max(18, Math.round(cardWidth * 0.1));
+      const velocityThreshold = 320;
       if (offsetX > distanceThreshold || velocityX > velocityThreshold) prev();
       else if (offsetX < -distanceThreshold || velocityX < -velocityThreshold) next();
     },
     [cardWidth, next, prev, reduceMotion]
   );
+
+  React.useEffect(() => {
+    setPanX(0);
+  }, [active]);
 
   React.useEffect(() => {
     if (!autoAdvance || reduceMotion || !len || (pauseOnHover && hovering)) return;
@@ -162,35 +167,6 @@ export function CardStack<T extends CardStackItem>({
               const rotateX = isActive ? 0 : tiltXDeg;
               const zIndex = 100 - abs;
 
-              const dragProps = isActive
-                ? {
-                    drag: "x" as const,
-                    dragDirectionLock: true,
-                    dragSnapToOrigin: true,
-                    dragElastic: 0.35,
-                    dragMomentum: false,
-                    onDragStart: () => {
-                      lastDragAtRef.current = Date.now();
-                      setDraggingId(item.id);
-                    },
-                    onDragEnd: (
-                      _e: unknown,
-                      info: { offset: { x: number }; velocity: { x: number } }
-                    ) => {
-                      lastDragAtRef.current = Date.now();
-                      setDraggingId(null);
-                      triggerSwipe(info.offset.x, info.velocity.x);
-                    },
-                    onPanEnd: (
-                      _e: unknown,
-                      info: { offset: { x: number }; velocity: { x: number } }
-                    ) => {
-                      setDraggingId(null);
-                      triggerSwipe(info.offset.x, info.velocity.x);
-                    },
-                  }
-                : {};
-
               return (
                 <motion.div
                   key={item.id}
@@ -202,7 +178,7 @@ export function CardStack<T extends CardStackItem>({
                     height: cardHeight,
                     zIndex,
                     transformStyle: "preserve-3d",
-                    touchAction: isActive ? "pan-y" : "auto",
+                    touchAction: isActive ? "none" : "auto",
                     cursor: isActive ? (draggingId === item.id ? "grabbing" : "grab") : "pointer",
                   }}
                   initial={
@@ -217,14 +193,35 @@ export function CardStack<T extends CardStackItem>({
                           scale,
                         }
                   }
-                  animate={{ opacity: 1, x, y: y + lift, rotateZ, rotateX, scale }}
-                  transition={{ type: "spring", stiffness: springStiffness, damping: springDamping }}
+                  animate={{ opacity: 1, x: x + (isActive ? panX : 0), y: y + lift, rotateZ, rotateX, scale }}
+                  transition={
+                    isActive && draggingId === item.id
+                      ? { duration: 0 }
+                      : { type: "spring", stiffness: springStiffness, damping: springDamping }
+                  }
+                  onPanStart={() => {
+                    if (!isActive) return;
+                    setDraggingId(item.id);
+                    lastDragAtRef.current = Date.now();
+                  }}
+                  onPan={(_e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+                    if (!isActive) return;
+                    const maxPan = cardWidth * 0.4;
+                    const nextPan = Math.max(-maxPan, Math.min(maxPan, info.offset.x));
+                    setPanX(nextPan);
+                  }}
+                  onPanEnd={(_e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+                    if (!isActive) return;
+                    setDraggingId(null);
+                    lastDragAtRef.current = Date.now();
+                    triggerSwipe(info.offset.x, info.velocity.x);
+                    setPanX(0);
+                  }}
                   onClick={() => {
                     // iOS can emit a click right after drag end; ignore that so swipe advances persist.
                     if (Date.now() - lastDragAtRef.current < 280) return;
                     setActive(i);
                   }}
-                  {...dragProps}
                 >
                   <div className="h-full w-full" style={{ transform: `translateZ(${z}px)`, transformStyle: "preserve-3d" }}>
                     {renderCard ? renderCard(item, { active: isActive }) : <DefaultFanCard item={item} />}
