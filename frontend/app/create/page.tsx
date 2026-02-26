@@ -307,7 +307,6 @@ function CreatePageContent() {
       )}
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-xl sm:text-2xl font-bold text-white">Create Listing</h1>
-          <Link href="/" className="text-sm text-chrome hover:text-white font-medium">Home</Link>
         </div>
 
       {!walletConnected && (

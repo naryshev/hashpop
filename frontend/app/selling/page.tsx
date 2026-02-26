@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { AccountSidebar } from "../../components/AccountSidebar";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
 import { getApiUrl } from "../../lib/apiUrl";
 import { formatPriceForDisplay } from "../../lib/formatPrice";
@@ -57,9 +56,7 @@ export default function SellingPage() {
     <main className="min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         <h1 className="text-xl sm:text-2xl font-bold text-white">Selling</h1>
-        <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
-          <AccountSidebar />
-          {!address ? (
+        {!address ? (
             <p className="text-silver">Connect your wallet to view your listings.</p>
           ) : loading ? (
             <p className="text-silver">Loading…</p>
@@ -110,7 +107,6 @@ export default function SellingPage() {
               </section>
             </div>
           )}
-        </div>
       </div>
     </main>
   );

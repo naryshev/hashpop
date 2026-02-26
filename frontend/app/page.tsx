@@ -8,6 +8,7 @@ import { formatHbarWithUsd } from "../lib/hbarUsd";
 import { useHbarUsd } from "../hooks/useHbarUsd";
 import { getApiUrl } from "../lib/apiUrl";
 import { CardStack, type CardStackItem } from "../components/ui/card-stack";
+import { MorphingSquare } from "../components/ui/morphing-square";
 import { Sparkles } from "lucide-react";
 
 function formatListingId(id: string): string {
@@ -240,7 +241,7 @@ export default function Home() {
             >
               {listingsLoading ? (
                 <div className="flex h-full min-h-[330px] items-center justify-center">
-                  <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/40 border-t-transparent" aria-label="Loading listings" />
+                  <MorphingSquare message="Loading listings..." className="bg-white/90" />
                 </div>
               ) : stackItems.length > 0 ? (
                 <CardStack

@@ -8,7 +8,6 @@ import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { formatPriceForDisplay } from "../../lib/formatPrice";
 import { formatListingDate } from "../../lib/formatDate";
 import { getApiUrl } from "../../lib/apiUrl";
-import { AccountSidebar } from "../../components/AccountSidebar";
 
 type PurchaseRow = {
   id: string;
@@ -58,9 +57,7 @@ export default function PurchasesPage() {
           <Link href="/dashboard" className="text-sm text-chrome hover:text-white font-medium">Dashboard</Link>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
-          <AccountSidebar />
-          <div className="space-y-6">
+        <div className="space-y-6">
             {!address ? (
               <p className="text-silver">Connect your wallet to view purchase history.</p>
             ) : loading ? (
@@ -126,7 +123,6 @@ export default function PurchasesPage() {
             </section>
               </>
             )}
-          </div>
         </div>
       </div>
     </main>

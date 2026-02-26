@@ -4,7 +4,6 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AddressDisplay } from "../../components/AddressDisplay";
-import { AccountSidebar } from "../../components/AccountSidebar";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
 import { getApiUrl } from "../../lib/apiUrl";
 
@@ -113,9 +112,7 @@ function MessagesPageContent() {
     <main className="min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         <h1 className="text-xl sm:text-2xl font-bold text-white">Messages</h1>
-        <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
-          <AccountSidebar />
-          {!address ? (
+        {!address ? (
             <p className="text-silver">Connect your wallet to view messages.</p>
           ) : (
             <div className="glass-card overflow-hidden flex flex-col md:flex-row min-h-[420px] rounded-xl">
@@ -214,7 +211,6 @@ function MessagesPageContent() {
               )}
             </div>
           )}
-        </div>
       </div>
     </main>
   );

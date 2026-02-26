@@ -6,7 +6,6 @@ import { formatPriceForDisplay } from "../../lib/formatPrice";
 import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { formatListingDate } from "../../lib/formatDate";
-import { AccountSidebar } from "../../components/AccountSidebar";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
 import { getApiUrl } from "../../lib/apiUrl";
 
@@ -96,9 +95,7 @@ export default function DashboardPage() {
           )}
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]" suppressHydrationWarning>
-          <AccountSidebar />
-          <div className="space-y-8">
+        <div className="space-y-8" suppressHydrationWarning>
             {!mounted ? (
               <p className="text-silver">Loading…</p>
             ) : !address ? (
@@ -190,7 +187,6 @@ export default function DashboardPage() {
 
               </>
             )}
-          </div>
         </div>
       </div>
     </main>

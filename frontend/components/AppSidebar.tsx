@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import { Home, Store, LayoutDashboard, PlusSquare, Heart, MessageSquare, LifeBuoy } from "lucide-react";
 import { Sidebar, SidebarBody, SidebarLink } from "./ui/sidebar";
 import { cn } from "../lib/utils";
-import { AccountMenu } from "./AccountMenu";
 
 type NavLink = {
   label: string;
@@ -17,6 +16,7 @@ type NavLink = {
 export function AppSidebar() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const appVersion = process.env.NEXT_PUBLIC_APP_VERSION?.trim() || "v1.0.0";
 
   const links = useMemo<NavLink[]>(
     () => [
@@ -59,7 +59,9 @@ export function AppSidebar() {
           </div>
         </div>
         <div className="border-t border-black/10 dark:border-white/10 pt-3">
-          <AccountMenu />
+          <p className="text-xs text-neutral-600 dark:text-neutral-300 px-2">
+            {open ? `App ${appVersion}` : appVersion}
+          </p>
         </div>
       </SidebarBody>
     </Sidebar>
