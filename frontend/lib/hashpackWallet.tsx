@@ -434,6 +434,13 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
       }
 
       // 3) Desktop fallback: HashConnect pairing modal (QR / deep link).
+      const desktopPairingUri = await getPairingUri(hc);
+      if (!desktopPairingUri || !desktopPairingUri.startsWith("wc:")) {
+        setError(
+          "Could not initialize WalletConnect pairing. Disable wallet-injecting extensions (e.g. MetaMask/Brave Wallet) for this site and try again."
+        );
+        return;
+      }
       const openModal = (hc as { openPairingModal?: (theme?: unknown) => Promise<void> }).openPairingModal;
       if (typeof openModal !== "function") {
         setError("HashConnect pairing not available. Try refreshing or use a private window.");
