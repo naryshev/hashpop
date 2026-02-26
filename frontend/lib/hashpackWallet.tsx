@@ -361,21 +361,29 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
   const connect = useCallback(async () => {
     if (connectInFlightRef.current) return;
     connectInFlightRef.current = true;
-    let hc = hashconnect;
-    if (!hc && initPromiseRef.current) {
-      try {
-        hc = await initPromiseRef.current;
-      } catch {
-        hc = null;
-      }
-    }
-    if (!hc) {
-      setError("Wallet initialization failed. Refresh and try again.");
-      return;
-    }
     setIsConnecting(true);
     setError(null);
     try {
+      let hc = hashconnect;
+      if (!hc && initPromiseRef.current) {
+        try {
+          hc = await initPromiseRef.current;
+        } catch {
+          hc = null;
+        }
+      }
+      if (!hc) {
+        const projectId = process.env.NEXT_PUBLIC_WC_PROJECT_ID?.trim();
+        if (projectId) {
+          hc = await getOrCreateHashConnect(network, projectId).catch(() => null);
+          if (hc) setHashconnect(hc);
+        }
+      }
+      if (!hc) {
+        setError("Wallet initialization failed. Refresh and try again.");
+        return;
+      }
+
       if ((hc.connectedAccountIds?.length ?? 0) > 0) return;
 
       const extensionOnly = process.env.NEXT_PUBLIC_HASHPACK_EXTENSION_ONLY === "true";
@@ -415,13 +423,23 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
         return;
       }
 
-      // 2) Desktop: single pairing modal path to avoid duplicate prompt flows.
+      // 2) Desktop: prefer extension path to avoid modal duplicate prompts.
+      const maybeConnectToExtension = (hc as unknown as { connectToExtension?: () => Promise<unknown> }).connectToExtension;
+      if (typeof maybeConnectToExtension === "function") {
+        const extErr = await maybeConnectToExtension.call(hc).then(() => null).catch((err: unknown) => err);
+        if (!extErr) {
+          await waitForPairing(connectWaitRef, PAIRING_WAIT_MS);
+          return;
+        }
+      }
+
+      // 3) Desktop fallback: HashConnect pairing modal (QR / deep link).
       const openModal = (hc as { openPairingModal?: (theme?: unknown) => Promise<void> }).openPairingModal;
       if (typeof openModal !== "function") {
         setError("HashConnect pairing not available. Try refreshing or use a private window.");
         return;
       }
-      const modalErr = await openModal.call(hc, "dark").then(() => null).catch((err: unknown) => err);
+      const modalErr = await openModal.call(hc).then(() => null).catch((err: unknown) => err);
       if (modalErr) {
         const modalMsg =
           modalErr instanceof Error
@@ -433,7 +451,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
           // Recover from stale WC sessions by resetting connector storage and requesting a fresh pairing.
           await hc.disconnect().catch(() => {});
           clearWalletConnectorStorage();
-          const retryErr = await openModal.call(hc, "dark").then(() => null).catch((err: unknown) => err);
+          const retryErr = await openModal.call(hc).then(() => null).catch((err: unknown) => err);
           if (retryErr) {
             setError("Pairing session already existed. We reset stale pairing data, but opening a new pairing still failed. Please try again.");
             return;
@@ -457,7 +475,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
       setIsConnecting(false);
       connectInFlightRef.current = false;
     }
-  }, [hashconnect]);
+  }, [hashconnect, network]);
 
   const disconnect = useCallback(async () => {
     try {
