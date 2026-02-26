@@ -30,7 +30,6 @@ type HashpackWalletContextValue = {
 
 const HashpackWalletContext = createContext<HashpackWalletContextValue | null>(null);
 
-const EXTENSION_WAIT_MS = 10_000;
 const PAIRING_WAIT_MS = 120_000; // Time for user to approve in HashPack (extension or modal)
 
 let sharedHashconnect: HashConnect | null = null;
@@ -63,8 +62,20 @@ function isMobileBrowser(): boolean {
 function openHashPackMobileDeepLink(pairingUri: string): void {
   if (typeof window === "undefined" || !pairingUri) return;
   const encoded = encodeURIComponent(pairingUri);
-  // App deep link only so the browser stays on hashpop.io.
-  window.location.href = `hashpack://wc?uri=${encoded}`;
+  const deeplink = `hashpack://wc?uri=${encoded}`;
+  // Attempt multiple techniques for iOS/Android browsers.
+  try {
+    window.location.assign(deeplink);
+  } catch {
+    // Ignore and continue fallback.
+  }
+  const iframe = document.createElement("iframe");
+  iframe.style.display = "none";
+  iframe.src = deeplink;
+  document.body.appendChild(iframe);
+  window.setTimeout(() => {
+    iframe.remove();
+  }, 1500);
 }
 
 async function getPairingUri(hc: HashConnect): Promise<string | null> {
@@ -363,27 +374,21 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
       if ((hc.connectedAccountIds?.length ?? 0) > 0) return;
 
       const extensionOnly = process.env.NEXT_PUBLIC_HASHPACK_EXTENSION_ONLY === "true";
-      const maybeConnectToExtension = (hc as unknown as { connectToExtension?: () => Promise<unknown> }).connectToExtension;
       const mobileBrowser = isMobileBrowser();
 
-      // 1) On desktop, try HashPack extension first (no modal).
-      // On mobile, skip this to preserve direct user-gesture flow into the wallet modal/deeplink.
-      if (!mobileBrowser && typeof maybeConnectToExtension === "function") {
-        await maybeConnectToExtension.call(hc).catch(() => {});
-        try {
-          await waitForPairing(connectWaitRef, EXTENSION_WAIT_MS);
-          return;
-        } catch {
-          // Fall through to modal unless extension-only mode is enabled.
-        }
-      }
-
       if (extensionOnly) {
-        setError("HashPack extension-only mode is enabled and extension pairing failed. Ensure HashPack extension is installed, unlocked, and on this profile.");
+        // Explicit extension-only path for teams that require browser extension.
+        const maybeConnectToExtension = (hc as unknown as { connectToExtension?: () => Promise<unknown> }).connectToExtension;
+        if (typeof maybeConnectToExtension !== "function") {
+          setError("HashPack extension-only mode is enabled, but extension connect is unavailable.");
+          return;
+        }
+        await maybeConnectToExtension.call(hc).catch(() => {});
+        await waitForPairing(connectWaitRef, PAIRING_WAIT_MS);
         return;
       }
 
-      // 2) Mobile: skip modal entirely to avoid QR popup and open HashPack directly.
+      // 1) Mobile: deep-link directly into HashPack.
       if (mobileBrowser) {
         const pairingUri = await getPairingUri(hc);
         if (!pairingUri) {
@@ -395,7 +400,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
         return;
       }
 
-      // 3) Desktop fallback to HashConnect pairing modal (QR / deep link).
+      // 2) Desktop: single pairing modal path to avoid duplicate prompt flows.
       const openModal = (hc as { openPairingModal?: (theme?: unknown) => Promise<void> }).openPairingModal;
       if (typeof openModal !== "function") {
         setError("HashConnect pairing not available. Try refreshing or use a private window.");

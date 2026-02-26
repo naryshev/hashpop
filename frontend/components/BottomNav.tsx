@@ -11,6 +11,13 @@ const links = [
   { href: "/selling", label: "Selling", icon: "sell" },
 ];
 
+const signInLinks = [
+  { href: "/", label: "Home", icon: "home" },
+  { href: "/dashboard", label: "My Hashpop", icon: "dashboard" },
+  { href: "/marketplace", label: "Search", icon: "search" },
+  { href: "/messages", label: "Alerts", icon: "bell" },
+];
+
 function Icon({ name }: { name: string }) {
   const c = "w-5 h-5";
   switch (name) {
@@ -55,16 +62,17 @@ function Icon({ name }: { name: string }) {
   }
 }
 
-export function BottomNav() {
+export function BottomNav({ signInMode = false }: { signInMode?: boolean }) {
   const pathname = usePathname();
+  const navLinks = signInMode ? signInLinks : links;
 
   return (
     <nav
-      className="fixed bottom-2 left-1/2 z-30 w-[calc(100%-16px)] max-w-md -translate-x-1/2 rounded-3xl border border-white/10 bg-black/90 shadow-[0_16px_30px_rgba(0,0,0,0.45)] backdrop-blur-[20px] md:hidden"
+      className={`fixed bottom-2 left-1/2 z-30 w-[calc(100%-16px)] max-w-md -translate-x-1/2 rounded-3xl border border-white/10 bg-black/90 shadow-[0_16px_30px_rgba(0,0,0,0.45)] backdrop-blur-[20px] ${signInMode ? "" : "md:hidden"}`}
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0)" }}
     >
-      <div className="grid grid-cols-5 items-center">
-        {links.map(({ href, label, icon }) => {
+      <div className={`grid items-center ${signInMode ? "grid-cols-4" : "grid-cols-5"}`}>
+        {navLinks.map(({ href, label, icon }) => {
           const isActive = pathname === href || (href !== "/" && pathname.startsWith(href));
           return (
             <Link

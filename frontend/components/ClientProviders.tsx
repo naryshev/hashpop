@@ -25,7 +25,7 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
           {children}
           {!isFullscreenRoute && !isSignIn && <Footer />}
         </div>
-        {!isFullscreenRoute && <BottomNav />}
+        {!isFullscreenRoute && <BottomNav signInMode={isSignIn} />}
       </QueryClientProvider>
     </HashpackWalletProvider>
   );
