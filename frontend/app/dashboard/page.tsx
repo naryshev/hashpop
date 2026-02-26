@@ -29,7 +29,6 @@ export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
   const [stats, setStats] = useState<any>(null);
   const [activeListings, setActiveListings] = useState<any[]>([]);
-  const [archivedListings, setArchivedListings] = useState<any[]>([]);
   const [wishlistItems, setWishlistItems] = useState<{ itemId: string; itemType: string; title?: string; price?: string; reservePrice?: string }[]>([]);
   const [purchaseCount, setPurchaseCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -41,7 +40,6 @@ export default function DashboardPage() {
     let cancelled = false;
     setStats(null);
     setActiveListings([]);
-    setArchivedListings([]);
     setWishlistItems([]);
     setPurchaseCount(0);
     if (!address) {
@@ -53,15 +51,13 @@ export default function DashboardPage() {
       fetch(`${getApiUrl()}/api/user/${address}`).then((res) => res.json()).then((d) => { if (!cancelled) setStats(d); }).catch(() => { if (!cancelled) setStats(null); }),
       fetch(`${getApiUrl()}/api/user/${address}/listings`)
         .then((res) => res.json())
-        .then((data: { active?: any[]; archived?: any[] }) => {
+        .then((data: { active?: any[] }) => {
           if (cancelled) return;
           setActiveListings(data.active ?? []);
-          setArchivedListings(data.archived ?? []);
         })
         .catch(() => {
           if (cancelled) return;
           setActiveListings([]);
-          setArchivedListings([]);
         }),
       fetch(`${getApiUrl()}/api/wishlist?address=${encodeURIComponent(address)}`)
         .then((res) => res.ok ? res.json() : Promise.reject())
@@ -192,49 +188,6 @@ export default function DashboardPage() {
                   )}
                 </section>
 
-                <section>
-                  <h2 className="text-lg font-semibold text-white mb-3">Archived Listings</h2>
-                  {loading ? (
-                    <p className="text-silver">Loading…</p>
-                  ) : archivedListings.length === 0 ? (
-                    <p className="text-silver">No archived listings.</p>
-                  ) : (
-                    <div className="glass-card overflow-hidden rounded-xl">
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                          <thead>
-                            <tr className="border-b border-white/10">
-                              <th className="p-3 text-silver text-sm font-medium">Listing</th>
-                              <th className="p-3 text-silver text-sm font-medium">Type</th>
-                              <th className="p-3 text-silver text-sm font-medium">Price</th>
-                              <th className="p-3 text-silver text-sm font-medium">Status</th>
-                              <th className="p-3 text-silver text-sm font-medium">Date</th>
-                              <th className="p-3 text-silver text-sm font-medium">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {archivedListings.map((row) => (
-                              <tr key={`${row.itemType || "listing"}-${row.id}`} className="border-b border-white/5 hover:bg-white/5">
-                                <td className="p-3">
-                                  <Link href={`/listing/${encodeURIComponent(row.id)}`} className="text-white hover:text-chrome font-medium">
-                                    {row.title || formatListingId(row.id) || row.id.slice(0, 10) + "…"}
-                                  </Link>
-                                </td>
-                                <td className="p-3 text-silver text-sm">Buy now</td>
-                                <td className="p-3 text-chrome">{formatHbarWithUsd(formatPriceForDisplay(row.price || row.reservePrice || "0"), usdRate)}</td>
-                                <td className="p-3 text-silver text-sm">{row.status}</td>
-                                <td className="p-3 text-silver text-sm">{formatListingDate(row.updatedAt ?? row.createdAt)}</td>
-                                <td className="p-3">
-                                  <Link href={`/listing/${encodeURIComponent(row.id)}`} className="text-chrome hover:text-white text-sm">View</Link>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-                </section>
               </>
             )}
           </div>

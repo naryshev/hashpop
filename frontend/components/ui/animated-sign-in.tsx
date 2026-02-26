@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Wallet } from "lucide-react";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
@@ -15,13 +15,20 @@ export default function AnimatedSignIn() {
     router.replace("/dashboard");
   }, [isConnected, router]);
 
-  const handleConnectPress = () => {
+  useEffect(() => {
+    router.prefetch("/dashboard");
+  }, [router]);
+
+  const handleConnectPress = useCallback(() => {
     const now = Date.now();
     // Ignore duplicate click/touch events fired in quick succession.
     if (now - lastPressAtRef.current < 300) return;
     lastPressAtRef.current = now;
-    void connect();
-  };
+    // Yield one frame so pressed/disabled state can paint before wallet connect work starts.
+    window.setTimeout(() => {
+      void connect();
+    }, 0);
+  }, [connect]);
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#071b38]">
@@ -47,12 +54,9 @@ export default function AnimatedSignIn() {
           <button
             type="button"
             onClick={handleConnectPress}
-            onTouchEnd={(e) => {
-              e.preventDefault();
-              handleConnectPress();
-            }}
             disabled={!isReady || isConnecting}
             className="btn-frost-cta flex w-full items-center justify-center gap-2 py-3 text-sm font-semibold disabled:opacity-60"
+            style={{ touchAction: "manipulation" }}
           >
             <Wallet size={16} />
             {!isReady ? "Loading wallet..." : isConnecting ? "Connecting..." : "Continue with HashPack"}

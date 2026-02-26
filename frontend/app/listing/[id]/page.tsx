@@ -890,7 +890,11 @@ export default function ListingPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => void cancel(listing.id)}
+                  onClick={() => {
+                    const confirmed = window.confirm("This will delete all record of this item.");
+                    if (!confirmed) return;
+                    void cancel(listing.id);
+                  }}
                   disabled={cancelPending}
                   className="btn-frost-cta flex-1 border-rose-500/50 text-rose-300 hover:bg-rose-500/20 disabled:opacity-60"
                 >

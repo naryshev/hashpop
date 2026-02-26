@@ -248,7 +248,7 @@ export default function Home() {
                   cardWidth={cardWidth}
                   cardHeight={cardHeight}
                   initialIndex={0}
-                  autoAdvance={!isMobileViewport}
+                  autoAdvance={false}
                   intervalMs={2500}
                   pauseOnHover
                   showDots

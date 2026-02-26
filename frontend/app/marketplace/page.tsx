@@ -198,7 +198,7 @@ function MarketplacePageContent() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-xl sm:text-2xl font-bold text-white">Marketplace</h1>
-          <Link href="/" className="text-sm text-chrome hover:text-white font-medium">Home</Link>
+          <Link href="/signin" className="text-sm text-chrome hover:text-white font-medium">Sign In</Link>
         </div>
         {loading ? (
           <p className="text-silver">Loading listings…</p>

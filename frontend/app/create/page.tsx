@@ -319,7 +319,7 @@ function CreatePageContent() {
 
       {duplicateId && (
         <p className="text-sm text-chrome bg-white/5 rounded-lg px-3 py-2 border border-white/10">
-          Duplicating from archived listing. Details are prefilled—review and click Create listing when ready.
+          Duplicating listing. Details are prefilled—review and click Create listing when ready.
         </p>
       )}
 
