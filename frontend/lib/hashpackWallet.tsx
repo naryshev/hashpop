@@ -262,6 +262,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
   const connectWaitRef = useRef<((value: void | PromiseLike<void>) => void) | null>(null);
   const initPromiseRef = useRef<Promise<HashConnect | null> | null>(null);
   const connectInFlightRef = useRef(false);
+  const mobilePairingUriRef = useRef<string | null>(null);
 
   const resetWalletState = useCallback((clearConnectorData = false) => {
     setAccountId(null);
@@ -337,6 +338,10 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
         } else {
           resetWalletState();
         }
+        // Pre-cache a pairing URI so mobile can deep-link immediately from a user gesture.
+        void getPairingUri(hc).then((uri) => {
+          if (uri) mobilePairingUriRef.current = uri;
+        });
         return hc;
       } catch (e) {
         if (!mounted) return null;
@@ -390,11 +395,21 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
 
       // 1) Mobile: deep-link directly into HashPack.
       if (mobileBrowser) {
-        const pairingUri = await getPairingUri(hc);
+        const immediatePairingUri =
+          mobilePairingUriRef.current ??
+          ((hc as unknown as { pairingString?: string }).pairingString ?? null);
+        if (immediatePairingUri && immediatePairingUri.startsWith("wc:")) {
+          openHashPackMobileDeepLink(immediatePairingUri);
+        }
+
+        const pairingUri = immediatePairingUri && immediatePairingUri.startsWith("wc:")
+          ? immediatePairingUri
+          : await getPairingUri(hc);
         if (!pairingUri) {
           setError("Could not create a wallet pairing URI on mobile. Try refreshing and connecting again.");
           return;
         }
+        mobilePairingUriRef.current = pairingUri;
         openHashPackMobileDeepLink(pairingUri);
         await waitForPairing(connectWaitRef, PAIRING_WAIT_MS);
         return;
