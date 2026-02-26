@@ -59,11 +59,11 @@ function isMobileBrowser(): boolean {
   return /android|iphone|ipad|ipod|mobile/i.test(ua);
 }
 
-function openHashPackMobileDeepLink(pairingUri: string): void {
+function openHashPackDeepLink(pairingUri: string): void {
   if (typeof window === "undefined" || !pairingUri) return;
   const encoded = encodeURIComponent(pairingUri);
   const deeplink = `hashpack://wc?uri=${encoded}`;
-  // Attempt multiple techniques for iOS/Android browsers.
+  // Attempt multiple techniques for browsers where protocol handlers are finicky.
   try {
     window.location.assign(deeplink);
   } catch {
@@ -76,6 +76,65 @@ function openHashPackMobileDeepLink(pairingUri: string): void {
   window.setTimeout(() => {
     iframe.remove();
   }, 1500);
+}
+
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === "string") return err;
+  return "";
+}
+
+function isWalletConnectAttestationError(err: unknown): boolean {
+  const msg = getErrorMessage(err).toLowerCase();
+  return (
+    msg.includes("verify.walletconnect.org") ||
+    msg.includes("attestation") ||
+    msg.includes("id=undefined") ||
+    msg.includes("decryptedid=undefined")
+  );
+}
+
+function blockCompetingInjectedWallets(): void {
+  if (typeof window === "undefined") return;
+  const win = window as Window & {
+    ethereum?: unknown;
+    web3?: unknown;
+    __hashpopWalletBlockInstalled?: boolean;
+  };
+  if (win.__hashpopWalletBlockInstalled) return;
+  win.__hashpopWalletBlockInstalled = true;
+
+  const scrub = () => {
+    try {
+      Reflect.deleteProperty(win, "ethereum");
+    } catch {
+      // Ignore non-configurable property errors.
+    }
+    try {
+      Reflect.deleteProperty(win, "web3");
+    } catch {
+      // Ignore non-configurable property errors.
+    }
+    try {
+      if ("ethereum" in win) win.ethereum = undefined;
+      if ("web3" in win) win.web3 = undefined;
+    } catch {
+      // Ignore assignment errors.
+    }
+  };
+
+  scrub();
+  window.addEventListener("eip6963:announceProvider", (event) => {
+    event.stopImmediatePropagation();
+  }, true);
+  window.addEventListener("eip6963:requestProvider", (event) => {
+    event.stopImmediatePropagation();
+  }, true);
+
+  const interval = window.setInterval(scrub, 1000);
+  window.setTimeout(() => {
+    window.clearInterval(interval);
+  }, 30_000);
 }
 
 async function getPairingUri(hc: HashConnect): Promise<string | null> {
@@ -214,13 +273,19 @@ function waitForPairing(connectWaitRef: MutableRefObject<((value: void | Promise
   });
 }
 
-async function getOrCreateHashConnect(network: HederaNetwork, projectId: string): Promise<HashConnect> {
+async function getOrCreateHashConnect(network: HederaNetwork, projectId: string, forceFresh = false): Promise<HashConnect> {
+  if (forceFresh) {
+    sharedHashconnect = null;
+    sharedHashconnectInitPromise = null;
+    sharedHashconnectKey = null;
+  }
   const key = `${network}:${projectId}`;
   if (sharedHashconnect && sharedHashconnectKey === key) return sharedHashconnect;
   if (sharedHashconnectInitPromise && sharedHashconnectKey === key) return sharedHashconnectInitPromise;
 
   sharedHashconnectKey = key;
   sharedHashconnectInitPromise = (async () => {
+    blockCompetingInjectedWallets();
     const [{ HashConnect }, sdk] = await Promise.all([
       import("hashconnect"),
       import("@hashgraph/sdk"),
@@ -298,7 +363,15 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
 
     initPromiseRef.current = (async () => {
       try {
-        const hc = await getOrCreateHashConnect(network, projectId);
+        let hc: HashConnect;
+        try {
+          hc = await getOrCreateHashConnect(network, projectId);
+        } catch (initErr) {
+          if (!isWalletConnectAttestationError(initErr)) throw initErr;
+          // Recover once from stale/poisoned WC state and retry with a fresh instance.
+          clearWalletConnectorStorage();
+          hc = await getOrCreateHashConnect(network, projectId, true);
+        }
         hc.pairingEvent.on(async (session: { accountIds: string[] }) => {
           if (!mounted) return;
           const first = session.accountIds[0] ?? null;
@@ -375,7 +448,11 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
       if (!hc) {
         const projectId = process.env.NEXT_PUBLIC_WC_PROJECT_ID?.trim();
         if (projectId) {
-          hc = await getOrCreateHashConnect(network, projectId).catch(() => null);
+          hc = await getOrCreateHashConnect(network, projectId).catch(async (e: unknown) => {
+            if (!isWalletConnectAttestationError(e)) return null;
+            clearWalletConnectorStorage();
+            return getOrCreateHashConnect(network, projectId, true).catch(() => null);
+          });
           if (hc) setHashconnect(hc);
         }
       }
@@ -386,45 +463,26 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
 
       if ((hc.connectedAccountIds?.length ?? 0) > 0) return;
 
-      const mobileBrowser = isMobileBrowser();
-
-      // 1) Mobile: deep-link directly into HashPack.
-      if (mobileBrowser) {
-        const immediatePairingUri =
-          mobilePairingUriRef.current ??
-          ((hc as unknown as { pairingString?: string }).pairingString ?? null);
-        if (immediatePairingUri && immediatePairingUri.startsWith("wc:")) {
-          openHashPackMobileDeepLink(immediatePairingUri);
-        }
-
-        const pairingUri = immediatePairingUri && immediatePairingUri.startsWith("wc:")
-          ? immediatePairingUri
-          : await getPairingUri(hc);
-        if (!pairingUri) {
-          setError("Could not create a wallet pairing URI on mobile. Try refreshing and connecting again.");
-          return;
-        }
-        mobilePairingUriRef.current = pairingUri;
-        openHashPackMobileDeepLink(pairingUri);
-        await waitForPairing(connectWaitRef, PAIRING_WAIT_MS);
+      const immediatePairingUri =
+        mobilePairingUriRef.current ??
+        ((hc as unknown as { pairingString?: string }).pairingString ?? null);
+      const pairingUri = immediatePairingUri && immediatePairingUri.startsWith("wc:")
+        ? immediatePairingUri
+        : await getPairingUri(hc);
+      if (!pairingUri) {
+        setError("Could not create a HashPack pairing URI. Refresh and try again.");
         return;
       }
+      mobilePairingUriRef.current = pairingUri;
+      // Always deep-link first (desktop and mobile) to avoid QR modal UX.
+      openHashPackDeepLink(pairingUri);
 
-      // 2) Desktop: extension-only connect to avoid WalletConnect verify failures.
+      // Desktop extension users can still pair instantly via extension popup.
       const maybeConnectToExtension = (hc as unknown as { connectToExtension?: () => Promise<unknown> }).connectToExtension;
-      if (typeof maybeConnectToExtension !== "function") {
-        setError(
-          "HashPack extension connection is unavailable. Install/unlock HashPack extension and disable conflicting wallet extensions on this site."
-        );
-        return;
+      if (!isMobileBrowser() && typeof maybeConnectToExtension === "function") {
+        void maybeConnectToExtension.call(hc).catch(() => {});
       }
-      const extErr = await maybeConnectToExtension.call(hc).then(() => null).catch((err: unknown) => err);
-      if (extErr) {
-        setError(
-          "Could not connect to HashPack extension. Ensure HashPack is installed/unlocked and disable MetaMask/Brave Wallet for this site."
-        );
-        return;
-      }
+
       await waitForPairing(connectWaitRef, PAIRING_WAIT_MS);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Wallet connection failed.";
