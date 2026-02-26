@@ -1,10 +1,20 @@
 "use client";
 
+import { useRef } from "react";
 import { Wallet } from "lucide-react";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
 
 export default function AnimatedSignIn() {
   const { connect, isConnecting, isReady, error } = useHashpackWallet();
+  const lastPressAtRef = useRef(0);
+
+  const handleConnectPress = () => {
+    const now = Date.now();
+    // Ignore duplicate click/touch events fired in quick succession.
+    if (now - lastPressAtRef.current < 300) return;
+    lastPressAtRef.current = now;
+    void connect();
+  };
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#071b38]">
@@ -29,7 +39,11 @@ export default function AnimatedSignIn() {
           <div className="rounded-3xl border border-white/15 bg-[#15181f]/90 p-6 shadow-[0_16px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl sm:p-8">
           <button
             type="button"
-            onClick={() => void connect()}
+            onClick={handleConnectPress}
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              handleConnectPress();
+            }}
             disabled={!isReady || isConnecting}
             className="btn-frost-cta flex w-full items-center justify-center gap-2 py-3 text-sm font-semibold disabled:opacity-60"
           >
