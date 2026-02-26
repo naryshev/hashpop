@@ -386,20 +386,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
 
       if ((hc.connectedAccountIds?.length ?? 0) > 0) return;
 
-      const extensionOnly = process.env.NEXT_PUBLIC_HASHPACK_EXTENSION_ONLY === "true";
       const mobileBrowser = isMobileBrowser();
-
-      if (extensionOnly) {
-        // Explicit extension-only path for teams that require browser extension.
-        const maybeConnectToExtension = (hc as unknown as { connectToExtension?: () => Promise<unknown> }).connectToExtension;
-        if (typeof maybeConnectToExtension !== "function") {
-          setError("HashPack extension-only mode is enabled, but extension connect is unavailable.");
-          return;
-        }
-        await maybeConnectToExtension.call(hc).catch(() => {});
-        await waitForPairing(connectWaitRef, PAIRING_WAIT_MS);
-        return;
-      }
 
       // 1) Mobile: deep-link directly into HashPack.
       if (mobileBrowser) {
@@ -423,53 +410,18 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
         return;
       }
 
-      // 2) Desktop: prefer extension path to avoid modal duplicate prompts.
+      // 2) Desktop: extension-only connect to avoid WalletConnect verify failures.
       const maybeConnectToExtension = (hc as unknown as { connectToExtension?: () => Promise<unknown> }).connectToExtension;
-      if (typeof maybeConnectToExtension === "function") {
-        const extErr = await maybeConnectToExtension.call(hc).then(() => null).catch((err: unknown) => err);
-        if (!extErr) {
-          await waitForPairing(connectWaitRef, PAIRING_WAIT_MS);
-          return;
-        }
-      }
-
-      // 3) Desktop fallback: HashConnect pairing modal (QR / deep link).
-      const desktopPairingUri = await getPairingUri(hc);
-      if (!desktopPairingUri || !desktopPairingUri.startsWith("wc:")) {
+      if (typeof maybeConnectToExtension !== "function") {
         setError(
-          "Could not initialize WalletConnect pairing. Disable wallet-injecting extensions (e.g. MetaMask/Brave Wallet) for this site and try again."
+          "HashPack extension connection is unavailable. Install/unlock HashPack extension and disable conflicting wallet extensions on this site."
         );
         return;
       }
-      const openModal = (hc as { openPairingModal?: (theme?: unknown) => Promise<void> }).openPairingModal;
-      if (typeof openModal !== "function") {
-        setError("HashConnect pairing not available. Try refreshing or use a private window.");
-        return;
-      }
-      const modalErr = await openModal.call(hc).then(() => null).catch((err: unknown) => err);
-      if (modalErr) {
-        const modalMsg =
-          modalErr instanceof Error
-            ? modalErr.message
-            : typeof modalErr === "string"
-              ? modalErr
-              : "";
-        if (/pairing already exists/i.test(modalMsg)) {
-          // Recover from stale WC sessions by resetting connector storage and requesting a fresh pairing.
-          await hc.disconnect().catch(() => {});
-          clearWalletConnectorStorage();
-          const retryErr = await openModal.call(hc).then(() => null).catch((err: unknown) => err);
-          if (retryErr) {
-            setError("Pairing session already existed. We reset stale pairing data, but opening a new pairing still failed. Please try again.");
-            return;
-          }
-          await waitForPairing(connectWaitRef, PAIRING_WAIT_MS);
-          return;
-        }
+      const extErr = await maybeConnectToExtension.call(hc).then(() => null).catch((err: unknown) => err);
+      if (extErr) {
         setError(
-          mobileBrowser
-            ? "Could not open HashPack on mobile. Try opening this dApp in HashPack's in-app browser or paste the pairing string in HashPack."
-            : "Could not open wallet pairing. Try a private/incognito window or disable browser extensions."
+          "Could not connect to HashPack extension. Ensure HashPack is installed/unlocked and disable MetaMask/Brave Wallet for this site."
         );
         return;
       }
