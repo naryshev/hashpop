@@ -1,10 +1,8 @@
 "use client";
 
 /**
- * HashConnect wallet integration.
- * All Hedera wallet functionality (connect, disconnect, send transactions, sign)
- * is implemented via the HashConnect SDK (https://hashpack.app / hashconnect package),
- * which connects this dApp to HashPack and other compatible wallets.
+ * HashPack wallet integration rebuilt from scratch around HashConnect.
+ * This provider owns wallet lifecycle, account session restore, and pairing.
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { MutableRefObject } from "react";
@@ -30,12 +28,12 @@ type HashpackWalletContextValue = {
 
 const HashpackWalletContext = createContext<HashpackWalletContextValue | null>(null);
 
-const PAIRING_WAIT_MS = 120_000; // Time for user to approve in HashPack (extension or modal)
+const PAIRING_WAIT_MS = 120_000;
+const WALLET_SESSION_STORAGE_KEY = "hashpop.wallet.session.v1";
 
 let sharedHashconnect: HashConnect | null = null;
 let sharedHashconnectInitPromise: Promise<HashConnect> | null = null;
 let sharedHashconnectKey: string | null = null;
-const WALLET_SESSION_STORAGE_KEY = "hashpop.wallet.session.v1";
 
 function getNetwork(): HederaNetwork {
   return activeHederaChain.id === 295 ? "mainnet" : "testnet";
@@ -53,21 +51,13 @@ type StoredWalletSession = {
   address?: `0x${string}`;
 };
 
-function isMobileBrowser(): boolean {
-  if (typeof window === "undefined") return false;
-  const ua = window.navigator.userAgent || "";
-  return /android|iphone|ipad|ipod|mobile/i.test(ua);
-}
-
 function openHashPackDeepLink(pairingUri: string): void {
   if (typeof window === "undefined" || !pairingUri) return;
-  const encoded = encodeURIComponent(pairingUri);
-  const deeplink = `hashpack://wc?uri=${encoded}`;
-  // Attempt multiple techniques for browsers where protocol handlers are finicky.
+  const deeplink = `hashpack://wc?uri=${encodeURIComponent(pairingUri)}`;
   try {
     window.location.assign(deeplink);
   } catch {
-    // Ignore and continue fallback.
+    // Fallback below.
   }
   const iframe = document.createElement("iframe");
   iframe.style.display = "none";
@@ -76,65 +66,6 @@ function openHashPackDeepLink(pairingUri: string): void {
   window.setTimeout(() => {
     iframe.remove();
   }, 1500);
-}
-
-function getErrorMessage(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  if (typeof err === "string") return err;
-  return "";
-}
-
-function isWalletConnectAttestationError(err: unknown): boolean {
-  const msg = getErrorMessage(err).toLowerCase();
-  return (
-    msg.includes("verify.walletconnect.org") ||
-    msg.includes("attestation") ||
-    msg.includes("id=undefined") ||
-    msg.includes("decryptedid=undefined")
-  );
-}
-
-function blockCompetingInjectedWallets(): void {
-  if (typeof window === "undefined") return;
-  const win = window as Window & {
-    ethereum?: unknown;
-    web3?: unknown;
-    __hashpopWalletBlockInstalled?: boolean;
-  };
-  if (win.__hashpopWalletBlockInstalled) return;
-  win.__hashpopWalletBlockInstalled = true;
-
-  const scrub = () => {
-    try {
-      Reflect.deleteProperty(win, "ethereum");
-    } catch {
-      // Ignore non-configurable property errors.
-    }
-    try {
-      Reflect.deleteProperty(win, "web3");
-    } catch {
-      // Ignore non-configurable property errors.
-    }
-    try {
-      if ("ethereum" in win) win.ethereum = undefined;
-      if ("web3" in win) win.web3 = undefined;
-    } catch {
-      // Ignore assignment errors.
-    }
-  };
-
-  scrub();
-  window.addEventListener("eip6963:announceProvider", (event) => {
-    event.stopImmediatePropagation();
-  }, true);
-  window.addEventListener("eip6963:requestProvider", (event) => {
-    event.stopImmediatePropagation();
-  }, true);
-
-  const interval = window.setInterval(scrub, 1000);
-  window.setTimeout(() => {
-    window.clearInterval(interval);
-  }, 30_000);
 }
 
 async function getPairingUri(hc: HashConnect): Promise<string | null> {
@@ -176,7 +107,7 @@ function clearWalletSessionStorage(): void {
   try {
     window.localStorage.removeItem(WALLET_SESSION_STORAGE_KEY);
   } catch {
-    // Ignore storage errors.
+    // no-op
   }
 }
 
@@ -214,8 +145,18 @@ function clearWalletConnectorStorage(): void {
       }
     }
   } catch {
-    // Ignore storage errors.
+    // no-op
   }
+}
+
+function normalizeAccountId(raw: string | null): string | null {
+  if (!raw) return null;
+  if (/^\d+\.\d+\.\d+$/.test(raw)) return raw;
+  const parts = raw.split(":");
+  for (let i = parts.length - 1; i >= 0; i -= 1) {
+    if (/^\d+\.\d+\.\d+$/.test(parts[i] ?? "")) return parts[i]!;
+  }
+  return null;
 }
 
 async function fetchMirrorAccount(accountId: string, network: HederaNetwork): Promise<{
@@ -285,7 +226,6 @@ async function getOrCreateHashConnect(network: HederaNetwork, projectId: string,
 
   sharedHashconnectKey = key;
   sharedHashconnectInitPromise = (async () => {
-    blockCompetingInjectedWallets();
     const [{ HashConnect }, sdk] = await Promise.all([
       import("hashconnect"),
       import("@hashgraph/sdk"),
@@ -363,18 +303,22 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
 
     initPromiseRef.current = (async () => {
       try {
+        const createClient = async (forceFresh: boolean) => {
+          const client = await getOrCreateHashConnect(network, projectId, forceFresh);
+          return client;
+        };
+
         let hc: HashConnect;
         try {
-          hc = await getOrCreateHashConnect(network, projectId);
-        } catch (initErr) {
-          if (!isWalletConnectAttestationError(initErr)) throw initErr;
-          // Recover once from stale/poisoned WC state and retry with a fresh instance.
+          hc = await createClient(false);
+        } catch {
           clearWalletConnectorStorage();
-          hc = await getOrCreateHashConnect(network, projectId, true);
+          hc = await createClient(true);
         }
+
         hc.pairingEvent.on(async (session: { accountIds: string[] }) => {
           if (!mounted) return;
-          const first = session.accountIds[0] ?? null;
+          const first = normalizeAccountId(session.accountIds[0] ?? null);
           setAccountId(first);
           setError(null);
           connectWaitRef.current?.();
@@ -399,7 +343,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
         if (!mounted) return null;
         setHashconnect(hc);
         setIsReady(true);
-        const first = hc.connectedAccountIds[0]?.toString() ?? null;
+        const first = normalizeAccountId(hc.connectedAccountIds[0]?.toString() ?? null);
         if (first) {
           setAccountId(first);
           const mirrorData = await fetchMirrorAccount(first, network);
@@ -411,15 +355,15 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
         } else {
           resetWalletState();
         }
-        // Pre-cache a pairing URI so mobile can deep-link immediately from a user gesture.
+        // Pre-cache pairing URI so click/tap can deep-link immediately.
         void getPairingUri(hc).then((uri) => {
           if (uri) mobilePairingUriRef.current = uri;
         });
         return hc;
       } catch (e) {
         if (!mounted) return null;
-        const msg = e instanceof Error ? e.message : "Failed to initialize HashPack connection";
-        setError(msg + " Try a private/incognito window or disable browser extensions (e.g. MetaMask) that use SES.");
+        const msg = e instanceof Error ? e.message : "Failed to initialize HashPack connection.";
+        setError(msg);
         setIsReady(true);
         throw e;
       }
@@ -448,8 +392,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
       if (!hc) {
         const projectId = process.env.NEXT_PUBLIC_WC_PROJECT_ID?.trim();
         if (projectId) {
-          hc = await getOrCreateHashConnect(network, projectId).catch(async (e: unknown) => {
-            if (!isWalletConnectAttestationError(e)) return null;
+          hc = await getOrCreateHashConnect(network, projectId).catch(async () => {
             clearWalletConnectorStorage();
             return getOrCreateHashConnect(network, projectId, true).catch(() => null);
           });
@@ -474,12 +417,12 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
         return;
       }
       mobilePairingUriRef.current = pairingUri;
-      // Always deep-link first (desktop and mobile) to avoid QR modal UX.
+
+      // Direct HashPack deep-link first on both desktop and mobile.
       openHashPackDeepLink(pairingUri);
 
-      // Desktop extension users can still pair instantly via extension popup.
       const maybeConnectToExtension = (hc as unknown as { connectToExtension?: () => Promise<unknown> }).connectToExtension;
-      if (!isMobileBrowser() && typeof maybeConnectToExtension === "function") {
+      if (typeof maybeConnectToExtension === "function") {
         void maybeConnectToExtension.call(hc).catch(() => {});
       }
 
