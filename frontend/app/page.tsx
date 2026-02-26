@@ -2,9 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ListingMedia } from "../components/ListingMedia";
-import { ConnectWalletButton } from "../components/ConnectWalletButton";
 import { formatPriceForDisplay } from "../lib/formatPrice";
 import { formatHbarWithUsd } from "../lib/hbarUsd";
 import { useHbarUsd } from "../hooks/useHbarUsd";
@@ -74,6 +72,7 @@ type ListingRecord = {
   status?: string;
   imageUrl?: string | null;
   mediaUrls?: string[] | null;
+  seller?: string;
   itemType?: "listing";
 };
 
@@ -84,8 +83,28 @@ type HomeStackItem = CardStackItem & {
   priceLabel?: string;
 };
 
+function formatSellerLabel(seller?: string): string {
+  if (!seller) return "by 0.0.xxxx";
+  const trimmed = seller.trim();
+  const accountMatch = /^(\d+)\.(\d+)\.(\d+)$/.exec(trimmed);
+  if (accountMatch) {
+    return `by ${accountMatch[1]}.${accountMatch[2]}.${accountMatch[3]}`;
+  }
+  if (/^0x[0-9a-fA-F]{40}$/.test(trimmed)) {
+    // Convert Hedera long-zero EVM addresses to account-id style when possible.
+    const hex = trimmed.slice(2);
+    const shard = BigInt(`0x${hex.slice(0, 8)}`);
+    const realm = BigInt(`0x${hex.slice(8, 24)}`);
+    const num = BigInt(`0x${hex.slice(24, 40)}`);
+    if (shard === 0n && realm === 0n) {
+      return `by ${shard.toString()}.${realm.toString()}.${num.toString()}`;
+    }
+    return `by ${trimmed.slice(0, 8)}…${trimmed.slice(-4)}`;
+  }
+  return `by ${trimmed}`;
+}
+
 export default function Home() {
-  const router = useRouter();
   const [listings, setListings] = useState<ListingRecord[]>([]);
   const [listingsError, setListingsError] = useState<string | null>(null);
   const [listingsLoading, setListingsLoading] = useState(true);
@@ -163,7 +182,7 @@ export default function Home() {
       return {
         id: item.id,
         title: item.title || formatListingId(item.id) || "Untitled",
-        description: "Tap to view listing details",
+        description: formatSellerLabel(item.seller),
         href: `/listing/${encodeURIComponent(item.id)}`,
         listing: item,
         statusLabel: badge.label,
@@ -208,9 +227,12 @@ export default function Home() {
             </div>
 
             <div className="mt-3 flex justify-center">
-              <ConnectWalletButton className="btn-frost-cta h-12 border-emerald-200/70 px-6 text-sm font-extrabold uppercase tracking-[0.08em] disabled:opacity-60">
-                Connect Wallet
-              </ConnectWalletButton>
+              <Link
+                href="/marketplace"
+                className="btn-frost-cta inline-flex h-12 items-center border-emerald-200/70 px-6 text-sm font-extrabold uppercase tracking-[0.08em]"
+              >
+                Browse Listings
+              </Link>
             </div>
 
             <div
@@ -267,12 +289,7 @@ export default function Home() {
                       </div>
                     );
                     return (
-                      <div
-                        className={active && item.href ? "h-full w-full cursor-pointer" : "h-full w-full"}
-                        onClick={() => {
-                          if (active && item.href) router.push(item.href);
-                        }}
-                      >
+                      <div className="h-full w-full">
                         {cardContent}
                       </div>
                     );

@@ -235,8 +235,7 @@ export function CardStack<T extends CardStackItem>({
                     if (!t) return;
                     const dx = t.clientX - touchStartXRef.current;
                     const dy = t.clientY - touchStartYRef.current;
-                    // Prefer horizontal gesture capture when horizontal intent is clear.
-                    if (Math.abs(dx) > Math.abs(dy)) e.preventDefault();
+                    // touchAction handles gesture capture; avoid preventDefault in passive listeners.
                     const maxPan = cardWidth * 0.4;
                     setPanX(Math.max(-maxPan, Math.min(maxPan, dx)));
                   }}

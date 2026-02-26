@@ -1,12 +1,19 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Wallet } from "lucide-react";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
 
 export default function AnimatedSignIn() {
-  const { connect, isConnecting, isReady, error } = useHashpackWallet();
+  const router = useRouter();
+  const { connect, isConnecting, isReady, error, isConnected } = useHashpackWallet();
   const lastPressAtRef = useRef(0);
+
+  useEffect(() => {
+    if (!isConnected) return;
+    router.replace("/dashboard");
+  }, [isConnected, router]);
 
   const handleConnectPress = () => {
     const now = Date.now();
