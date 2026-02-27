@@ -33,13 +33,15 @@ function isActiveStatus(status?: string): boolean {
   return normalizeListingStatus(status) === "LISTED";
 }
 
-function getStatusBadge(status?: string): { label: string; className: string; glowClass: string } {
+function getStatusBadge(status?: string): { label: string; className: string; glowClass: string; pulseDot?: boolean } {
   const normalized = normalizeListingStatus(status);
   if (normalized === "LISTED") {
     return {
       label: "ACTIVE",
-      className: "bg-emerald-500/20 border-emerald-400/40 text-emerald-200",
+      className:
+        "bg-green-500/10 text-green-600 border-green-500/20 dark:bg-green-500/20 dark:text-green-400 dark:border-green-500/30",
       glowClass: "shadow-[0_0_24px_rgba(52,211,153,0.32)]",
+      pulseDot: true,
     };
   }
   if (normalized === "LOCKED") {
@@ -81,6 +83,7 @@ type HomeStackItem = CardStackItem & {
   listing?: ListingRecord;
   statusClass?: string;
   statusLabel?: string;
+  statusPulseDot?: boolean;
   priceLabel?: string;
 };
 
@@ -91,16 +94,22 @@ function formatSellerLabel(seller?: string): string {
   if (accountMatch) {
     return `by ${accountMatch[1]}.${accountMatch[2]}.${accountMatch[3]}`;
   }
-  if (/^0x[0-9a-fA-F]{40}$/.test(trimmed)) {
-    // Convert Hedera long-zero EVM addresses to account-id style when possible.
+  if (/^0x[0-9a-fA-F]+$/.test(trimmed)) {
     const hex = trimmed.slice(2);
-    const shard = BigInt(`0x${hex.slice(0, 8)}`);
-    const realm = BigInt(`0x${hex.slice(8, 24)}`);
-    const num = BigInt(`0x${hex.slice(24, 40)}`);
-    if (shard === 0n && realm === 0n) {
-      return `by ${shard.toString()}.${realm.toString()}.${num.toString()}`;
+    if (hex.length === 40) {
+      // Convert Hedera long-zero EVM addresses to account-id style when possible.
+      const shard = BigInt(`0x${hex.slice(0, 8)}`);
+      const realm = BigInt(`0x${hex.slice(8, 24)}`);
+      const num = BigInt(`0x${hex.slice(24, 40)}`);
+      if (shard === 0n && realm === 0n) {
+        return `by ${shard.toString()}.${realm.toString()}.${num.toString()}`;
+      }
+      return `by ${trimmed.slice(0, 8)}…${trimmed.slice(-4)}`;
     }
-    return `by ${trimmed.slice(0, 8)}…${trimmed.slice(-4)}`;
+    // Some payloads provide account numbers as short hex (e.g. 0x01393fbb).
+    // Normalize these to Hedera account-id style.
+    const accountNum = BigInt(`0x${hex}`);
+    return `by 0.0.${accountNum.toString()}`;
   }
   return `by ${trimmed}`;
 }
@@ -188,6 +197,7 @@ export default function Home() {
         listing: item,
         statusLabel: badge.label,
         statusClass: `${badge.className} ${badge.glowClass}`,
+        statusPulseDot: badge.pulseDot,
         priceLabel: formatHbarWithUsd(formatPriceForDisplay(String(item.price ?? item.reservePrice ?? "0")), usdRate),
       };
     });
@@ -273,7 +283,12 @@ export default function Home() {
                         </div>
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-black/5" />
                         {item.statusLabel && item.statusClass ? (
-                          <span className={`absolute left-4 top-4 rounded-full border px-2 py-0.5 text-[10px] font-bold tracking-wide ${item.statusClass}`}>
+                          <span
+                            className={`absolute left-4 top-4 rounded-full inline-flex items-center gap-1.5 border px-2 py-0.5 text-[10px] font-bold tracking-wide ${item.statusClass}`}
+                          >
+                            {item.statusPulseDot ? (
+                              <span className="inline-flex h-2 w-2 rounded-full bg-green-400 animate-pulse shadow-[0_0_0_0_rgba(74,222,128,0.7)]" />
+                            ) : null}
                             {item.statusLabel}
                           </span>
                         ) : null}

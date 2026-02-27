@@ -51,12 +51,14 @@ function isActiveStatus(status?: string): boolean {
   return normalizeListingStatus(status) === "LISTED";
 }
 
-function getStatusBadge(status?: string): { label: string; className: string } {
+function getStatusBadge(status?: string): { label: string; className: string; pulseDot?: boolean } {
   const normalized = normalizeListingStatus(status);
   if (normalized === "LISTED") {
     return {
       label: "ACTIVE",
-      className: "bg-emerald-500/20 border-emerald-400/40 text-emerald-200",
+      className:
+        "bg-green-500/10 text-green-600 border-green-500/20 dark:bg-green-500/20 dark:text-green-400 dark:border-green-500/30",
+      pulseDot: true,
     };
   }
   if (normalized === "LOCKED") {
@@ -247,7 +249,12 @@ function MarketplacePageContent() {
                       cardSize
                       compactHeight="160px"
                     />
-                    <span className={`absolute top-2 left-2 rounded-full px-2 py-0.5 text-[10px] font-semibold border ${getStatusBadge(item.status).className}`}>
+                    <span
+                      className={`absolute top-2 left-2 rounded-full inline-flex items-center gap-1.5 border px-2 py-0.5 text-[10px] font-semibold ${getStatusBadge(item.status).className}`}
+                    >
+                      {getStatusBadge(item.status).pulseDot ? (
+                        <span className="inline-flex h-2 w-2 rounded-full bg-green-400 animate-pulse shadow-[0_0_0_0_rgba(74,222,128,0.7)]" />
+                      ) : null}
                       {getStatusBadge(item.status).label}
                     </span>
                   </div>
@@ -282,7 +289,12 @@ function MarketplacePageContent() {
                     <div className="absolute top-2 right-2">
                       <WishlistButton itemId={item.id} itemType={item.itemType} compact />
                     </div>
-                    <span className={`absolute top-2 left-2 rounded-full px-2 py-0.5 text-[10px] font-semibold border ${getStatusBadge(item.status).className}`}>
+                    <span
+                      className={`absolute top-2 left-2 rounded-full inline-flex items-center gap-1.5 border px-2 py-0.5 text-[10px] font-semibold ${getStatusBadge(item.status).className}`}
+                    >
+                      {getStatusBadge(item.status).pulseDot ? (
+                        <span className="inline-flex h-2 w-2 rounded-full bg-green-400 animate-pulse shadow-[0_0_0_0_rgba(74,222,128,0.7)]" />
+                      ) : null}
                       {getStatusBadge(item.status).label}
                     </span>
                   </div>
