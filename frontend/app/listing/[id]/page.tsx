@@ -117,7 +117,7 @@ export default function ListingPage() {
   const item = listing;
 
   const listingIdBytes = useMemo(() => (listing?.id ? listingIdToBytes32(listing.id) : undefined), [listing?.id]);
-  const [onChainListing, setOnChainListing] = useState<{ price: bigint; status: number } | undefined>(undefined);
+  const [onChainListing, setOnChainListing] = useState<{ seller: string; price: bigint; status: number } | undefined>(undefined);
   function parsePriceWei(raw: unknown): bigint {
     if (raw == null) return 0n;
     if (typeof raw === "bigint") return raw;
@@ -136,7 +136,7 @@ export default function ListingPage() {
     let cancelled = false;
     void readListingCompat(listingIdBytes)
       .then((data) => {
-        if (!cancelled) setOnChainListing({ price: data.price, status: data.status });
+        if (!cancelled) setOnChainListing({ seller: data.seller, price: data.price, status: data.status });
       })
       .catch(() => {
         if (!cancelled) setOnChainListing(undefined);
@@ -330,7 +330,10 @@ export default function ListingPage() {
   ].filter((v): v is string => !!v);
   const isSeller = !!item?.seller && walletAddressCandidates.includes(item.seller.toLowerCase());
   const onChainStatusNum = Number(onChainListing?.status ?? -1);
-  const isListedOnChain = onChainStatusNum === -1 ? null : onChainStatusNum === 1;
+  const isListedOnChain =
+    onChainStatusNum === -1
+      ? null
+      : onChainStatusNum === 1 || onChainStatusNum === 0;
   const isListed = listing?.status === "LISTED" && (isListedOnChain == null ? true : isListedOnChain);
   const isSellerActiveListing = listing?.status === "LISTED";
   const isLockedOnChain = onChainStatusNum === 2;

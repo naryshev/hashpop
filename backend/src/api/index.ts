@@ -17,6 +17,10 @@ function normalizeListingId(id: string): string {
   return "0x" + hex.toLowerCase();
 }
 
+function normalizeWalletAddress(address?: string | null): string {
+  return String(address || "").trim().toLowerCase();
+}
+
 /** Convert listing id (0x...64 hex or string) to bytes32 for contract calls. */
 function listingIdToBytes32(id: string): string {
   if (!id || typeof id !== "string") return "0x" + "0".repeat(64);
@@ -165,6 +169,42 @@ const memoryStorage = multer.memoryStorage();
 export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string): Router {
   const router = Router();
 
+  async function createSaleIfMissing(params: {
+    listingId: string;
+    buyer: string;
+    seller: string;
+    amount: string;
+  }): Promise<void> {
+    const listingId = normalizeListingId(params.listingId);
+    const buyer = normalizeWalletAddress(params.buyer);
+    const seller = normalizeWalletAddress(params.seller);
+    const amount = String(params.amount || "0");
+    if (!listingId || !buyer || !seller || buyer === seller) return;
+
+    const recentWindowStart = new Date(Date.now() - 5 * 60 * 1000);
+    const existing = await prisma.sale.findFirst({
+      where: {
+        listingId,
+        buyer,
+        seller,
+        amount,
+        createdAt: { gte: recentWindowStart },
+      },
+      select: { id: true },
+    });
+    if (existing) return;
+
+    await prisma.sale.create({
+      data: {
+        id: `sale-${Date.now()}-${listingId}`,
+        listingId,
+        buyer,
+        seller,
+        amount,
+      },
+    });
+  }
+
   const upload = multer({
     storage: memoryStorage,
     limits: { fileSize: MAX_IMAGE_SIZE },
@@ -243,7 +283,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       const [listings, auctions] = await Promise.all([
         prisma.listing.findMany({
           where: {
-            status: { in: ["LISTED", "SOLD", "LOCKED", "COMPLETED"] },
+            status: "LISTED",
             OR: [
               { imageUrl: { not: null } },
               { mediaUrls: { isEmpty: false } },
@@ -632,17 +672,12 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
 
     const applyFallbackPurchaseStatus = async () => {
       if (!fallbackListingId) return false;
-      const row = await prisma.listing.findUnique({
-        where: { id: fallbackListingId },
-        select: { requireEscrow: true },
-      });
-      const nextStatus = row?.requireEscrow ? "LOCKED" : "SOLD";
       const updated = await prisma.listing.updateMany({
         where: { id: fallbackListingId },
-        data: { status: nextStatus },
+        data: { status: "LOCKED" },
       });
       if (updated.count === 0) return false;
-      log.info({ listingId: fallbackListingId, txHash, nextStatus }, "Synced purchase via fallback update");
+      log.info({ listingId: fallbackListingId, txHash, nextStatus: "LOCKED" }, "Synced purchase via fallback update");
       return true;
     };
 
@@ -673,17 +708,23 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         const decoded = decodeEvents(logEntry);
         if (decoded?.type !== "ItemPurchased") continue;
         const purchasedId = normalizeListingId(decoded.listingId);
-        const listingRow = await prisma.listing.findUnique({
-          where: { id: purchasedId },
-          select: { requireEscrow: true },
+        const buyer = normalizeWalletAddress(decoded.buyer);
+        const seller = normalizeWalletAddress(decoded.seller);
+        const amount = String(decoded.price ?? "0");
+
+        await createSaleIfMissing({
+          listingId: purchasedId,
+          buyer,
+          seller,
+          amount,
         });
-        const nextStatus = listingRow?.requireEscrow ? "LOCKED" : "SOLD";
+
         await prisma.listing.updateMany({
           where: { id: purchasedId },
-          data: { status: nextStatus },
+          data: { status: "LOCKED" },
         });
-        log.info({ listingId: purchasedId, txHash, nextStatus }, "Synced purchase from tx");
-        return res.json({ ok: true, listingId: purchasedId, status: nextStatus });
+        log.info({ listingId: purchasedId, txHash, nextStatus: "LOCKED" }, "Synced purchase from tx");
+        return res.json({ ok: true, listingId: purchasedId, status: "LOCKED" });
       }
       if (await applyFallbackPurchaseStatus()) {
         return res.json({ ok: true, listingId: fallbackListingId, source: "fallback" });

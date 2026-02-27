@@ -179,23 +179,34 @@ async function handleEvent(event: any, prisma: PrismaClient, log: Logger) {
 
     case "ItemPurchased": {
       const purchListingId = normalizeListingId(event.listingId);
-      await prisma.sale.create({
-        data: {
-          id: `sale-${Date.now()}-${purchListingId}`,
+      const buyer = normalizeAddress(event.buyer);
+      const seller = normalizeAddress(event.seller);
+      const amount = event.price.toString();
+      const recentWindowStart = new Date(Date.now() - 5 * 60 * 1000);
+      const existing = await prisma.sale.findFirst({
+        where: {
           listingId: purchListingId,
-          buyer: event.buyer,
-          seller: event.seller,
-          amount: event.price.toString(),
+          buyer,
+          seller,
+          amount,
+          createdAt: { gte: recentWindowStart },
         },
+        select: { id: true },
       });
-      const listingRow = await prisma.listing.findUnique({
-        where: { id: purchListingId },
-        select: { requireEscrow: true },
-      });
-      const nextStatus = listingRow?.requireEscrow ? "LOCKED" : "SOLD";
+      if (!existing) {
+        await prisma.sale.create({
+          data: {
+            id: `sale-${Date.now()}-${purchListingId}`,
+            listingId: purchListingId,
+            buyer,
+            seller,
+            amount,
+          },
+        });
+      }
       await prisma.listing.update({
         where: { id: purchListingId },
-        data: { status: nextStatus },
+        data: { status: "LOCKED" },
       });
       break;
     }
