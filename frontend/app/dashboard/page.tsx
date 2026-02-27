@@ -24,7 +24,7 @@ function formatListingId(id: string): string {
 }
 
 export default function DashboardPage() {
-  const { address } = useHashpackWallet();
+  const { address, accountId, disconnect } = useHashpackWallet();
   const [mounted, setMounted] = useState(false);
   const [stats, setStats] = useState<any>(null);
   const [activeListings, setActiveListings] = useState<any[]>([]);
@@ -87,7 +87,7 @@ export default function DashboardPage() {
     <main className="min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-8">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl sm:text-2xl font-bold text-white">Dashboard</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-white">{accountId || "My Hashpop"}</h1>
           {address && (
             <Link href={`/profile/${encodeURIComponent(address)}`} className="text-sm text-chrome hover:text-white font-medium">
               ★ {Number(stats?.ratingAverage ?? 0).toFixed(1)}
@@ -117,31 +117,6 @@ export default function DashboardPage() {
                     <Link href="/purchases" className="text-xs text-chrome hover:text-white mt-1 inline-block">View history</Link>
                   </div>
                 </div>
-
-                <section>
-                  <h2 className="text-lg font-semibold text-white mb-3">Wishlist</h2>
-                  {loading ? (
-                    <p className="text-silver">Loading…</p>
-                  ) : wishlistItems.length === 0 ? (
-                    <p className="text-silver">No wishlist items. Add listings from the marketplace with the ♡ or + Add to wishlist button.</p>
-                  ) : (
-                    <div className="glass-card overflow-hidden rounded-xl">
-                      <ul className="divide-y divide-white/5">
-                        {wishlistItems.map((w) => (
-                          <li key={w.itemId} className="flex items-center justify-between p-3 hover:bg-white/5">
-                            <Link href={`/listing/${encodeURIComponent(w.itemId)}`} className="text-white hover:text-chrome font-medium flex-1 min-w-0 truncate">
-                              {w.title || formatListingId(w.itemId) || w.itemId.slice(0, 10) + "…"}
-                            </Link>
-                            <span className="text-chrome text-sm shrink-0 ml-2">
-                              {formatHbarWithUsd(formatPriceForDisplay(w.price || w.reservePrice || "0"), usdRate)}
-                            </span>
-                            <Link href={`/listing/${encodeURIComponent(w.itemId)}`} className="text-chrome hover:text-white text-sm shrink-0 ml-2">View</Link>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </section>
 
                 <section>
                   <h2 className="text-lg font-semibold text-white mb-3">Current Listings</h2>
@@ -184,6 +159,43 @@ export default function DashboardPage() {
                     </div>
                   )}
                 </section>
+
+                <section>
+                  <h2 className="text-lg font-semibold text-white mb-3">Watchlist</h2>
+                  {loading ? (
+                    <p className="text-silver">Loading…</p>
+                  ) : wishlistItems.length === 0 ? (
+                    <p className="text-silver">No watchlist items. Add listings from the marketplace with the ♡ or + Add to wishlist button.</p>
+                  ) : (
+                    <div className="glass-card overflow-hidden rounded-xl">
+                      <ul className="divide-y divide-white/5">
+                        {wishlistItems.map((w) => (
+                          <li key={w.itemId} className="flex items-center justify-between p-3 hover:bg-white/5">
+                            <Link href={`/listing/${encodeURIComponent(w.itemId)}`} className="text-white hover:text-chrome font-medium flex-1 min-w-0 truncate">
+                              {w.title || formatListingId(w.itemId) || w.itemId.slice(0, 10) + "…"}
+                            </Link>
+                            <span className="text-chrome text-sm shrink-0 ml-2">
+                              {formatHbarWithUsd(formatPriceForDisplay(w.price || w.reservePrice || "0"), usdRate)}
+                            </span>
+                            <Link href={`/listing/${encodeURIComponent(w.itemId)}`} className="text-chrome hover:text-white text-sm shrink-0 ml-2">View</Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </section>
+
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void disconnect();
+                    }}
+                    className="inline-flex items-center rounded-lg border border-white/20 px-4 py-2 text-sm font-medium text-silver transition hover:border-white/30 hover:text-white"
+                  >
+                    Sign out
+                  </button>
+                </div>
 
               </>
             )}

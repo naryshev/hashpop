@@ -114,23 +114,31 @@ export const MobileSidebar = ({
         </div>
         <AnimatePresence>
           {open && (
-            <motion.div
-              initial={{ x: "-100%", opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: "-100%", opacity: 0 }}
-              transition={{ duration: 0.25, ease: "easeInOut" }}
-              className={cn(
-                "fixed h-full w-full inset-0 bg-white dark:bg-neutral-900 p-6 z-[100] flex flex-col justify-between",
-                className
-              )}
-            >
-              <div
-                className="absolute right-6 top-6 z-50 text-neutral-800 dark:text-neutral-200 cursor-pointer"
-                onClick={() => setOpen(!open)}
+            <motion.div className="fixed inset-0 z-[100] md:hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <button
+                type="button"
+                aria-label="Close sidebar"
+                className="absolute inset-0 bg-black/30 backdrop-blur-[1px]"
+                onClick={() => setOpen(false)}
+              />
+              <motion.aside
+                initial={{ x: "-100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "-100%" }}
+                transition={{ type: "spring", stiffness: 320, damping: 34 }}
+                className={cn(
+                  "relative h-full w-[82vw] max-w-[280px] bg-white dark:bg-neutral-900 p-6 flex flex-col justify-between border-r border-black/10 dark:border-white/10 shadow-2xl",
+                  className
+                )}
               >
-                <X />
-              </div>
-              {children}
+                <div
+                  className="absolute right-4 top-4 z-50 text-neutral-800 dark:text-neutral-200 cursor-pointer"
+                  onClick={() => setOpen(false)}
+                >
+                  <X />
+                </div>
+                {children}
+              </motion.aside>
             </motion.div>
           )}
         </AnimatePresence>
@@ -142,16 +150,23 @@ export const MobileSidebar = ({
 export const SidebarLink = ({
   link,
   className,
+  onClick,
   ...props
 }: Omit<React.ComponentProps<typeof Link>, "href"> & {
   link: Links;
   className?: string;
 }) => {
-  const { open, animate } = useSidebar();
+  const { open, animate, setOpen } = useSidebar();
   return (
     <Link
       href={link.href}
       className={cn("flex items-center justify-start gap-2 group/sidebar py-2", className)}
+      onClick={(event) => {
+        onClick?.(event);
+        if (typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches) {
+          setOpen(false);
+        }
+      }}
       {...props}
     >
       {link.icon}

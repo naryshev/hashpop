@@ -16,7 +16,7 @@ type NavLink = {
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { isConnected } = useHashpackWallet();
+  const { isConnected, accountId } = useHashpackWallet();
   const [open, setOpen] = useState(false);
   const appVersion = process.env.NEXT_PUBLIC_APP_VERSION?.trim() || "v1.0.0";
 
@@ -62,6 +62,9 @@ export function AppSidebar() {
             })}
           </div>
         </div>
+        {isConnected && accountId ? (
+          <p className="px-2 pb-2 text-xs text-neutral-600 dark:text-neutral-300">{accountId}</p>
+        ) : null}
         <div className="border-t border-black/10 dark:border-white/10 pt-3">
           <p className="text-xs text-neutral-600 dark:text-neutral-300 px-2">
             {open ? `App ${appVersion}` : appVersion}
