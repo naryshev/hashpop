@@ -6,11 +6,13 @@ import { useSearchParams } from "next/navigation";
 import Fuse from "fuse.js";
 import { ListingMedia } from "../../components/ListingMedia";
 import { WishlistButton } from "../../components/WishlistButton";
+import { StatusBadge } from "../../components/ui/status-badge-beautiful-accessible-status-indicators";
 import { formatPriceForDisplay } from "../../lib/formatPrice";
 import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { getApiUrl } from "../../lib/apiUrl";
 import { canonicalizeCategory } from "../../lib/categories";
+import { useHashpackWallet } from "../../lib/hashpackWallet";
 
 function formatListingId(id: string): string {
   if (!id || !id.startsWith("0x") || id.length !== 66) return id;
@@ -90,6 +92,7 @@ function parsePostedWithinDays(value: string): number | null {
 }
 
 function MarketplacePageContent() {
+  const { isConnected } = useHashpackWallet();
   const searchParams = useSearchParams();
   const query = searchParams.get("q")?.trim() ?? "";
   const categoryQuery = canonicalizeCategory(searchParams.get("category")?.trim() ?? "");
@@ -197,8 +200,15 @@ function MarketplacePageContent() {
     <main className="min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-xl sm:text-2xl font-bold text-white">Marketplace</h1>
-          <Link href="/signin" className="text-sm text-chrome hover:text-white font-medium">Sign In</Link>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-bold text-white">Marketplace</h1>
+            <StatusBadge status={isConnected ? "success" : "error"} className="h-6 px-2.5 text-[11px]">
+              {isConnected ? "Authenticated" : "Connect"}
+            </StatusBadge>
+          </div>
+          <Link href="/create" className="text-sm text-chrome hover:text-white font-medium">
+            Create Listing
+          </Link>
         </div>
         {loading ? (
           <p className="text-silver">Loading listings…</p>
