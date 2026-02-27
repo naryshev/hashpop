@@ -117,7 +117,13 @@ export default function HomePageClient({
   const usdRate = useHbarUsd();
   const [cardWidth, setCardWidth] = useState(520);
   const [cardHeight, setCardHeight] = useState(360);
+  const [stackVisible, setStackVisible] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
+
+  useEffect(() => {
+    const raf = window.requestAnimationFrame(() => setStackVisible(true));
+    return () => window.cancelAnimationFrame(raf);
+  }, []);
 
   useEffect(() => {
     const handleResize = () => {
@@ -201,58 +207,60 @@ export default function HomePageClient({
 
           <div className="mt-1 flex flex-1 min-h-0 flex-col sm:mt-3">
             {stackItems.length > 0 ? (
-              <CardStack
-                items={stackItems}
-                cardWidth={cardWidth}
-                cardHeight={cardHeight}
-                initialIndex={0}
-                autoAdvance={false}
-                intervalMs={2500}
-                pauseOnHover
-                showDots
-                maxVisible={7}
-                overlap={0.5}
-                spreadDeg={52}
-                className="mx-auto -mt-4 sm:mt-0"
-                renderCard={(item) => (
-                  <div className="h-full w-full">
-                    <div className="relative h-full w-full overflow-hidden rounded-2xl border border-white/15">
-                      <div className="absolute inset-0 pointer-events-none">
-                        {item.listing ? (
-                          <ListingMedia
-                            listing={item.listing}
-                            className="h-full w-full object-cover"
-                            navigation="arrows"
-                            cardSize
-                            compactHeight="100%"
-                          />
-                        ) : null}
-                      </div>
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-black/5" />
-                      {item.statusLabel && item.statusClass ? (
-                        <span
-                          className={`absolute left-4 top-4 rounded-full inline-flex items-center gap-1.5 border px-2 py-0.5 text-[10px] font-bold tracking-wide ${item.statusClass}`}
-                        >
-                          {item.statusPulseDot ? (
-                            <span className="inline-flex h-2 w-2 rounded-full bg-green-400 animate-pulse shadow-[0_0_0_0_rgba(74,222,128,0.7)]" />
+              <div className={`transition-all duration-500 ease-out ${stackVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1"}`}>
+                <CardStack
+                  items={stackItems}
+                  cardWidth={cardWidth}
+                  cardHeight={cardHeight}
+                  initialIndex={0}
+                  autoAdvance={false}
+                  intervalMs={2500}
+                  pauseOnHover
+                  showDots
+                  maxVisible={7}
+                  overlap={0.5}
+                  spreadDeg={52}
+                  className="mx-auto -mt-4 sm:mt-0"
+                  renderCard={(item) => (
+                    <div className="h-full w-full">
+                      <div className="relative h-full w-full overflow-hidden rounded-2xl border border-white/15">
+                        <div className="absolute inset-0 pointer-events-none">
+                          {item.listing ? (
+                            <ListingMedia
+                              listing={item.listing}
+                              className="h-full w-full object-cover"
+                              navigation="arrows"
+                              cardSize
+                              compactHeight="100%"
+                            />
                           ) : null}
-                          {item.statusLabel}
-                        </span>
-                      ) : null}
-                      <div className="absolute inset-x-0 bottom-0 p-4">
-                        <h2 className="line-clamp-2 text-base font-bold text-white sm:text-lg">{item.title}</h2>
-                        <p className="mt-1 line-clamp-2 text-xs text-white/85">{item.description}</p>
-                        {item.priceLabel ? (
-                          <p className="mt-2 inline-flex items-center gap-1 rounded-full border border-cyan-300/30 bg-cyan-400/10 px-2.5 py-1 text-xs font-semibold text-cyan-100">
-                            <Sparkles className="h-3 w-3" />
-                            {item.priceLabel}
-                          </p>
+                        </div>
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-black/5" />
+                        {item.statusLabel && item.statusClass ? (
+                          <span
+                            className={`absolute left-4 top-4 rounded-full inline-flex items-center gap-1.5 border px-2 py-0.5 text-[10px] font-bold tracking-wide ${item.statusClass}`}
+                          >
+                            {item.statusPulseDot ? (
+                              <span className="inline-flex h-2 w-2 rounded-full bg-green-400 animate-pulse shadow-[0_0_0_0_rgba(74,222,128,0.7)]" />
+                            ) : null}
+                            {item.statusLabel}
+                          </span>
                         ) : null}
+                        <div className="absolute inset-x-0 bottom-0 p-4">
+                          <h2 className="line-clamp-2 text-base font-bold text-white sm:text-lg">{item.title}</h2>
+                          <p className="mt-1 line-clamp-2 text-xs text-white/85">{item.description}</p>
+                          {item.priceLabel ? (
+                            <p className="mt-2 inline-flex items-center gap-1 rounded-full border border-cyan-300/30 bg-cyan-400/10 px-2.5 py-1 text-xs font-semibold text-cyan-100">
+                              <Sparkles className="h-3 w-3" />
+                              {item.priceLabel}
+                            </p>
+                          ) : null}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
-              />
+                  )}
+                />
+              </div>
             ) : (
               <div className="flex h-full min-h-[330px] items-center justify-center">
                 <p className="text-sm text-silver">No listings found in marketplace yet.</p>
