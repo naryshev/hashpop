@@ -64,6 +64,7 @@ export function ListingMedia({
       );
     }
     const imgEl = (
+      // eslint-disable-next-line @next/next/no-img-element
       <img
         src={urls[0]}
         alt="Listing"
@@ -94,6 +95,7 @@ export function ListingMedia({
             <span className="text-sm">Failed to load</span>
           </div>
         ) : (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={currentUrl}
             alt={`Listing ${safeIndex + 1}`}
@@ -137,6 +139,7 @@ export function ListingMedia({
               <span className="text-silver text-sm">Failed to load</span>
             </div>
           ) : (
+            // eslint-disable-next-line @next/next/no-img-element
             <img
               key={i}
               src={url}

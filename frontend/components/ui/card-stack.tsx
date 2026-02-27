@@ -290,6 +290,7 @@ function DefaultFanCard({ item }: { item: CardStackItem }) {
     <div className="relative h-full w-full">
       <div className="absolute inset-0">
         {item.imageSrc ? (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={item.imageSrc}
             alt={item.title}

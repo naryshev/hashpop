@@ -1,5 +1,27 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalEnv": [
+    "HEDERA_TESTNET_OPERATOR",
+    "PRIVATE_KEY",
+    "HEDERA_TESTNET_RPC",
+    "PLATFORM_FEE_BPS",
+    "MARKETPLACE_ADDRESS",
+    "ESCROW_ADDRESS",
+    "S3_ENDPOINT",
+    "PORT",
+    "S3_PUBLIC_URL",
+    "DATABASE_URL",
+    "MIRROR_URL",
+    "LOG_LEVEL",
+    "S3_ACCESS_KEY_ID",
+    "AUCTION_HOUSE_ADDRESS",
+    "HEDERA_RPC_URL",
+    "S3_REGION",
+    "CORS_ORIGIN",
+    "S3_SECRET_ACCESS_KEY",
+    "S3_BUCKET",
+    "DISCORD_REPORT_WEBHOOK_URL"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

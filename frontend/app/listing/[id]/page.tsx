@@ -182,15 +182,14 @@ export default function ListingPage() {
   }, [id, fetchListing]);
 
   useEffect(() => {
-    if (listing) {
-      setEditTitle(listing.title ?? "");
-      setEditSubtitle(listing.subtitle ?? "");
-      setEditDescription(listing.description ?? "");
-      setEditPrice(formatPriceForDisplay(listing.price));
-      setEditCondition(listing.condition ?? "");
-      setEditYearOfProduction(listing.yearOfProduction ?? "");
-    }
-    }, [listing?.id, listing?.title, listing?.subtitle, listing?.description, listing?.price, listing?.condition, listing?.yearOfProduction]);
+    if (!listing) return;
+    setEditTitle(listing.title ?? "");
+    setEditSubtitle(listing.subtitle ?? "");
+    setEditDescription(listing.description ?? "");
+    setEditPrice(formatPriceForDisplay(listing.price));
+    setEditCondition(listing.condition ?? "");
+    setEditYearOfProduction(listing.yearOfProduction ?? "");
+  }, [listing]);
 
   useEffect(() => {
     if (!cancelSuccess) return;
