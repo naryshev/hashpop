@@ -13,11 +13,8 @@ import { formatListingDate } from "../../../lib/formatDate";
 import { useCancelListing } from "../../../hooks/useCancelListing";
 import { getTransactionErrorMessage } from "../../../lib/transactionError";
 import { useUpdateListingPrice } from "../../../hooks/useUpdateListingPrice";
-import { useRobustContractWrite } from "../../../hooks/useRobustContractWrite";
 import { compressImage } from "../../../lib/compressImage";
-import { marketplaceAbi, marketplaceAddress } from "../../../lib/contracts";
 import { listingIdToBytes32 } from "../../../lib/bytes32";
-import { parseUnits } from "viem";
 import { useHashpackWallet } from "../../../lib/hashpackWallet";
 import { ConnectWalletButton } from "../../../components/ConnectWalletButton";
 import { activeHederaChain } from "../../../lib/hederaChains";
@@ -26,6 +23,10 @@ import { readListingCompat } from "../../../lib/marketplaceRead";
 import { getApiUrl } from "../../../lib/apiUrl";
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024;
 const ALLOWED_TYPES = "image/jpeg,image/jpg,image/png,image/gif,image/webp";
+
+function isVideoMedia(url: string): boolean {
+  return /\.(mp4|webm|mov)(\?.*)?$/i.test(url);
+}
 
 function formatListingId(id: string): string {
   if (!id || !id.startsWith("0x") || id.length !== 66) return id;
@@ -92,12 +93,6 @@ export default function ListingPage() {
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [priceUpdateFailedBanner, setPriceUpdateFailedBanner] = useState<string | null>(null);
-  const [suggestOpen, setSuggestOpen] = useState(false);
-  const [suggestHbar, setSuggestHbar] = useState("");
-  const [suggestSending, setSuggestSending] = useState(false);
-  const [suggestSuccess, setSuggestSuccess] = useState(false);
-  const [suggestFadeOut, setSuggestFadeOut] = useState(false);
-  const [suggestError, setSuggestError] = useState<string | null>(null);
   const [inWishlist, setInWishlist] = useState(false);
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
@@ -110,7 +105,6 @@ export default function ListingPage() {
   const chainId = activeHederaChain.id;
   const { cancel, isPending: cancelPending, isSuccess: cancelSuccess, hash: cancelTxHash } = useCancelListing();
   const { updatePriceOnChain, isPending: priceUpdatePending } = useUpdateListingPrice();
-  const { send: sendOffer, isPending: offerPending } = useRobustContractWrite();
   const walletConnected = !!address;
   const usdRate = useHbarUsd();
 
@@ -478,37 +472,6 @@ export default function ListingPage() {
 
   const handleSaveEdit = handleSaveEditListing;
 
-  const handleSuggestSend = () => {
-    if (!listing || !suggestHbar.trim() || Number(suggestHbar) <= 0) return;
-    setSuggestError(null);
-    setSuggestSending(true);
-    void (async () => {
-      try {
-        await sendOffer({
-          address: marketplaceAddress,
-          abi: marketplaceAbi,
-          functionName: "makeOffer",
-          args: [listingIdToBytes32(listing.id)],
-          value: parseUnits(suggestHbar.trim(), 8),
-        });
-        setSuggestSuccess(true);
-        setTimeout(() => {
-          setSuggestFadeOut(true);
-          setTimeout(() => {
-            setSuggestOpen(false);
-            setSuggestSending(false);
-            setSuggestSuccess(false);
-            setSuggestFadeOut(false);
-            setSuggestHbar("");
-          }, 500);
-        }, 1200);
-      } catch (e) {
-        setSuggestSending(false);
-        setSuggestError(getTransactionErrorMessage(e, { chainId }));
-      }
-    })();
-  };
-
   const mainImageUrl = keptMediaUrls[safeMediaIndex] ?? null;
   const categoryLabel = listing?.category || "Marketplace";
 
@@ -584,29 +547,6 @@ export default function ListingPage() {
         </div>
       )}
 
-      {(suggestSending || suggestSuccess) && (
-        <div
-          className={`fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity duration-500 ${suggestFadeOut ? "opacity-0" : "opacity-100"}`}
-        >
-          <div className="glass-card p-8 max-w-sm text-center space-y-4">
-            {suggestSending && (
-              <>
-                <div className="w-12 h-12 mx-auto rounded-full border-2 border-chrome border-t-transparent animate-spin" />
-                <p className="text-lg font-semibold text-white">Sending offer…</p>
-              </>
-            )}
-            {suggestSuccess && (
-              <>
-                <div className="w-14 h-14 mx-auto rounded-full border-2 border-white/40 bg-white/10 flex items-center justify-center text-white/70 text-3xl" aria-hidden>
-                  ✓
-                </div>
-                <p className="text-silver text-sm">Offer sent</p>
-              </>
-            )}
-          </div>
-      </div>
-      )}
-
       {priceUpdateFailedBanner && (
         <div className="mb-4 rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
           {priceUpdateFailedBanner}
@@ -622,11 +562,21 @@ export default function ListingPage() {
       <div className="grid gap-8 lg:grid-cols-[1fr,400px]">
         {/* Left: media gallery (Chrono24-style) */}
         <div className="space-y-4">
-          <div className="rounded-glass-lg border border-white/10 overflow-hidden bg-white/5 relative aspect-[4/3]">
+          <div className="rounded-glass-lg border border-white/10 overflow-hidden bg-black relative aspect-[4/3]">
             {mainImageUrl ? (
               <>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={mainImageUrl} alt="" className="w-full h-full object-contain" />
+                {isVideoMedia(mainImageUrl) ? (
+                  <video
+                    src={mainImageUrl}
+                    className="w-full h-full object-cover"
+                    controls
+                    playsInline
+                    muted
+                  />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={mainImageUrl} alt="" className="w-full h-full object-cover" />
+                )}
                 <div className="absolute top-3 right-3 flex gap-2">
                   <button
                     type="button"
@@ -655,8 +605,12 @@ export default function ListingPage() {
                   onKeyDown={(e) => !editing && (e.key === "Enter" || e.key === " ") && setSelectedMediaIndex(i)}
                   className={`relative flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-colors cursor-pointer ${i === safeMediaIndex ? "border-chrome" : "border-white/20 hover:border-white/40"}`}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={url} alt="" className="w-full h-full object-cover" />
+                  {isVideoMedia(url) ? (
+                    <video src={url} className="w-full h-full object-cover" muted playsInline />
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={url} alt="" className="w-full h-full object-cover" />
+                  )}
                   {editing && (
                     <button
                       type="button"
@@ -765,31 +719,11 @@ export default function ListingPage() {
           {displaySubtitle && <p className="text-silver text-sm">{editing ? editSubtitle : displaySubtitle}</p>}
           {attributesLine && <p className="text-silver text-sm">{editing ? [editCondition, editYearOfProduction].filter(Boolean).join(" | ") : attributesLine}</p>}
 
-          {listing && (
-            <>
-              <p className="text-2xl font-semibold text-white">{formatHbarWithUsd(formatPriceForDisplay(listing.price), usdRate)}</p>
-              {priceMismatch && onChainPriceHbar && (
-                <p className="text-sm text-amber-300/90 mt-1">
-                  Listing price: <strong>{formatPriceForDisplay(listing.price)} HBAR</strong>. You&apos;ll pay <strong>{onChainPriceHbar} HBAR</strong> until the seller approves the price update in their wallet.
-                </p>
-              )}
-            </>
+          {listing && priceMismatch && onChainPriceHbar && (
+            <p className="text-sm text-amber-300/90 mt-1">
+              Listing price: <strong>{formatPriceForDisplay(listing.price)} HBAR</strong>. You&apos;ll pay <strong>{onChainPriceHbar} HBAR</strong> until the seller approves the price update in their wallet.
+            </p>
           )}
-          <p className="text-xs text-silver">Excl. shipping · Network fee applies at checkout</p>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={toggleWishlist}
-              disabled={!address || wishlistLoading}
-              className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
-                inWishlist ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-300" : "border-white/20 bg-white/5 text-silver hover:text-white hover:bg-white/10"
-              }`}
-              aria-label={inWishlist ? "In wishlist" : "Add to wishlist"}
-            >
-              {inWishlist ? "✓ In wishlist" : "+ Add to wishlist"}
-            </button>
-          </div>
 
           {listing && (
             listing.status === "LOCKED" ||
@@ -807,7 +741,15 @@ export default function ListingPage() {
           )}
           {listing && isListed && !isSeller && (
             walletConnected ? (
-              <BuyButton listingId={listing.id} price={listing.price} />
+              <BuyButton
+                listingId={listing.id}
+                price={listing.price}
+                inWishlist={inWishlist}
+                onToggleWishlist={() => {
+                  void toggleWishlist();
+                }}
+                wishlistDisabled={!address || wishlistLoading}
+              />
             ) : (
               <div className="glass-card p-4 rounded-lg border border-white/10">
                 <p className="text-silver text-sm mb-3">Connect your wallet to buy this listing.</p>
@@ -824,49 +766,6 @@ export default function ListingPage() {
             <div className="glass-card p-4 rounded-lg border border-white/10">
               <p className="text-silver text-sm">You cannot buy your own listing.</p>
             </div>
-          )}
-          {listing && isListed && (
-            <>
-              <button
-                type="button"
-                onClick={() => walletConnected && setSuggestOpen((o) => !o)}
-                disabled={!walletConnected}
-                className={`btn-frost-cta w-full border-white/30 text-silver hover:text-white ${!walletConnected ? "opacity-50 cursor-not-allowed" : ""}`}
-              >
-                Suggest a price
-              </button>
-              <div
-                className={`grid transition-[grid-template-rows] duration-300 ease-out ${suggestOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}
-              >
-                <div className="overflow-hidden">
-                  <div className="pt-3 space-y-3 border-t border-white/10 mt-1">
-                    <label className="block">
-                      <span className="text-xs text-silver">Your offer (HBAR)</span>
-                      <input
-                        type="number"
-                        step="any"
-                        min="0"
-                        value={suggestHbar}
-                        onChange={(e) => setSuggestHbar(e.target.value)}
-                        className="input-frost mt-1 w-full text-sm"
-                        placeholder="0"
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      onClick={handleSuggestSend}
-                      disabled={!suggestHbar.trim() || Number(suggestHbar) <= 0 || suggestSending || offerPending}
-                      className="btn-frost-cta w-full disabled:opacity-50"
-                    >
-                      {suggestSending || offerPending ? "Submitting…" : "Send"}
-                    </button>
-                    {suggestError && (
-                      <p className="text-xs text-rose-300">{suggestError}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </>
           )}
           <div className="glass-card p-4 rounded-lg border border-white/10">
             <h3 className="text-white font-medium mb-2">Security</h3>

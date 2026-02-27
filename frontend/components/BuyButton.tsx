@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { marketplaceAbi, marketplaceAddress } from "../lib/contracts";
-import { formatContractAmountToHbar } from "../lib/formatPrice";
+import { formatPriceForDisplay } from "../lib/formatPrice";
 import { formatHbarWithUsd } from "../lib/hbarUsd";
 import { getTransactionErrorMessage } from "../lib/transactionError";
 import { useHbarUsd } from "../hooks/useHbarUsd";
@@ -15,7 +15,19 @@ import { readListingCompat } from "../lib/marketplaceRead";
 import { getApiUrl } from "../lib/apiUrl";
 import { getTransactionExplorerUrl } from "../lib/explorer";
 
-export function BuyButton({ listingId, price: _price }: { listingId: string; price: string }) {
+export function BuyButton({
+  listingId,
+  price: _price,
+  inWishlist = false,
+  onToggleWishlist,
+  wishlistDisabled = false,
+}: {
+  listingId: string;
+  price: string;
+  inWishlist?: boolean;
+  onToggleWishlist?: () => void;
+  wishlistDisabled?: boolean;
+}) {
   const idBytes = useMemo(() => listingIdToBytes32(listingId), [listingId]);
 
   const { address } = useHashpackWallet();
@@ -119,39 +131,44 @@ export function BuyButton({ listingId, price: _price }: { listingId: string; pri
     }
   };
 
-  const priceHbar = hasPrice ? formatContractAmountToHbar(priceWei.toString()) : "—";
   const usdRate = useHbarUsd();
-  const priceWithUsd = formatHbarWithUsd(priceHbar, usdRate);
+  const listingPriceWithUsd = formatHbarWithUsd(formatPriceForDisplay(_price || "0"), usdRate);
 
   return (
     <div className="glass-card p-4 space-y-4">
       <h3 className="text-lg font-semibold text-white mb-2">Buy Now</h3>
-      <div className="mb-2 min-h-[2rem]">
-        <span className="text-silver text-sm">Price: </span>
-        <span className="text-2xl font-bold text-chrome">{priceWithUsd}</span>
-      </div>
-      <p className="text-sm text-silver mb-3">
-        {hasPrice
-          ? `You will send ${priceWithUsd} on Hedera Testnet. Confirm in your wallet (HashPack supports this).`
-          : chainReadFailed
-            ? "Could not read chain price quickly. We will use the latest known listing price at checkout."
-            : "Loading price from chain…"}
-      </p>
+      <p className="text-2xl font-semibold text-white">{listingPriceWithUsd}</p>
+      <p className="text-xs text-silver">Excl. shipping · Network fee applies at checkout</p>
       {isLegacyWeiListing && (
         <p className="text-xs text-amber-300/90 mb-1">
           This listing was created with a legacy price unit and cannot be bought yet. The seller needs to edit the price and save, or relist.
         </p>
       )}
-      <button
-        onClick={() => {
-          if (!hasPrice || isLegacyWeiListing || isWrongNetwork || isPending || isConfirming) return;
-          void buy();
-        }}
-        disabled={( !hasPrice && !chainReadFailed ) || isLegacyWeiListing || isPending || isConfirming || isWrongNetwork}
-        className="btn-frost-cta w-full disabled:opacity-60"
-      >
-        {isPending ? "Confirm in wallet…" : "Buy Now"}
-      </button>
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={onToggleWishlist}
+          disabled={wishlistDisabled}
+          className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
+            inWishlist
+              ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-300"
+              : "border-white/20 bg-white/5 text-silver hover:text-white hover:bg-white/10"
+          }`}
+          aria-label={inWishlist ? "In wishlist" : "Add to wishlist"}
+        >
+          {inWishlist ? "✓ In wishlist" : "+ Add to wishlist"}
+        </button>
+        <button
+          onClick={() => {
+            if (!hasPrice || isLegacyWeiListing || isWrongNetwork || isPending || isConfirming) return;
+            void buy();
+          }}
+          disabled={(!hasPrice && !chainReadFailed) || isLegacyWeiListing || isPending || isConfirming || isWrongNetwork}
+          className="btn-frost-cta w-full disabled:opacity-60"
+        >
+          {isPending ? "Confirm in wallet…" : "Buy Now"}
+        </button>
+      </div>
       {isSuccess && (
         <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 space-y-2">
           <p className="text-sm text-emerald-200">Purchase submitted and synced. You can verify this transaction on-chain.</p>
