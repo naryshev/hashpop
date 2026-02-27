@@ -3,9 +3,10 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Store, LayoutDashboard, PlusSquare, Heart, MessageSquare, LifeBuoy } from "lucide-react";
+import { Home, Store, LayoutDashboard, PlusSquare, Heart, MessageSquare, LifeBuoy, LogIn } from "lucide-react";
 import { Sidebar, SidebarBody, SidebarLink } from "./ui/sidebar";
 import { cn } from "../lib/utils";
+import { useHashpackWallet } from "../lib/hashpackWallet";
 
 type NavLink = {
   label: string;
@@ -15,6 +16,7 @@ type NavLink = {
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const { isConnected } = useHashpackWallet();
   const [open, setOpen] = useState(false);
   const appVersion = process.env.NEXT_PUBLIC_APP_VERSION?.trim() || "v1.0.0";
 
@@ -22,13 +24,15 @@ export function AppSidebar() {
     () => [
       { label: "Home", href: "/", icon: <Home className="h-5 w-5 flex-shrink-0" /> },
       { label: "Marketplace", href: "/marketplace", icon: <Store className="h-5 w-5 flex-shrink-0" /> },
-      { label: "My Hashpop", href: "/dashboard", icon: <LayoutDashboard className="h-5 w-5 flex-shrink-0" /> },
+      isConnected
+        ? { label: "My Hashpop", href: "/dashboard", icon: <LayoutDashboard className="h-5 w-5 flex-shrink-0" /> }
+        : { label: "Sign In", href: "/signin", icon: <LogIn className="h-5 w-5 flex-shrink-0" /> },
       { label: "Create Listing", href: "/create", icon: <PlusSquare className="h-5 w-5 flex-shrink-0" /> },
       { label: "Watchlist", href: "/watchlist", icon: <Heart className="h-5 w-5 flex-shrink-0" /> },
       { label: "Messages", href: "/messages", icon: <MessageSquare className="h-5 w-5 flex-shrink-0" /> },
       { label: "Support", href: "/support", icon: <LifeBuoy className="h-5 w-5 flex-shrink-0" /> },
     ],
-    []
+    [isConnected]
   );
 
   return (
