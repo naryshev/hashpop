@@ -6,6 +6,7 @@
     "dev": "ts-node-dev --respawn src/index.ts",
     "start": "node dist/index.js",
     "build": "prisma generate && tsc -p tsconfig.json",
+    "lint": "tsc --noEmit -p tsconfig.json",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
     "db:seed": "prisma db seed",

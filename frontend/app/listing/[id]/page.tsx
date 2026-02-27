@@ -81,6 +81,7 @@ export default function ListingPage() {
   const [listing, setListing] = useState<Listing | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
+  const [galleryOpen, setGalleryOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editSubtitle, setEditSubtitle] = useState("");
@@ -475,9 +476,19 @@ export default function ListingPage() {
   const mainImageUrl = keptMediaUrls[safeMediaIndex] ?? null;
   const categoryLabel = listing?.category || "Marketplace";
 
+  const showPrevMedia = () => {
+    if (keptMediaUrls.length <= 1) return;
+    setSelectedMediaIndex((prev) => (prev - 1 + keptMediaUrls.length) % keptMediaUrls.length);
+  };
+
+  const showNextMedia = () => {
+    if (keptMediaUrls.length <= 1) return;
+    setSelectedMediaIndex((prev) => (prev + 1) % keptMediaUrls.length);
+  };
+
   return (
-    <main className="min-h-screen">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 relative">
+    <main className="min-h-screen overflow-x-hidden">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 relative overflow-x-hidden">
       {cancelSuccess && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity duration-300">
           <div className="glass-card p-8 max-w-sm text-center space-y-4">
@@ -547,6 +558,59 @@ export default function ListingPage() {
         </div>
       )}
 
+      {galleryOpen && mainImageUrl && (
+        <div className="fixed inset-0 z-[70] bg-black/85 backdrop-blur-md p-4 sm:p-6">
+          <div className="mx-auto flex h-full w-full max-w-6xl flex-col rounded-2xl border border-white/10 bg-[#07152a]/95 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+              <p className="truncate text-sm text-silver">
+                Media {safeMediaIndex + 1} of {keptMediaUrls.length}
+              </p>
+              <button
+                type="button"
+                onClick={() => setGalleryOpen(false)}
+                className="rounded-md border border-white/20 px-3 py-1 text-xs font-medium text-silver hover:text-white hover:bg-white/10"
+              >
+                Close
+              </button>
+            </div>
+            <div className="relative min-h-0 flex-1 p-3 sm:p-4">
+              {isVideoMedia(mainImageUrl) ? (
+                <video
+                  src={mainImageUrl}
+                  className="h-full w-full rounded-xl object-contain"
+                  controls
+                  playsInline
+                  autoPlay
+                />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={mainImageUrl} alt="" className="h-full w-full rounded-xl object-contain" />
+              )}
+              {keptMediaUrls.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={showPrevMedia}
+                    className="absolute left-5 top-1/2 -translate-y-1/2 rounded-full border border-white/20 bg-black/45 px-3 py-2 text-white hover:bg-black/70"
+                    aria-label="Previous media"
+                  >
+                    ‹
+                  </button>
+                  <button
+                    type="button"
+                    onClick={showNextMedia}
+                    className="absolute right-5 top-1/2 -translate-y-1/2 rounded-full border border-white/20 bg-black/45 px-3 py-2 text-white hover:bg-black/70"
+                    aria-label="Next media"
+                  >
+                    ›
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {priceUpdateFailedBanner && (
         <div className="mb-4 rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
           {priceUpdateFailedBanner}
@@ -559,23 +623,23 @@ export default function ListingPage() {
         </div>
       )}
 
-      <div className="grid gap-8 lg:grid-cols-[1fr,400px]">
+      <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_400px]">
         {/* Left: media gallery (Chrono24-style) */}
-        <div className="space-y-4">
-          <div className="rounded-glass-lg border border-white/10 overflow-hidden bg-black relative aspect-[4/3]">
+        <div className="min-w-0 space-y-4">
+          <div className="relative aspect-[4/3] max-h-[62vh] overflow-hidden rounded-glass-lg border border-white/10 bg-black">
             {mainImageUrl ? (
               <>
                 {isVideoMedia(mainImageUrl) ? (
                   <video
                     src={mainImageUrl}
-                    className="w-full h-full object-cover"
+                    className="h-full w-full object-contain"
                     controls
                     playsInline
                     muted
                   />
                 ) : (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={mainImageUrl} alt="" className="w-full h-full object-cover" />
+                  <img src={mainImageUrl} alt="" className="h-full w-full object-contain" />
                 )}
                 <div className="absolute top-3 right-3 flex gap-2">
                   <button
@@ -589,6 +653,12 @@ export default function ListingPage() {
                   </button>
                   <button type="button" className="w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center text-white" aria-label="Share">⎘</button>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setGalleryOpen(true)}
+                  className="absolute inset-0 z-10 cursor-zoom-in"
+                  aria-label="Open media gallery"
+                />
               </>
             ) : (
               <div className="absolute inset-0 flex items-center justify-center text-silver">No image</div>
@@ -606,10 +676,10 @@ export default function ListingPage() {
                   className={`relative flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-colors cursor-pointer ${i === safeMediaIndex ? "border-chrome" : "border-white/20 hover:border-white/40"}`}
                 >
                   {isVideoMedia(url) ? (
-                    <video src={url} className="w-full h-full object-cover" muted playsInline />
+                    <video src={url} className="w-full h-full object-contain bg-black" muted playsInline />
                   ) : (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={url} alt="" className="w-full h-full object-cover" />
+                    <img src={url} alt="" className="w-full h-full object-contain bg-black" />
                   )}
                   {editing && (
                     <button
@@ -702,7 +772,7 @@ export default function ListingPage() {
         </div>
 
         {/* Right: details panel (Chrono24-style) */}
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <nav className="flex items-center gap-1 text-sm text-silver flex-wrap">
             <Link href="/" className="hover:text-white">Home</Link>
             <span>{">"}</span>
