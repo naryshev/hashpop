@@ -1,6 +1,7 @@
 import "./globals.css";
 import { ClientProviders } from "../components/ClientProviders";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from "@vercel/analytics/next";
 
 export const metadata = {
   title: "Hashpop",
@@ -18,6 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body suppressHydrationWarning>
         <ClientProviders>{children}</ClientProviders>
         <SpeedInsights />
+        <Analytics />
       </body>
     </html>
   );
