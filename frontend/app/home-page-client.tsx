@@ -3,61 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ListingMedia } from "../components/ListingMedia";
+import { CardStack, type CardStackItem } from "../components/ui/card-stack";
+import { Sparkles } from "lucide-react";
 import { formatPriceForDisplay } from "../lib/formatPrice";
 import { formatHbarWithUsd } from "../lib/hbarUsd";
 import { useHbarUsd } from "../hooks/useHbarUsd";
-import { CardStack, type CardStackItem } from "../components/ui/card-stack";
-import { Sparkles } from "lucide-react";
-
-function formatListingId(id: string): string {
-  if (!id || !id.startsWith("0x") || id.length !== 66) return id;
-  try {
-    const hex = id.slice(2).replace(/0+$/, "");
-    if (hex.length % 2) return id;
-    const bytes = new Uint8Array(hex.length / 2);
-    for (let i = 0; i < hex.length; i += 2) bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
-    const str = new TextDecoder().decode(bytes);
-    return /^[\x20-\x7e]+$/.test(str) ? str : `${id.slice(0, 10)}…`;
-  } catch {
-    return `${id.slice(0, 10)}…`;
-  }
-}
-
-function normalizeListingStatus(status?: string): string {
-  return String(status || "").trim().toUpperCase();
-}
-
-function getStatusBadge(status?: string): { label: string; className: string; glowClass: string; pulseDot?: boolean } {
-  const normalized = normalizeListingStatus(status);
-  if (normalized === "LISTED") {
-    return {
-      label: "ACTIVE",
-      className:
-        "bg-green-500/10 text-green-600 border-green-500/20 dark:bg-green-500/20 dark:text-green-400 dark:border-green-500/30",
-      glowClass: "shadow-[0_0_24px_rgba(52,211,153,0.32)]",
-      pulseDot: true,
-    };
-  }
-  if (normalized === "LOCKED") {
-    return {
-      label: "LOCKED",
-      className: "bg-amber-500/20 border-amber-400/40 text-amber-200",
-      glowClass: "shadow-[0_0_24px_rgba(251,191,36,0.3)]",
-    };
-  }
-  if (normalized === "CANCELLED") {
-    return {
-      label: "CANCELLED",
-      className: "bg-zinc-500/20 border-zinc-300/40 text-zinc-200",
-      glowClass: "shadow-[0_0_24px_rgba(161,161,170,0.28)]",
-    };
-  }
-  return {
-    label: "SOLD",
-    className: "bg-rose-500/20 border-rose-400/40 text-rose-200",
-    glowClass: "shadow-[0_0_24px_rgba(251,113,133,0.28)]",
-  };
-}
+import { formatListingId, getStatusBadge } from "../lib/listingFormat";
 
 export type ListingRecord = {
   id: string;
@@ -112,13 +63,10 @@ export default function HomePageClient({
   initialListings: ListingRecord[];
   initialError: string | null;
 }) {
-  const listings = initialListings;
-  const listingsError = initialError;
   const usdRate = useHbarUsd();
   const [cardWidth, setCardWidth] = useState(520);
   const [cardHeight, setCardHeight] = useState(360);
   const [stackVisible, setStackVisible] = useState(false);
-  const [isMobileViewport, setIsMobileViewport] = useState(false);
 
   useEffect(() => {
     const raf = window.requestAnimationFrame(() => setStackVisible(true));
@@ -129,7 +77,6 @@ export default function HomePageClient({
     const handleResize = () => {
       const width = window.innerWidth;
       const height = window.innerHeight;
-      setIsMobileViewport(width < 640);
       if (width < 640) {
         const cw = Math.min(270, width - 44);
         const ch = Math.min(250, Math.round(height * 0.32));
@@ -151,7 +98,7 @@ export default function HomePageClient({
   }, []);
 
   const stackItems = useMemo<HomeStackItem[]>(() => {
-    return listings.map((item) => {
+    return initialListings.map((item) => {
       const badge = getStatusBadge(item.status);
       return {
         id: item.id,
@@ -165,7 +112,7 @@ export default function HomePageClient({
         priceLabel: formatHbarWithUsd(formatPriceForDisplay(String(item.price ?? item.reservePrice ?? "0")), usdRate),
       };
     });
-  }, [listings, usdRate]);
+  }, [initialListings, usdRate]);
 
   return (
     <main className="h-screen overflow-hidden" style={{ backgroundColor: "#071b38" }}>
@@ -268,9 +215,9 @@ export default function HomePageClient({
             )}
           </div>
 
-          {listingsError ? (
+          {initialError ? (
             <p className="mt-2 text-center text-xs text-amber-300/95">
-              {listingsError} Ensure backend and database are running.
+              {initialError} Ensure backend and database are running.
             </p>
           ) : null}
         </div>

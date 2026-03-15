@@ -21,25 +21,12 @@ import { activeHederaChain } from "../../../lib/hederaChains";
 import { readListingCompat } from "../../../lib/marketplaceRead";
 
 import { getApiUrl } from "../../../lib/apiUrl";
+import { formatListingId } from "../../../lib/listingFormat";
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024;
 const ALLOWED_TYPES = "image/jpeg,image/jpg,image/png,image/gif,image/webp";
 
 function isVideoMedia(url: string): boolean {
   return /\.(mp4|webm|mov)(\?.*)?$/i.test(url);
-}
-
-function formatListingId(id: string): string {
-  if (!id || !id.startsWith("0x") || id.length !== 66) return id;
-  try {
-    const hex = id.slice(2).replace(/0+$/, "");
-    if (hex.length % 2) return id;
-    const bytes = new Uint8Array(hex.length / 2);
-    for (let i = 0; i < hex.length; i += 2) bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
-    const str = new TextDecoder().decode(bytes);
-    return /^[\x20-\x7e]+$/.test(str) ? str : `${id.slice(0, 10)}…`;
-  } catch {
-    return `${id.slice(0, 10)}…`;
-  }
 }
 
 type Listing = {

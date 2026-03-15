@@ -1,13 +1,6 @@
 import { getApiUrl } from "../lib/apiUrl";
+import { isActiveStatus } from "../lib/listingFormat";
 import HomePageClient, { type ListingRecord } from "./home-page-client";
-
-function normalizeListingStatus(status?: string): string {
-  return String(status || "").trim().toUpperCase();
-}
-
-function isActiveStatus(status?: string): boolean {
-  return normalizeListingStatus(status) === "LISTED";
-}
 
 async function loadInitialListings(): Promise<{ listings: ListingRecord[]; error: string | null }> {
   try {

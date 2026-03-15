@@ -1,14 +1,7 @@
 import { Suspense } from "react";
 import { getApiUrl } from "../../lib/apiUrl";
+import { isActiveStatus } from "../../lib/listingFormat";
 import MarketplacePageClient, { type ListingItem } from "./marketplace-page-client";
-
-function normalizeListingStatus(status?: string): string {
-  return String(status || "").trim().toUpperCase();
-}
-
-function isActiveStatus(status?: string): boolean {
-  return normalizeListingStatus(status) === "LISTED";
-}
 
 async function loadInitialMarketplaceListings(): Promise<{ items: ListingItem[]; error: string | null }> {
   try {

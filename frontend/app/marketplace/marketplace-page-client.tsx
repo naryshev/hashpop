@@ -12,52 +12,7 @@ import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { canonicalizeCategory } from "../../lib/categories";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
-
-function formatListingId(id: string): string {
-  if (!id || !id.startsWith("0x") || id.length !== 66) return id;
-  try {
-    const hex = id.slice(2).replace(/0+$/, "");
-    if (hex.length % 2) return id;
-    const bytes = new Uint8Array(hex.length / 2);
-    for (let i = 0; i < hex.length; i += 2) bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
-    const str = new TextDecoder().decode(bytes);
-    return /^[\x20-\x7e]+$/.test(str) ? str : `${id.slice(0, 10)}…`;
-  } catch {
-    return `${id.slice(0, 10)}…`;
-  }
-}
-
-function normalizeListingStatus(status?: string): string {
-  return String(status || "").trim().toUpperCase();
-}
-
-function getStatusBadge(status?: string): { label: string; className: string; pulseDot?: boolean } {
-  const normalized = normalizeListingStatus(status);
-  if (normalized === "LISTED") {
-    return {
-      label: "ACTIVE",
-      className:
-        "bg-green-500/10 text-green-600 border-green-500/20 dark:bg-green-500/20 dark:text-green-400 dark:border-green-500/30",
-      pulseDot: true,
-    };
-  }
-  if (normalized === "LOCKED") {
-    return {
-      label: "LOCKED",
-      className: "bg-amber-500/20 border-amber-400/40 text-amber-200",
-    };
-  }
-  if (normalized === "CANCELLED") {
-    return {
-      label: "CANCELLED",
-      className: "bg-zinc-500/20 border-zinc-300/40 text-zinc-200",
-    };
-  }
-  return {
-    label: "SOLD",
-    className: "bg-rose-500/20 border-rose-400/40 text-rose-200",
-  };
-}
+import { formatListingId, getStatusBadge } from "../../lib/listingFormat";
 
 function parsePostedWithinDays(value: string): number | null {
   if (!value) return null;
@@ -71,6 +26,20 @@ function parsePostedWithinDays(value: string): number | null {
     "2y": 730,
   };
   return daysMap[value] ?? null;
+}
+
+function getEmptyMessage(
+  query: string,
+  category: string,
+  minPrice: string,
+  maxPrice: string,
+  postedWithin: string,
+): string {
+  if (query && category) return `No listings matched "${query}" in ${category}.`;
+  if (query) return `No listings matched "${query}".`;
+  if (category) return `No listings found in ${category}.`;
+  if (minPrice || maxPrice || postedWithin) return "No listings matched your advanced filters.";
+  return "No listings found. Create one to get started!";
 }
 
 export type ListingItem = {
@@ -102,21 +71,19 @@ export default function MarketplacePageClient({
   const minPriceQuery = searchParams.get("minPrice")?.trim() ?? "";
   const maxPriceQuery = searchParams.get("maxPrice")?.trim() ?? "";
   const postedWithinQuery = searchParams.get("postedWithin")?.trim() ?? "";
-  const items = initialItems;
-  const listingsError = initialError;
   const usdRate = useHbarUsd();
 
   const filteredItems = useMemo(() => {
-    let categoryMatched = items;
+    let categoryMatched = initialItems;
     if (categoryQuery) {
       const normalizedCategory = categoryQuery.toLowerCase();
-      const strict = items.filter(
+      const strict = initialItems.filter(
         (item) => canonicalizeCategory(item.category ?? "").toLowerCase() === normalizedCategory
       );
       if (strict.length > 0) {
         categoryMatched = strict;
       } else {
-        const catFuse = new Fuse(items, {
+        const catFuse = new Fuse(initialItems, {
           includeScore: true,
           threshold: 0.3,
           ignoreLocation: true,
@@ -161,7 +128,7 @@ export default function MarketplacePageClient({
       }
       return true;
     });
-  }, [items, query, categoryQuery, minPriceQuery, maxPriceQuery, postedWithinQuery]);
+  }, [initialItems, query, categoryQuery, minPriceQuery, maxPriceQuery, postedWithinQuery]);
 
   return (
     <main className="min-h-screen">
@@ -177,26 +144,18 @@ export default function MarketplacePageClient({
             Create Listing
           </Link>
         </div>
-        {listingsError ? (
+        {initialError ? (
           <p className="text-amber-400/90 text-sm">
-            {listingsError} Ensure the backend is running and PostgreSQL is up (e.g. <code className="text-chrome">docker compose up -d db</code>).
+            {initialError} Ensure the backend is running and PostgreSQL is up (e.g. <code className="text-chrome">docker compose up -d db</code>).
           </p>
         ) : filteredItems.length === 0 ? (
-          <p className="text-silver">
-            {query && categoryQuery
-              ? `No listings matched "${query}" in ${categoryQuery}.`
-              : query
-                ? `No listings matched "${query}".`
-                : categoryQuery
-                  ? `No listings found in ${categoryQuery}.`
-                  : minPriceQuery || maxPriceQuery || postedWithinQuery
-                    ? "No listings matched your advanced filters."
-                    : "No listings found. Create one to get started!"}
-          </p>
+          <p className="text-silver">{getEmptyMessage(query, categoryQuery, minPriceQuery, maxPriceQuery, postedWithinQuery)}</p>
         ) : (
           <>
             <div className="sm:hidden space-y-3">
-              {filteredItems.map((item) => (
+              {filteredItems.map((item) => {
+                const badge = getStatusBadge(item.status);
+                return (
                 <Link
                   key={`${item.itemType}-${item.id}`}
                   href={`/listing/${encodeURIComponent(item.id)}`}
@@ -212,12 +171,12 @@ export default function MarketplacePageClient({
                       compactHeight="160px"
                     />
                     <span
-                      className={`absolute top-2 left-2 rounded-full inline-flex items-center gap-1.5 border px-2 py-0.5 text-[10px] font-semibold ${getStatusBadge(item.status).className}`}
+                      className={`absolute top-2 left-2 rounded-full inline-flex items-center gap-1.5 border px-2 py-0.5 text-[10px] font-semibold ${badge.className}`}
                     >
-                      {getStatusBadge(item.status).pulseDot ? (
+                      {badge.pulseDot ? (
                         <span className="inline-flex h-2 w-2 rounded-full bg-green-400 animate-pulse shadow-[0_0_0_0_rgba(74,222,128,0.7)]" />
                       ) : null}
-                      {getStatusBadge(item.status).label}
+                      {badge.label}
                     </span>
                   </div>
                   <div className="p-3">
@@ -229,10 +188,13 @@ export default function MarketplacePageClient({
                     </p>
                   </div>
                 </Link>
-              ))}
+                );
+              })}
             </div>
             <div className="hidden sm:grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
-              {filteredItems.map((item) => (
+              {filteredItems.map((item) => {
+                const badge = getStatusBadge(item.status);
+                return (
                 <Link
                   key={`${item.itemType}-${item.id}`}
                   href={`/listing/${encodeURIComponent(item.id)}`}
@@ -251,12 +213,12 @@ export default function MarketplacePageClient({
                       <WishlistButton itemId={item.id} itemType={item.itemType} compact />
                     </div>
                     <span
-                      className={`absolute top-2 left-2 rounded-full inline-flex items-center gap-1.5 border px-2 py-0.5 text-[10px] font-semibold ${getStatusBadge(item.status).className}`}
+                      className={`absolute top-2 left-2 rounded-full inline-flex items-center gap-1.5 border px-2 py-0.5 text-[10px] font-semibold ${badge.className}`}
                     >
-                      {getStatusBadge(item.status).pulseDot ? (
+                      {badge.pulseDot ? (
                         <span className="inline-flex h-2 w-2 rounded-full bg-green-400 animate-pulse shadow-[0_0_0_0_rgba(74,222,128,0.7)]" />
                       ) : null}
-                      {getStatusBadge(item.status).label}
+                      {badge.label}
                     </span>
                   </div>
                   <div className="p-3">
@@ -268,7 +230,8 @@ export default function MarketplacePageClient({
                     </p>
                   </div>
                 </Link>
-              ))}
+                );
+              })}
             </div>
           </>
         )}
