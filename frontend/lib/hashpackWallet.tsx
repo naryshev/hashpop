@@ -53,19 +53,19 @@ type StoredWalletSession = {
 
 function openHashPackDeepLink(pairingUri: string): void {
   if (typeof window === "undefined" || !pairingUri) return;
+  // Deep links require a user gesture. If called outside a gesture context
+  // (e.g. from a resolved promise), the browser will block the navigation.
+  // Use window.open which degrades more gracefully when blocked.
   const deeplink = `hashpack://wc?uri=${encodeURIComponent(pairingUri)}`;
   try {
-    window.location.assign(deeplink);
+    const popup = window.open(deeplink, "_self");
+    // If popup is null, the browser blocked it — silently fall through
+    // to let HashConnect's built-in extension detection handle it.
+    if (popup === null) return;
   } catch {
-    // Fallback below.
+    // Custom protocol not registered — the user likely doesn't have HashPack
+    // installed as a native app, which is fine (browser extension will handle it).
   }
-  const iframe = document.createElement("iframe");
-  iframe.style.display = "none";
-  iframe.src = deeplink;
-  document.body.appendChild(iframe);
-  window.setTimeout(() => {
-    iframe.remove();
-  }, 1500);
 }
 
 async function getPairingUri(hc: HashConnect): Promise<string | null> {
@@ -108,6 +108,35 @@ function clearWalletSessionStorage(): void {
     window.localStorage.removeItem(WALLET_SESSION_STORAGE_KEY);
   } catch {
     // no-op
+  }
+}
+
+/**
+ * Clear stale WalletConnect pairings from localStorage to prevent
+ * "Missing or invalid. Record was recently deleted" errors on init.
+ */
+function clearStalePairings(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const wcKey = "wc@2:core:0.3//pairing";
+    const raw = window.localStorage.getItem(wcKey);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as Array<{ active?: boolean; expiry?: number }>;
+    if (!Array.isArray(parsed)) return;
+    const now = Math.floor(Date.now() / 1000);
+    const valid = parsed.filter(
+      (p) => p.active !== false && (p.expiry == null || p.expiry > now),
+    );
+    if (valid.length !== parsed.length) {
+      window.localStorage.setItem(wcKey, JSON.stringify(valid));
+    }
+  } catch {
+    // If the format is unexpected, wipe all pairings to avoid init errors.
+    try {
+      window.localStorage.removeItem("wc@2:core:0.3//pairing");
+    } catch {
+      // no-op
+    }
   }
 }
 
@@ -268,6 +297,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
   const initPromiseRef = useRef<Promise<HashConnect | null> | null>(null);
   const connectInFlightRef = useRef(false);
   const mobilePairingUriRef = useRef<string | null>(null);
+  const listenersRef = useRef<{ pairing: ((s: any) => void) | null; disconnect: (() => void) | null }>({ pairing: null, disconnect: null });
 
   const resetWalletState = useCallback((clearConnectorData = false) => {
     setAccountId(null);
@@ -303,6 +333,10 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
 
     initPromiseRef.current = (async () => {
       try {
+        // Prune expired/inactive WalletConnect pairings to avoid
+        // "Record was recently deleted" errors during init.
+        clearStalePairings();
+
         const createClient = async (forceFresh: boolean) => {
           const client = await getOrCreateHashConnect(network, projectId, forceFresh);
           return client;
@@ -316,7 +350,16 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
           hc = await createClient(true);
         }
 
-        hc.pairingEvent.on(async (session: { accountIds: string[] }) => {
+        // Remove any previously registered listeners to prevent duplicates
+        // (React StrictMode, re-mounts, network changes).
+        if (listenersRef.current.pairing) {
+          hc.pairingEvent.off(listenersRef.current.pairing);
+        }
+        if (listenersRef.current.disconnect) {
+          hc.disconnectionEvent.off(listenersRef.current.disconnect);
+        }
+
+        const pairingHandler = async (session: { accountIds: string[] }) => {
           if (!mounted) return;
           const first = normalizeAccountId(session.accountIds[0] ?? null);
           setAccountId(first);
@@ -335,12 +378,16 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
           // true by the time any caller awaits connect().
           connectWaitRef.current?.();
           connectWaitRef.current = null;
-        });
+        };
 
-        hc.disconnectionEvent.on(() => {
+        const disconnectHandler = () => {
           if (!mounted) return;
           resetWalletState(true);
-        });
+        };
+
+        listenersRef.current = { pairing: pairingHandler, disconnect: disconnectHandler };
+        hc.pairingEvent.on(pairingHandler);
+        hc.disconnectionEvent.on(disconnectHandler);
 
         if (!mounted) return null;
         setHashconnect(hc);
@@ -374,6 +421,16 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
     return () => {
       mounted = false;
       initPromiseRef.current = null;
+      // Unregister event listeners to prevent memory leaks and duplicate handlers.
+      if (sharedHashconnect) {
+        if (listenersRef.current.pairing) {
+          sharedHashconnect.pairingEvent.off(listenersRef.current.pairing);
+        }
+        if (listenersRef.current.disconnect) {
+          sharedHashconnect.disconnectionEvent.off(listenersRef.current.disconnect);
+        }
+      }
+      listenersRef.current = { pairing: null, disconnect: null };
     };
   }, [network, resetWalletState]);
 
