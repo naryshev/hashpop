@@ -719,12 +719,26 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           amount,
         });
 
+        // Read on-chain status to determine if escrow (LOCKED=2) or direct sale (COMPLETED=3)
+        let nextStatus = "LOCKED";
+        const marketplaceAddr = process.env.MARKETPLACE_ADDRESS;
+        if (isUsableContractAddress(marketplaceAddr)) {
+          try {
+            const chainData = await readMarketplaceListingCompat(provider, marketplaceAddr, purchasedId);
+            const chainStatus = Number(chainData.status);
+            // COMPLETED(3) = direct sale settled immediately; LOCKED(2) = escrow
+            if (chainStatus === 3) nextStatus = "SOLD";
+          } catch {
+            // If chain read fails, default to LOCKED (safer; indexer will correct later)
+          }
+        }
+
         await prisma.listing.updateMany({
           where: { id: purchasedId },
-          data: { status: "LOCKED" },
+          data: { status: nextStatus, buyer },
         });
-        log.info({ listingId: purchasedId, txHash, nextStatus: "LOCKED" }, "Synced purchase from tx");
-        return res.json({ ok: true, listingId: purchasedId, status: "LOCKED" });
+        log.info({ listingId: purchasedId, txHash, buyer, nextStatus }, "Synced purchase from tx");
+        return res.json({ ok: true, listingId: purchasedId, buyer, status: nextStatus });
       }
       if (await applyFallbackPurchaseStatus()) {
         return res.json({ ok: true, listingId: fallbackListingId, source: "fallback" });
@@ -758,14 +772,19 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       const provider = new ethers.JsonRpcProvider(rpcUrl);
       const contract = new ethers.Contract(escrowAddr, ESCROW_ABI_VIEW, provider);
       const data = await contract.escrows(listingIdToBytes32(normalizedId));
-      const [, , , , , stateNum] = data;
+      const [buyer, , , , , stateNum] = data;
       const isComplete = Number(stateNum) === 2;
       if (!isComplete) {
         return res.status(409).json({ error: "Escrow is not complete yet" });
       }
+      const buyerAddr = buyer && buyer !== ethers.ZeroAddress ? buyer.toLowerCase() : undefined;
       await prisma.listing.updateMany({
         where: { id: normalizedId },
-        data: { status: "SOLD", exchangeConfirmedAt: new Date() } as any,
+        data: {
+          status: "SOLD",
+          exchangeConfirmedAt: new Date(),
+          ...(buyerAddr && { buyer: buyerAddr }),
+        } as any,
       });
       return res.json({ ok: true, listingId: normalizedId, status: "SOLD" });
     } catch (err: any) {
