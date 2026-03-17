@@ -1,6 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  swcMinify: true,
+  // Transpile Hashgraph packages through the Next.js compiler rather than
+  // treating them as pre-compiled. Prevents the SWC minifier from producing
+  // duplicate variable names (e.g. "Identifier 'n' has already been declared")
+  // which causes ChunkLoadError at runtime.
+  transpilePackages: [
+    "@hashgraph/sdk",
+    "@hashgraph/proto",
+    "@hashgraph/hedera-wallet-connect",
+    "hashconnect",
+  ],
   webpack: (config, { isServer }) => {
     // Stub so @metamask/sdk (pulled in by wagmi/connectors) doesn't break the build
     config.resolve.fallback = {
