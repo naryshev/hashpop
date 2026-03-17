@@ -102,9 +102,9 @@ export function relayRouter(log: Logger): Router {
       const r = await fetch(`${mirrorUrl}/api/v1/accounts/${accountId}`);
       if (!r.ok) return res.status(404).json({ error: "Account not found" });
       const data = await r.json();
-      const alias = data.alias;
-      if (!alias || typeof alias !== "string" || !alias.startsWith("0x")) {
-        return res.status(404).json({ error: "No EVM alias for this account (ECDSA/alias required)" });
+      const alias = data.evm_address;
+      if (!alias || typeof alias !== "string" || !/^0x[0-9a-fA-F]{40}$/.test(alias)) {
+        return res.status(404).json({ error: "No EVM alias for this account" });
       }
       return res.json({ accountId, evmAlias: alias });
     } catch (err: unknown) {
