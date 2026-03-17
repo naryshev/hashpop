@@ -1,9 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Transpile Hashgraph packages through the Next.js compiler rather than
-  // treating them as pre-compiled. Prevents the SWC minifier from producing
-  // duplicate variable names (e.g. "Identifier 'n' has already been declared")
-  // which causes ChunkLoadError at runtime.
+  // SWC minifier produces duplicate variable declarations when processing
+  // @hashgraph/sdk and @hashgraph/proto (protobuf Long.js patterns).
+  // Terser handles these edge cases correctly.
+  swcMinify: false,
   transpilePackages: [
     "@hashgraph/sdk",
     "@hashgraph/proto",
