@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { parseEther } from "viem";
 import { auctionHouseAbi, auctionHouseAddress } from "../lib/contracts";
 import { getTransactionErrorMessage } from "../lib/transactionError";
-import { auctionIdToBytes32, placeBidMessageHash, defaultDeadline, relayPlaceBid, fetchAccountAlias } from "../lib/ed25519Relay";
+import { auctionIdToBytes32, placeBidMessageHash, defaultDeadline, relayPlaceBid, signHashWithHashpack } from "../lib/ed25519Relay";
 import { useRobustContractWrite } from "../hooks/useRobustContractWrite";
 import { useHashpackWallet } from "../lib/hashpackWallet";
 import { activeHederaChain } from "../lib/hederaChains";
@@ -19,7 +19,7 @@ export function BidPanel({ auctionId }: { auctionId: string }) {
     bidAmountWei = 0n;
   }
 
-  const { address } = useHashpackWallet();
+  const { hashconnect, address, accountId } = useHashpackWallet();
   const chainId = activeHederaChain.id;
   const isWrongNetwork = false;
 
@@ -30,8 +30,6 @@ export function BidPanel({ auctionId }: { auctionId: string }) {
   const errorMessage = getTransactionErrorMessage(displayError, { chainId });
 
   const [ed25519Open, setEd25519Open] = useState(false);
-  const [accountIdOrAlias, setAccountIdOrAlias] = useState("");
-  const [signature, setSignature] = useState("");
   const [ed25519Status, setEd25519Status] = useState<"idle" | "loading" | "error" | "success">("idle");
   const [ed25519Error, setEd25519Error] = useState("");
 
@@ -47,37 +45,24 @@ export function BidPanel({ auctionId }: { auctionId: string }) {
   const deadline = defaultDeadline();
   const messageHash = placeBidMessageHash(idBytes, bidAmountWei, deadline);
 
-  const resolveAlias = async (): Promise<`0x${string}` | null> => {
-    const s = accountIdOrAlias.trim();
-    if (!s) return null;
-    if (s.startsWith("0x") && s.length === 42) return s as `0x${string}`;
-    if (/^0\.0\.\d+$/.test(s)) return fetchAccountAlias(s);
-    return null;
-  };
-
   const placeBidWithED25519 = async () => {
     setEd25519Status("loading");
     setEd25519Error("");
     try {
-      const bidderAlias = await resolveAlias();
-      if (!bidderAlias) {
-        setEd25519Error("Enter Hedera account ID (0.0.XXXXX) or EVM alias (0x...).");
+      if (!hashconnect || !accountId || !address) {
+        setEd25519Error("Connect HashPack first.");
         setEd25519Status("error");
         return;
       }
-      const sig = signature.trim().startsWith("0x") ? signature.trim() : `0x${signature.trim()}`;
-      if (sig.length < 130) {
-        setEd25519Error("Paste the full ED25519 signature (0x + 128 hex chars).");
-        setEd25519Status("error");
-        return;
-      }
+      // address from wallet context is already the EVM alias (or long-zero fallback).
+      const sig = await signHashWithHashpack(hashconnect, accountId, messageHash);
       await relayPlaceBid({
         auctionId: idBytes,
-        bidderAlias,
+        bidderAlias: address,
         bidAmountWei: bidAmountWei.toString(),
         deadline,
         messageHash,
-        signature: sig as `0x${string}`,
+        signature: sig,
       });
       setEd25519Status("success");
     } catch (e) {
@@ -125,30 +110,22 @@ export function BidPanel({ auctionId }: { auctionId: string }) {
         </button>
         {ed25519Open && (
           <div className="mt-3 p-3 rounded-lg bg-white/5 border border-white/10 space-y-2">
-            <input
-              type="text"
-              placeholder="Account ID (0.0.XXXXX) or EVM alias (0x...)"
-              value={accountIdOrAlias}
-              onChange={(e) => setAccountIdOrAlias(e.target.value)}
-              className="w-full px-3 py-2 rounded bg-black/40 border border-white/20 text-white text-sm"
-            />
-            <p className="text-xs text-silver break-all">Sign in HashPack: <code className="text-chrome">{messageHash}</code></p>
-            <input
-              type="text"
-              placeholder="Signature (0x...)"
-              value={signature}
-              onChange={(e) => setSignature(e.target.value)}
-              className="w-full px-3 py-2 rounded bg-black/40 border border-white/20 text-white text-sm"
-            />
+            <p className="text-xs text-silver">
+              Signs the bid via your connected HashPack and submits it through the relay.
+              HashPack will open a signing prompt — no copy-pasting required.
+            </p>
+            {!accountId && (
+              <p className="text-xs text-yellow-400">Connect HashPack above first.</p>
+            )}
             {ed25519Error && <p className="text-xs text-red-400">{ed25519Error}</p>}
             {ed25519Status === "success" && <p className="text-xs text-green-400">Bid submitted.</p>}
             <button
               type="button"
-              onClick={placeBidWithED25519}
-              disabled={ed25519Status === "loading"}
+              onClick={() => void placeBidWithED25519()}
+              disabled={!accountId || !canBid || ed25519Status === "loading"}
               className="btn-frost w-full text-sm py-2 disabled:opacity-60"
             >
-              {ed25519Status === "loading" ? "Submitting…" : "Submit (ED25519)"}
+              {ed25519Status === "loading" ? "Signing…" : "Sign & Submit (ED25519)"}
             </button>
           </div>
         )}

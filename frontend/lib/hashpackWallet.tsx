@@ -321,8 +321,6 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
           const first = normalizeAccountId(session.accountIds[0] ?? null);
           setAccountId(first);
           setError(null);
-          connectWaitRef.current?.();
-          connectWaitRef.current = null;
           if (first) {
             const mirrorData = await fetchMirrorAccount(first, network);
             if (!mounted) return;
@@ -333,6 +331,10 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
           } else {
             resetWalletState();
           }
+          // Resolve connect() only after address is fully set so isConnected is
+          // true by the time any caller awaits connect().
+          connectWaitRef.current?.();
+          connectWaitRef.current = null;
         });
 
         hc.disconnectionEvent.on(() => {

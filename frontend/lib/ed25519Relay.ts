@@ -4,6 +4,7 @@
  */
 
 import { keccak256, encodePacked, toHex } from "viem";
+import type { HashConnect } from "hashconnect";
 import { getApiUrl } from "./apiUrl";
 import { stringToBytes32Hex } from "./bytes32";
 
@@ -141,6 +142,57 @@ export async function relayPlaceBid(params: RelayPlaceBidParams): Promise<{ txHa
     throw new Error(err.details || err.error || "Relay place-bid failed");
   }
   return res.json();
+}
+
+/**
+ * Ask HashPack to sign a 32-byte message hash and return the raw signature.
+ *
+ * Works for both ECDSA and ED25519 accounts. The wallet opens a signing
+ * prompt; no copy-pasting required. The returned hex is passed directly to
+ * relay endpoints that call *WithED25519 contract functions.
+ */
+export async function signHashWithHashpack(
+  hashconnect: HashConnect,
+  accountId: string,
+  messageHashHex: `0x${string}`,
+): Promise<`0x${string}`> {
+  const sdk = await import("@hashgraph/sdk");
+  const accountObj = sdk.AccountId.fromString(accountId);
+  const signer = (hashconnect as unknown as { getSigner?: (id: unknown) => unknown }).getSigner?.(accountObj);
+  if (!signer || typeof (signer as { sign?: unknown }).sign !== "function") {
+    throw new Error("HashPack signer unavailable — reconnect your wallet and try again.");
+  }
+
+  const hexBody = messageHashHex.slice(2);
+  const messageBytes = new Uint8Array(hexBody.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+
+  let signatureMaps: unknown[];
+  try {
+    signatureMaps = await (signer as { sign: (m: Uint8Array[]) => Promise<unknown[]> }).sign([messageBytes]);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(`HashPack rejected the sign request: ${msg}`);
+  }
+
+  if (!signatureMaps || signatureMaps.length === 0) {
+    throw new Error("HashPack returned no signature — try again.");
+  }
+
+  // DAppSigner.sign() returns @hashgraph/sdk SignatureMap objects.
+  // _toProtobuf() exposes { sigPair: [{ ed25519?, ECDSASecp256k1? }] }.
+  type SigPair = { ed25519?: Uint8Array; ECDSASecp256k1?: Uint8Array };
+  type SigMapProto = { sigPair?: SigPair[] };
+  const proto = (signatureMaps[0] as { _toProtobuf?: () => SigMapProto })?._toProtobuf?.();
+  const firstPair = proto?.sigPair?.[0];
+  const rawSig: Uint8Array | undefined = firstPair?.ed25519 ?? firstPair?.ECDSASecp256k1;
+
+  if (!rawSig || rawSig.length === 0) {
+    throw new Error("Could not extract signature bytes from HashPack response.");
+  }
+
+  return `0x${Array.from(rawSig)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")}` as `0x${string}`;
 }
 
 /** Resolve Hedera account ID (0.0.XXXXX) to EVM alias (0x...) via backend. */
