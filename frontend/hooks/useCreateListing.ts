@@ -46,7 +46,7 @@ export function useCreateListing(options?: UseCreateListingOptions) {
     const category = categoryRef?.current ?? undefined;
     const condition = conditionRef?.current ?? undefined;
     const yearOfProduction = yearOfProductionRef?.current ?? undefined;
-    await fetch(`${getApiUrl()}/api/sync-listing`, {
+    const syncRes = await fetch(`${getApiUrl()}/api/sync-listing`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -64,7 +64,10 @@ export function useCreateListing(options?: UseCreateListingOptions) {
         ...(condition && { condition }),
         ...(yearOfProduction && { yearOfProduction }),
       }),
-    }).catch(() => {});
+    }).catch(() => null);
+    if (!syncRes?.ok) {
+      throw new Error("Listing was created on-chain but could not be saved. Please try again.");
+    }
     setIsSuccess(true);
     return idBytes;
   };
