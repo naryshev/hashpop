@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import express from "express";
 import pino from "pino";
+import pg from "pg";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { startIndexer } from "./indexer";
@@ -14,14 +15,30 @@ const uploadsDir = path.join(process.cwd(), "uploads");
 fs.mkdirSync(uploadsDir, { recursive: true });
 const log = pino({ level: process.env.LOG_LEVEL || "info" });
 
-// Use verify-full for SSL URLs to avoid pg/node-postgres security warning (Neon, etc.)
-let connectionString = process.env.DATABASE_URL || "postgres://hedera:hedera@localhost:5432/marketplace";
-if (connectionString.includes("sslmode=require") && !connectionString.includes("sslmode=verify-full")) {
-  connectionString = connectionString.replace("sslmode=require", "sslmode=verify-full");
-} else if (connectionString.includes("neon.tech") && !connectionString.includes("sslmode=")) {
-  connectionString += (connectionString.includes("?") ? "&" : "?") + "sslmode=verify-full";
-}
-const adapter = new PrismaPg({ connectionString });
+const rawConnectionString = process.env.DATABASE_URL || "postgres://hedera:hedera@localhost:5432/marketplace";
+
+// Detect cloud/remote databases that need SSL (Railway, Neon, Supabase, etc.)
+const isCloudDatabase =
+  rawConnectionString.includes("neon.tech") ||
+  rawConnectionString.includes("railway.app") ||
+  rawConnectionString.includes("railway.internal") ||
+  rawConnectionString.includes("rlwy.net") ||
+  rawConnectionString.includes("supabase.co") ||
+  rawConnectionString.includes("sslmode=require") ||
+  rawConnectionString.includes("sslmode=verify-full");
+
+// Strip sslmode from the URL — we pass SSL options directly to pg.Pool instead,
+// which avoids verify-full hostname failures on Railway and similar providers.
+const connectionString = rawConnectionString
+  .replace(/[?&]sslmode=[^&]+/g, "")
+  .replace(/\?$/, "")
+  .replace(/&(?=$)/, "");
+
+const pool = new pg.Pool({
+  connectionString,
+  ssl: isCloudDatabase ? { rejectUnauthorized: false } : undefined,
+});
+const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 // Allow multiple origins: local dev (localhost, 127.0.0.1, LAN IPs like 192.168.x.x) and Vercel.

@@ -360,7 +360,9 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     } catch (err: unknown) {
       log.error({ err }, "Failed to fetch listings");
       const code = err && typeof err === "object" && "code" in err ? (err as { code?: string }).code : undefined;
-      if (code === "ECONNREFUSED" || (err && typeof err === "object" && "message" in err && String((err as Error).message).includes("connect"))) {
+      const message = err && typeof err === "object" && "message" in err ? String((err as Error).message) : "";
+      const isTlsError = message.includes("SSL") || message.includes("TLS") || message.includes("certificate") || message.includes("self signed") || (code && String(code).startsWith("ERR_TLS"));
+      if (code === "ECONNREFUSED" || message.includes("connect") || isTlsError) {
         res.status(503).json({ error: "Database unavailable. Start PostgreSQL (e.g. docker compose up -d db) and run backend migrations." });
         return;
       }
