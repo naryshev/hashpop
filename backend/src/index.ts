@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import express from "express";
 import pino from "pino";
+import pg from "pg";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { startIndexer } from "./indexer";
@@ -21,7 +22,15 @@ if (connectionString.includes("sslmode=require") && !connectionString.includes("
 } else if (connectionString.includes("neon.tech") && !connectionString.includes("sslmode=")) {
   connectionString += (connectionString.includes("?") ? "&" : "?") + "sslmode=verify-full";
 }
-const adapter = new PrismaPg({ connectionString });
+const pool = new pg.Pool({
+  connectionString,
+  max: 10,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 10_000,
+  keepAlive: true,
+});
+pool.on("error", (err) => log.warn({ err }, "Idle pg pool client error"));
+const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 // Allow multiple origins: local dev (localhost, 127.0.0.1, LAN IPs like 192.168.x.x) and Vercel.
@@ -64,7 +73,15 @@ app.use("/uploads", express.static(uploadsDir));
 app.use("/api", apiRouter(prisma, log, uploadsDir));
 app.use("/api/relay", relayRouter(log));
 
-app.get("/health", (_, res) => res.json({ ok: true, timestamp: new Date().toISOString() }));
+app.get("/health", async (_, res) => {
+  try {
+    await prisma.$executeRawUnsafe("SELECT 1");
+    res.json({ ok: true, db: true, timestamp: new Date().toISOString() });
+  } catch (err) {
+    log.warn({ err }, "Health check: DB unreachable");
+    res.status(503).json({ ok: false, db: false, timestamp: new Date().toISOString() });
+  }
+});
 
 const port = Number(process.env.PORT || 4000);
 

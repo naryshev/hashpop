@@ -363,9 +363,21 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       });
     } catch (err: unknown) {
       log.error({ err }, "Failed to fetch listings");
+      const msg = err && typeof err === "object" && "message" in err ? String((err as Error).message) : "";
       const code = err && typeof err === "object" && "code" in err ? (err as { code?: string }).code : undefined;
-      if (code === "ECONNREFUSED" || (err && typeof err === "object" && "message" in err && String((err as Error).message).includes("connect"))) {
-        res.status(503).json({ error: "Database unavailable. Start PostgreSQL (e.g. docker compose up -d db) and run backend migrations." });
+      const isDbError =
+        code === "ECONNREFUSED" ||
+        code === "ECONNRESET" ||
+        code === "ETIMEDOUT" ||
+        code === "EPIPE" ||
+        msg.includes("connect") ||
+        msg.includes("terminated") ||
+        msg.includes("Connection") ||
+        msg.includes("timeout") ||
+        msg.includes("ECONNRESET") ||
+        msg.includes("socket");
+      if (isDbError) {
+        res.status(503).json({ error: "Database connection lost. The server will reconnect automatically — please retry in a few seconds." });
         return;
       }
       res.status(500).json({ error: "Internal server error" });
