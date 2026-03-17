@@ -3,10 +3,11 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Store, LayoutDashboard, PlusSquare, Heart, MessageSquare, LifeBuoy, LogIn } from "lucide-react";
-import { Sidebar, SidebarBody, SidebarLink } from "./ui/sidebar";
+import { Store, LayoutDashboard, PlusSquare, Heart, MessageSquare, LifeBuoy, LogIn, UserCircle } from "lucide-react";
+import { Sidebar, SidebarBody, SidebarLink, useSidebar } from "./ui/sidebar";
 import { cn } from "../lib/utils";
 import { useHashpackWallet } from "../lib/hashpackWallet";
+import { motion } from "framer-motion";
 
 type NavLink = {
   label: string;
@@ -22,7 +23,6 @@ export function AppSidebar() {
 
   const links = useMemo<NavLink[]>(
     () => [
-      { label: "Home", href: "/", icon: <Home className="h-5 w-5 flex-shrink-0" /> },
       { label: "Marketplace", href: "/marketplace", icon: <Store className="h-5 w-5 flex-shrink-0" /> },
       isConnected
         ? { label: "My Hashpop", href: "/dashboard", icon: <LayoutDashboard className="h-5 w-5 flex-shrink-0" /> }
@@ -42,9 +42,12 @@ export function AppSidebar() {
           <Link href="/marketplace" className="mb-6 inline-flex items-center gap-2 py-1">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/hashpop-cart-3d.PNG" alt="Hashpop" className="h-7 w-auto object-contain" />
-            <span className="bg-[linear-gradient(100deg,#ff2f3d_0%,#ff8f00_32%,#13a0ff_62%,#6ddf85_100%)] bg-clip-text text-lg font-extrabold text-transparent">
+            <motion.span
+              animate={{ display: open ? "inline-block" : "none", opacity: open ? 1 : 0 }}
+              className="bg-[linear-gradient(100deg,#ff2f3d_0%,#ff8f00_32%,#13a0ff_62%,#6ddf85_100%)] bg-clip-text text-lg font-extrabold text-transparent whitespace-pre"
+            >
               Hashpop
-            </span>
+            </motion.span>
           </Link>
           <div className="flex flex-col gap-1">
             {links.map((link) => {
@@ -63,7 +66,7 @@ export function AppSidebar() {
           </div>
         </div>
         {isConnected && accountId ? (
-          <p className="px-2 pb-2 text-xs text-neutral-600 dark:text-neutral-300">{accountId}</p>
+          <SidebarProfile accountId={accountId} />
         ) : null}
         <div className="border-t border-black/10 dark:border-white/10 pt-3">
           <p className="text-xs text-neutral-600 dark:text-neutral-300 px-2">
@@ -72,5 +75,23 @@ export function AppSidebar() {
         </div>
       </SidebarBody>
     </Sidebar>
+  );
+}
+
+function SidebarProfile({ accountId }: { accountId: string }) {
+  const { open, animate } = useSidebar();
+  return (
+    <div className="flex items-center gap-2 px-2 pb-2">
+      <UserCircle className="h-5 w-5 flex-shrink-0 text-neutral-600 dark:text-neutral-300" />
+      <motion.span
+        animate={{
+          display: animate ? (open ? "inline-block" : "none") : "inline-block",
+          opacity: animate ? (open ? 1 : 0) : 1,
+        }}
+        className="text-xs text-neutral-600 dark:text-neutral-300 whitespace-pre"
+      >
+        {accountId}
+      </motion.span>
+    </div>
   );
 }
