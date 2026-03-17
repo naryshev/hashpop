@@ -21,12 +21,14 @@ export function BuyButton({
   inWishlist = false,
   onToggleWishlist,
   wishlistDisabled = false,
+  onPurchaseComplete,
 }: {
   listingId: string;
   price: string;
   inWishlist?: boolean;
   onToggleWishlist?: () => void;
   wishlistDisabled?: boolean;
+  onPurchaseComplete?: () => void;
 }) {
   const idBytes = useMemo(() => listingIdToBytes32(listingId), [listingId]);
 
@@ -125,6 +127,7 @@ export function BuyButton({
         body: JSON.stringify({ txHash, listingId }),
       }).catch(() => {});
       setIsSuccess(true);
+      onPurchaseComplete?.();
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Unable to prepare buy transaction. Please refresh and retry.";
       setActionError(msg);

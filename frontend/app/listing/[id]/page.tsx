@@ -45,6 +45,7 @@ function formatListingId(id: string): string {
 type Listing = {
   id: string;
   seller: string;
+  buyer?: string | null;
   price: string;
   status: string;
   requireEscrow?: boolean;
@@ -818,6 +819,7 @@ export default function ListingPage() {
                   void toggleWishlist();
                 }}
                 wishlistDisabled={!address || wishlistLoading}
+                onPurchaseComplete={() => fetchListing(0, false)}
               />
             ) : (
               <div className="glass-card p-4 rounded-lg border border-white/10">
@@ -826,7 +828,18 @@ export default function ListingPage() {
               </div>
             )
           )}
-          {listing && !isListed && !isSeller && (
+          {listing && listing.status === "SOLD" && !listing.requireEscrow && listing.buyer && address && listing.buyer.toLowerCase() === address.toLowerCase() && (
+            <div className="glass-card p-4 rounded-lg border border-emerald-500/30 bg-emerald-500/5">
+              <h3 className="text-lg font-semibold text-emerald-300 mb-2">Purchase Complete</h3>
+              <p className="text-sm text-silver">
+                You bought this item. Payment of <span className="text-chrome">{formatHbarWithUsd(formatPriceForDisplay(listing.price), usdRate)}</span> has been sent to the seller.
+              </p>
+              <p className="text-xs text-silver mt-2">
+                Seller: <AddressDisplay address={listing.seller} className="text-chrome" />
+              </p>
+            </div>
+          )}
+          {listing && !isListed && !isSeller && !(listing.status === "SOLD" && !listing.requireEscrow && listing.buyer && address && listing.buyer.toLowerCase() === address.toLowerCase()) && !(listing.status === "LOCKED" || isLockedOnChain) && (
             <div className="glass-card p-4 rounded-lg border border-white/10">
               <p className="text-silver text-sm">This listing is no longer available for purchase.</p>
             </div>

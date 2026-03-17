@@ -9,6 +9,7 @@ datasource db {
 model Listing {
   id                 String   @id
   seller             String
+  buyer              String?
   price              String
   status             String
   requireEscrow      Boolean  @default(false)

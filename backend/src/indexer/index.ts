@@ -204,9 +204,15 @@ async function handleEvent(event: any, prisma: PrismaClient, log: Logger) {
           },
         });
       }
+      // Check DB listing to determine if escrow or direct sale
+      const dbListing = await prisma.listing.findUnique({
+        where: { id: purchListingId },
+        select: { requireEscrow: true },
+      });
+      const nextStatus = dbListing?.requireEscrow ? "LOCKED" : "SOLD";
       await prisma.listing.update({
         where: { id: purchListingId },
-        data: { status: "LOCKED" },
+        data: { status: nextStatus, buyer },
       });
       break;
     }
