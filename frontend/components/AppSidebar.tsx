@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Store, LayoutDashboard, PlusSquare, Heart, MessageSquare, LifeBuoy, LogIn } from "lucide-react";
+import { Home, Store, LayoutDashboard, PlusSquare, Heart, MessageSquare, LifeBuoy, LogIn, UserCircle } from "lucide-react";
 import { Sidebar, SidebarBody, SidebarLink } from "./ui/sidebar";
 import { cn } from "../lib/utils";
 import { useHashpackWallet } from "../lib/hashpackWallet";
@@ -63,7 +63,12 @@ export function AppSidebar() {
           </div>
         </div>
         {isConnected && accountId ? (
-          <p className="px-2 pb-2 text-xs text-neutral-600 dark:text-neutral-300">{accountId}</p>
+          <div className="flex items-center gap-2 px-2 pb-2">
+            <UserCircle className="h-5 w-5 flex-shrink-0 text-neutral-500 dark:text-neutral-400" />
+            {open && (
+              <p className="text-xs text-neutral-600 dark:text-neutral-300 truncate">{accountId}</p>
+            )}
+          </div>
         ) : null}
         <div className="border-t border-black/10 dark:border-white/10 pt-3">
           <p className="text-xs text-neutral-600 dark:text-neutral-300 px-2">
