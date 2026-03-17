@@ -284,10 +284,6 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         prisma.listing.findMany({
           where: {
             status: "LISTED",
-            OR: [
-              { imageUrl: { not: null } },
-              { mediaUrls: { isEmpty: false } },
-            ],
           },
           orderBy: { createdAt: "desc" },
           take: 100,
