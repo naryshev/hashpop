@@ -132,6 +132,26 @@ export const escrowAbi: Abi = [
   },
 ];
 
+export const pausableAdminAbi: Abi = [
+  {
+    name: "paused",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    name: "unpause",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [],
+    outputs: [],
+  },
+];
+
+/** @deprecated use pausableAdminAbi */
+export const marketplaceAdminAbi = pausableAdminAbi;
+
 export const marketplaceAddress = (process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS || "0x0000000000000000000000000000000000000000") as `0x${string}`;
 export const auctionHouseAddress = (process.env.NEXT_PUBLIC_AUCTION_HOUSE_ADDRESS || "0x0000000000000000000000000000000000000000") as `0x${string}`;
 export const escrowAddress = (process.env.NEXT_PUBLIC_ESCROW_ADDRESS || "0x0000000000000000000000000000000000000000") as `0x${string}`;

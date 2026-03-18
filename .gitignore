@@ -14,6 +14,7 @@ out/
 artifacts/
 cache/
 typechain-types/
+*.tsbuildinfo
 
 # IDE
 .vscode/

@@ -22,6 +22,8 @@
     "format:check": "prettier --check .",
     "deploy:testnet": "hardhat run deploy/deploy.ts --network hederaTestnet",
     "deploy:mainnet": "hardhat run deploy/deploy.ts --network hederaMainnet",
+    "unpause:testnet": "hardhat run deploy/unpause.ts --network hederaTestnet",
+    "unpause:mainnet": "hardhat run deploy/unpause.ts --network hederaMainnet",
     "authorize:escrow": "hardhat run deploy/authorize-escrow.ts --network hederaTestnet",
     "authorize:escrow:mainnet": "hardhat run deploy/authorize-escrow.ts --network hederaMainnet",
     "verify": "hardhat run deploy/verify.ts",

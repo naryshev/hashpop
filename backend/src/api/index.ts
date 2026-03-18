@@ -280,20 +280,21 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
 
   router.get("/listings", async (req, res) => {
     try {
-      const [listings, auctions] = await Promise.all([
-        prisma.listing.findMany({
-          where: {
-            status: "LISTED",
-          },
-          orderBy: { createdAt: "desc" },
-          take: 100,
-        }),
-        prisma.auction.findMany({
+      const listings = await prisma.listing.findMany({
+        where: { status: "LISTED" },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+      });
+      let auctions: Awaited<ReturnType<typeof prisma.auction.findMany>> = [];
+      try {
+        auctions = await prisma.auction.findMany({
           where: { status: "ACTIVE" },
           orderBy: { createdAt: "desc" },
           take: 50,
-        }),
-      ]);
+        });
+      } catch (auctionErr) {
+        log.warn({ err: auctionErr }, "Could not fetch auctions (table may not exist yet)");
+      }
       let listingPriceOverrides = new Map<string, string>();
       let listingStatusOverrides = new Map<string, string>();
       const marketplaceAddr = process.env.MARKETPLACE_ADDRESS;
@@ -366,7 +367,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         res.status(503).json({ error: "Database unavailable. Start PostgreSQL (e.g. docker compose up -d db) and run backend migrations." });
         return;
       }
-      res.status(500).json({ error: "Internal server error" });
+      res.status(500).json({ error: `Internal server error: ${message || String(err)}` });
     }
   });
 
