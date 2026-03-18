@@ -132,7 +132,7 @@ export const escrowAbi: Abi = [
   },
 ];
 
-export const marketplaceAdminAbi: Abi = [
+export const pausableAdminAbi: Abi = [
   {
     name: "paused",
     type: "function",
@@ -148,6 +148,9 @@ export const marketplaceAdminAbi: Abi = [
     outputs: [],
   },
 ];
+
+/** @deprecated use pausableAdminAbi */
+export const marketplaceAdminAbi = pausableAdminAbi;
 
 export const marketplaceAddress = (process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS || "0x0000000000000000000000000000000000000000") as `0x${string}`;
 export const auctionHouseAddress = (process.env.NEXT_PUBLIC_AUCTION_HOUSE_ADDRESS || "0x0000000000000000000000000000000000000000") as `0x${string}`;
