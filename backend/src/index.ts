@@ -31,6 +31,7 @@ const isCloudDatabase =
 // which avoids verify-full hostname failures on Railway and similar providers.
 const connectionString = rawConnectionString
   .replace(/[?&]sslmode=[^&]+/g, "")
+  .replace(/[?&]channel_binding=[^&]+/g, "")
   .replace(/\?$/, "")
   .replace(/&(?=$)/, "");
 
