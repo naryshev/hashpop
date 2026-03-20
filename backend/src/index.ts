@@ -4,7 +4,7 @@ import fs from "fs";
 import express from "express";
 import pino from "pino";
 import pg from "pg";
-import { PrismaClient } from "./generated/prisma";
+import { PrismaClient } from "./generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { startIndexer } from "./indexer";
 import { apiRouter } from "./api";
