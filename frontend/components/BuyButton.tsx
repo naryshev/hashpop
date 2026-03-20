@@ -54,8 +54,17 @@ export function BuyButton({
     void readListingCompat(idBytes)
       .then((data) => {
         if (!cancelled) {
-          setOnChainListing({ price: data.price, status: data.status });
-          setChainReadFailed(false);
+          const p = parsePriceWei(data.price);
+          const s = Number(data.status ?? 0);
+          // If on-chain returns an empty/zero listing, treat as chain read failure
+          // so the button falls back to the API-provided price.
+          if (p === 0n && s === 0) {
+            setOnChainListing(undefined);
+            setChainReadFailed(true);
+          } else {
+            setOnChainListing({ price: p, status: s });
+            setChainReadFailed(false);
+          }
         }
       })
       .catch(() => {
@@ -69,8 +78,8 @@ export function BuyButton({
     };
   }, [idBytes]);
   const priceWei = parsePriceWei(onChainListing?.price);
-  const hasPrice = priceWei > 0n;
-  const isLegacyWeiListing = priceWei >= 10n ** 15n;
+  const hasPrice = priceWei > 0n || chainReadFailed;
+  const isLegacyWeiListing = priceWei > 0n && priceWei >= 10n ** 15n;
 
   const { send, isPending, error: writeError } = useRobustContractWrite();
   const isConfirming = false;
@@ -101,7 +110,12 @@ export function BuyButton({
         latestPrice = parsePriceWei(latest.price);
         latestStatus = Number(latest.status ?? 0);
       } catch {
-        // Legacy fallback: use API-provided price if live read fails.
+        // Fallback: use API-provided price if live read fails.
+        latestPrice = parseUnits(String(_price || "0"), 8);
+        latestStatus = 1;
+      }
+      // If on-chain returns empty struct (price=0, status=0), fall back to API price.
+      if (latestPrice === 0n && latestStatus === 0) {
         latestPrice = parseUnits(String(_price || "0"), 8);
         latestStatus = 1;
       }
