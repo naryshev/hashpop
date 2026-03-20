@@ -38,6 +38,7 @@ coverage.json
 
 # Prisma
 backend/prisma/migrations/
+backend/src/generated/
 
 # Indexer state (persisted so wipe is not undone on restart)
 backend/.indexer-state.json
