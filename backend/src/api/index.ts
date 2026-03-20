@@ -1,7 +1,7 @@
 import path from "path";
 import { Router } from "express";
 import multer from "multer";
-import { PrismaClient } from "../generated/prisma";
+import { PrismaClient } from "../generated/prisma/client";
 import type { Logger } from "pino";
 import { ethers } from "ethers";
 import { fetchMirrorEvents } from "../mirror";
