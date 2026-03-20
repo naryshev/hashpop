@@ -1,6 +1,6 @@
 import path from "path";
 import fs from "fs";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "../generated/prisma";
 import type { Logger } from "pino";
 import { fetchMirrorEvents } from "../mirror";
 import { decodeEvents } from "./decoder";
