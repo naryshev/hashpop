@@ -5,7 +5,7 @@ import { execSync } from "child_process";
 import express from "express";
 import pino from "pino";
 import pg from "pg";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "./generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { startIndexer } from "./indexer";
 import { apiRouter } from "./api";

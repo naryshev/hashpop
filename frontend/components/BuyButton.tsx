@@ -49,13 +49,24 @@ export function BuyButton({
     if (typeof o.toString === "function") return BigInt(o.toString());
     return 0n;
   }
+  const [notOnChain, setNotOnChain] = useState(false);
   useEffect(() => {
     let cancelled = false;
     void readListingCompat(idBytes)
       .then((data) => {
         if (!cancelled) {
-          setOnChainListing({ price: data.price, status: data.status });
-          setChainReadFailed(false);
+          const p = parsePriceWei(data.price);
+          const s = Number(data.status ?? 0);
+          if (p === 0n && s === 0) {
+            // Listing doesn't exist on-chain (empty struct returned).
+            setOnChainListing(undefined);
+            setChainReadFailed(true);
+            setNotOnChain(true);
+          } else {
+            setOnChainListing({ price: p, status: s });
+            setChainReadFailed(false);
+            setNotOnChain(false);
+          }
         }
       })
       .catch(() => {
@@ -70,7 +81,7 @@ export function BuyButton({
   }, [idBytes]);
   const priceWei = parsePriceWei(onChainListing?.price);
   const hasPrice = priceWei > 0n;
-  const isLegacyWeiListing = priceWei >= 10n ** 15n;
+  const isLegacyWeiListing = priceWei > 0n && priceWei >= 10n ** 15n;
 
   const { send, isPending, error: writeError } = useRobustContractWrite();
   const isConfirming = false;
@@ -96,12 +107,25 @@ export function BuyButton({
       // Read the latest on-chain listing at click-time to avoid stale cached price mismatches.
       let latestPrice = 0n;
       let latestStatus = 0;
+      let chainReadSucceeded = false;
       try {
         const latest = await readListingCompat(idBytes);
         latestPrice = parsePriceWei(latest.price);
         latestStatus = Number(latest.status ?? 0);
+        chainReadSucceeded = true;
       } catch {
-        // Legacy fallback: use API-provided price if live read fails.
+        // RPC failure — cannot verify on-chain state.
+        chainReadSucceeded = false;
+      }
+      // If on-chain returns empty struct, listing doesn't exist on contract.
+      if (chainReadSucceeded && latestPrice === 0n && latestStatus === 0) {
+        throw new Error(
+          "This listing does not exist on-chain yet. The seller's creation transaction may not have completed. " +
+          "Ask the seller to delete and recreate this listing."
+        );
+      }
+      // If RPC failed entirely, try with API price but warn it may fail.
+      if (!chainReadSucceeded) {
         latestPrice = parseUnits(String(_price || "0"), 8);
         latestStatus = 1;
       }
@@ -142,6 +166,11 @@ export function BuyButton({
       <h3 className="text-lg font-semibold text-white mb-2">Buy Now</h3>
       <p className="text-2xl font-semibold text-white">{listingPriceWithUsd}</p>
       <p className="text-xs text-silver">Excl. shipping · Network fee applies at checkout</p>
+      {notOnChain && (
+        <p className="text-xs text-amber-300/90 mb-1">
+          This listing does not exist on the smart contract yet. The seller&apos;s creation transaction may not have completed successfully. Ask the seller to delete and recreate this listing.
+        </p>
+      )}
       {isLegacyWeiListing && (
         <p className="text-xs text-amber-300/90 mb-1">
           This listing was created with a legacy price unit and cannot be bought yet. The seller needs to edit the price and save, or relist.
@@ -166,7 +195,7 @@ export function BuyButton({
             if (!hasPrice || isLegacyWeiListing || isWrongNetwork || isPending || isConfirming) return;
             void buy();
           }}
-          disabled={(!hasPrice && !chainReadFailed) || isLegacyWeiListing || isPending || isConfirming || isWrongNetwork}
+          disabled={(!hasPrice && !chainReadFailed) || notOnChain || isLegacyWeiListing || isPending || isConfirming || isWrongNetwork}
           className="btn-frost-cta w-full disabled:opacity-60"
         >
           {isPending ? "Confirm in wallet…" : "Buy Now"}

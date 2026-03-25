@@ -36,7 +36,9 @@ Thumbs.db
 coverage/
 coverage.json
 
-# Prisma — migrations are tracked in git so they auto-apply on deploy
+# Prisma
+backend/prisma/migrations/
+backend/src/generated/
 
 # Indexer state (persisted so wipe is not undone on restart)
 backend/.indexer-state.json

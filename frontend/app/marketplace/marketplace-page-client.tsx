@@ -231,7 +231,7 @@ export default function MarketplacePageClient({
                 </Link>
               ))}
             </div>
-            <div className="hidden sm:grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+            <div className="hidden sm:grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filteredItems.map((item) => (
                 <Link
                   key={`${item.itemType}-${item.id}`}
@@ -245,7 +245,7 @@ export default function MarketplacePageClient({
                       aspectRatio="square"
                       navigation="arrows"
                       cardSize
-                      compactHeight="160px"
+                      compactHeight="220px"
                     />
                     <div className="absolute top-2 right-2">
                       <WishlistButton itemId={item.id} itemType={item.itemType} compact />
@@ -259,11 +259,11 @@ export default function MarketplacePageClient({
                       {getStatusBadge(item.status).label}
                     </span>
                   </div>
-                  <div className="p-3">
-                    <h2 className="text-sm font-medium text-white line-clamp-2 leading-tight min-h-[2.5rem]">
+                  <div className="p-4">
+                    <h2 className="text-base font-medium text-white line-clamp-2 leading-snug min-h-[2.75rem]">
                       {item.title || formatListingId(item.id) || "Untitled"}
                     </h2>
-                    <p className="text-chrome font-semibold mt-1">
+                    <p className="text-chrome font-semibold mt-1.5 text-lg">
                       {formatHbarWithUsd(formatPriceForDisplay(item.price || "0"), usdRate)}
                     </p>
                   </div>
