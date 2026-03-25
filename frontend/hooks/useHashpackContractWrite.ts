@@ -228,40 +228,73 @@ export function useHashpackContractWrite() {
                     tx.transactionId?.toString?.() ??
                     null;
                 }
-              } catch {
-                // leave as-is; handled by status check below
+              } catch (receiptErr: any) {
+                // getReceipt() throws StatusError when the tx reverted on-chain.
+                // Extract the status from the error so we don't silently swallow reverts.
+                const errStatus = receiptErr?.status?.toString?.() ?? "";
+                const errMsg = receiptErr?.message ?? String(receiptErr);
+                if (
+                  errStatus.includes("REVERT") ||
+                  errStatus.includes("ERROR") ||
+                  errMsg.includes("CONTRACT_REVERT") ||
+                  errMsg.includes("REVERT_EXECUTED")
+                ) {
+                  throw new TransactionRevertError(
+                    txId || "unknown",
+                    `Transaction reverted on-chain.${txId ? ` Transaction ID: ${txId}.` : ""} ${errMsg}`
+                  );
+                }
+                // For other receipt errors (network timeout, etc.), fall through to mirror node check below.
               }
             }
             const statusText = status?.toString?.() ?? "";
             if (!status && txId) {
-              // HashPack returned a txId but no status — verify on-chain via mirror node.
-              try {
-                const mirrorBase = network === "mainnet"
-                  ? "https://mainnet.mirrornode.hedera.com"
-                  : "https://testnet.mirrornode.hedera.com";
-                // Transaction ID format: 0.0.XXXX@seconds.nanos → needs URL encoding
-                const txIdForMirror = txId.replace("@", "-").replace(/\./g, "-");
-                // Wait briefly for consensus
-                await sleep(3000);
-                const mirrorRes = await fetch(`${mirrorBase}/api/v1/transactions/${txIdForMirror}`);
-                if (mirrorRes.ok) {
-                  const mirrorData = await mirrorRes.json() as { transactions?: { result?: string }[] };
-                  const result = mirrorData?.transactions?.[0]?.result;
-                  if (result && result !== "SUCCESS") {
-                    throw new TransactionRevertError(
-                      txId,
-                      `Transaction reverted on-chain with status: ${result}. Transaction ID: ${txId}.`
-                    );
+              // Status unknown — verify via Hedera mirror node before assuming success.
+              const mirrorBase = network === "mainnet"
+                ? "https://mainnet.mirrornode.hedera.com"
+                : "https://testnet.mirrornode.hedera.com";
+              const mirrorTxId = txId.replace("@", "-").replace(/\./g, "-");
+              let verified = false;
+              for (let poll = 0; poll < 3; poll++) {
+                if (poll > 0) await sleep(2_000);
+                try {
+                  const resp = await fetch(`${mirrorBase}/api/v1/transactions/${mirrorTxId}`);
+                  if (resp.ok) {
+                    const data = await resp.json() as { transactions?: { result?: string }[] };
+                    const txResult = data?.transactions?.[0]?.result ?? "";
+                    if (txResult === "SUCCESS") {
+                      verified = true;
+                      break;
+                    }
+                    if (txResult.includes("REVERT") || txResult.includes("ERROR")) {
+                      throw new TransactionRevertError(
+                        txId,
+                        `Transaction failed on-chain with status ${txResult}. Transaction ID: ${txId}.`
+                      );
+                    }
+                    if (txResult) {
+                      throw new TransactionRevertError(
+                        txId,
+                        `Transaction failed with status ${txResult}. Transaction ID: ${txId}.`
+                      );
+                    }
                   }
+                } catch (e) {
+                  if (e instanceof TransactionRevertError) throw e;
+                  // Mirror node not available yet, keep polling
                 }
-              } catch (verifyErr) {
-                // If it's our own TransactionRevertError, re-throw it
-                if (verifyErr instanceof TransactionRevertError) throw verifyErr;
-                // Mirror node lookup failed — log but don't block (tx may still be valid)
               }
-              if (txId) safeSetLastHash(txId);
-              await refreshAccountData().catch(() => {});
-              break;
+              if (verified) {
+                if (txId) safeSetLastHash(txId);
+                await refreshAccountData().catch(() => {});
+                break;
+              }
+              // After 3 polls, mirror node still doesn't have the tx — treat as unverified failure
+              // rather than optimistically assuming success.
+              throw new TransactionRevertError(
+                txId,
+                `Could not verify transaction status. Transaction ID: ${txId}. The transaction may have failed — please check HashScan before retrying.`
+              );
             }
             if (!status || statusText !== sdk.Status.Success.toString()) {
               throw new TransactionRevertError(

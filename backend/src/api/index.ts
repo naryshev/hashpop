@@ -5,6 +5,7 @@ import multer from "multer";
 import { PrismaClient } from "../generated/prisma/client";
 import type { Logger } from "pino";
 import { ethers } from "ethers";
+import axios from "axios";
 import { fetchMirrorEvents } from "../mirror";
 import { decodeEvents, EXPECTED_TOPIC0_ITEM_LISTED } from "../indexer/decoder";
 import { saveUpload } from "../storage";
@@ -473,6 +474,33 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       }
       return res.status(400).json({ error: "txHash required" });
     }
+
+    // When a txHash looks like a Hedera transaction ID (e.g. "0.0.123@timestamp"),
+    // verify via mirror node that the transaction actually succeeded before persisting.
+    const isHederaTxId = /^\d+\.\d+\.\d+@/.test(txHash);
+    if (isHederaTxId) {
+      const mirrorBase = process.env.MIRROR_URL || "https://testnet.mirrornode.hedera.com";
+      const mirrorTxId = txHash.replace("@", "-").replace(/\./g, "-");
+      try {
+        // Wait a moment for mirror node propagation, then check
+        await new Promise((r) => setTimeout(r, 2_000));
+        const mirrorResp = await axios.get(`${mirrorBase}/api/v1/transactions/${mirrorTxId}`, { timeout: 5_000 });
+        const txResult = mirrorResp.data?.transactions?.[0]?.result ?? "";
+        if (txResult && txResult !== "SUCCESS") {
+          log.warn({ txHash, txResult }, "Transaction did not succeed on-chain, refusing to create listing");
+          return res.status(400).json({
+            error: `Transaction failed on-chain with status: ${txResult}. Listing was not created.`,
+            txResult,
+          });
+        }
+      } catch (mirrorErr: any) {
+        // 404 = mirror hasn't indexed yet; other errors = network issue. Either way, proceed with RPC check.
+        if (mirrorErr?.response?.status !== 404) {
+          log.warn({ mirrorErr: mirrorErr?.message, txHash }, "Mirror node check failed, proceeding with RPC verification");
+        }
+      }
+    }
+
     const rpcUrl = process.env.HEDERA_RPC_URL;
     if (!rpcUrl) {
       if (canFallbackUpsert) {
