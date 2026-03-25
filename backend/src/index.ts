@@ -1,6 +1,7 @@
 import "dotenv/config";
 import path from "path";
 import fs from "fs";
+import { execSync } from "child_process";
 import express from "express";
 import pino from "pino";
 import pg from "pg";
@@ -85,6 +86,19 @@ app.use("/api/relay", relayRouter(log));
 app.get("/health", (_, res) => res.json({ ok: true, timestamp: new Date().toISOString() }));
 
 const port = Number(process.env.PORT || 4000);
+
+// Auto-apply pending Prisma migrations on startup
+try {
+  log.info("Applying pending database migrations…");
+  execSync("npx prisma migrate deploy", {
+    cwd: path.join(__dirname, ".."),
+    stdio: "pipe",
+    env: { ...process.env },
+  });
+  log.info("Database migrations applied");
+} catch (err: any) {
+  log.warn({ err: err.stderr?.toString() || err.message }, "Migration failed — continuing with existing schema");
+}
 
 app.listen(port, () => {
   log.info({ port }, "Backend server started");

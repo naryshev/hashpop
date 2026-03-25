@@ -8,6 +8,9 @@ import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { formatPriceForDisplay } from "../../lib/formatPrice";
 import { formatListingDate } from "../../lib/formatDate";
 import { getApiUrl } from "../../lib/apiUrl";
+import { AddressDisplay } from "../../components/AddressDisplay";
+import { getTransactionExplorerUrl } from "../../lib/explorer";
+import { activeHederaChain } from "../../lib/hederaChains";
 
 type PurchaseRow = {
   id: string;
@@ -16,11 +19,70 @@ type PurchaseRow = {
   buyer: string;
   seller: string;
   amount: string;
+  txHash?: string | null;
   createdAt: string;
   role: "buyer" | "seller";
   listing?: { id: string; title?: string | null; status?: string; imageUrl?: string | null } | null;
   auction?: { id: string; title?: string | null; status?: string; imageUrl?: string | null } | null;
 };
+
+function PurchaseCard({ row, usdRate, counterpartyLabel }: { row: PurchaseRow; usdRate: number | null; counterpartyLabel: string }) {
+  const targetId = row.listingId || row.auctionId;
+  const title = row.listing?.title || row.auction?.title || targetId || row.id;
+  const imageUrl = row.listing?.imageUrl || row.auction?.imageUrl;
+  const status = row.listing?.status || row.auction?.status || "N/A";
+  const counterparty = counterpartyLabel === "Seller" ? row.seller : row.buyer;
+  const chainId = activeHederaChain.id;
+  const explorerUrl = getTransactionExplorerUrl(row.txHash, chainId);
+
+  return (
+    <li className="p-3 sm:p-4 flex items-start gap-3">
+      {/* Thumbnail */}
+      <Link
+        href={targetId ? `/listing/${encodeURIComponent(targetId)}` : "/marketplace"}
+        className="flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden border border-white/10 bg-white/5"
+      >
+        {imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-silver text-xs">No img</div>
+        )}
+      </Link>
+
+      {/* Details */}
+      <div className="min-w-0 flex-1">
+        <Link
+          href={targetId ? `/listing/${encodeURIComponent(targetId)}` : "/marketplace"}
+          className="text-white hover:text-chrome font-medium truncate block"
+        >
+          {title}
+        </Link>
+        <p className="text-xs text-silver mt-0.5">
+          {formatListingDate(row.createdAt)} · {status}
+        </p>
+        <p className="text-xs text-silver mt-0.5">
+          {counterpartyLabel}: <AddressDisplay address={counterparty} className="text-chrome font-mono text-xs" />
+        </p>
+        {explorerUrl && (
+          <a
+            href={explorerUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-chrome/80 hover:text-white underline mt-0.5 inline-block"
+          >
+            View on HashScan
+          </a>
+        )}
+      </div>
+
+      {/* Amount */}
+      <span className="text-chrome shrink-0 text-sm font-medium">
+        {formatHbarWithUsd(formatPriceForDisplay(row.amount || "0"), usdRate)}
+      </span>
+    </li>
+  );
+}
 
 export default function PurchasesPage() {
   const { address } = useHashpackWallet();
@@ -71,23 +133,9 @@ export default function PurchasesPage() {
               ) : (
                 <div className="glass-card overflow-hidden rounded-xl">
                   <ul className="divide-y divide-white/5">
-                    {asBuyer.map((row) => {
-                      const targetId = row.listingId || row.auctionId;
-                      const title = row.listing?.title || row.auction?.title || targetId || row.id;
-                      return (
-                        <li key={row.id} className="p-3 flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <Link href={targetId ? `/listing/${encodeURIComponent(targetId)}` : "/marketplace"} className="text-white hover:text-chrome font-medium truncate block">
-                              {title}
-                            </Link>
-                            <p className="text-xs text-silver mt-0.5">
-                              {formatListingDate(row.createdAt)} · Status: {row.listing?.status || row.auction?.status || "N/A"}
-                            </p>
-                          </div>
-                          <span className="text-chrome shrink-0">{formatHbarWithUsd(formatPriceForDisplay(row.amount || "0"), usdRate)}</span>
-                        </li>
-                      );
-                    })}
+                    {asBuyer.map((row) => (
+                      <PurchaseCard key={row.id} row={row} usdRate={usdRate} counterpartyLabel="Seller" />
+                    ))}
                   </ul>
                 </div>
               )}
@@ -100,23 +148,9 @@ export default function PurchasesPage() {
               ) : (
                 <div className="glass-card overflow-hidden rounded-xl">
                   <ul className="divide-y divide-white/5">
-                    {asSeller.map((row) => {
-                      const targetId = row.listingId || row.auctionId;
-                      const title = row.listing?.title || row.auction?.title || targetId || row.id;
-                      return (
-                        <li key={row.id} className="p-3 flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <Link href={targetId ? `/listing/${encodeURIComponent(targetId)}` : "/marketplace"} className="text-white hover:text-chrome font-medium truncate block">
-                              {title}
-                            </Link>
-                            <p className="text-xs text-silver mt-0.5">
-                              {formatListingDate(row.createdAt)} · Status: {row.listing?.status || row.auction?.status || "N/A"}
-                            </p>
-                          </div>
-                          <span className="text-chrome shrink-0">{formatHbarWithUsd(formatPriceForDisplay(row.amount || "0"), usdRate)}</span>
-                        </li>
-                      );
-                    })}
+                    {asSeller.map((row) => (
+                      <PurchaseCard key={row.id} row={row} usdRate={usdRate} counterpartyLabel="Buyer" />
+                    ))}
                   </ul>
                 </div>
               )}
@@ -128,4 +162,3 @@ export default function PurchasesPage() {
     </main>
   );
 }
-

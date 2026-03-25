@@ -19,6 +19,7 @@ import { useHashpackWallet } from "../../../lib/hashpackWallet";
 import { ConnectWalletButton } from "../../../components/ConnectWalletButton";
 import { activeHederaChain } from "../../../lib/hederaChains";
 import { readListingCompat } from "../../../lib/marketplaceRead";
+import { getTransactionExplorerUrl } from "../../../lib/explorer";
 
 import { getApiUrl } from "../../../lib/apiUrl";
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024;
@@ -63,6 +64,7 @@ type Listing = {
   originalPapers?: string | null;
   imageUrl?: string | null;
   mediaUrls?: string[];
+  txHash?: string | null;
   createdAt?: string;
 };
 
@@ -849,6 +851,34 @@ export default function ListingPage() {
               <p className="text-silver text-sm">You cannot buy your own listing.</p>
             </div>
           )}
+          {listing && onChainListing !== undefined && Number(onChainListing.status) === 0 && listing.status === "LISTED" && (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 space-y-2">
+              <p className="text-sm font-medium text-amber-200">Not confirmed on-chain</p>
+              <p className="text-xs text-silver">
+                This listing does not exist on the smart contract yet. The creation transaction may not have completed successfully.
+              </p>
+              {isSeller && (
+                <p className="text-xs text-silver">
+                  Try deleting this listing and creating a new one. Make sure to approve the transaction in your wallet.
+                </p>
+              )}
+            </div>
+          )}
+
+          {listing?.txHash && (
+            <div className="glass-card p-4 rounded-lg border border-white/10">
+              <h3 className="text-white font-medium mb-2">Transaction</h3>
+              <div className="text-sm text-silver space-y-1">
+                <p className="font-mono text-xs text-silver/80 break-all">{listing.txHash}</p>
+                {(() => { const url = getTransactionExplorerUrl(listing.txHash, chainId); return url ? (
+                  <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-chrome hover:text-white underline">
+                    View on HashScan
+                  </a>
+                ) : null; })()}
+              </div>
+            </div>
+          )}
+
           <div className="glass-card p-4 rounded-lg border border-white/10">
             <h3 className="text-white font-medium mb-2">Security</h3>
             <ul className="text-sm text-silver space-y-1">
