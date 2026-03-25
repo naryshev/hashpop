@@ -9,6 +9,9 @@ import { formatPriceForDisplay } from "../../lib/formatPrice";
 import { formatListingDate } from "../../lib/formatDate";
 import { TransactionProgress } from "../../components/TransactionProgress";
 import { getApiUrl } from "../../lib/apiUrl";
+import { AddressDisplay } from "../../components/AddressDisplay";
+import { getTransactionExplorerUrl } from "../../lib/explorer";
+import { activeHederaChain } from "../../lib/hederaChains";
 
 type PurchaseRow = {
   id: string;
@@ -17,6 +20,7 @@ type PurchaseRow = {
   buyer: string;
   seller: string;
   amount: string;
+  txHash?: string | null;
   createdAt: string;
   role: "buyer" | "seller";
   listing?: { id: string; title?: string | null; status?: string; imageUrl?: string | null } | null;

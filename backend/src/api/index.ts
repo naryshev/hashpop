@@ -175,6 +175,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     buyer: string;
     seller: string;
     amount: string;
+    txHash?: string;
   }): Promise<void> {
     const listingId = normalizeListingId(params.listingId);
     const buyer = normalizeWalletAddress(params.buyer);
@@ -202,6 +203,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         buyer,
         seller,
         amount,
+        ...(params.txHash && { txHash: params.txHash }),
       },
     });
   }
@@ -424,10 +426,12 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
 
     const upsertFallbackListing = async () => {
       if (!canFallbackUpsert) return null;
+      const txHashStr = typeof txHash === "string" && txHash.trim() ? txHash.trim() : null;
       const fallbackUpdateData: any = {
         status: "LISTED",
         price: fallbackPrice!,
         requireEscrow: requireEscrowBool,
+        ...(txHashStr != null && { txHash: txHashStr }),
         ...(imageUrlStr != null && { imageUrl: imageUrlStr }),
         ...(mediaList.length > 0 && { mediaUrls: mediaList }),
         ...(titleStr != null && { title: titleStr }),
@@ -443,6 +447,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         price: fallbackPrice!,
         status: "LISTED",
         requireEscrow: requireEscrowBool,
+        ...(txHashStr != null && { txHash: txHashStr }),
         ...(imageUrlStr != null && { imageUrl: imageUrlStr }),
         ...(mediaList.length > 0 && { mediaUrls: mediaList }),
         ...(titleStr != null && { title: titleStr }),
@@ -496,6 +501,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           status: "LISTED",
           price: priceHbar,
           requireEscrow: requireEscrowBool,
+          txHash: txHash,
           ...(imageUrlStr != null && { imageUrl: imageUrlStr }),
           ...(mediaList.length > 0 && { mediaUrls: mediaList }),
           ...(titleStr != null && { title: titleStr }),
@@ -511,6 +517,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           price: priceHbar,
           status: "LISTED",
           requireEscrow: requireEscrowBool,
+          txHash: txHash,
           ...(imageUrlStr != null && { imageUrl: imageUrlStr }),
           ...(mediaList.length > 0 && { mediaUrls: mediaList }),
           ...(titleStr != null && { title: titleStr }),
@@ -717,6 +724,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           buyer,
           seller,
           amount,
+          txHash,
         });
 
         // Read on-chain status to determine if escrow (LOCKED=2) or direct sale (COMPLETED=3)
@@ -1256,6 +1264,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           buyer: s.buyer,
           seller: s.seller,
           amount: toHbarForClient(s.amount),
+          txHash: s.txHash ?? null,
           createdAt: s.createdAt,
           role: s.buyer.toLowerCase() === addrLower ? "buyer" : "seller",
           listing: s.listing

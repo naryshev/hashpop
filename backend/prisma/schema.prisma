@@ -14,6 +14,7 @@ model Listing {
   price              String
   status             String
   requireEscrow      Boolean  @default(false)
+  txHash             String?
   trackingNumber     String?
   trackingCarrier    String?
   shippedAt          DateTime?
@@ -72,6 +73,7 @@ model Sale {
   buyer     String
   seller    String
   amount    String
+  txHash    String?
   createdAt DateTime @default(now())
   listing   Listing? @relation(fields: [listingId], references: [id])
   auction   Auction? @relation(fields: [auctionId], references: [id])
