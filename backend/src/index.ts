@@ -39,7 +39,9 @@ const pool = new pg.Pool({
   connectionString,
   ssl: isCloudDatabase ? { rejectUnauthorized: false } : undefined,
 });
-const adapter = new PrismaPg(pool);
+// Cast: @prisma/adapter-pg bundles its own @types/pg which conflicts with the
+// top-level pg package types. The runtime values are fully compatible.
+const adapter = new PrismaPg(pool as any);
 const prisma = new PrismaClient({ adapter });
 
 // Allow multiple origins: local dev (localhost, 127.0.0.1, LAN IPs like 192.168.x.x) and Vercel.
