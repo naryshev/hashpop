@@ -157,23 +157,21 @@ async function handleEvent(event: any, prisma: PrismaClient, log: Logger) {
     case "ItemListed": {
       const listingId = normalizeListingId(event.listingId);
       const seller = (event.seller || "").toLowerCase();
-      const existing = await prisma.listing.findUnique({ where: { id: listingId } });
-      if (!existing) {
-        await prisma.listing.create({
-          data: {
-            id: listingId,
-            seller,
-            price: weiToHbar(event.price),
-            status: "LISTED",
-          },
-        });
-        log.info({ listingId, seller }, "Listing indexed");
-      } else {
-        await prisma.listing.update({
-          where: { id: listingId },
-          data: { status: "LISTED" },
-        });
-      }
+      await prisma.listing.upsert({
+        where: { id: listingId },
+        create: {
+          id: listingId,
+          seller,
+          price: weiToHbar(event.price),
+          status: "LISTED",
+          onChainConfirmed: true,
+        },
+        update: {
+          status: "LISTED",
+          onChainConfirmed: true,
+        },
+      });
+      log.info({ listingId, seller }, "Listing indexed");
       break;
     }
 
@@ -182,28 +180,18 @@ async function handleEvent(event: any, prisma: PrismaClient, log: Logger) {
       const buyer = normalizeAddress(event.buyer);
       const seller = normalizeAddress(event.seller);
       const amount = event.price.toString();
-      const recentWindowStart = new Date(Date.now() - 5 * 60 * 1000);
-      const existing = await prisma.sale.findFirst({
-        where: {
+      const saleId = `sale-${purchListingId}-${buyer}`;
+      await prisma.sale.upsert({
+        where: { id: saleId },
+        create: {
+          id: saleId,
           listingId: purchListingId,
           buyer,
           seller,
           amount,
-          createdAt: { gte: recentWindowStart },
         },
-        select: { id: true },
+        update: {},
       });
-      if (!existing) {
-        await prisma.sale.create({
-          data: {
-            id: `sale-${Date.now()}-${purchListingId}`,
-            listingId: purchListingId,
-            buyer,
-            seller,
-            amount,
-          },
-        });
-      }
       // Check DB listing to determine if escrow or direct sale
       const dbListing = await prisma.listing.findUnique({
         where: { id: purchListingId },

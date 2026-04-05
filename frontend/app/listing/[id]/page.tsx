@@ -330,8 +330,9 @@ export default function ListingPage() {
   const isListedOnChain =
     onChainStatusNum === -1
       ? null
-      : onChainStatusNum === 1 || onChainStatusNum === 0;
+      : onChainStatusNum === 1; // 0 = not created on-chain, only 1 = active
   const isListed = listing?.status === "LISTED" && (isListedOnChain == null ? true : isListedOnChain);
+  const isUnconfirmed = listing?.status === "LISTED" && onChainListing !== undefined && Number(onChainListing.status) === 0;
   const isSellerActiveListing = listing?.status === "LISTED";
   const isLockedOnChain = onChainStatusNum === 2;
 
@@ -785,7 +786,7 @@ export default function ListingPage() {
             )}
           </nav>
           <div className="flex items-center gap-2 flex-wrap">
-            {!isListed && (
+            {!isListed && !isUnconfirmed && (
               <span className="px-2 py-0.5 rounded text-xs font-medium bg-white/10 text-silver border border-white/10">Archived</span>
             )}
           </div>
@@ -843,15 +844,21 @@ export default function ListingPage() {
               </p>
             </div>
           )}
-          {listing && !isListed && !isSeller && !(listing.status === "SOLD" && !listing.requireEscrow && listing.buyer && address && listing.buyer.toLowerCase() === address.toLowerCase()) && !(listing.status === "LOCKED" || isLockedOnChain) && (
+          {listing && !isListed && !isUnconfirmed && !isSeller && !(listing.status === "SOLD" && !listing.requireEscrow && listing.buyer && address && listing.buyer.toLowerCase() === address.toLowerCase()) && !(listing.status === "LOCKED" || isLockedOnChain) && (
             <div className="glass-card p-4 rounded-lg border border-white/10">
               <p className="text-silver text-sm">This listing is no longer available for purchase.</p>
             </div>
           )}
-          {listing && isListed && isSeller && (
-            <div className="glass-card p-4 rounded-lg border border-white/10">
-              <p className="text-silver text-sm">You cannot buy your own listing.</p>
-            </div>
+          {listing && (isListed || isUnconfirmed) && isSeller && (
+            <div className="glass-card p-4 rounded-lg border border-white\/10 space-y-3">
+              <div>
+                <p className="text-xs text-silver uppercase tracking-wider mb-1">Your listing price<\/p>
+                <p className="text-xl font-bold text-white">
+                  {formatHbarWithUsd(apiPriceHbar ?? formatPriceForDisplay(listing.price || "0"), usdRate)}
+                <\/p>
+              <\/div>
+              <p className="text-silver text-sm">You cannot buy your own listing.<\/p>
+            <\/div>
           )}
           {listing && onChainListing !== undefined && Number(onChainListing.status) === 0 && listing.status === "LISTED" && (
             <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 space-y-2">
@@ -885,7 +892,11 @@ export default function ListingPage() {
             <h3 className="text-white font-medium mb-2">Security</h3>
             <ul className="text-sm text-silver space-y-1">
               <li className="flex items-center gap-2">✓ Payment via escrow</li>
-              <li className="flex items-center gap-2">✓ Ownership confirmed on-chain</li>
+              <li className="flex items-center {isUnconfirmed ? (
+                <li className="flex items-center gap-2 text-amber-300\/80">✗ Ownership not yet confirmed on-chain<\/li>
+              ) : (
+                <li className="flex items-center gap-2">✓ Ownership confirmed on-chain<\/li>
+              )}
               <li className="flex items-center gap-2 text-rose-300/80">✗ No legal obligation to accept returns for private sales</li>
             </ul>
           </div>

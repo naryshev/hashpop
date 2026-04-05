@@ -275,7 +275,7 @@ function MessagesPageContent() {
                 type="text"
                 value={composeAddress}
                 onChange={(e) => setComposeAddress(e.target.value)}
-                placeholder="Recipient wallet address (0x...)"
+                placeholder="Recipient wallet address (0x...) or account ID (0.0.XXXXX)"
                 className="input-frost w-full text-sm"
               />
               <textarea

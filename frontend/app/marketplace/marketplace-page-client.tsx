@@ -31,9 +31,12 @@ function normalizeListingStatus(status?: string): string {
   return String(status || "").trim().toUpperCase();
 }
 
-function getStatusBadge(status?: string): { label: string; className: string; pulseDot?: boolean } {
+function getStatusBadge(status?: string, onChainConfirmed?: boolean): { label: string; className: string; pulseDot?: boolean } {
   const normalized = normalizeListingStatus(status);
   if (normalized === "LISTED") {
+    if (onChainConfirmed === false) {
+      return { label: "PENDING", className: "bg-amber-500\/20 border-amber-400\/40 text-amber-200" };
+    }
     return {
       label: "ACTIVE",
       className:
@@ -85,6 +88,7 @@ export type ListingItem = {
   mediaUrls?: string[];
   createdAt?: string;
   status?: string;
+  onChainConfirmed?: boolean;
   itemType: "listing";
 };
 
@@ -212,12 +216,12 @@ export default function MarketplacePageClient({
                       compactHeight="160px"
                     />
                     <span
-                      className={`absolute top-2 left-2 rounded-full inline-flex items-center gap-1.5 border px-2 py-0.5 text-[10px] font-semibold ${getStatusBadge(item.status).className}`}
+                      className={`absolute top-2 left-2 rounded-full inline-flex items-center gap-1.5 border px-2 py-0.5 text-[10px] font-semibold ${getStatusBadge(item.status, item.onChainConfirmed).className}`}
                     >
-                      {getStatusBadge(item.status).pulseDot ? (
+                      {getStatusBadge(item.status, item.onChainConfirmed).pulseDot ? (
                         <span className="inline-flex h-2 w-2 rounded-full bg-green-400 animate-pulse shadow-[0_0_0_0_rgba(74,222,128,0.7)]" />
                       ) : null}
-                      {getStatusBadge(item.status).label}
+                      {getStatusBadge(item.status, item.onChainConfirmed).label}
                     </span>
                   </div>
                   <div className="p-3">
@@ -251,12 +255,12 @@ export default function MarketplacePageClient({
                       <WishlistButton itemId={item.id} itemType={item.itemType} compact />
                     </div>
                     <span
-                      className={`absolute top-2 left-2 rounded-full inline-flex items-center gap-1.5 border px-2 py-0.5 text-[10px] font-semibold ${getStatusBadge(item.status).className}`}
+                      className={`absolute top-2 left-2 rounded-full inline-flex items-center gap-1.5 border px-2 py-0.5 text-[10px] font-semibold ${getStatusBadge(item.status, item.onChainConfirmed).className}`}
                     >
-                      {getStatusBadge(item.status).pulseDot ? (
+                      {getStatusBadge(item.status, item.onChainConfirmed).pulseDot ? (
                         <span className="inline-flex h-2 w-2 rounded-full bg-green-400 animate-pulse shadow-[0_0_0_0_rgba(74,222,128,0.7)]" />
                       ) : null}
-                      {getStatusBadge(item.status).label}
+                      {getStatusBadge(item.status, item.onChainConfirmed).label}
                     </span>
                   </div>
                   <div className="p-4">

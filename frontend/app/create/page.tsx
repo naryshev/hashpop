@@ -21,7 +21,6 @@ const ALLOWED_VIDEO_TYPES = "video/mp4,video/webm,video/quicktime";
 const ALLOWED_MEDIA_TYPES = `${ALLOWED_IMAGE_TYPES},${ALLOWED_VIDEO_TYPES}`;
 
 const CONDITIONS = [
-  "Like new & unworn",
   "Like new",
   "Used",
   "Refurbished",
