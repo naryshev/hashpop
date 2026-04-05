@@ -1369,38 +1369,87 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     }
   });
 
+  router.post("/user/public-key", async (req, res) => {
+    try {
+      const { address: rawAddr, publicKey, signature } = (req.body || {}) as {
+        address?: string;
+        publicKey?: string;
+        signature?: string;
+      };
+      if (!rawAddr || !publicKey || !signature) {
+        return res.status(400).json({ error: "address, publicKey, and signature required" });
+      }
+      const addr = rawAddr.trim().toLowerCase();
+      const expectedMessage = `hashpop.pubkey:${publicKey}`;
+      let recoveredAddress: string;
+      try {
+        recoveredAddress = ethers.verifyMessage(expectedMessage, signature).toLowerCase();
+      } catch {
+        return res.status(400).json({ error: "Invalid signature" });
+      }
+      if (recoveredAddress !== addr) {
+        return res.status(403).json({ error: "Signature does not match address" });
+      }
+      await prisma.user.upsert({
+        where: { id: addr },
+        update: { publicKey },
+        create: { id: addr, address: addr, publicKey, reputationScore: 0 },
+      });
+      res.json({ success: true });
+    } catch (err) {
+      log.error({ err }, "Failed to register public key");
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  router.get("/user/:address/public-key", async (req, res) => {
+    try {
+      const addr = req.params.address?.trim().toLowerCase();
+      if (!addr) return res.status(400).json({ error: "address required" });
+      const user = await prisma.user.findFirst({ where: { address: addr } });
+      res.json({ publicKey: user?.publicKey ?? null });
+    } catch (err) {
+      log.error({ err }, "Failed to fetch public key");
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   router.post("/messages", async (req, res) => {
     try {
-      const { fromAddress, toAddress, body, listingId } = (req.body || {}) as {
+      const { fromAddress, toAddress, body, listingId, encrypted, nonce } = (req.body || {}) as {
         fromAddress?: string;
         toAddress?: string;
         body?: string;
         listingId?: string;
+        encrypted?: boolean;
+        nonce?: string;
       };
       const from = fromAddress?.trim().toLowerCase();
       const to = toAddress?.trim().toLowerCase();
       const text = typeof body === "string" ? body.trim() : "";
       if (!from || !to) return res.status(400).json({ error: "fromAddress and toAddress required" });
       if (!text) return res.status(400).json({ error: "body required" });
-      const listingInput = typeof listingId === "string" ? listingId.trim() : "";
-      const normalizedListingId = listingInput
-        ? (listingInput.startsWith("0x") && listingInput.length === 66 ? normalizeListingId(listingInput) : listingIdToBytes32(listingInput))
-        : "";
-      if (!normalizedListingId) return res.status(400).json({ error: "listingId required" });
       if (from === to) return res.status(400).json({ error: "Cannot message yourself" });
-      const listing = await prisma.listing.findUnique({ where: { id: normalizedListingId } });
-      if (!listing) return res.status(404).json({ error: "Listing not found" });
-      const seller = listing.seller.toLowerCase();
-      const isSellerBuyerThread = (from === seller && to !== seller) || (to === seller && from !== seller);
-      if (!isSellerBuyerThread) {
-        return res.status(403).json({ error: "Messages are private seller-buyer threads only" });
+
+      const listingInput = typeof listingId === "string" ? listingId.trim() : "";
+      let normalizedListingId: string | null = null;
+
+      if (listingInput) {
+        normalizedListingId = listingInput.startsWith("0x") && listingInput.length === 66
+          ? normalizeListingId(listingInput)
+          : listingIdToBytes32(listingInput);
+        const listing = await prisma.listing.findUnique({ where: { id: normalizedListingId } });
+        if (!listing) return res.status(404).json({ error: "Listing not found" });
       }
+
       const msg = await prisma.message.create({
         data: {
           fromAddress: from,
           toAddress: to,
           body: text,
           listingId: normalizedListingId,
+          encrypted: encrypted === true,
+          nonce: encrypted === true && nonce ? nonce : null,
         },
       });
       res.status(201).json({ message: msg });
@@ -1417,26 +1466,17 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       const messages = await prisma.message.findMany({
         where: {
           OR: [{ fromAddress: address }, { toAddress: address }],
-          listingId: { not: null },
         },
         orderBy: { createdAt: "desc" },
       });
-      const listingIds = Array.from(new Set(messages.map((m) => m.listingId).filter((v): v is string => !!v)));
-      const listingRows = await prisma.listing.findMany({
-        where: { id: { in: listingIds } },
-        select: { id: true, seller: true },
-      });
-      const listingSellerById = new Map(listingRows.map((l) => [l.id, l.seller.toLowerCase()]));
       const seen = new Map<string, { last: typeof messages[0]; preview: string }>();
       for (const m of messages) {
-        if (!m.listingId) continue;
-        const seller = listingSellerById.get(m.listingId);
-        if (!seller) continue;
-        const isSellerBuyerThread = (m.fromAddress === seller && m.toAddress !== seller) || (m.toAddress === seller && m.fromAddress !== seller);
-        if (!isSellerBuyerThread) continue;
         const other = m.fromAddress === address ? m.toAddress : m.fromAddress;
-        const key = `${other}-${m.listingId}`;
-        if (!seen.has(key)) seen.set(key, { last: m, preview: m.body.slice(0, 80) });
+        const key = `${other}-${m.listingId ?? ""}`;
+        if (!seen.has(key)) {
+          const preview = m.encrypted ? "[Encrypted message]" : m.body.slice(0, 80);
+          seen.set(key, { last: m, preview });
+        }
       }
       const conversations = Array.from(seen.entries()).map(([key, v]) => {
         const dash = key.indexOf("-");
@@ -1464,25 +1504,27 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       const address = (req.query.address as string)?.trim()?.toLowerCase();
       const other = (req.query.other as string)?.trim()?.toLowerCase();
       const listingIdRaw = (req.query.listingId as string)?.trim() || "";
-      const listingId = listingIdRaw
-        ? (listingIdRaw.startsWith("0x") && listingIdRaw.length === 66 ? normalizeListingId(listingIdRaw) : listingIdToBytes32(listingIdRaw))
-        : "";
       if (!address || !other) return res.status(400).json({ error: "address and other required" });
-      if (!listingId) return res.status(400).json({ error: "listingId required" });
-      const listing = await prisma.listing.findUnique({ where: { id: listingId } });
-      if (!listing) return res.status(404).json({ error: "Listing not found" });
-      const seller = listing.seller.toLowerCase();
-      const isSellerBuyerThread = (address === seller && other !== seller) || (other === seller && address !== seller);
-      if (!isSellerBuyerThread) {
-        return res.status(403).json({ error: "Only listing buyer/seller can view this thread" });
+
+      let listingId: string | null = null;
+      if (listingIdRaw) {
+        listingId = listingIdRaw.startsWith("0x") && listingIdRaw.length === 66
+          ? normalizeListingId(listingIdRaw)
+          : listingIdToBytes32(listingIdRaw);
       }
-      const where = {
+
+      const where: Record<string, unknown> = {
         OR: [
           { fromAddress: address, toAddress: other },
           { fromAddress: other, toAddress: address },
         ],
-        listingId,
       };
+      if (listingId) {
+        where.listingId = listingId;
+      } else {
+        where.listingId = null;
+      }
+
       const messages = await prisma.message.findMany({
         where,
         orderBy: { createdAt: "asc" },
