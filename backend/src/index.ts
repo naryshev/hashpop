@@ -1,10 +1,11 @@
 import "dotenv/config";
 import path from "path";
 import fs from "fs";
+import { execSync } from "child_process";
 import express from "express";
 import pino from "pino";
 import pg from "pg";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "./generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { startIndexer } from "./indexer";
 import { apiRouter } from "./api";
@@ -39,7 +40,9 @@ const pool = new pg.Pool({
   connectionString,
   ssl: isCloudDatabase ? { rejectUnauthorized: false } : undefined,
 });
-const adapter = new PrismaPg(pool);
+// Cast: @prisma/adapter-pg bundles its own @types/pg which conflicts with the
+// top-level pg package types. The runtime values are fully compatible.
+const adapter = new PrismaPg(pool as any);
 const prisma = new PrismaClient({ adapter });
 
 // Allow multiple origins: local dev (localhost, 127.0.0.1, LAN IPs like 192.168.x.x) and Vercel.
@@ -85,6 +88,19 @@ app.use("/api/relay", relayRouter(log));
 app.get("/health", (_, res) => res.json({ ok: true, timestamp: new Date().toISOString() }));
 
 const port = Number(process.env.PORT || 4000);
+
+// Auto-apply pending Prisma migrations on startup
+try {
+  log.info("Applying pending database migrations…");
+  execSync("npx prisma migrate deploy", {
+    cwd: path.join(__dirname, ".."),
+    stdio: "pipe",
+    env: { ...process.env },
+  });
+  log.info("Database migrations applied");
+} catch (err: any) {
+  log.warn({ err: err.stderr?.toString() || err.message }, "Migration failed — continuing with existing schema");
+}
 
 app.listen(port, () => {
   log.info({ port }, "Backend server started");

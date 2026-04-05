@@ -1,7 +1,8 @@
 import path from "path";
+import fs from "fs";
 import { Router } from "express";
 import multer from "multer";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "../generated/prisma/client";
 import type { Logger } from "pino";
 import { ethers } from "ethers";
 import { fetchMirrorEvents } from "../mirror";
@@ -174,6 +175,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     buyer: string;
     seller: string;
     amount: string;
+    txHash?: string;
   }): Promise<void> {
     const listingId = normalizeListingId(params.listingId);
     const buyer = normalizeWalletAddress(params.buyer);
@@ -201,6 +203,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         buyer,
         seller,
         amount,
+        ...(params.txHash && { txHash: params.txHash }),
       },
     });
   }
@@ -423,10 +426,12 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
 
     const upsertFallbackListing = async () => {
       if (!canFallbackUpsert) return null;
+      const txHashStr = typeof txHash === "string" && txHash.trim() ? txHash.trim() : null;
       const fallbackUpdateData: any = {
         status: "LISTED",
         price: fallbackPrice!,
         requireEscrow: requireEscrowBool,
+        ...(txHashStr != null && { txHash: txHashStr }),
         ...(imageUrlStr != null && { imageUrl: imageUrlStr }),
         ...(mediaList.length > 0 && { mediaUrls: mediaList }),
         ...(titleStr != null && { title: titleStr }),
@@ -442,6 +447,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         price: fallbackPrice!,
         status: "LISTED",
         requireEscrow: requireEscrowBool,
+        ...(txHashStr != null && { txHash: txHashStr }),
         ...(imageUrlStr != null && { imageUrl: imageUrlStr }),
         ...(mediaList.length > 0 && { mediaUrls: mediaList }),
         ...(titleStr != null && { title: titleStr }),
@@ -495,6 +501,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           status: "LISTED",
           price: priceHbar,
           requireEscrow: requireEscrowBool,
+          txHash: txHash,
           ...(imageUrlStr != null && { imageUrl: imageUrlStr }),
           ...(mediaList.length > 0 && { mediaUrls: mediaList }),
           ...(titleStr != null && { title: titleStr }),
@@ -510,6 +517,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           price: priceHbar,
           status: "LISTED",
           requireEscrow: requireEscrowBool,
+          txHash: txHash,
           ...(imageUrlStr != null && { imageUrl: imageUrlStr }),
           ...(mediaList.length > 0 && { mediaUrls: mediaList }),
           ...(titleStr != null && { title: titleStr }),
@@ -716,6 +724,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           buyer,
           seller,
           amount,
+          txHash,
         });
 
         // Read on-chain status to determine if escrow (LOCKED=2) or direct sale (COMPLETED=3)
@@ -1255,6 +1264,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           buyer: s.buyer,
           seller: s.seller,
           amount: toHbarForClient(s.amount),
+          txHash: s.txHash ?? null,
           createdAt: s.createdAt,
           role: s.buyer.toLowerCase() === addrLower ? "buyer" : "seller",
           listing: s.listing
@@ -1767,6 +1777,33 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       return res.json({ ok: true, deleted: result.count });
     } catch (err: any) {
       log.error({ err }, "Clear listings failed");
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.delete("/debug/clear-history", async (req, res) => {
+    try {
+      const sales = await prisma.sale.deleteMany({});
+      const bids = await prisma.bid.deleteMany({});
+      const ratings = await prisma.rating.deleteMany({});
+      const messages = await prisma.message.deleteMany({});
+      const wishlist = await prisma.wishlistItem.deleteMany({});
+      const users = await prisma.user.deleteMany({});
+
+      // Reset indexer state so it doesn't re-index old purchase events
+      const stateFile = path.join(process.cwd(), ".indexer-state.json");
+      const nowSec = Math.floor(Date.now() / 1000);
+      try {
+        fs.writeFileSync(stateFile, JSON.stringify({ lastProcessedTimestamp: nowSec, lastProcessedBlock: 999999999 }), "utf8");
+      } catch {}
+
+      log.info({ sales: sales.count, bids: bids.count, ratings: ratings.count, messages: messages.count }, "Cleared history (kept listings)");
+      return res.json({
+        ok: true,
+        cleared: { sales: sales.count, bids: bids.count, ratings: ratings.count, messages: messages.count, wishlist: wishlist.count, users: users.count },
+      });
+    } catch (err: any) {
+      log.error({ err }, "Clear history failed");
       return res.status(500).json({ error: err.message });
     }
   });

@@ -234,8 +234,31 @@ export function useHashpackContractWrite() {
             }
             const statusText = status?.toString?.() ?? "";
             if (!status && txId) {
-              // HashPack can occasionally return without immediate status even though the tx was submitted.
-              // Treat as submitted and let subsequent reads/indexer confirm final state.
+              // HashPack returned a txId but no status — verify on-chain via mirror node.
+              try {
+                const mirrorBase = network === "mainnet"
+                  ? "https://mainnet.mirrornode.hedera.com"
+                  : "https://testnet.mirrornode.hedera.com";
+                // Transaction ID format: 0.0.XXXX@seconds.nanos → needs URL encoding
+                const txIdForMirror = txId.replace("@", "-").replace(/\./g, "-");
+                // Wait briefly for consensus
+                await sleep(3000);
+                const mirrorRes = await fetch(`${mirrorBase}/api/v1/transactions/${txIdForMirror}`);
+                if (mirrorRes.ok) {
+                  const mirrorData = await mirrorRes.json() as { transactions?: { result?: string }[] };
+                  const result = mirrorData?.transactions?.[0]?.result;
+                  if (result && result !== "SUCCESS") {
+                    throw new TransactionRevertError(
+                      txId,
+                      `Transaction reverted on-chain with status: ${result}. Transaction ID: ${txId}.`
+                    );
+                  }
+                }
+              } catch (verifyErr) {
+                // If it's our own TransactionRevertError, re-throw it
+                if (verifyErr instanceof TransactionRevertError) throw verifyErr;
+                // Mirror node lookup failed — log but don't block (tx may still be valid)
+              }
               if (txId) safeSetLastHash(txId);
               await refreshAccountData().catch(() => {});
               break;
