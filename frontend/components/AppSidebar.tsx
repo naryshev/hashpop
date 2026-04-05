@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Store, LayoutDashboard, PlusSquare, Heart, MessageSquare, LifeBuoy, LogIn, UserCircle } from "lucide-react";
+import { Store, LayoutDashboard, PlusSquare, Heart, MessageSquare, LifeBuoy, LogIn, UserCircle } from "lucide-react";
 import { Sidebar, SidebarBody, SidebarLink } from "./ui/sidebar";
 import { cn } from "../lib/utils";
 import { useHashpackWallet } from "../lib/hashpackWallet";
@@ -22,7 +22,6 @@ export function AppSidebar() {
 
   const links = useMemo<NavLink[]>(
     () => [
-      { label: "Home", href: "/", icon: <Home className="h-5 w-5 flex-shrink-0" /> },
       { label: "Marketplace", href: "/marketplace", icon: <Store className="h-5 w-5 flex-shrink-0" /> },
       isConnected
         ? { label: "My Hashpop", href: "/dashboard", icon: <LayoutDashboard className="h-5 w-5 flex-shrink-0" /> }

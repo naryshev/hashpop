@@ -70,6 +70,7 @@ export function BuyButton({
   }, [idBytes]);
   const priceWei = parsePriceWei(onChainListing?.price);
   const hasPrice = priceWei > 0n;
+  const hasApiPrice = !!_price && _price !== "0";
   const isLegacyWeiListing = priceWei >= 10n ** 15n;
 
   const { send, isPending, error: writeError } = useRobustContractWrite();
@@ -163,10 +164,10 @@ export function BuyButton({
         </button>
         <button
           onClick={() => {
-            if (!hasPrice || isLegacyWeiListing || isWrongNetwork || isPending || isConfirming) return;
+            if ((!hasPrice && !hasApiPrice) || isWrongNetwork || isPending || isConfirming) return;
             void buy();
           }}
-          disabled={(!hasPrice && !chainReadFailed) || isLegacyWeiListing || isPending || isConfirming || isWrongNetwork}
+          disabled={(!hasPrice && !chainReadFailed && !hasApiPrice) || isPending || isConfirming || isWrongNetwork}
           className="btn-frost-cta w-full disabled:opacity-60"
         >
           {isPending ? "Confirm in wallet…" : "Buy Now"}

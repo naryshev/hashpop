@@ -774,11 +774,13 @@ export default function ListingPage() {
         {/* Right: details panel (Chrono24-style) */}
         <div className="min-w-0 space-y-4">
           <nav className="flex items-center gap-1 text-sm text-silver flex-wrap">
-            <Link href="/" className="hover:text-white">Home</Link>
-            <span>{">"}</span>
-            {categoryLabel && <Link href="/marketplace" className="hover:text-white">{categoryLabel}</Link>}
-            {categoryLabel && <span>{">"}</span>}
-            <span className="text-white truncate max-w-[180px]" title={displayTitle}>{displayId}</span>
+            <Link href="/marketplace" className="hover:text-white">Marketplace</Link>
+            {categoryLabel && categoryLabel !== "Marketplace" && (
+              <>
+                <span>{">"}</span>
+                <span className="text-white">{categoryLabel}</span>
+              </>
+            )}
           </nav>
           <div className="flex items-center gap-2 flex-wrap">
             {!isListed && (
