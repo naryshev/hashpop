@@ -2,7 +2,7 @@ import "./globals.css";
 import { ClientProviders } from "../components/ClientProviders";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 
 export const metadata: Metadata = {
   title: "Hashpop",
@@ -13,6 +13,7 @@ export const metadata: Metadata = {
     shortcut: "/hashpop-cart-3d.PNG",
     apple: "/hashpop-cart-3d.PNG",
   },
+  manifest: "/manifest.json",
   metadataBase: new URL("https://hashpop.io"),
   openGraph: {
     type: "website",
@@ -30,6 +31,15 @@ export const metadata: Metadata = {
     description:
       "Buy and sell on the Hedera network with Hashpop - The community marketplace.",
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
+  themeColor: "#0b111b",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
