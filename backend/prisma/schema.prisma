@@ -4,7 +4,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model Listing {
@@ -80,6 +79,7 @@ model Sale {
 model User {
   id                String   @id
   address           String   @unique
+  publicKey         String?  // X25519 public key (base64), registered on first message send
   totalSales        Int      @default(0)
   successfulCompletions Int @default(0)
   refunds           Int      @default(0)
@@ -111,6 +111,8 @@ model Message {
   toAddress   String
   body        String
   listingId   String?
+  encrypted   Boolean  @default(false)
+  nonce       String?  // base64 nonce used in NaCl box
   createdAt   DateTime @default(now())
 }
 
