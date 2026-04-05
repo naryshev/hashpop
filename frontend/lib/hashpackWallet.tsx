@@ -21,6 +21,8 @@ type HashpackWalletContextValue = {
   isConnecting: boolean;
   error: string | null;
   network: HederaNetwork;
+  /** Pre-cached WalletConnect pairing URI. Use this for synchronous deep-links in click handlers. */
+  pairingUri: string | null;
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
   refreshAccountData: () => Promise<void>;
@@ -51,20 +53,35 @@ type StoredWalletSession = {
   address?: `0x${string}`;
 };
 
+function isMobileBrowser(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
+}
+
+/**
+ * Build the HashPack deep-link URI for the given WalletConnect pairing string.
+ * On mobile, navigating to this URI will open (or prompt to install) HashPack.
+ */
+export function buildHashPackDeepLink(pairingUri: string): string {
+  return `hashpack://wc?uri=${encodeURIComponent(pairingUri)}`;
+}
+
 function openHashPackDeepLink(pairingUri: string): void {
   if (typeof window === "undefined" || !pairingUri) return;
-  // Deep links require a user gesture. If called outside a gesture context
-  // (e.g. from a resolved promise), the browser will block the navigation.
-  // Use window.open which degrades more gracefully when blocked.
-  const deeplink = `hashpack://wc?uri=${encodeURIComponent(pairingUri)}`;
+  const deeplink = buildHashPackDeepLink(pairingUri);
   try {
-    const popup = window.open(deeplink, "_self");
-    // If popup is null, the browser blocked it — silently fall through
-    // to let HashConnect's built-in extension detection handle it.
-    if (popup === null) return;
+    if (isMobileBrowser()) {
+      // location.href is the most reliable way to fire a custom-scheme deep link
+      // on mobile because it happens synchronously within the current document
+      // navigation, unlike window.open which browsers restrict post-promise.
+      window.location.href = deeplink;
+    } else {
+      // On desktop, window.open works fine and keeps the tab open.
+      const popup = window.open(deeplink, "_self");
+      if (popup === null) return;
+    }
   } catch {
-    // Custom protocol not registered — the user likely doesn't have HashPack
-    // installed as a native app, which is fine (browser extension will handle it).
+    // Custom protocol not registered — browser extension will handle it.
   }
 }
 
@@ -292,6 +309,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
   const [balanceTinybar, setBalanceTinybar] = useState<bigint | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pairingUri, setPairingUri] = useState<string | null>(null);
   const network = getNetwork();
   const connectWaitRef = useRef<((value: void | PromiseLike<void>) => void) | null>(null);
   const initPromiseRef = useRef<Promise<HashConnect | null> | null>(null);
@@ -404,9 +422,13 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
         } else {
           resetWalletState();
         }
-        // Pre-cache pairing URI so click/tap can deep-link immediately.
+        // Pre-cache pairing URI so click/tap can deep-link immediately
+        // without waiting on an async call (which browsers block for deep links).
         void getPairingUri(hc).then((uri) => {
-          if (uri) mobilePairingUriRef.current = uri;
+          if (uri && mounted) {
+            mobilePairingUriRef.current = uri;
+            setPairingUri(uri);
+          }
         });
         return hc;
       } catch (e) {
@@ -517,11 +539,12 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
       isConnecting,
       error,
       network,
+      pairingUri,
       connect,
       disconnect,
       refreshAccountData,
     }),
-    [hashconnect, address, accountId, balanceTinybar, isReady, isConnecting, error, network, connect, disconnect, refreshAccountData]
+    [hashconnect, address, accountId, balanceTinybar, isReady, isConnecting, error, network, pairingUri, connect, disconnect, refreshAccountData]
   );
 
   return <HashpackWalletContext.Provider value={value}>{children}</HashpackWalletContext.Provider>;

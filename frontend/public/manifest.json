@@ -1,0 +1,24 @@
+{
+  "name": "Hashpop",
+  "short_name": "Hashpop",
+  "description": "Buy and sell on the Hedera network with Hashpop - The community marketplace.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b111b",
+  "theme_color": "#0b111b",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/hashpop-cart-3d.PNG",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/hashpop-cart-3d.PNG",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
