@@ -1,122 +1,68 @@
 # Hashpop
 
-Hashpop is a Hedera marketplace for fixed-price sales, offers, escrow, and wallet-native checkout with HashPack.
+A decentralized marketplace built on Hedera, enabling peer-to-peer commerce with native wallet integration, on-chain escrow, and end-to-end encrypted messaging.
 
-## Stack
+## Platform Overview
 
-- `frontend/` - Next.js 14 app
-- `backend/` - Express + Prisma API and indexer
-- `contracts/` - Hardhat Solidity contracts (Marketplace, Escrow, AuctionHouse, Treasury)
+Hashpop connects buyers and sellers through a trustless, blockchain-backed trading experience. All transactions settle on-chain via smart contracts deployed to the Hedera network, with HashPack wallet serving as the primary authentication and payment layer.
 
-## Core Features
+## Key Features
 
-- Create listings with optional escrow requirement
-- Buy now flow:
-  - `requireEscrow=true`: payment locks in escrow
-  - `requireEscrow=false`: immediate seller payout minus 2% service fee
-- Offer flow with escrow/non-escrow settlement rules
-- Purchase history, messages, dashboard, ratings
-- Hedera Mirror + RPC sync
+### Marketplace
+- **Fixed-price listings** with optional escrow protection
+- **Offer system** allowing buyers to negotiate directly with sellers
+- **Auction house** with timed bidding and reserve prices
+- **2% platform fee** collected via on-chain treasury contract
 
-## Quick Start (Local)
+### Escrow & Settlement
+- Smart contract-managed escrow for buyer/seller protection
+- Immediate settlement option for trusted transactions
+- Shipping confirmation and exchange tracking
+- Dispute resolution through contract-level timeouts and refunds
 
-```bash
-npm install
-npm install --prefix frontend
-npm install --prefix backend
+### Wallet-to-Wallet Encrypted Messaging
+- End-to-end encrypted chat between any two wallets
+- X25519 ECDH key exchange with XSalsa20-Poly1305 encryption (TweetNaCl.js)
+- Deterministic keypair derivation from wallet signatures — no key storage required
+- Backend stores only ciphertext; server never sees plaintext
+- Listing-context threads and general-purpose direct messaging
+
+### Reputation & Ratings
+- On-chain verified purchase history
+- Post-sale rating system tied to completed transactions
+- Seller reputation scores based on completions, refunds, and timeouts
+
+### User Experience
+- HashPack wallet authentication (browser extension and mobile deep-link)
+- Real-time dashboard with purchase history, active listings, and analytics
+- Wishlist tracking for listings and auctions
+- Media-rich listings with image and video uploads
+- Responsive design optimized for desktop and mobile
+
+## Architecture
+
+| Layer | Technology |
+|---|---|
+| Frontend | Next.js 14, React 18, TailwindCSS |
+| Backend | Express, Prisma ORM, PostgreSQL |
+| Blockchain | Hedera (Hashgraph), Solidity smart contracts |
+| Wallet | HashPack via HashConnect / WalletConnect |
+| Encryption | TweetNaCl.js (X25519 + XSalsa20-Poly1305) |
+| Contracts | Marketplace, Escrow, AuctionHouse, Treasury (Hardhat) |
+| Indexer | Hedera Mirror Node event sync |
+
+## Project Structure
+
 ```
-
-1) Configure env files (`.env`, `frontend/.env.local`, `backend/.env`)  
-2) Compile and deploy contracts  
-3) Run migrations  
-4) Start app
-
-```bash
-npm run compile
-npm run deploy:testnet
-npm run db:migrate
-npm run dev
-```
-
-## Environment Variables
-
-### Root `.env` (deploy scripts)
-
-| Variable | Required | Notes |
-|---|---|---|
-| `HEDERA_TESTNET_OPERATOR` | Yes | Deployer private key (64 hex, no `0x`) |
-| `PRIVATE_KEY` | Optional | Backward-compatible fallback |
-| `HEDERA_TESTNET_RPC` | Yes | `https://testnet.hashio.io/api` |
-| `PLATFORM_FEE_BPS` | Optional | Contract config for fee-enabled flows |
-
-### Frontend `frontend/.env.local`
-
-| Variable | Required | Notes |
-|---|---|---|
-| `NEXT_PUBLIC_API_URL` | Yes | Backend base URL |
-| `NEXT_PUBLIC_HEDERA_RPC` | Yes | Hedera RPC URL |
-| `NEXT_PUBLIC_MARKETPLACE_ADDRESS` | Yes | Deployed contract address |
-| `NEXT_PUBLIC_ESCROW_ADDRESS` | Yes | Deployed contract address |
-| `NEXT_PUBLIC_AUCTION_HOUSE_ADDRESS` | Yes | Deployed contract address |
-| `NEXT_PUBLIC_WC_PROJECT_ID` | Yes | WalletConnect/Reown project ID |
-| `NEXT_PUBLIC_HASHPACK_EXTENSION_ONLY` | Optional | `false` recommended |
-| `NEXT_PUBLIC_APP_URL` | Optional | Public frontend URL |
-| `NEXT_PUBLIC_HBAR_USD` | Optional | Fixed HBAR/USD override |
-| `NEXT_PUBLIC_FEATURE_OFFERS` | Optional | `true/false` |
-| `NEXT_PUBLIC_FEATURE_MESSAGING_HCS_SEAM` | Optional | `true/false` |
-| `NEXT_PUBLIC_FEATURE_RATINGS` | Optional | `true/false` |
-
-### Backend `backend/.env`
-
-| Variable | Required | Notes |
-|---|---|---|
-| `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `MARKETPLACE_ADDRESS` | Yes | Deployed contract address |
-| `ESCROW_ADDRESS` | Yes | Deployed contract address |
-| `AUCTION_HOUSE_ADDRESS` | Yes | Deployed contract address |
-| `HEDERA_RPC_URL` | Yes | Hedera RPC URL |
-| `MIRROR_URL` | Yes | `https://testnet.mirrornode.hedera.com` |
-| `PORT` | Optional | Defaults to `4000` |
-| `CORS_ORIGIN` | Yes for production | Frontend URL(s), comma-separated |
-| `RELAYER_PRIVATE_KEY` | Optional | Needed for ED25519 relay flows |
-| `LOG_LEVEL` | Optional | e.g. `info` |
-| `S3_BUCKET` | Optional | S3/R2 media storage |
-| `S3_PUBLIC_URL` | Optional | Public media base URL |
-| `S3_REGION` | Optional | `us-east-1` or `auto` for R2 |
-| `S3_ACCESS_KEY_ID` | Optional | S3/R2 credential |
-| `S3_SECRET_ACCESS_KEY` | Optional | S3/R2 credential |
-| `S3_ENDPOINT` | Optional | Required for R2 endpoint |
-
-## Database Options (Backend)
-
-Any PostgreSQL provider works. Recommended:
-
-- Neon (easy serverless Postgres)
-- Supabase Postgres
-- Railway Postgres
-- Render Postgres
-- AWS RDS Postgres
-
-Use SSL-enabled URLs for hosted providers (for Neon: include `?sslmode=require`).
-
-Run Prisma:
-
-```bash
-cd backend
-npx prisma generate
-npx prisma migrate deploy
+frontend/    Next.js application
+backend/     Express API server, Prisma schema, event indexer
+contracts/   Solidity smart contracts (Hardhat)
 ```
 
 ## Deployment
 
-Use:
+See `DEPLOY.md` for production deployment instructions.
 
-- Frontend on Vercel
-- Backend on Railway/Render/Fly (long-running Express process)
-- Postgres on Neon/Supabase/Railway/etc
+## License
 
-Detailed guide: see `DEPLOY.md`.
-
-## Branding
-
-Project branding is Hashpop with a red -> orange -> blue -> green gradient aesthetic inspired by the provided logo palette.
+Proprietary. All rights reserved.
