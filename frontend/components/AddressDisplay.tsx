@@ -6,7 +6,8 @@ import { getApiUrl } from "../lib/apiUrl";
 
 function truncateEvm(address: string): string {
   if (!address || address.length < 12) return address;
-  if (address.startsWith("0x") && address.length === 42) return `${address.slice(0, 6)}…${address.slice(-4)}`;
+  if (address.startsWith("0x") && address.length === 42)
+    return `${address.slice(0, 6)}…${address.slice(-4)}`;
   return address;
 }
 
@@ -35,7 +36,9 @@ export function AddressDisplay({ address, className }: { address: string; classN
       .catch(() => setLoaded(true));
   }, [address]);
 
-  const display = accountId ?? (address && address.startsWith("0x") && address.length === 42 ? truncateEvm(address) : address);
+  const display =
+    accountId ??
+    (address && address.startsWith("0x") && address.length === 42 ? truncateEvm(address) : address);
   const title = accountId ? `${accountId} (${address})` : address;
 
   return (

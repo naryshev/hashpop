@@ -127,7 +127,11 @@ export function decodeEvents(event: any): any | null {
   }
 
   if (t0 === AUCTION_EXTENDED) {
-    return { type: "AuctionExtended", auctionId: topicAt(event, 1), newEndTime: uint256FromData(data) };
+    return {
+      type: "AuctionExtended",
+      auctionId: topicAt(event, 1),
+      newEndTime: uint256FromData(data),
+    };
   }
 
   if (t0 === AUCTION_SETTLED) {

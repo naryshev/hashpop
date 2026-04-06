@@ -11,7 +11,13 @@ type CategorySearchProps = {
   id?: string;
 };
 
-export function CategorySearch({ value, onChange, placeholder = "Search categories…", className = "", id }: CategorySearchProps) {
+export function CategorySearch({
+  value,
+  onChange,
+  placeholder = "Search categories…",
+  className = "",
+  id,
+}: CategorySearchProps) {
   const [query, setQuery] = useState(value);
   const [open, setOpen] = useState(false);
   const [highlightIndex, setHighlightIndex] = useState(0);

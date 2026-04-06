@@ -6,7 +6,10 @@ function getHashscanBase(chainId?: number): string {
   return "https://hashscan.io/testnet";
 }
 
-export function getTransactionExplorerUrl(txId: string | null | undefined, chainId?: number): string | null {
+export function getTransactionExplorerUrl(
+  txId: string | null | undefined,
+  chainId?: number,
+): string | null {
   if (!txId || txId === "submitted") return null;
   const normalized = txId.trim();
   if (!normalized) return null;

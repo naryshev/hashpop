@@ -42,7 +42,11 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function encodeFunctionData(abi: readonly unknown[], functionName: string, args?: readonly unknown[]): string {
+function encodeFunctionData(
+  abi: readonly unknown[],
+  functionName: string,
+  args?: readonly unknown[],
+): string {
   const iface = new Interface(abi as any);
   return iface.encodeFunctionData(functionName, (args ?? []) as any[]);
 }
@@ -89,10 +93,13 @@ function pickSingleNodeAccountId(sdk: any, client: any, network: "mainnet" | "te
 }
 
 class TransactionRevertError extends Error {
-  constructor(public readonly hash: string, message?: string) {
+  constructor(
+    public readonly hash: string,
+    message?: string,
+  ) {
     super(
       message ||
-        `Transaction failed on-chain. Transaction ID: ${hash}. This may indicate insufficient funds or invalid parameters.`
+        `Transaction failed on-chain. Transaction ID: ${hash}. This may indicate insufficient funds or invalid parameters.`,
     );
     this.name = "TransactionRevertError";
   }
@@ -135,9 +142,13 @@ export function useHashpackContractWrite() {
         safeSetError(noClientError);
         throw noClientError;
       }
-      if (!request.address || !/^0x[0-9a-fA-F]{40}$/.test(request.address) || isZeroAddress(request.address)) {
+      if (
+        !request.address ||
+        !/^0x[0-9a-fA-F]{40}$/.test(request.address) ||
+        isZeroAddress(request.address)
+      ) {
         const addrError = new Error(
-          "Contract address is not configured. Set deployed contract addresses in frontend/.env.local (NEXT_PUBLIC_MARKETPLACE_ADDRESS / NEXT_PUBLIC_AUCTION_HOUSE_ADDRESS / NEXT_PUBLIC_ESCROW_ADDRESS)."
+          "Contract address is not configured. Set deployed contract addresses in frontend/.env.local (NEXT_PUBLIC_MARKETPLACE_ADDRESS / NEXT_PUBLIC_AUCTION_HOUSE_ADDRESS / NEXT_PUBLIC_ESCROW_ADDRESS).",
         );
         safeSetError(addrError);
         throw addrError;
@@ -154,7 +165,11 @@ export function useHashpackContractWrite() {
           try {
             if (attempt > 0) await sleep(calculateBackoffDelay(attempt - 1));
             const sdk = await import("@hashgraph/sdk");
-            const functionData = encodeFunctionData(request.abi, request.functionName, request.args);
+            const functionData = encodeFunctionData(
+              request.abi,
+              request.functionName,
+              request.args,
+            );
             const accountObj = sdk.AccountId.fromString(accountId);
             const txIdObj = sdk.TransactionId.generate(accountObj);
             const contractId = sdk.ContractId.fromSolidityAddress(request.address.slice(2));
@@ -181,33 +196,34 @@ export function useHashpackContractWrite() {
               const singleNode = pickSingleNodeAccountId(sdk, freezeClient, network);
               (tx as any).setNodeAccountIds([singleNode]);
             }
-            if (freezeClient && typeof (tx as any).isFrozen === "function" && !(tx as any).isFrozen()) {
+            if (
+              freezeClient &&
+              typeof (tx as any).isFrozen === "function" &&
+              !(tx as any).isFrozen()
+            ) {
               tx.freezeWith(freezeClient);
             }
             let receipt: any;
             if (!isPayableRequest && signer && typeof signer.call === "function") {
               receipt = await signer.call(tx as any);
-              txId =
-                tx.transactionId?.toString?.() ??
-                receipt?.transactionId?.toString?.() ??
-                txId;
-            } else if (isPayableRequest && signer && typeof signer.signTransaction === "function" && freezeClient) {
+              txId = tx.transactionId?.toString?.() ?? receipt?.transactionId?.toString?.() ?? txId;
+            } else if (
+              isPayableRequest &&
+              signer &&
+              typeof signer.signTransaction === "function" &&
+              freezeClient
+            ) {
               // For payable calls, sign with HashPack then execute via Hedera client.
               // This avoids WalletConnect protobuf payload issues and preserves msg.value.
               const signedTx = await signer.signTransaction(tx as any);
               const txResponse = await (signedTx as any).execute(freezeClient);
               txId =
-                txResponse?.transactionId?.toString?.() ??
-                tx.transactionId?.toString?.() ??
-                txId;
+                txResponse?.transactionId?.toString?.() ?? tx.transactionId?.toString?.() ?? txId;
               receipt = await txResponse.getReceipt(freezeClient);
             } else {
               // Fallback for older HashConnect behavior
               receipt = await (hashconnect as any).sendTransaction(accountObj as any, tx as any);
-              txId =
-                tx.transactionId?.toString?.() ??
-                receipt?.transactionId?.toString?.() ??
-                txId;
+              txId = tx.transactionId?.toString?.() ?? receipt?.transactionId?.toString?.() ?? txId;
             }
             let status = receipt?.status;
             // Some wallet paths can return a transaction response-like object.
@@ -236,21 +252,24 @@ export function useHashpackContractWrite() {
             if (!status && txId) {
               // HashPack returned a txId but no status — verify on-chain via mirror node.
               try {
-                const mirrorBase = network === "mainnet"
-                  ? "https://mainnet.mirrornode.hedera.com"
-                  : "https://testnet.mirrornode.hedera.com";
+                const mirrorBase =
+                  network === "mainnet"
+                    ? "https://mainnet.mirrornode.hedera.com"
+                    : "https://testnet.mirrornode.hedera.com";
                 // Transaction ID format: 0.0.XXXX@seconds.nanos → needs URL encoding
                 const txIdForMirror = txId.replace("@", "-").replace(/\./g, "-");
                 // Wait briefly for consensus
                 await sleep(3000);
                 const mirrorRes = await fetch(`${mirrorBase}/api/v1/transactions/${txIdForMirror}`);
                 if (mirrorRes.ok) {
-                  const mirrorData = await mirrorRes.json() as { transactions?: { result?: string }[] };
+                  const mirrorData = (await mirrorRes.json()) as {
+                    transactions?: { result?: string }[];
+                  };
                   const result = mirrorData?.transactions?.[0]?.result;
                   if (result && result !== "SUCCESS") {
                     throw new TransactionRevertError(
                       txId,
-                      `Transaction reverted on-chain with status: ${result}. Transaction ID: ${txId}.`
+                      `Transaction reverted on-chain with status: ${result}. Transaction ID: ${txId}.`,
                     );
                   }
                 }
@@ -266,7 +285,7 @@ export function useHashpackContractWrite() {
             if (!status || statusText !== sdk.Status.Success.toString()) {
               throw new TransactionRevertError(
                 txId || "unknown",
-                `Transaction failed with Hedera status ${statusText || "UNKNOWN"}.${txId ? ` Transaction ID: ${txId}.` : ""}`
+                `Transaction failed with Hedera status ${statusText || "UNKNOWN"}.${txId ? ` Transaction ID: ${txId}.` : ""}`,
               );
             }
             if (txId) safeSetLastHash(txId);
@@ -294,9 +313,8 @@ export function useHashpackContractWrite() {
         safeSetPending(false);
       }
     },
-    [accountId, hashconnect, isConnected, network, refreshAccountData]
+    [accountId, hashconnect, isConnected, network, refreshAccountData],
   );
 
   return { send, isPending, error, lastHash };
 }
-

@@ -16,7 +16,7 @@ function normalizeAddress(addr: string): `0x${string}` {
 
 export async function fetchItemListedLogsFromRpc(
   marketplaceAddress: string,
-  log?: Logger
+  log?: Logger,
 ): Promise<any[]> {
   if (!RPC_URL) return [];
 
@@ -26,9 +26,7 @@ export async function fetchItemListedLogsFromRpc(
     if (toBlockNum == null || toBlockNum < 0) return [];
 
     const fromBlock =
-      lastProcessedBlock > 0
-        ? lastProcessedBlock + 1
-        : Math.max(0, toBlockNum - BLOCK_CHUNK);
+      lastProcessedBlock > 0 ? lastProcessedBlock + 1 : Math.max(0, toBlockNum - BLOCK_CHUNK);
 
     const address = normalizeAddress(marketplaceAddress);
     const logs = await provider.getLogs({
@@ -40,14 +38,19 @@ export async function fetchItemListedLogsFromRpc(
 
     return Array.isArray(logs) ? logs : [];
   } catch (err: unknown) {
-    const msg = err && typeof err === "object" && "shortMessage" in err
-      ? (err as { shortMessage?: string }).shortMessage
-      : err instanceof Error
-        ? err.message
-        : "RPC request failed";
-    const isRetryable = typeof msg === "string" && (
-      msg.includes("504") || msg.includes("502") || msg.includes("timeout") || msg.includes("TIMEOUT") || msg.includes("Bad Gateway")
-    );
+    const msg =
+      err && typeof err === "object" && "shortMessage" in err
+        ? (err as { shortMessage?: string }).shortMessage
+        : err instanceof Error
+          ? err.message
+          : "RPC request failed";
+    const isRetryable =
+      typeof msg === "string" &&
+      (msg.includes("504") ||
+        msg.includes("502") ||
+        msg.includes("timeout") ||
+        msg.includes("TIMEOUT") ||
+        msg.includes("Bad Gateway"));
     if (log) {
       log[isRetryable ? "warn" : "error"]({ err: msg }, "RPC getLogs failed, skipping this cycle");
     } else {

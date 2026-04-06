@@ -39,7 +39,11 @@ function ContractRow({ contract }: { contract: ContractInfo }) {
   const handleUnpause = async () => {
     setStatus(null);
     try {
-      const txId = await send({ address: contract.address, abi: pausableAdminAbi, functionName: "unpause" });
+      const txId = await send({
+        address: contract.address,
+        abi: pausableAdminAbi,
+        functionName: "unpause",
+      });
       setStatus(`✓ Unpaused. Tx: ${txId}`);
       setPaused(false);
     } catch (e) {
@@ -71,7 +75,9 @@ function ContractRow({ contract }: { contract: ContractInfo }) {
       )}
 
       {status && (
-        <p className={`text-sm break-all ${status.startsWith("✓") ? "text-emerald-400" : "text-rose-400"}`}>
+        <p
+          className={`text-sm break-all ${status.startsWith("✓") ? "text-emerald-400" : "text-rose-400"}`}
+        >
           {status}
         </p>
       )}

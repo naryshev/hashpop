@@ -2,7 +2,8 @@ import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
-const connectionString = process.env.DATABASE_URL || "postgres://hedera:hedera@localhost:5432/marketplace";
+const connectionString =
+  process.env.DATABASE_URL || "postgres://hedera:hedera@localhost:5432/marketplace";
 const adapter = new PrismaPg({ connectionString });
 const prisma = new PrismaClient({ adapter });
 
@@ -15,7 +16,9 @@ async function main() {
   await prisma.wishlistItem.deleteMany({});
   await prisma.listing.deleteMany({});
   await prisma.auction.deleteMany({});
-  console.log("Marketplace wiped (listings, auctions, bids, sales, wishlist). Add listings manually.");
+  console.log(
+    "Marketplace wiped (listings, auctions, bids, sales, wishlist). Add listings manually.",
+  );
 }
 
 main()

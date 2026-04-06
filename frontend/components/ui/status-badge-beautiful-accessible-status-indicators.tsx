@@ -45,7 +45,8 @@ const STATUS_MAP: Record<StatusType, StatusConfig> = {
   },
   default: {
     icon: MinusCircle,
-    classNames: "bg-secondary text-secondary-foreground border-secondary-border hover:bg-secondary/80",
+    classNames:
+      "bg-secondary text-secondary-foreground border-secondary-border hover:bg-secondary/80",
     role: "none",
   },
 };
@@ -57,7 +58,12 @@ export interface StatusBadgeProps {
   hideIcon?: boolean;
 }
 
-export const StatusBadge: React.FC<StatusBadgeProps> = ({ children, status, className, hideIcon = false }) => {
+export const StatusBadge: React.FC<StatusBadgeProps> = ({
+  children,
+  status,
+  className,
+  hideIcon = false,
+}) => {
   const config = useMemo(() => STATUS_MAP[status] || STATUS_MAP.default, [status]);
   const IconComponent = config.icon;
 
@@ -66,7 +72,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ children, status, clas
       className={cn(
         "flex items-center gap-1 font-medium text-xs h-5 px-2 py-0 border transition-all duration-200 cursor-default",
         config.classNames,
-        className
+        className,
       )}
       role={config.role}
       aria-live={config.role === "alert" ? "assertive" : "polite"}

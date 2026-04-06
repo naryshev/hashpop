@@ -2,7 +2,9 @@ import { getApiUrl } from "../lib/apiUrl";
 import HomePageClient, { type ListingRecord } from "./home-page-client";
 
 function normalizeListingStatus(status?: string): string {
-  return String(status || "").trim().toUpperCase();
+  return String(status || "")
+    .trim()
+    .toUpperCase();
 }
 
 function isActiveStatus(status?: string): boolean {
@@ -13,10 +15,12 @@ async function loadInitialListings(): Promise<{ listings: ListingRecord[]; error
   try {
     const res = await fetch(`${getApiUrl()}/api/listings`, { cache: "no-store" });
     if (!res.ok) {
-      const body = await res.json().catch(() => ({} as { error?: string }));
+      const body = await res.json().catch(() => ({}) as { error?: string });
       return {
         listings: [],
-        error: body?.error || (res.status === 503 ? "Backend or database unavailable." : "Failed to load listings."),
+        error:
+          body?.error ||
+          (res.status === 503 ? "Backend or database unavailable." : "Failed to load listings."),
       };
     }
     const data = (await res.json()) as { listings?: ListingRecord[] };
@@ -26,7 +30,10 @@ async function loadInitialListings(): Promise<{ listings: ListingRecord[]; error
         const aActive = isActiveStatus(a.status);
         const bActive = isActiveStatus(b.status);
         if (aActive !== bActive) return aActive ? -1 : 1;
-        return new Date((b.createdAt as string) || 0).getTime() - new Date((a.createdAt as string) || 0).getTime();
+        return (
+          new Date((b.createdAt as string) || 0).getTime() -
+          new Date((a.createdAt as string) || 0).getTime()
+        );
       })
       .slice(0, 8);
     return { listings: sorted, error: null };

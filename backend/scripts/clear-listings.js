@@ -24,7 +24,7 @@ async function main() {
 
   console.log("Marketplace wiped:");
   console.log(
-    `  ${listings.count} listing(s), ${auctions.count} auction(s), ${bids.count} bid(s), ${sales.count} sale(s), ${wishlist.count} wishlist item(s)`
+    `  ${listings.count} listing(s), ${auctions.count} auction(s), ${bids.count} bid(s), ${sales.count} sale(s), ${wishlist.count} wishlist item(s)`,
   );
 
   const nowSec = Math.floor(Date.now() / 1000);

@@ -42,10 +42,13 @@ export function ContractApprovalModal({
 }: ContractApprovalModalProps) {
   if (!open) return null;
 
-  const dAppName = typeof window !== "undefined" && process.env.NEXT_PUBLIC_APP_URL
-    ? new URL(process.env.NEXT_PUBLIC_APP_URL).hostname
-    : "Marketplace";
-  const dAppOrigin = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== "undefined" ? window.location.origin : "");
+  const dAppName =
+    typeof window !== "undefined" && process.env.NEXT_PUBLIC_APP_URL
+      ? new URL(process.env.NEXT_PUBLIC_APP_URL).hostname
+      : "Marketplace";
+  const dAppOrigin =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (typeof window !== "undefined" ? window.location.origin : "");
 
   return (
     <div
@@ -70,31 +73,43 @@ export function ContractApprovalModal({
           aria-label="Close"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
           </svg>
         </button>
         {/* Icon / branding */}
         <div className="flex justify-center pt-8 pb-2">
           <div className="w-16 h-16 rounded-full border-2 border-amber-500/70 bg-black flex items-center justify-center">
-            <span className="text-2xl text-amber-400" aria-hidden>⚡</span>
+            <span className="text-2xl text-amber-400" aria-hidden>
+              ⚡
+            </span>
           </div>
         </div>
 
-        <h2 id="contract-approval-title" className="text-center text-xl font-bold text-white px-4 pb-4">
+        <h2
+          id="contract-approval-title"
+          className="text-center text-xl font-bold text-white px-4 pb-4"
+        >
           Execute Smart Contract
         </h2>
 
         <div className="px-5 pb-2 space-y-3 text-sm">
           <p className="text-white/90">
-            {dAppName} ({dAppOrigin}) would like you to execute a smart contract with your connected account.
+            {dAppName} ({dAppOrigin}) would like you to execute a smart contract with your connected
+            account.
             {actionLabel && actionLabel !== "Execute Smart Contract" && (
               <span className="block mt-1 text-zinc-400">Action: {actionLabel}</span>
             )}
           </p>
 
           <p className="text-red-400 text-xs leading-relaxed">
-            Please be aware there is significant risk using smart contracts from places that you do not trust. Always
-            ensure you are interacting with a reputable source when agreeing to smart contracts.
+            Please be aware there is significant risk using smart contracts from places that you do
+            not trust. Always ensure you are interacting with a reputable source when agreeing to
+            smart contracts.
           </p>
 
           <div className="rounded-lg bg-white/5 border border-white/10 p-3 space-y-1.5 text-white/90">

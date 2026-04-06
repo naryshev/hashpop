@@ -11,7 +11,8 @@ import fs from "fs";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
-const connectionString = process.env.DATABASE_URL || "postgres://hedera:hedera@localhost:5432/marketplace";
+const connectionString =
+  process.env.DATABASE_URL || "postgres://hedera:hedera@localhost:5432/marketplace";
 const adapter = new PrismaPg({ connectionString });
 const prisma = new PrismaClient({ adapter });
 
@@ -24,7 +25,9 @@ async function main() {
   const listings = await prisma.listing.deleteMany({});
   const auctions = await prisma.auction.deleteMany({});
   console.log("Marketplace wiped:");
-  console.log(`  ${listings.count} listing(s), ${auctions.count} auction(s), ${bids.count} bid(s), ${sales.count} sale(s), ${wishlist.count} wishlist item(s)`);
+  console.log(
+    `  ${listings.count} listing(s), ${auctions.count} auction(s), ${bids.count} bid(s), ${sales.count} sale(s), ${wishlist.count} wishlist item(s)`,
+  );
 
   const nowSec = Math.floor(Date.now() / 1000);
   const state = { lastProcessedTimestamp: nowSec, lastProcessedBlock: 999999999 };

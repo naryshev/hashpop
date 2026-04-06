@@ -28,14 +28,22 @@ function formatListingId(id: string): string {
 }
 
 function normalizeListingStatus(status?: string): string {
-  return String(status || "").trim().toUpperCase();
+  return String(status || "")
+    .trim()
+    .toUpperCase();
 }
 
-function getStatusBadge(status?: string, onChainConfirmed?: boolean): { label: string; className: string; pulseDot?: boolean } {
+function getStatusBadge(
+  status?: string,
+  onChainConfirmed?: boolean,
+): { label: string; className: string; pulseDot?: boolean } {
   const normalized = normalizeListingStatus(status);
   if (normalized === "LISTED") {
     if (onChainConfirmed === false) {
-      return { label: "PENDING", className: "bg-amber-500\/20 border-amber-400\/40 text-amber-200" };
+      return {
+        label: "PENDING",
+        className: "bg-amber-500\/20 border-amber-400\/40 text-amber-200",
+      };
     }
     return {
       label: "ACTIVE",
@@ -115,7 +123,7 @@ export default function MarketplacePageClient({
     if (categoryQuery) {
       const normalizedCategory = categoryQuery.toLowerCase();
       const strict = items.filter(
-        (item) => canonicalizeCategory(item.category ?? "").toLowerCase() === normalizedCategory
+        (item) => canonicalizeCategory(item.category ?? "").toLowerCase() === normalizedCategory,
       );
       if (strict.length > 0) {
         categoryMatched = strict;
@@ -173,7 +181,10 @@ export default function MarketplacePageClient({
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <h1 className="text-xl sm:text-2xl font-bold text-white">Marketplace</h1>
-            <StatusBadge status={isConnected ? "success" : "error"} className="h-6 px-2.5 text-[11px]">
+            <StatusBadge
+              status={isConnected ? "success" : "error"}
+              className="h-6 px-2.5 text-[11px]"
+            >
               {isConnected ? "Authenticated" : "Connect"}
             </StatusBadge>
           </div>
@@ -183,7 +194,8 @@ export default function MarketplacePageClient({
         </div>
         {listingsError ? (
           <p className="text-amber-400/90 text-sm">
-            {listingsError} Ensure the backend is running and PostgreSQL is up (e.g. <code className="text-chrome">docker compose up -d db</code>).
+            {listingsError} Ensure the backend is running and PostgreSQL is up (e.g.{" "}
+            <code className="text-chrome">docker compose up -d db</code>).
           </p>
         ) : filteredItems.length === 0 ? (
           <p className="text-silver">

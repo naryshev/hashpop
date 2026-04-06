@@ -9,8 +9,10 @@ dotenv.config();
 
 async function main() {
   const escrowAddr = process.env.ESCROW_ADDRESS || "0x55CF5adb83667Ced186aadfEA6b110F5de34276b";
-  const marketplaceAddr = process.env.MARKETPLACE_ADDRESS || "0x36154aD65eA94f6A7C2E3F9347f665917c2D49B0";
-  const auctionHouseAddr = process.env.AUCTION_HOUSE_ADDRESS || "0x28D7Ef2D060e0708fBa0313652a54D9Df3c25Be6";
+  const marketplaceAddr =
+    process.env.MARKETPLACE_ADDRESS || "0x36154aD65eA94f6A7C2E3F9347f665917c2D49B0";
+  const auctionHouseAddr =
+    process.env.AUCTION_HOUSE_ADDRESS || "0x28D7Ef2D060e0708fBa0313652a54D9Df3c25Be6";
 
   const escrow = await ethers.getContractAt("Escrow", escrowAddr);
   console.log("Granting Escrow MARKETPLACE_ROLE to Marketplace and AuctionHouse...");

@@ -13,10 +13,7 @@ export interface CompressOptions {
 /**
  * Compress an image file before upload to stay under size limit and speed up uploads.
  */
-export async function compressImage(
-  file: File,
-  options: CompressOptions = {}
-): Promise<File> {
+export async function compressImage(file: File, options: CompressOptions = {}): Promise<File> {
   const opts = {
     maxSizeMB: options.maxSizeMB ?? MAX_SIZE_MB,
     maxWidthOrHeight: options.maxWidthOrHeight ?? MAX_WIDTH_OR_HEIGHT,

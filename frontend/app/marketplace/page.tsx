@@ -3,21 +3,28 @@ import { getApiUrl } from "../../lib/apiUrl";
 import MarketplacePageClient, { type ListingItem } from "./marketplace-page-client";
 
 function normalizeListingStatus(status?: string): string {
-  return String(status || "").trim().toUpperCase();
+  return String(status || "")
+    .trim()
+    .toUpperCase();
 }
 
 function isActiveStatus(status?: string): boolean {
   return normalizeListingStatus(status) === "LISTED";
 }
 
-async function loadInitialMarketplaceListings(): Promise<{ items: ListingItem[]; error: string | null }> {
+async function loadInitialMarketplaceListings(): Promise<{
+  items: ListingItem[];
+  error: string | null;
+}> {
   try {
     const res = await fetch(`${getApiUrl()}/api/listings`, { cache: "no-store" });
     if (!res.ok) {
-      const body = await res.json().catch(() => ({} as { error?: string }));
+      const body = await res.json().catch(() => ({}) as { error?: string });
       return {
         items: [],
-        error: body?.error || (res.status === 503 ? "Backend or database unavailable." : "Failed to load listings."),
+        error:
+          body?.error ||
+          (res.status === 503 ? "Backend or database unavailable." : "Failed to load listings."),
       };
     }
     const data = (await res.json()) as { listings?: ListingItem[] };
@@ -26,7 +33,10 @@ async function loadInitialMarketplaceListings(): Promise<{ items: ListingItem[];
       const aActive = isActiveStatus(a.status);
       const bActive = isActiveStatus(b.status);
       if (aActive !== bActive) return aActive ? -1 : 1;
-      return new Date((b.createdAt as string) || 0).getTime() - new Date((a.createdAt as string) || 0).getTime();
+      return (
+        new Date((b.createdAt as string) || 0).getTime() -
+        new Date((a.createdAt as string) || 0).getTime()
+      );
     });
     return { items: sorted, error: null };
   } catch (e) {
@@ -37,7 +47,15 @@ async function loadInitialMarketplaceListings(): Promise<{ items: ListingItem[];
 export default async function MarketplacePage() {
   const { items, error } = await loadInitialMarketplaceListings();
   return (
-    <Suspense fallback={<main className="min-h-screen"><div className="max-w-6xl mx-auto px-4 sm:px-6 py-6"><p className="text-silver">Loading listings…</p></div></main>}>
+    <Suspense
+      fallback={
+        <main className="min-h-screen">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+            <p className="text-silver">Loading listings…</p>
+          </div>
+        </main>
+      }
+    >
       <MarketplacePageClient initialItems={items} initialError={error} />
     </Suspense>
   );

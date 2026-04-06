@@ -9,7 +9,11 @@ type ListingImageProps = {
   imageUrl?: string | null;
 };
 
-export function ListingImage({ className = "", aspectRatio = "square", imageUrl }: ListingImageProps) {
+export function ListingImage({
+  className = "",
+  aspectRatio = "square",
+  imageUrl,
+}: ListingImageProps) {
   const [imgError, setImgError] = useState(false);
   const ratioClass = aspectRatio === "video" ? "aspect-video" : "aspect-square";
   const resolvedUrl = resolveListingImageUrl(imageUrl);

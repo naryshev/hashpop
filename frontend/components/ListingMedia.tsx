@@ -74,7 +74,10 @@ export function ListingMedia({
     );
     if (cardSize) {
       return (
-        <div className={`rounded-glass-lg border border-white/10 overflow-hidden ${sizeClass} ${className}`} style={{ height: mediaHeight }}>
+        <div
+          className={`rounded-glass-lg border border-white/10 overflow-hidden ${sizeClass} ${className}`}
+          style={{ height: mediaHeight }}
+        >
           {imgEl}
         </div>
       );
@@ -105,7 +108,11 @@ export function ListingMedia({
         )}
         <button
           type="button"
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIndex((i) => (i - 1 + urls.length) % urls.length); }}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIndex((i) => (i - 1 + urls.length) % urls.length);
+          }}
           className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center text-lg font-medium"
           aria-label="Previous"
         >
@@ -113,7 +120,11 @@ export function ListingMedia({
         </button>
         <button
           type="button"
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIndex((i) => (i + 1) % urls.length); }}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIndex((i) => (i + 1) % urls.length);
+          }}
           className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center text-lg font-medium"
           aria-label="Next"
         >
@@ -128,7 +139,10 @@ export function ListingMedia({
       className={`rounded-glass-lg border border-white/10 overflow-hidden ${cardSize ? sizeClass : ""} ${className}`}
       style={heightStyle}
     >
-      <div className="flex gap-2 overflow-x-auto p-2 scroll-smooth h-full" style={{ scrollbarGutter: "stable" }}>
+      <div
+        className="flex gap-2 overflow-x-auto p-2 scroll-smooth h-full"
+        style={{ scrollbarGutter: "stable" }}
+      >
         {urls.map((url, i) =>
           failed.has(i) ? (
             <div
@@ -148,7 +162,7 @@ export function ListingMedia({
               style={{ minWidth: 280, maxHeight: 240 }}
               onError={() => setFailed((prev) => new Set([...prev, i]))}
             />
-          )
+          ),
         )}
       </div>
     </div>

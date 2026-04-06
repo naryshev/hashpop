@@ -1,11 +1,13 @@
 # Superpowers Brainstorm Notes - Hedera Marketplace Reliability
 
 ## Scope validated
+
 - Primary objective: stabilize core buy/sell flows before adding advanced modules.
 - Target environment: Hedera Testnet + HashPack (WalletConnect) with mirror-node indexing.
 - Success criterion: listing lifecycle (`create -> edit -> buy -> escrow -> complete`) works reliably under transient network failure.
 
 ## Socratic requirement checks
+
 1. How do we prevent "hanging" transactions?
    - Add receipt timeout + fallback checks; return deterministic UI states.
 2. How do we prove wallet communication is healthy?
@@ -18,6 +20,7 @@
    - Enforce RED-GREEN-REFACTOR tests for contract interactions and build checks for backend/frontend.
 
 ## Design decisions (core)
+
 - Event-driven source of truth for mutable listing data (price updates).
 - Defense-in-depth for writes:
   - retry for transient wallet/session failures,
@@ -28,9 +31,11 @@
   - performing heavy read/sync logic off-chain via indexer/mirror node.
 
 ## Risks identified
+
 - `Marketplace.authorizeEscrow()` currently cannot succeed due role context mismatch in `Escrow.setMarketplace`.
 - Mirror-node-only coverage can miss updates during outages unless fallback checks exist.
 - Existing tests had ethers v6 mismatch and were not validating current contract flows.
 
 ## Deferred optional modules (after core stability)
+
 - AI recommendations, NFT/HTS enhancements, dispute workflows, analytics dashboards.

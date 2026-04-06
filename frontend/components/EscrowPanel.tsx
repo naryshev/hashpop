@@ -108,7 +108,8 @@ export function EscrowPanel({
     setCarrierInput(trackingCarrier ?? "");
   }, [trackingCarrier]);
 
-  const isSeller = address && sellerAddress && address.toLowerCase() === sellerAddress.toLowerCase();
+  const isSeller =
+    address && sellerAddress && address.toLowerCase() === sellerAddress.toLowerCase();
   const isBuyer = address && escrow && address.toLowerCase() === escrow.buyer.toLowerCase();
 
   const confirmShipment = async () => {
@@ -192,13 +193,15 @@ export function EscrowPanel({
       <div className="px-5 pt-5 pb-3">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-white">Escrow Transaction</h3>
-          <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${
-            isSeller
-              ? "bg-amber-500/15 border-amber-400/30 text-amber-300"
-              : isBuyer
-                ? "bg-blue-500/15 border-blue-400/30 text-blue-300"
-                : "bg-white/5 border-white/10 text-silver"
-          }`}>
+          <span
+            className={`text-xs font-medium px-2.5 py-1 rounded-full border ${
+              isSeller
+                ? "bg-amber-500/15 border-amber-400/30 text-amber-300"
+                : isBuyer
+                  ? "bg-blue-500/15 border-blue-400/30 text-blue-300"
+                  : "bg-white/5 border-white/10 text-silver"
+            }`}
+          >
             {roleLabel}
           </span>
         </div>
@@ -252,7 +255,8 @@ export function EscrowPanel({
         {escrow.state === "AWAITING_SHIPMENT" && isSeller && (
           <div className="space-y-3">
             <p className="text-sm text-silver">
-              Provide proof of shipment or handoff to proceed. The buyer&apos;s payment will remain in escrow until they confirm receipt.
+              Provide proof of shipment or handoff to proceed. The buyer&apos;s payment will remain
+              in escrow until they confirm receipt.
             </p>
             {requireEscrow && (
               <div className="space-y-2">
@@ -273,10 +277,17 @@ export function EscrowPanel({
             <button
               type="button"
               onClick={() => void confirmShipment()}
-              disabled={shipPending || shipConfirming || trackingSaving || (requireEscrow && !trackingInput.trim())}
+              disabled={
+                shipPending ||
+                shipConfirming ||
+                trackingSaving ||
+                (requireEscrow && !trackingInput.trim())
+              }
               className="btn-frost-cta w-full disabled:opacity-60"
             >
-              {shipPending || shipConfirming || trackingSaving ? "Confirm in wallet…" : "Confirm Shipment / Handoff"}
+              {shipPending || shipConfirming || trackingSaving
+                ? "Confirm in wallet…"
+                : "Confirm Shipment / Handoff"}
             </button>
             {trackingSaveError && <p className="text-xs text-rose-300">{trackingSaveError}</p>}
           </div>
@@ -286,7 +297,8 @@ export function EscrowPanel({
         {escrow.state === "AWAITING_CONFIRMATION" && isBuyer && (
           <div className="space-y-3">
             <p className="text-sm text-silver">
-              The seller has shipped / handed off the item. Once you confirm receipt, funds will be released from escrow to the seller&apos;s wallet.
+              The seller has shipped / handed off the item. Once you confirm receipt, funds will be
+              released from escrow to the seller&apos;s wallet.
             </p>
             {trackingNumber && (
               <div className="rounded-lg bg-white/5 border border-white/10 px-3 py-2">
@@ -302,7 +314,9 @@ export function EscrowPanel({
               disabled={receiptPending || receiptConfirming}
               className="btn-frost-cta w-full disabled:opacity-60"
             >
-              {receiptPending || receiptConfirming ? "Confirm in wallet…" : "Confirm Receipt — Release Payment"}
+              {receiptPending || receiptConfirming
+                ? "Confirm in wallet…"
+                : "Confirm Receipt — Release Payment"}
             </button>
           </div>
         )}
@@ -311,11 +325,13 @@ export function EscrowPanel({
         {escrow.state === "AWAITING_SHIPMENT" && isBuyer && (
           <div className="space-y-2">
             <p className="text-sm text-silver">
-              Your payment is secured in escrow. Waiting for the seller to provide proof of shipment or handoff.
+              Your payment is secured in escrow. Waiting for the seller to provide proof of shipment
+              or handoff.
             </p>
             {trackingNumber && (
               <p className="text-xs text-chrome">
-                Tracking: {trackingNumber}{trackingCarrier ? ` (${trackingCarrier})` : ""}
+                Tracking: {trackingNumber}
+                {trackingCarrier ? ` (${trackingCarrier})` : ""}
               </p>
             )}
           </div>
@@ -323,11 +339,13 @@ export function EscrowPanel({
         {escrow.state === "AWAITING_CONFIRMATION" && isSeller && (
           <div className="space-y-2">
             <p className="text-sm text-silver">
-              Shipment confirmed. Waiting for the buyer to confirm receipt. Funds will be released to your wallet once confirmed.
+              Shipment confirmed. Waiting for the buyer to confirm receipt. Funds will be released
+              to your wallet once confirmed.
             </p>
             {trackingNumber && (
               <p className="text-xs text-chrome">
-                Tracking: {trackingNumber}{trackingCarrier ? ` (${trackingCarrier})` : ""}
+                Tracking: {trackingNumber}
+                {trackingCarrier ? ` (${trackingCarrier})` : ""}
               </p>
             )}
           </div>

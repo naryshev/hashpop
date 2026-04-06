@@ -4,7 +4,15 @@
  * HashPack wallet integration rebuilt from scratch around HashConnect.
  * This provider owns wallet lifecycle, account session restore, and pairing.
  */
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { MutableRefObject } from "react";
 import type { HashConnect } from "hashconnect";
 import { activeHederaChain } from "./hederaChains";
@@ -88,7 +96,8 @@ function openHashPackDeepLink(pairingUri: string): void {
 async function getPairingUri(hc: HashConnect): Promise<string | null> {
   const direct = (hc as unknown as { pairingString?: string }).pairingString;
   if (direct && direct.startsWith("wc:")) return direct;
-  const generate = (hc as unknown as { generatePairingString?: () => Promise<{ uri?: string }> }).generatePairingString;
+  const generate = (hc as unknown as { generatePairingString?: () => Promise<{ uri?: string }> })
+    .generatePairingString;
   if (typeof generate === "function") {
     const data = await generate.call(hc).catch(() => null);
     const uri = data?.uri;
@@ -141,9 +150,7 @@ function clearStalePairings(): void {
     const parsed = JSON.parse(raw) as Array<{ active?: boolean; expiry?: number }>;
     if (!Array.isArray(parsed)) return;
     const now = Math.floor(Date.now() / 1000);
-    const valid = parsed.filter(
-      (p) => p.active !== false && (p.expiry == null || p.expiry > now),
-    );
+    const valid = parsed.filter((p) => p.active !== false && (p.expiry == null || p.expiry > now));
     if (valid.length !== parsed.length) {
       window.localStorage.setItem(wcKey, JSON.stringify(valid));
     }
@@ -159,14 +166,7 @@ function clearStalePairings(): void {
 
 function clearWalletConnectorStorage(): void {
   if (typeof window === "undefined") return;
-  const patterns = [
-    "hashpop.wallet.",
-    "hashconnect",
-    "hashpack",
-    "walletconnect",
-    "wc@",
-    "wc:",
-  ];
+  const patterns = ["hashpop.wallet.", "hashconnect", "hashpack", "walletconnect", "wc@", "wc:"];
   try {
     const localKeys: string[] = [];
     for (let i = 0; i < window.localStorage.length; i += 1) {
@@ -205,11 +205,16 @@ function normalizeAccountId(raw: string | null): string | null {
   return null;
 }
 
-async function fetchMirrorAccount(accountId: string, network: HederaNetwork): Promise<{
+async function fetchMirrorAccount(
+  accountId: string,
+  network: HederaNetwork,
+): Promise<{
   evmAddress: `0x${string}` | null;
   balanceTinybar: bigint | null;
 }> {
-  const res = await fetch(`${getMirrorBase(network)}/api/v1/accounts/${encodeURIComponent(accountId)}`);
+  const res = await fetch(
+    `${getMirrorBase(network)}/api/v1/accounts/${encodeURIComponent(accountId)}`,
+  );
   if (!res.ok) {
     return { evmAddress: null, balanceTinybar: null };
   }
@@ -220,10 +225,7 @@ async function fetchMirrorAccount(accountId: string, network: HederaNetwork): Pr
   };
 
   const rawEvm = data.evm_address?.toLowerCase();
-  const evmAddress =
-    rawEvm && /^0x[0-9a-f]{40}$/.test(rawEvm)
-      ? (rawEvm as `0x${string}`)
-      : null;
+  const evmAddress = rawEvm && /^0x[0-9a-f]{40}$/.test(rawEvm) ? (rawEvm as `0x${string}`) : null;
 
   const rawBal = data.balance?.balance;
   const balanceTinybar =
@@ -247,7 +249,10 @@ function accountIdToLongZeroAddress(accountId: string): `0x${string}` {
   return `0x${(shardHex + realmHex + numHex).toLowerCase()}` as `0x${string}`;
 }
 
-function waitForPairing(connectWaitRef: MutableRefObject<((value: void | PromiseLike<void>) => void) | null>, timeoutMs: number): Promise<void> {
+function waitForPairing(
+  connectWaitRef: MutableRefObject<((value: void | PromiseLike<void>) => void) | null>,
+  timeoutMs: number,
+): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     const timeout = setTimeout(() => {
       connectWaitRef.current = null;
@@ -260,7 +265,11 @@ function waitForPairing(connectWaitRef: MutableRefObject<((value: void | Promise
   });
 }
 
-async function getOrCreateHashConnect(network: HederaNetwork, projectId: string, forceFresh = false): Promise<HashConnect> {
+async function getOrCreateHashConnect(
+  network: HederaNetwork,
+  projectId: string,
+  forceFresh = false,
+): Promise<HashConnect> {
   if (forceFresh) {
     sharedHashconnect = null;
     sharedHashconnectInitPromise = null;
@@ -268,7 +277,8 @@ async function getOrCreateHashConnect(network: HederaNetwork, projectId: string,
   }
   const key = `${network}:${projectId}`;
   if (sharedHashconnect && sharedHashconnectKey === key) return sharedHashconnect;
-  if (sharedHashconnectInitPromise && sharedHashconnectKey === key) return sharedHashconnectInitPromise;
+  if (sharedHashconnectInitPromise && sharedHashconnectKey === key)
+    return sharedHashconnectInitPromise;
 
   sharedHashconnectKey = key;
   sharedHashconnectInitPromise = (async () => {
@@ -315,7 +325,10 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
   const initPromiseRef = useRef<Promise<HashConnect | null> | null>(null);
   const connectInFlightRef = useRef(false);
   const mobilePairingUriRef = useRef<string | null>(null);
-  const listenersRef = useRef<{ pairing: ((s: any) => void) | null; disconnect: (() => void) | null }>({ pairing: null, disconnect: null });
+  const listenersRef = useRef<{
+    pairing: ((s: any) => void) | null;
+    disconnect: (() => void) | null;
+  }>({ pairing: null, disconnect: null });
 
   const resetWalletState = useCallback((clearConnectorData = false) => {
     setAccountId(null);
@@ -489,10 +502,12 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
 
       const immediatePairingUri =
         mobilePairingUriRef.current ??
-        ((hc as unknown as { pairingString?: string }).pairingString ?? null);
-      const pairingUri = immediatePairingUri && immediatePairingUri.startsWith("wc:")
-        ? immediatePairingUri
-        : await getPairingUri(hc);
+        (hc as unknown as { pairingString?: string }).pairingString ??
+        null;
+      const pairingUri =
+        immediatePairingUri && immediatePairingUri.startsWith("wc:")
+          ? immediatePairingUri
+          : await getPairingUri(hc);
       if (!pairingUri) {
         setError("Could not create a HashPack pairing URI. Refresh and try again.");
         return;
@@ -502,7 +517,9 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
       // Direct HashPack deep-link first on both desktop and mobile.
       openHashPackDeepLink(pairingUri);
 
-      const maybeConnectToExtension = (hc as unknown as { connectToExtension?: () => Promise<unknown> }).connectToExtension;
+      const maybeConnectToExtension = (
+        hc as unknown as { connectToExtension?: () => Promise<unknown> }
+      ).connectToExtension;
       if (typeof maybeConnectToExtension === "function") {
         void maybeConnectToExtension.call(hc).catch(() => {});
       }
@@ -544,7 +561,20 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
       disconnect,
       refreshAccountData,
     }),
-    [hashconnect, address, accountId, balanceTinybar, isReady, isConnecting, error, network, pairingUri, connect, disconnect, refreshAccountData]
+    [
+      hashconnect,
+      address,
+      accountId,
+      balanceTinybar,
+      isReady,
+      isConnecting,
+      error,
+      network,
+      pairingUri,
+      connect,
+      disconnect,
+      refreshAccountData,
+    ],
   );
 
   return <HashpackWalletContext.Provider value={value}>{children}</HashpackWalletContext.Provider>;

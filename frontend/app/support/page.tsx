@@ -38,7 +38,7 @@ export default function SupportPage() {
         "Best contact for updates (Discord @name, email, or X):",
         "- ",
       ].join("\n"),
-    []
+    [],
   );
 
   const copyTemplate = async () => {
@@ -56,9 +56,12 @@ export default function SupportPage() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6">
         <section className="rounded-2xl border border-white/15 bg-gradient-to-br from-[#5865F2]/30 via-[#0d1222] to-[#0f4f76]/40 p-6 sm:p-8">
           <p className="text-xs uppercase tracking-[0.2em] text-indigo-200/90">Hashpop Support</p>
-          <h1 className="mt-2 text-2xl sm:text-3xl font-bold text-white">Help & Contact on Discord</h1>
+          <h1 className="mt-2 text-2xl sm:text-3xl font-bold text-white">
+            Help & Contact on Discord
+          </h1>
           <p className="mt-3 text-silver max-w-2xl">
-            Join our Discord to speak with support, open a ticket, and receive status updates from the team.
+            Join our Discord to speak with support, open a ticket, and receive status updates from
+            the team.
           </p>
           <div className="mt-5 flex flex-wrap gap-3">
             <a
@@ -95,7 +98,8 @@ export default function SupportPage() {
           <div className="glass-card p-5 rounded-xl border border-white/10">
             <h2 className="text-white font-semibold">Direct support chat</h2>
             <p className="text-sm text-silver mt-2">
-              After joining Discord, go to the support area and post your issue so the team can respond quickly.
+              After joining Discord, go to the support area and post your issue so the team can
+              respond quickly.
             </p>
             <a
               href={DISCORD_INVITE_URL}
@@ -109,8 +113,8 @@ export default function SupportPage() {
           <div className="glass-card p-5 rounded-xl border border-white/10">
             <h2 className="text-white font-semibold">Open a ticket</h2>
             <p className="text-sm text-silver mt-2">
-              Open a support ticket in Discord and paste the template below so we have issue details and contact info
-              to send updates.
+              Open a support ticket in Discord and paste the template below so we have issue details
+              and contact info to send updates.
             </p>
             <a
               href={DISCORD_INVITE_URL}

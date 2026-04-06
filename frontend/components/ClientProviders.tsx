@@ -30,7 +30,13 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         ) : (
-          <div className={isFullscreenRoute ? "h-screen overflow-hidden flex flex-col" : "min-h-screen pb-20 md:pb-0 flex flex-col"}>
+          <div
+            className={
+              isFullscreenRoute
+                ? "h-screen overflow-hidden flex flex-col"
+                : "min-h-screen pb-20 md:pb-0 flex flex-col"
+            }
+          >
             {children}
             {!isFullscreenRoute && !isSignIn && <Footer />}
           </div>

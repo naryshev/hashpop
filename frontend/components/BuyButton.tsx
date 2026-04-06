@@ -35,7 +35,9 @@ export function BuyButton({
   const { address } = useHashpackWallet();
   const chainId = activeHederaChain.id;
   const isWrongNetwork = false;
-  const [onChainListing, setOnChainListing] = useState<{ price: bigint; status: number } | undefined>(undefined);
+  const [onChainListing, setOnChainListing] = useState<
+    { price: bigint; status: number } | undefined
+  >(undefined);
   const [chainReadFailed, setChainReadFailed] = useState(false);
 
   function parsePriceWei(raw: unknown): bigint {
@@ -127,7 +129,7 @@ export function BuyButton({
       }
       if (latestPrice >= 10n ** 15n) {
         throw new Error(
-          "This listing uses a legacy on-chain price format and cannot be purchased as-is. Ask the seller to edit price and save again, or recreate the listing."
+          "This listing uses a legacy on-chain price format and cannot be purchased as-is. Ask the seller to edit price and save again, or recreate the listing.",
         );
       }
       const txHash = await send({
@@ -146,7 +148,10 @@ export function BuyButton({
       setIsSuccess(true);
       onPurchaseComplete?.();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Unable to prepare buy transaction. Please refresh and retry.";
+      const msg =
+        e instanceof Error
+          ? e.message
+          : "Unable to prepare buy transaction. Please refresh and retry.";
       setActionError(msg);
     }
   };
@@ -161,12 +166,15 @@ export function BuyButton({
       <p className="text-xs text-silver">Excl. shipping · Network fee applies at checkout</p>
       {notOnChain && (
         <p className="text-xs text-amber-300/90 mb-1">
-          This listing does not exist on the smart contract yet. The seller&apos;s creation transaction may not have completed successfully. Ask the seller to delete and recreate this listing.
+          This listing does not exist on the smart contract yet. The seller&apos;s creation
+          transaction may not have completed successfully. Ask the seller to delete and recreate
+          this listing.
         </p>
       )}
       {isLegacyWeiListing && (
         <p className="text-xs text-amber-300/90 mb-1">
-          This listing was created with a legacy price unit and cannot be bought yet. The seller needs to edit the price and save, or relist.
+          This listing was created with a legacy price unit and cannot be bought yet. The seller
+          needs to edit the price and save, or relist.
         </p>
       )}
       <div className="grid grid-cols-2 gap-2">
@@ -188,7 +196,12 @@ export function BuyButton({
             if ((!hasPrice && !hasApiPrice) || isWrongNetwork || isPending || isConfirming) return;
             void buy();
           }}
-          disabled={(!hasPrice && !chainReadFailed && !hasApiPrice) || isPending || isConfirming || isWrongNetwork}
+          disabled={
+            (!hasPrice && !chainReadFailed && !hasApiPrice) ||
+            isPending ||
+            isConfirming ||
+            isWrongNetwork
+          }
           className="btn-frost-cta w-full disabled:opacity-60"
         >
           {isPending ? "Confirm in wallet\u2026" : "Buy Now"}
@@ -196,7 +209,9 @@ export function BuyButton({
       </div>
       {isSuccess && (
         <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 space-y-2">
-          <p className="text-sm text-emerald-200">Purchase submitted and synced. You can verify this transaction on-chain.</p>
+          <p className="text-sm text-emerald-200">
+            Purchase submitted and synced. You can verify this transaction on-chain.
+          </p>
           {explorerUrl && (
             <a
               href={explorerUrl}

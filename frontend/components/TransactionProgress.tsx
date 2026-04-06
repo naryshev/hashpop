@@ -71,9 +71,13 @@ export function TransactionProgress({
                       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                     </svg>
                   ) : isActive ? (
-                    <div className={`${compact ? "w-2 h-2" : "w-2.5 h-2.5"} rounded-full bg-blue-400 animate-pulse`} />
+                    <div
+                      className={`${compact ? "w-2 h-2" : "w-2.5 h-2.5"} rounded-full bg-blue-400 animate-pulse`}
+                    />
                   ) : (
-                    <div className={`${compact ? "w-2 h-2" : "w-2.5 h-2.5"} rounded-full bg-white/20`} />
+                    <div
+                      className={`${compact ? "w-2 h-2" : "w-2.5 h-2.5"} rounded-full bg-white/20`}
+                    />
                   )}
                 </div>
                 {/* Label below circle */}

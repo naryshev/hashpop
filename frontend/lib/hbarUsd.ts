@@ -2,7 +2,8 @@
  * HBAR/USD rate for display. Fetches from CoinGecko (no key) or uses NEXT_PUBLIC_HBAR_USD.
  */
 
-const COINGECKO_URL = "https://api.coingecko.com/api/v3/simple/price?ids=hedera-hashgraph&vs_currencies=usd";
+const COINGECKO_URL =
+  "https://api.coingecko.com/api/v3/simple/price?ids=hedera-hashgraph&vs_currencies=usd";
 
 let cachedRate: number | null = null;
 let fetchPromise: Promise<number | null> | null = null;

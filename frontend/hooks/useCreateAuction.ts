@@ -26,7 +26,15 @@ type UseCreateAuctionOptions = {
 };
 
 export function useCreateAuction(options?: UseCreateAuctionOptions) {
-  const { titleRef, subtitleRef, descriptionRef, conditionRef, yearOfProductionRef, imageUrlRef, mediaUrlsRef } = options || {};
+  const {
+    titleRef,
+    subtitleRef,
+    descriptionRef,
+    conditionRef,
+    yearOfProductionRef,
+    imageUrlRef,
+    mediaUrlsRef,
+  } = options || {};
   const { send, isPending, error, lastHash } = useRobustContractWrite();
   const isSuccess = !!lastHash;
   const hash = lastHash;
@@ -56,11 +64,21 @@ export function useCreateAuction(options?: UseCreateAuctionOptions) {
         ...(mediaUrls?.length && { mediaUrls }),
       }),
     }).catch(() => {});
-  }, [isSuccess, hash, titleRef, subtitleRef, descriptionRef, conditionRef, yearOfProductionRef, imageUrlRef, mediaUrlsRef]);
+  }, [
+    isSuccess,
+    hash,
+    titleRef,
+    subtitleRef,
+    descriptionRef,
+    conditionRef,
+    yearOfProductionRef,
+    imageUrlRef,
+    mediaUrlsRef,
+  ]);
 
   const createAuction = async (
     reservePriceHbar: string,
-    durationDays: AuctionDurationDays
+    durationDays: AuctionDurationDays,
   ): Promise<string> => {
     const auctionId = generateTimeBasedId("auc");
     const idBytes = stringToBytes32Hex(auctionId);

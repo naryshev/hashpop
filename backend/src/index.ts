@@ -16,7 +16,8 @@ const uploadsDir = path.join(process.cwd(), "uploads");
 fs.mkdirSync(uploadsDir, { recursive: true });
 const log = pino({ level: process.env.LOG_LEVEL || "info" });
 
-const rawConnectionString = process.env.DATABASE_URL || "postgres://hedera:hedera@localhost:5432/marketplace";
+const rawConnectionString =
+  process.env.DATABASE_URL || "postgres://hedera:hedera@localhost:5432/marketplace";
 
 // Detect cloud/remote databases that need SSL (Railway, Neon, Supabase, etc.)
 const isCloudDatabase =
@@ -47,7 +48,9 @@ const prisma = new PrismaClient({ adapter });
 
 // Allow multiple origins: local dev (localhost, 127.0.0.1, LAN IPs like 192.168.x.x) and Vercel.
 const corsOrigins = process.env.CORS_ORIGIN
-  ? process.env.CORS_ORIGIN.split(",").map((s) => s.trim()).filter(Boolean)
+  ? process.env.CORS_ORIGIN.split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
   : ["http://localhost:3000", "http://127.0.0.1:3000"];
 
 function isLocalNetworkOrigin(origin: string): boolean {
@@ -99,7 +102,10 @@ try {
   });
   log.info("Database migrations applied");
 } catch (err: any) {
-  log.warn({ err: err.stderr?.toString() || err.message }, "Migration failed — continuing with existing schema");
+  log.warn(
+    { err: err.stderr?.toString() || err.message },
+    "Migration failed — continuing with existing schema",
+  );
 }
 
 app.listen(port, () => {

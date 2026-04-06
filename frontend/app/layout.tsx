@@ -6,8 +6,7 @@ import type { Metadata, Viewport } from "next";
 
 export const metadata: Metadata = {
   title: "Hashpop",
-  description:
-    "Buy and sell on the Hedera network with Hashpop - The community marketplace.",
+  description: "Buy and sell on the Hedera network with Hashpop - The community marketplace.",
   icons: {
     icon: "/hashpop-cart-3d.PNG",
     shortcut: "/hashpop-cart-3d.PNG",
@@ -19,8 +18,7 @@ export const metadata: Metadata = {
     type: "website",
     siteName: "Hashpop",
     title: "Hashpop",
-    description:
-      "Buy and sell on the Hedera network with Hashpop - The community marketplace.",
+    description: "Buy and sell on the Hedera network with Hashpop - The community marketplace.",
     url: "https://hashpop.io",
   },
   twitter: {
@@ -28,8 +26,7 @@ export const metadata: Metadata = {
     site: "@hashpop",
     creator: "@hashpop",
     title: "Hashpop",
-    description:
-      "Buy and sell on the Hedera network with Hashpop - The community marketplace.",
+    description: "Buy and sell on the Hedera network with Hashpop - The community marketplace.",
   },
 };
 

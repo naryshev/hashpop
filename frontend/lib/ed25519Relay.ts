@@ -15,7 +15,8 @@ function relayUrl(relayPath: string): string {
 }
 
 export function listingIdToBytes32(listingId: string): `0x${string}` {
-  if (listingId.startsWith("0x") && listingId.length === 66) return listingId.toLowerCase() as `0x${string}`;
+  if (listingId.startsWith("0x") && listingId.length === 66)
+    return listingId.toLowerCase() as `0x${string}`;
   return stringToBytes32Hex(listingId);
 }
 
@@ -24,19 +25,29 @@ export function auctionIdToBytes32(auctionId: string): `0x${string}` {
 }
 
 /** Message hash for buyNowWithED25519. */
-export function buyNowMessageHash(listingIdBytes32: `0x${string}`, priceWei: bigint, deadline: number): `0x${string}` {
+export function buyNowMessageHash(
+  listingIdBytes32: `0x${string}`,
+  priceWei: bigint,
+  deadline: number,
+): `0x${string}` {
   return keccak256(
     encodePacked(
       ["bytes32", "uint256", "uint256", "string"],
-      [listingIdBytes32, priceWei, BigInt(deadline), "marketplace.buyNow"]
-    )
+      [listingIdBytes32, priceWei, BigInt(deadline), "marketplace.buyNow"],
+    ),
   );
 }
 
 /** Message hash for confirmReceiptWithED25519. */
-export function confirmReceiptMessageHash(listingIdBytes32: `0x${string}`, deadline: number): `0x${string}` {
+export function confirmReceiptMessageHash(
+  listingIdBytes32: `0x${string}`,
+  deadline: number,
+): `0x${string}` {
   return keccak256(
-    encodePacked(["bytes32", "uint256", "string"], [listingIdBytes32, BigInt(deadline), "escrow.confirmReceipt"])
+    encodePacked(
+      ["bytes32", "uint256", "string"],
+      [listingIdBytes32, BigInt(deadline), "escrow.confirmReceipt"],
+    ),
   );
 }
 
@@ -44,13 +55,13 @@ export function confirmReceiptMessageHash(listingIdBytes32: `0x${string}`, deadl
 export function placeBidMessageHash(
   auctionIdBytes32: `0x${string}`,
   bidAmountWei: bigint,
-  deadline: number
+  deadline: number,
 ): `0x${string}` {
   return keccak256(
     encodePacked(
       ["bytes32", "uint256", "uint256", "string"],
-      [auctionIdBytes32, bidAmountWei, BigInt(deadline), "auctionHouse.placeBid"]
-    )
+      [auctionIdBytes32, bidAmountWei, BigInt(deadline), "auctionHouse.placeBid"],
+    ),
   );
 }
 
@@ -96,7 +107,9 @@ export type RelayConfirmReceiptParams = {
   signature: `0x${string}`;
 };
 
-export async function relayConfirmReceipt(params: RelayConfirmReceiptParams): Promise<{ txHash: string }> {
+export async function relayConfirmReceipt(
+  params: RelayConfirmReceiptParams,
+): Promise<{ txHash: string }> {
   const res = await fetch(relayUrl("/relay/confirm-receipt"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -158,7 +171,9 @@ export async function signHashWithHashpack(
 ): Promise<`0x${string}`> {
   const sdk = await import("@hashgraph/sdk");
   const accountObj = sdk.AccountId.fromString(accountId);
-  const signer = (hashconnect as unknown as { getSigner?: (id: unknown) => unknown }).getSigner?.(accountObj);
+  const signer = (hashconnect as unknown as { getSigner?: (id: unknown) => unknown }).getSigner?.(
+    accountObj,
+  );
   if (!signer || typeof (signer as { sign?: unknown }).sign !== "function") {
     throw new Error("HashPack signer unavailable — reconnect your wallet and try again.");
   }
@@ -168,7 +183,9 @@ export async function signHashWithHashpack(
 
   let signatureMaps: unknown[];
   try {
-    signatureMaps = await (signer as { sign: (m: Uint8Array[]) => Promise<unknown[]> }).sign([messageBytes]);
+    signatureMaps = await (signer as { sign: (m: Uint8Array[]) => Promise<unknown[]> }).sign([
+      messageBytes,
+    ]);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     throw new Error(`HashPack rejected the sign request: ${msg}`);

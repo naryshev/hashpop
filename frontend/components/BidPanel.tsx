@@ -4,7 +4,13 @@ import { useState, useMemo } from "react";
 import { parseEther } from "viem";
 import { auctionHouseAbi, auctionHouseAddress } from "../lib/contracts";
 import { getTransactionErrorMessage } from "../lib/transactionError";
-import { auctionIdToBytes32, placeBidMessageHash, defaultDeadline, relayPlaceBid, signHashWithHashpack } from "../lib/ed25519Relay";
+import {
+  auctionIdToBytes32,
+  placeBidMessageHash,
+  defaultDeadline,
+  relayPlaceBid,
+  signHashWithHashpack,
+} from "../lib/ed25519Relay";
 import { useRobustContractWrite } from "../hooks/useRobustContractWrite";
 import { useHashpackWallet } from "../lib/hashpackWallet";
 import { activeHederaChain } from "../lib/hederaChains";
@@ -30,17 +36,19 @@ export function BidPanel({ auctionId }: { auctionId: string }) {
   const errorMessage = getTransactionErrorMessage(displayError, { chainId });
 
   const [ed25519Open, setEd25519Open] = useState(false);
-  const [ed25519Status, setEd25519Status] = useState<"idle" | "loading" | "error" | "success">("idle");
+  const [ed25519Status, setEd25519Status] = useState<"idle" | "loading" | "error" | "success">(
+    "idle",
+  );
   const [ed25519Error, setEd25519Error] = useState("");
 
   const submit = async () => {
     await send({
-        address: auctionHouseAddress,
-        abi: auctionHouseAbi,
-        functionName: "placeBid",
-        args: [idBytes],
-        value: bidAmountWei,
-      });
+      address: auctionHouseAddress,
+      abi: auctionHouseAbi,
+      functionName: "placeBid",
+      args: [idBytes],
+      value: bidAmountWei,
+    });
   };
   const deadline = defaultDeadline();
   const messageHash = placeBidMessageHash(idBytes, bidAmountWei, deadline);
@@ -85,14 +93,22 @@ export function BidPanel({ auctionId }: { auctionId: string }) {
         />
       </label>
       <p className="text-sm text-silver">
-        {canBid ? `You will send ${amount} HBAR. Confirm in your wallet.` : "Enter a valid amount (e.g. 0.1)."}
+        {canBid
+          ? `You will send ${amount} HBAR. Confirm in your wallet.`
+          : "Enter a valid amount (e.g. 0.1)."}
       </p>
       <button
         onClick={() => void submit()}
         disabled={!canBid || isPending || isConfirming}
         className="btn-frost-cta w-full disabled:opacity-60"
       >
-        {isPending ? "Confirm in wallet…" : isConfirming ? "Processing…" : isSuccess ? "Bid placed!" : "Place Bid"}
+        {isPending
+          ? "Confirm in wallet…"
+          : isConfirming
+            ? "Processing…"
+            : isSuccess
+              ? "Bid placed!"
+              : "Place Bid"}
       </button>
       {errorMessage && (
         <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2">
@@ -111,14 +127,14 @@ export function BidPanel({ auctionId }: { auctionId: string }) {
         {ed25519Open && (
           <div className="mt-3 p-3 rounded-lg bg-white/5 border border-white/10 space-y-2">
             <p className="text-xs text-silver">
-              Signs the bid via your connected HashPack and submits it through the relay.
-              HashPack will open a signing prompt — no copy-pasting required.
+              Signs the bid via your connected HashPack and submits it through the relay. HashPack
+              will open a signing prompt — no copy-pasting required.
             </p>
-            {!accountId && (
-              <p className="text-xs text-yellow-400">Connect HashPack above first.</p>
-            )}
+            {!accountId && <p className="text-xs text-yellow-400">Connect HashPack above first.</p>}
             {ed25519Error && <p className="text-xs text-red-400">{ed25519Error}</p>}
-            {ed25519Status === "success" && <p className="text-xs text-green-400">Bid submitted.</p>}
+            {ed25519Status === "success" && (
+              <p className="text-xs text-green-400">Bid submitted.</p>
+            )}
             <button
               type="button"
               onClick={() => void placeBidWithED25519()}
