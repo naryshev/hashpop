@@ -60,7 +60,7 @@ export function useCreateListing(options?: UseCreateListingOptions) {
       address: marketplaceAddress,
       abi: marketplaceAbi,
       functionName: "createListing",
-      args: [idBytes, parseUnits(price, 8), !!requireEscrowRef?.current],
+      args: [idBytes, parseUnits(price, 8)],
     });
     const imageUrl = imageUrlRef?.current ?? undefined;
     const mediaUrls = mediaUrlsRef?.current ?? undefined;

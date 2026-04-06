@@ -22,7 +22,6 @@ export const marketplaceAbi: Abi = [
     inputs: [
       { name: "listingId", type: "bytes32" },
       { name: "price", type: "uint256" },
-      { name: "requireEscrow", type: "bool" },
     ],
     outputs: [],
   },
