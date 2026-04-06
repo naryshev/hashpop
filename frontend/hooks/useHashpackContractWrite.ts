@@ -192,25 +192,33 @@ export function useHashpackContractWrite() {
               (signer && typeof signer.getClient === "function" ? signer.getClient() : null) ??
               (network === "mainnet" ? sdk.Client.forMainnet() : sdk.Client.forTestnet());
             let receipt: any;
-            if (!isPayableRequest && signer) {
-              // For non-payable calls use executeWithSigner — the SDK-official pattern.
-              // signer.call() has an unresolvable lifecycle conflict:
-              //   - without freeze → "must have been frozen before calculating the hash"
-              //   - with freezeWithSigner → "list is locked" (call() tries to re-populate
-              //     an already-frozen tx's nodeAccountIds field, which protobuf locks).
-              // executeWithSigner handles populate + sign + submit internally without
-              // requiring a manual freeze, so neither error can occur.
-              if (typeof (tx as any).executeWithSigner === "function") {
-                const txResponse = await (tx as any).executeWithSigner(signer);
-                txId =
-                  txResponse?.transactionId?.toString?.() ?? tx.transactionId?.toString?.() ?? txId;
-                receipt = txResponse; // existing getReceipt() fallback handles status
-              } else if (typeof signer.call === "function") {
-                // Legacy fallback for HashConnect versions that lack executeWithSigner.
-                receipt = await signer.call(tx as any);
-                txId =
-                  tx.transactionId?.toString?.() ?? receipt?.transactionId?.toString?.() ?? txId;
+            if (!isPayableRequest && signer && typeof signer.signTransaction === "function") {
+              // Non-payable path: populateTransaction → freeze() → signTransaction → execute.
+              //
+              // Why not signer.call():
+              //   • No pre-freeze  → "must have been frozen before calculating the hash"
+              //   • freezeWithSigner then call() → "list is locked" (call() re-populates
+              //     nodeAccountIds on an already-frozen/protobuf-locked transaction)
+              //
+              // Why not executeWithSigner:
+              //   • executeWithSigner calls populateTransaction then signTransaction without
+              //     an intermediate freeze(), so signTransaction still throws "must have been
+              //     frozen" when it tries to toBytes() for the HashPack signing payload.
+              //
+              // Correct sequence: let the signer populate nodeAccountIds via populateTransaction,
+              // then call freeze() (no client arg — nodeIds are already set), then signTransaction
+              // works because the protobuf is now sealed, then execute via the client.
+              if (typeof signer.populateTransaction === "function") {
+                await signer.populateTransaction(tx);
               }
+              if (typeof (tx as any).isFrozen === "function" && !(tx as any).isFrozen()) {
+                (tx as any).freeze();
+              }
+              const signedTx = await signer.signTransaction(tx as any);
+              const txResponse = await (signedTx as any).execute(freezeClient);
+              txId =
+                txResponse?.transactionId?.toString?.() ?? tx.transactionId?.toString?.() ?? txId;
+              receipt = await txResponse.getReceipt(freezeClient);
             } else if (
               isPayableRequest &&
               signer &&
