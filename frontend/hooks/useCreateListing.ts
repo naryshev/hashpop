@@ -6,6 +6,7 @@ import { stringToBytes32Hex, generateTimeBasedId } from "../lib/bytes32";
 import { parseUnits } from "viem";
 import { useRobustContractWrite } from "./useRobustContractWrite";
 import { useHashpackWallet } from "../lib/hashpackWallet";
+import { hederaPublicClient } from "../lib/hederaPublicClient";
 
 import { getApiUrl } from "../lib/apiUrl";
 
@@ -41,6 +42,20 @@ export function useCreateListing(options?: UseCreateListingOptions) {
     setIsSuccess(false);
     const id = generateTimeBasedId("lst");
     const idBytes = stringToBytes32Hex(id);
+    // Preflight: abort early with a readable error if the marketplace is paused.
+    const isPaused = await hederaPublicClient
+      .readContract({
+        address: marketplaceAddress as `0x${string}`,
+        abi: marketplaceAbi,
+        functionName: "paused",
+      })
+      .catch(() => false);
+    if (isPaused) {
+      throw new Error(
+        "The marketplace is temporarily paused for maintenance. Please try again later.",
+      );
+    }
+
     const txHash = await send({
       address: marketplaceAddress,
       abi: marketplaceAbi,
