@@ -43,11 +43,9 @@ export function relayRouter(log: Logger): Router {
     try {
       const { listingId, buyerAlias, price, deadline, messageHash, signature } = req.body;
       if (!listingId || !buyerAlias || price == null || !deadline || !messageHash || !signature) {
-        return res
-          .status(400)
-          .json({
-            error: "Missing listingId, buyerAlias, price, deadline, messageHash, or signature",
-          });
+        return res.status(400).json({
+          error: "Missing listingId, buyerAlias, price, deadline, messageHash, or signature",
+        });
       }
       const contract = new ethers.Contract(marketplaceAddress, MARKETPLACE_ABI, wallet);
       const tx = await contract.buyNowWithED25519(
@@ -184,11 +182,9 @@ export function relayRouter(log: Logger): Router {
         !messageHash ||
         !signature
       ) {
-        return res
-          .status(400)
-          .json({
-            error: "Missing auctionId, bidderAlias, bidAmount, deadline, messageHash, or signature",
-          });
+        return res.status(400).json({
+          error: "Missing auctionId, bidderAlias, bidAmount, deadline, messageHash, or signature",
+        });
       }
       const contract = new ethers.Contract(auctionHouseAddress, AUCTION_HOUSE_ABI, wallet);
       const tx = await contract.placeBidWithED25519(

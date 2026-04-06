@@ -387,12 +387,10 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         message.includes("self signed") ||
         (code && String(code).startsWith("ERR_TLS"));
       if (code === "ECONNREFUSED" || message.includes("connect") || isTlsError) {
-        res
-          .status(503)
-          .json({
-            error:
-              "Database unavailable. Start PostgreSQL (e.g. docker compose up -d db) and run backend migrations.",
-          });
+        res.status(503).json({
+          error:
+            "Database unavailable. Start PostgreSQL (e.g. docker compose up -d db) and run backend migrations.",
+        });
         return;
       }
       res.status(500).json({ error: `Internal server error: ${message || String(err)}` });
