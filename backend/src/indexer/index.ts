@@ -1,5 +1,6 @@
 import path from "path";
 import fs from "fs";
+import { ethers } from "ethers";
 import { PrismaClient } from "../generated/prisma/client";
 import type { Logger } from "pino";
 import { fetchMirrorEvents } from "../mirror";
@@ -12,6 +13,8 @@ import {
 } from "./rpc";
 
 const POLL_INTERVAL = 8000; // 8 seconds
+const RECONCILE_INTERVAL = 60_000; // 1 minute — recheck unconfirmed listings against contract
+const RECONCILE_BATCH = 50; // listings per reconciliation pass
 let lastProcessedTimestamp = 0;
 
 const STATE_FILE = path.join(process.cwd(), ".indexer-state.json");
@@ -78,6 +81,101 @@ function chainAmountToHbar(amount: bigint | string): string {
   return tinybarToHbar(n);
 }
 
+const MARKETPLACE_LISTINGS_ABI = [
+  "function listings(bytes32) view returns (address seller, uint256 price, uint256 createdAt, uint8 status, bytes32 escrowId, bool requireEscrow)",
+];
+
+/**
+ * Reconcile DB listings that are marked as LISTED but not yet confirmed on-chain.
+ * For each, reads the contract directly. If the contract knows the listing (status > NONE),
+ * set onChainConfirmed=true and correct the price. This fixes listings that were created
+ * before the sync fixes landed, or where the mirror event was missed.
+ */
+async function reconcileUnconfirmedListings(
+  marketplaceAddress: string,
+  prisma: PrismaClient,
+  log: Logger,
+): Promise<void> {
+  const rpcUrl = process.env.HEDERA_RPC_URL;
+  if (!rpcUrl || !marketplaceAddress) return;
+
+  const unconfirmed = await prisma.listing.findMany({
+    where: { onChainConfirmed: false, status: "LISTED" },
+    select: { id: true, price: true },
+    take: RECONCILE_BATCH,
+    orderBy: { createdAt: "asc" },
+  });
+
+  if (unconfirmed.length === 0) return;
+
+  const provider = new ethers.JsonRpcProvider(rpcUrl);
+  const iface = new ethers.Interface(MARKETPLACE_LISTINGS_ABI);
+  let confirmed = 0;
+
+  for (const listing of unconfirmed) {
+    try {
+      const calldata = iface.encodeFunctionData("listings", [listing.id]);
+      const raw = await provider.call({ to: marketplaceAddress, data: calldata });
+      if (!raw || raw === "0x") continue;
+
+      const decoded = iface.decodeFunctionResult("listings", raw);
+      const status = Number(decoded[3] ?? 0);
+      if (status === 0) continue; // NONE — listing genuinely does not exist on-chain
+
+      const onChainPrice = BigInt(decoded[1]?.toString?.() ?? "0");
+      const priceHbar = chainAmountToHbar(onChainPrice);
+
+      await prisma.listing.update({
+        where: { id: listing.id },
+        data: {
+          onChainConfirmed: true,
+          ...(onChainPrice > 0n && { price: priceHbar }),
+        },
+      });
+      confirmed++;
+      log.info({ listingId: listing.id, priceHbar, status }, "Reconciler confirmed listing on-chain");
+    } catch (err) {
+      log.warn({ err, listingId: listing.id }, "Reconciler: contract read failed for listing");
+    }
+  }
+
+  if (confirmed > 0) {
+    log.info({ confirmed, total: unconfirmed.length }, "Reconciler: confirmed listings on-chain");
+  }
+}
+
+/**
+ * Backfill historical ItemListed events from the mirror node from the beginning of time.
+ * Runs once at startup. Picks up any events the regular poll missed because they
+ * occurred before lastProcessedTimestamp was initialised, or because the RPC chunk
+ * window (5 blocks) was too narrow to catch them.
+ */
+async function backfillHistoricalEvents(
+  marketplaceAddress: string,
+  auctionHouseAddress: string,
+  prisma: PrismaClient,
+  log: Logger,
+): Promise<void> {
+  try {
+    log.info("Starting historical event backfill from mirror node (timestamp=0)");
+    const events = await fetchMirrorEvents(marketplaceAddress, auctionHouseAddress, 0);
+    let processed = 0;
+    for (const event of events) {
+      try {
+        const decoded = decodeEvents(event);
+        if (!decoded) continue;
+        await handleEvent(decoded, prisma, log);
+        processed++;
+      } catch (err) {
+        log.warn({ err, event }, "Backfill: failed to process event");
+      }
+    }
+    log.info({ processed }, "Historical event backfill complete");
+  } catch (err) {
+    log.error({ err }, "Historical event backfill failed");
+  }
+}
+
 export async function startIndexer(prisma: PrismaClient, log: Logger) {
   const marketplaceAddress = normalizeAddress(process.env.MARKETPLACE_ADDRESS);
   const auctionHouseAddress = normalizeAddress(process.env.AUCTION_HOUSE_ADDRESS);
@@ -112,8 +210,20 @@ export async function startIndexer(prisma: PrismaClient, log: Logger) {
     }
   };
 
-  run();
-  setInterval(run, POLL_INTERVAL);
+  // On startup: backfill all historical mirror events, then start the normal poll.
+  backfillHistoricalEvents(marketplaceAddress, auctionHouseAddress, prisma, log).finally(() => {
+    run();
+    setInterval(run, POLL_INTERVAL);
+  });
+
+  // Periodically reconcile DB listings that are still unconfirmed against the contract.
+  const reconcile = () =>
+    reconcileUnconfirmedListings(marketplaceAddress, prisma, log).catch((err) =>
+      log.error({ err }, "Reconciler error"),
+    );
+  // First pass after a short delay to let the backfill settle.
+  setTimeout(reconcile, 15_000);
+  setInterval(reconcile, RECONCILE_INTERVAL);
 }
 
 async function processEvents(
