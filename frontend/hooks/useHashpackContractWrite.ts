@@ -193,26 +193,29 @@ export function useHashpackContractWrite() {
               (network === "mainnet" ? sdk.Client.forMainnet() : sdk.Client.forTestnet());
             let receipt: any;
             if (!isPayableRequest && signer && typeof signer.signTransaction === "function") {
-              // Non-payable path: populateTransaction → freeze() → signTransaction → execute.
+              // Non-payable path: single node → freezeWith → signTransaction → execute.
+              //
+              // Why not populateTransaction:
+              //   • populateTransaction sets ALL network nodes on the transaction.
+              //   • signTransaction internally calls tx.addSignature() which calls
+              //     _requireOneNodeAccountId() — throws when more than one node is set.
+              //   • This is identical to the "list is locked" / "payload immutable" errors.
               //
               // Why not signer.call():
               //   • No pre-freeze  → "must have been frozen before calculating the hash"
-              //   • freezeWithSigner then call() → "list is locked" (call() re-populates
-              //     nodeAccountIds on an already-frozen/protobuf-locked transaction)
+              //   • freezeWithSigner then call() → re-populates nodeAccountIds on a frozen tx
               //
               // Why not executeWithSigner:
-              //   • executeWithSigner calls populateTransaction then signTransaction without
-              //     an intermediate freeze(), so signTransaction still throws "must have been
-              //     frozen" when it tries to toBytes() for the HashPack signing payload.
+              //   • Does not call freeze() between populateTransaction and signTransaction.
               //
-              // Correct sequence: let the signer populate nodeAccountIds via populateTransaction,
-              // then call freeze() (no client arg — nodeIds are already set), then signTransaction
-              // works because the protobuf is now sealed, then execute via the client.
-              if (typeof signer.populateTransaction === "function") {
-                await signer.populateTransaction(tx);
+              // Correct sequence: set exactly ONE node (satisfies _requireOneNodeAccountId),
+              // then freezeWith(client), then signTransaction, then execute via the client.
+              if (typeof (tx as any).setNodeAccountIds === "function") {
+                const singleNode = pickSingleNodeAccountId(sdk, freezeClient, network);
+                (tx as any).setNodeAccountIds([singleNode]);
               }
               if (typeof (tx as any).isFrozen === "function" && !(tx as any).isFrozen()) {
-                (tx as any).freeze();
+                tx.freezeWith(freezeClient);
               }
               const signedTx = await signer.signTransaction(tx as any);
               const txResponse = await (signedTx as any).execute(freezeClient);
