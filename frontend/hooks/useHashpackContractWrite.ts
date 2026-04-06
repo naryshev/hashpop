@@ -192,17 +192,25 @@ export function useHashpackContractWrite() {
               (signer && typeof signer.getClient === "function" ? signer.getClient() : null) ??
               (network === "mainnet" ? sdk.Client.forMainnet() : sdk.Client.forTestnet());
             let receipt: any;
-            if (!isPayableRequest && signer && typeof signer.call === "function") {
-              // For non-payable calls, use freezeWithSigner so HashConnect's own signer
-              // populates node account IDs correctly before the transaction is frozen.
-              // Using freezeWith(client) here caused CONTRACT_REVERT_EXECUTED because it
-              // conflicts with HashConnect's internal tx population lifecycle.
-              // freezeWithSigner is the official way to prepare a tx before signer.call().
-              if (typeof (tx as any).freezeWithSigner === "function") {
-                await (tx as any).freezeWithSigner(signer);
+            if (!isPayableRequest && signer) {
+              // For non-payable calls use executeWithSigner — the SDK-official pattern.
+              // signer.call() has an unresolvable lifecycle conflict:
+              //   - without freeze → "must have been frozen before calculating the hash"
+              //   - with freezeWithSigner → "list is locked" (call() tries to re-populate
+              //     an already-frozen tx's nodeAccountIds field, which protobuf locks).
+              // executeWithSigner handles populate + sign + submit internally without
+              // requiring a manual freeze, so neither error can occur.
+              if (typeof (tx as any).executeWithSigner === "function") {
+                const txResponse = await (tx as any).executeWithSigner(signer);
+                txId =
+                  txResponse?.transactionId?.toString?.() ?? tx.transactionId?.toString?.() ?? txId;
+                receipt = txResponse; // existing getReceipt() fallback handles status
+              } else if (typeof signer.call === "function") {
+                // Legacy fallback for HashConnect versions that lack executeWithSigner.
+                receipt = await signer.call(tx as any);
+                txId =
+                  tx.transactionId?.toString?.() ?? receipt?.transactionId?.toString?.() ?? txId;
               }
-              receipt = await signer.call(tx as any);
-              txId = tx.transactionId?.toString?.() ?? receipt?.transactionId?.toString?.() ?? txId;
             } else if (
               isPayableRequest &&
               signer &&
