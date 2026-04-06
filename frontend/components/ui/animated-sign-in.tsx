@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Wallet } from "lucide-react";
+import { Wallet, Copy, Check, QrCode, ChevronUp } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
 import { buildHashPackDeepLink } from "../../lib/hashpackWallet";
 
@@ -11,6 +12,8 @@ export default function AnimatedSignIn() {
   const { connect, isConnecting, isReady, error, isConnected, pairingUri } = useHashpackWallet();
   const lastPressAtRef = useRef(0);
   const [deepLinkFired, setDeepLinkFired] = useState(false);
+  const [showQr, setShowQr] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!isConnected) return;
@@ -45,11 +48,30 @@ export default function AnimatedSignIn() {
     }, 0);
   }, [connect, pairingUri]);
 
+  const handleCopyPairingString = useCallback(async () => {
+    if (!pairingUri) return;
+    try {
+      await navigator.clipboard.writeText(pairingUri);
+    } catch {
+      // Fallback for browsers without clipboard API
+      const el = document.createElement("textarea");
+      el.value = pairingUri;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [pairingUri]);
+
   const buttonLabel = !isReady
     ? "Loading wallet..."
     : isConnecting
       ? "Connecting..."
       : "Continue with HashPack";
+
+  const canShowQr = !!pairingUri && isReady && !isConnecting;
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#071b38]">
@@ -106,6 +128,83 @@ export default function AnimatedSignIn() {
                   Download HashPack
                 </a>
               </p>
+            )}
+
+            {/* QR / pairing string section */}
+            {canShowQr && (
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowQr((v) => !v)}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-medium text-slate-300 transition hover:bg-white/10 hover:text-white"
+                >
+                  {showQr ? (
+                    <>
+                      <ChevronUp size={13} />
+                      Hide QR code
+                    </>
+                  ) : (
+                    <>
+                      <QrCode size={13} />
+                      Scan QR code with HashPack
+                    </>
+                  )}
+                </button>
+
+                {showQr && (
+                  <div className="mt-4 flex flex-col items-center gap-4">
+                    {/* QR code */}
+                    <div className="rounded-2xl bg-white p-4 shadow-lg">
+                      <QRCodeSVG
+                        value={pairingUri}
+                        size={200}
+                        bgColor="#ffffff"
+                        fgColor="#0b111b"
+                        level="M"
+                        imageSettings={{
+                          src: "/hashpop-cart-3d.PNG",
+                          height: 36,
+                          width: 36,
+                          excavate: true,
+                        }}
+                      />
+                    </div>
+                    <p className="text-center text-xs text-slate-400">
+                      Open HashPack → Scan QR to pair
+                    </p>
+
+                    {/* Copy pairing string */}
+                    <div className="w-full">
+                      <p className="mb-1.5 text-center text-xs font-medium text-slate-400">
+                        Or paste the pairing string into HashPack
+                      </p>
+                      <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#0d1220] px-3 py-2">
+                        <span className="flex-1 truncate font-mono text-[10px] text-slate-400 select-all">
+                          {pairingUri}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleCopyPairingString}
+                          title="Copy pairing string"
+                          className="flex shrink-0 items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-slate-300 transition hover:bg-white/10 hover:text-white"
+                        >
+                          {copied ? (
+                            <>
+                              <Check size={12} className="text-emerald-400" />
+                              <span className="text-emerald-400">Copied</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy size={12} />
+                              Copy
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Feature list */}
