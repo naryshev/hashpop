@@ -38,7 +38,9 @@ export function Nav() {
                   key={href}
                   href={href}
                   className={`rounded-glass px-3 py-2 text-sm font-medium transition-all duration-200 ${
-                    isActive ? "bg-white/10 text-white border-white/15 shadow-inner" : "text-silver hover:bg-white/5 hover:text-white border-transparent"
+                    isActive
+                      ? "bg-white/10 text-white border-white/15 shadow-inner"
+                      : "text-silver hover:bg-white/5 hover:text-white border-transparent"
                   }`}
                 >
                   {label}
@@ -56,8 +58,19 @@ export function Nav() {
               className="p-2 rounded-lg text-silver hover:text-white hover:bg-white/10 transition-colors"
               aria-label="Open menu"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
               </svg>
             </button>
           </div>
@@ -86,7 +99,12 @@ export function Nav() {
               aria-label="Close menu"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -99,7 +117,9 @@ export function Nav() {
                   href={href}
                   onClick={closeMenu}
                   className={`block rounded-glass px-4 py-3 text-sm font-medium transition-colors ${
-                    isActive ? "bg-white/10 text-white" : "text-silver hover:bg-white/5 hover:text-white"
+                    isActive
+                      ? "bg-white/10 text-white"
+                      : "text-silver hover:bg-white/5 hover:text-white"
                   }`}
                 >
                   {label}

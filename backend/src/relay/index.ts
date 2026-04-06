@@ -14,7 +14,8 @@ const AUCTION_HOUSE_ABI = [
 
 export function relayRouter(log: Logger): Router {
   const router = Router();
-  const rpcUrl = process.env.HEDERA_RPC_URL || process.env.MARKETPLACE_RPC || "https://testnet.hashio.io/api";
+  const rpcUrl =
+    process.env.HEDERA_RPC_URL || process.env.MARKETPLACE_RPC || "https://testnet.hashio.io/api";
   const marketplaceAddress = process.env.MARKETPLACE_ADDRESS;
   const escrowAddress = process.env.ESCROW_ADDRESS;
   const auctionHouseAddress = process.env.AUCTION_HOUSE_ADDRESS;
@@ -42,7 +43,11 @@ export function relayRouter(log: Logger): Router {
     try {
       const { listingId, buyerAlias, price, deadline, messageHash, signature } = req.body;
       if (!listingId || !buyerAlias || price == null || !deadline || !messageHash || !signature) {
-        return res.status(400).json({ error: "Missing listingId, buyerAlias, price, deadline, messageHash, or signature" });
+        return res
+          .status(400)
+          .json({
+            error: "Missing listingId, buyerAlias, price, deadline, messageHash, or signature",
+          });
       }
       const contract = new ethers.Contract(marketplaceAddress, MARKETPLACE_ABI, wallet);
       const tx = await contract.buyNowWithED25519(
@@ -52,7 +57,7 @@ export function relayRouter(log: Logger): Router {
         deadline,
         messageHash,
         signature,
-        { value: price }
+        { value: price },
       );
       const receipt = await tx.wait();
       return res.json({ success: true, txHash: receipt.hash });
@@ -75,10 +80,18 @@ export function relayRouter(log: Logger): Router {
     try {
       const { listingId, buyerAlias, deadline, messageHash, signature } = req.body;
       if (!listingId || !buyerAlias || !deadline || !messageHash || !signature) {
-        return res.status(400).json({ error: "Missing listingId, buyerAlias, deadline, messageHash, or signature" });
+        return res
+          .status(400)
+          .json({ error: "Missing listingId, buyerAlias, deadline, messageHash, or signature" });
       }
       const contract = new ethers.Contract(escrowAddress, ESCROW_ABI, wallet);
-      const tx = await contract.confirmReceiptWithED25519(listingId, buyerAlias, deadline, messageHash, signature);
+      const tx = await contract.confirmReceiptWithED25519(
+        listingId,
+        buyerAlias,
+        deadline,
+        messageHash,
+        signature,
+      );
       const receipt = await tx.wait();
       return res.json({ success: true, txHash: receipt.hash });
     } catch (err: unknown) {
@@ -121,7 +134,11 @@ export function relayRouter(log: Logger): Router {
    */
   router.get("/account-id", async (req: Request, res: Response) => {
     const evmAddress = req.query.evmAddress as string;
-    if (!evmAddress || typeof evmAddress !== "string" || !/^0x[a-fA-F0-9]{40}$/.test(evmAddress.trim())) {
+    if (
+      !evmAddress ||
+      typeof evmAddress !== "string" ||
+      !/^0x[a-fA-F0-9]{40}$/.test(evmAddress.trim())
+    ) {
       return res.status(400).json({ error: "Invalid evmAddress; use 0x followed by 40 hex chars" });
     }
     const mirrorUrl = process.env.MIRROR_URL || "https://testnet.mirrornode.hedera.com";
@@ -130,12 +147,14 @@ export function relayRouter(log: Logger): Router {
       if (!r.ok) return res.status(404).json({ error: "Account not found for this EVM address" });
       const data = await r.json();
       const first = Array.isArray(data.accounts) && data.accounts[0] ? data.accounts[0] : data;
-      const accountId = first.account ?? first.account_id ?? first.id ?? data.account ?? data.account_id ?? data.id;
-      const normalized = typeof accountId === "string" && /^0\.0\.\d+$/.test(accountId)
-        ? accountId
-        : typeof accountId === "number"
-          ? `0.0.${accountId}`
-          : null;
+      const accountId =
+        first.account ?? first.account_id ?? first.id ?? data.account ?? data.account_id ?? data.id;
+      const normalized =
+        typeof accountId === "string" && /^0\.0\.\d+$/.test(accountId)
+          ? accountId
+          : typeof accountId === "number"
+            ? `0.0.${accountId}`
+            : null;
       if (!normalized) {
         return res.status(404).json({ error: "No Hedera account ID for this address" });
       }
@@ -157,8 +176,19 @@ export function relayRouter(log: Logger): Router {
     }
     try {
       const { auctionId, bidderAlias, bidAmount, deadline, messageHash, signature } = req.body;
-      if (!auctionId || !bidderAlias || bidAmount == null || !deadline || !messageHash || !signature) {
-        return res.status(400).json({ error: "Missing auctionId, bidderAlias, bidAmount, deadline, messageHash, or signature" });
+      if (
+        !auctionId ||
+        !bidderAlias ||
+        bidAmount == null ||
+        !deadline ||
+        !messageHash ||
+        !signature
+      ) {
+        return res
+          .status(400)
+          .json({
+            error: "Missing auctionId, bidderAlias, bidAmount, deadline, messageHash, or signature",
+          });
       }
       const contract = new ethers.Contract(auctionHouseAddress, AUCTION_HOUSE_ABI, wallet);
       const tx = await contract.placeBidWithED25519(
@@ -168,7 +198,7 @@ export function relayRouter(log: Logger): Router {
         deadline,
         messageHash,
         signature,
-        { value: bidAmount }
+        { value: bidAmount },
       );
       const receipt = await tx.wait();
       return res.json({ success: true, txHash: receipt.hash });

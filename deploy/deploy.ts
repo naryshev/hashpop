@@ -33,7 +33,7 @@ async function main() {
     await escrow.getAddress(),
     await treasury.getAddress(),
     await reputation.getAddress(),
-    platformFeeBps
+    platformFeeBps,
   );
   console.log("Marketplace deployed to:", await marketplace.getAddress());
 
@@ -42,7 +42,7 @@ async function main() {
   const auctionHouse = await AuctionHouse.deploy(
     await escrow.getAddress(),
     await treasury.getAddress(),
-    platformFeeBps
+    platformFeeBps,
   );
   console.log("AuctionHouse deployed to:", await auctionHouse.getAddress());
 

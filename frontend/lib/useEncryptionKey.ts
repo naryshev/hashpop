@@ -40,10 +40,12 @@ export function useEncryptionKey(): EncryptionKeyState {
       setError(null);
       try {
         // Sign the fixed derivation message with the wallet
-        const signResult = await (hashconnect as any).signMessages(accountId, [KEY_DERIVATION_MESSAGE]);
+        const signResult = await (hashconnect as any).signMessages(accountId, [
+          KEY_DERIVATION_MESSAGE,
+        ]);
         const signatureHex: string = Array.isArray(signResult)
           ? signResult[0]
-          : signResult?.signedMessages?.[0] ?? signResult;
+          : (signResult?.signedMessages?.[0] ?? signResult);
 
         if (!signatureHex || typeof signatureHex !== "string") {
           throw new Error("Failed to get signature from wallet");
@@ -66,7 +68,7 @@ export function useEncryptionKey(): EncryptionKeyState {
           const proofResult = await (hashconnect as any).signMessages(accountId, [proofMessage]);
           const proofSig: string = Array.isArray(proofResult)
             ? proofResult[0]
-            : proofResult?.signedMessages?.[0] ?? proofResult;
+            : (proofResult?.signedMessages?.[0] ?? proofResult);
 
           await fetch(`${getApiUrl()}/api/user/public-key`, {
             method: "POST",

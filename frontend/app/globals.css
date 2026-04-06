@@ -15,10 +15,14 @@ body {
   background:
     radial-gradient(900px 400px at 10% -10%, rgba(255, 47, 61, 0.2), transparent 55%),
     radial-gradient(900px 500px at 90% -20%, rgba(20, 164, 255, 0.2), transparent 58%),
-    radial-gradient(900px 600px at 50% 130%, rgba(109, 223, 133, 0.16), transparent 62%),
-    var(--bg);
+    radial-gradient(900px 600px at 50% 130%, rgba(109, 223, 133, 0.16), transparent 62%), var(--bg);
   color: var(--text);
-  font-family: system-ui, -apple-system, "Segoe UI", "Inter", sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    "Inter",
+    sans-serif;
   -webkit-font-smoothing: antialiased;
   /* Prevent horizontal overflow on narrow screens */
   overflow-x: hidden;
@@ -33,7 +37,9 @@ body {
 }
 
 /* Ensure all interactive elements have adequate touch targets on mobile */
-button, a, [role="button"] {
+button,
+a,
+[role="button"] {
   touch-action: manipulation;
 }
 

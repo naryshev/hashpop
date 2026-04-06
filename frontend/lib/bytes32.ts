@@ -15,7 +15,7 @@ export function listingIdToBytes32(listingId: string): `0x${string}` {
     const body = listingId.slice(2).toLowerCase();
     // Accept short/partial hex ids from URL and normalize to bytes32.
     if (/^[0-9a-f]*$/.test(body) && body.length > 0 && body.length <= 64) {
-      return (`0x${body.padEnd(64, "0")}`) as `0x${string}`;
+      return `0x${body.padEnd(64, "0")}` as `0x${string}`;
     }
   }
   return stringToBytes32Hex(listingId);

@@ -24,10 +24,17 @@ function formatListingId(id: string): string {
 }
 
 function normalizeListingStatus(status?: string): string {
-  return String(status || "").trim().toUpperCase();
+  return String(status || "")
+    .trim()
+    .toUpperCase();
 }
 
-function getStatusBadge(status?: string): { label: string; className: string; glowClass: string; pulseDot?: boolean } {
+function getStatusBadge(status?: string): {
+  label: string;
+  className: string;
+  glowClass: string;
+  pulseDot?: boolean;
+} {
   const normalized = normalizeListingStatus(status);
   if (normalized === "LISTED") {
     return {
@@ -162,7 +169,10 @@ export default function HomePageClient({
         statusLabel: badge.label,
         statusClass: `${badge.className} ${badge.glowClass}`,
         statusPulseDot: badge.pulseDot,
-        priceLabel: formatHbarWithUsd(formatPriceForDisplay(String(item.price ?? item.reservePrice ?? "0")), usdRate),
+        priceLabel: formatHbarWithUsd(
+          formatPriceForDisplay(String(item.price ?? item.reservePrice ?? "0")),
+          usdRate,
+        ),
       };
     });
   }, [listings, usdRate]);
@@ -189,8 +199,12 @@ export default function HomePageClient({
           </div>
 
           <div className="mt-4 text-center sm:mt-5">
-            <p className="text-xs uppercase tracking-[0.2em] text-emerald-200/85">Verify • Trade • Collect</p>
-            <h1 className="mt-2 text-2xl font-black text-white sm:text-4xl">Trade Verifiably on Hashpop</h1>
+            <p className="text-xs uppercase tracking-[0.2em] text-emerald-200/85">
+              Verify • Trade • Collect
+            </p>
+            <h1 className="mt-2 text-2xl font-black text-white sm:text-4xl">
+              Trade Verifiably on Hashpop
+            </h1>
             <p className="mx-auto mt-2 max-w-2xl text-sm text-silver sm:text-base">
               Swipe through featured listings powered by the Hashgraph.
             </p>
@@ -207,7 +221,9 @@ export default function HomePageClient({
 
           <div className="mt-1 flex flex-1 min-h-0 flex-col sm:mt-3">
             {stackItems.length > 0 ? (
-              <div className={`transition-all duration-500 ease-out ${stackVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1"}`}>
+              <div
+                className={`transition-all duration-500 ease-out ${stackVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1"}`}
+              >
                 <CardStack
                   items={stackItems}
                   cardWidth={cardWidth}
@@ -247,8 +263,12 @@ export default function HomePageClient({
                           </span>
                         ) : null}
                         <div className="absolute inset-x-0 bottom-0 p-4">
-                          <h2 className="line-clamp-2 text-base font-bold text-white sm:text-lg">{item.title}</h2>
-                          <p className="mt-1 line-clamp-2 text-xs text-white/85">{item.description}</p>
+                          <h2 className="line-clamp-2 text-base font-bold text-white sm:text-lg">
+                            {item.title}
+                          </h2>
+                          <p className="mt-1 line-clamp-2 text-xs text-white/85">
+                            {item.description}
+                          </p>
                           {item.priceLabel ? (
                             <p className="mt-2 inline-flex items-center gap-1 rounded-full border border-cyan-300/30 bg-cyan-400/10 px-2.5 py-1 text-xs font-semibold text-cyan-100">
                               <Sparkles className="h-3 w-3" />

@@ -30,7 +30,11 @@ function loadIndexerState(): { lastProcessedTimestamp: number; lastProcessedBloc
 
 function saveIndexerState(ts: number, block: number): void {
   try {
-    fs.writeFileSync(STATE_FILE, JSON.stringify({ lastProcessedTimestamp: ts, lastProcessedBlock: block }), "utf8");
+    fs.writeFileSync(
+      STATE_FILE,
+      JSON.stringify({ lastProcessedTimestamp: ts, lastProcessedBlock: block }),
+      "utf8",
+    );
   } catch {
     // ignore
   }
@@ -64,16 +68,19 @@ export async function startIndexer(prisma: PrismaClient, log: Logger) {
   const state = loadIndexerState();
   lastProcessedTimestamp = state.lastProcessedTimestamp;
   setLastProcessedBlock(state.lastProcessedBlock);
-  log.info({ marketplaceAddress, auctionHouseAddress, lastProcessedTimestamp, lastProcessedBlock: state.lastProcessedBlock }, "Starting indexer (Mirror + RPC)");
+  log.info(
+    {
+      marketplaceAddress,
+      auctionHouseAddress,
+      lastProcessedTimestamp,
+      lastProcessedBlock: state.lastProcessedBlock,
+    },
+    "Starting indexer (Mirror + RPC)",
+  );
 
   const run = async () => {
     try {
-      const processed = await processEvents(
-        marketplaceAddress,
-        auctionHouseAddress,
-        prisma,
-        log
-      );
+      const processed = await processEvents(marketplaceAddress, auctionHouseAddress, prisma, log);
       saveIndexerState(lastProcessedTimestamp, getLastProcessedBlock());
       if (processed > 0) {
         log.info({ processed }, "Indexer processed events");
@@ -91,13 +98,9 @@ async function processEvents(
   marketplaceAddr: string,
   auctionHouseAddr: string,
   prisma: PrismaClient,
-  log: Logger
+  log: Logger,
 ): Promise<number> {
-  const events = await fetchMirrorEvents(
-    marketplaceAddr,
-    auctionHouseAddr,
-    lastProcessedTimestamp
-  );
+  const events = await fetchMirrorEvents(marketplaceAddr, auctionHouseAddr, lastProcessedTimestamp);
 
   if (events.length === 0 && lastProcessedTimestamp === 0) {
     log.debug("Mirror returned 0 logs; check GET /api/debug/mirror-logs");
@@ -107,9 +110,7 @@ async function processEvents(
   for (const event of events) {
     try {
       let ts =
-        typeof event.timestamp === "string"
-          ? parseFloat(event.timestamp)
-          : Number(event.timestamp);
+        typeof event.timestamp === "string" ? parseFloat(event.timestamp) : Number(event.timestamp);
       if (ts > 1e15) ts = ts / 1e9;
       if (!Number.isNaN(ts) && isFinite(ts))
         lastProcessedTimestamp = Math.max(lastProcessedTimestamp, ts);
@@ -157,23 +158,21 @@ async function handleEvent(event: any, prisma: PrismaClient, log: Logger) {
     case "ItemListed": {
       const listingId = normalizeListingId(event.listingId);
       const seller = (event.seller || "").toLowerCase();
-      const existing = await prisma.listing.findUnique({ where: { id: listingId } });
-      if (!existing) {
-        await prisma.listing.create({
-          data: {
-            id: listingId,
-            seller,
-            price: weiToHbar(event.price),
-            status: "LISTED",
-          },
-        });
-        log.info({ listingId, seller }, "Listing indexed");
-      } else {
-        await prisma.listing.update({
-          where: { id: listingId },
-          data: { status: "LISTED" },
-        });
-      }
+      await prisma.listing.upsert({
+        where: { id: listingId },
+        create: {
+          id: listingId,
+          seller,
+          price: weiToHbar(event.price),
+          status: "LISTED",
+          onChainConfirmed: true,
+        },
+        update: {
+          status: "LISTED",
+          onChainConfirmed: true,
+        },
+      });
+      log.info({ listingId, seller }, "Listing indexed");
       break;
     }
 
@@ -182,28 +181,18 @@ async function handleEvent(event: any, prisma: PrismaClient, log: Logger) {
       const buyer = normalizeAddress(event.buyer);
       const seller = normalizeAddress(event.seller);
       const amount = event.price.toString();
-      const recentWindowStart = new Date(Date.now() - 5 * 60 * 1000);
-      const existing = await prisma.sale.findFirst({
-        where: {
+      const saleId = `sale-${purchListingId}-${buyer}`;
+      await prisma.sale.upsert({
+        where: { id: saleId },
+        create: {
+          id: saleId,
           listingId: purchListingId,
           buyer,
           seller,
           amount,
-          createdAt: { gte: recentWindowStart },
         },
-        select: { id: true },
+        update: {},
       });
-      if (!existing) {
-        await prisma.sale.create({
-          data: {
-            id: `sale-${Date.now()}-${purchListingId}`,
-            listingId: purchListingId,
-            buyer,
-            seller,
-            amount,
-          },
-        });
-      }
       // Check DB listing to determine if escrow or direct sale
       const dbListing = await prisma.listing.findUnique({
         where: { id: purchListingId },

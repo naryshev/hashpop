@@ -130,7 +130,7 @@ export function CardStack<T extends CardStackItem>({
       if (offsetX > distanceThreshold || velocityX > velocityThreshold) prev();
       else if (offsetX < -distanceThreshold || velocityX < -velocityThreshold) next();
     },
-    [cardWidth, next, prev, reduceMotion]
+    [cardWidth, next, prev, reduceMotion],
   );
 
   React.useEffect(() => {
@@ -139,21 +139,42 @@ export function CardStack<T extends CardStackItem>({
 
   React.useEffect(() => {
     if (!autoAdvance || reduceMotion || !len || (pauseOnHover && hovering)) return;
-    const id = window.setInterval(() => {
-      if (loop || active < len - 1) next();
-    }, Math.max(700, intervalMs));
+    const id = window.setInterval(
+      () => {
+        if (loop || active < len - 1) next();
+      },
+      Math.max(700, intervalMs),
+    );
     return () => window.clearInterval(id);
   }, [autoAdvance, intervalMs, hovering, pauseOnHover, reduceMotion, len, loop, active, next]);
 
   if (!len) return null;
 
   return (
-    <div className={cn("w-full", className)} onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)}>
-      <div className="relative w-full" style={{ height: Math.max(300, cardHeight + 70) }} tabIndex={0} onKeyDown={onKeyDown}>
-        <div className="pointer-events-none absolute inset-x-0 top-6 mx-auto h-48 w-[70%] rounded-full bg-black/25 blur-3xl" aria-hidden />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 mx-auto h-40 w-[76%] rounded-full bg-black/35 blur-3xl" aria-hidden />
+    <div
+      className={cn("w-full", className)}
+      onMouseEnter={() => setHovering(true)}
+      onMouseLeave={() => setHovering(false)}
+    >
+      <div
+        className="relative w-full"
+        style={{ height: Math.max(300, cardHeight + 70) }}
+        tabIndex={0}
+        onKeyDown={onKeyDown}
+      >
+        <div
+          className="pointer-events-none absolute inset-x-0 top-6 mx-auto h-48 w-[70%] rounded-full bg-black/25 blur-3xl"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute inset-x-0 bottom-0 mx-auto h-40 w-[76%] rounded-full bg-black/35 blur-3xl"
+          aria-hidden
+        />
 
-        <div className="absolute inset-0 flex items-end justify-center" style={{ perspective: `${perspectivePx}px` }}>
+        <div
+          className="absolute inset-0 flex items-end justify-center"
+          style={{ perspective: `${perspectivePx}px` }}
+        >
           <AnimatePresence initial={false}>
             {items.map((item, i) => {
               const off = signedOffset(i, active, len, loop);
@@ -174,7 +195,7 @@ export function CardStack<T extends CardStackItem>({
                 <motion.div
                   key={item.id}
                   className={cn(
-                    "absolute bottom-0 overflow-hidden rounded-2xl border-4 border-black/10 shadow-xl will-change-transform select-none touch-manipulation"
+                    "absolute bottom-0 overflow-hidden rounded-2xl border-4 border-black/10 shadow-xl will-change-transform select-none touch-manipulation",
                   )}
                   style={{
                     width: cardWidth,
@@ -196,7 +217,14 @@ export function CardStack<T extends CardStackItem>({
                           scale,
                         }
                   }
-                  animate={{ opacity: 1, x: x + (isActive ? panX : 0), y: y + lift, rotateZ, rotateX, scale }}
+                  animate={{
+                    opacity: 1,
+                    x: x + (isActive ? panX : 0),
+                    y: y + lift,
+                    rotateZ,
+                    rotateX,
+                    scale,
+                  }}
                   transition={
                     isActive && draggingId === item.id
                       ? { duration: 0 }
@@ -254,8 +282,15 @@ export function CardStack<T extends CardStackItem>({
                     setActive(i);
                   }}
                 >
-                  <div className="h-full w-full" style={{ transform: `translateZ(${z}px)`, transformStyle: "preserve-3d" }}>
-                    {renderCard ? renderCard(item, { active: isActive }) : <DefaultFanCard item={item} />}
+                  <div
+                    className="h-full w-full"
+                    style={{ transform: `translateZ(${z}px)`, transformStyle: "preserve-3d" }}
+                  >
+                    {renderCard ? (
+                      renderCard(item, { active: isActive })
+                    ) : (
+                      <DefaultFanCard item={item} />
+                    )}
                   </div>
                 </motion.div>
               );
@@ -273,7 +308,10 @@ export function CardStack<T extends CardStackItem>({
                 <button
                   key={it.id}
                   onClick={() => setActive(idx)}
-                  className={cn("h-2 w-2 rounded-full transition", on ? "bg-white" : "bg-white/35 hover:bg-white/55")}
+                  className={cn(
+                    "h-2 w-2 rounded-full transition",
+                    on ? "bg-white" : "bg-white/35 hover:bg-white/55",
+                  )}
                   aria-label={`Go to ${it.title}`}
                 />
               );
@@ -307,7 +345,9 @@ function DefaultFanCard({ item }: { item: CardStackItem }) {
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
       <div className="relative z-10 flex h-full flex-col justify-end p-5">
         <div className="truncate text-lg font-semibold text-white">{item.title}</div>
-        {item.description ? <div className="mt-1 line-clamp-2 text-sm text-white/85">{item.description}</div> : null}
+        {item.description ? (
+          <div className="mt-1 line-clamp-2 text-sm text-white/85">{item.description}</div>
+        ) : null}
       </div>
     </div>
   );

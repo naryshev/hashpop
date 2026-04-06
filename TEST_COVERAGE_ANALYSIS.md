@@ -4,12 +4,12 @@
 
 The codebase has a single test file — `contracts/test/Marketplace.test.ts` (219 lines, 12 tests) — covering only the `Marketplace` smart contract. Everything else is untested.
 
-| Layer | Source files | Lines of code | Tests |
-|-------|-------------|---------------|-------|
-| Smart contracts | 7 core + 3 interfaces | ~971 | 12 tests (Marketplace only) |
-| Backend | 8 modules | ~2,589 | 0 |
-| Frontend | ~75 files | ~8,549 | 0 |
-| **Total** | **~90 files** | **~12,109** | **12 tests** |
+| Layer           | Source files          | Lines of code | Tests                       |
+| --------------- | --------------------- | ------------- | --------------------------- |
+| Smart contracts | 7 core + 3 interfaces | ~971          | 12 tests (Marketplace only) |
+| Backend         | 8 modules             | ~2,589        | 0                           |
+| Frontend        | ~75 files             | ~8,549        | 0                           |
+| **Total**       | **~90 files**         | **~12,109**   | **12 tests**                |
 
 Estimated coverage: **< 2%**
 
@@ -22,6 +22,7 @@ Estimated coverage: **< 2%**
 The existing Marketplace tests are a good baseline. Three other contracts with meaningful logic have zero coverage:
 
 #### `AuctionHouse.sol` (244 lines) — **highest priority**
+
 The auction contract is the most complex untested contract. Key scenarios to cover:
 
 - **Happy path**: `createAuction` → `placeBid` (multiple bidders) → `settleAuction` → escrow/shipment/receipt flow
@@ -34,6 +35,7 @@ The auction contract is the most complex untested contract. Key scenarios to cov
 - **Pause/unpause**: `createAuction` and `placeBid` should revert when paused
 
 #### `Escrow.sol` (195 lines) — **high priority**
+
 Only the happy-path receipt confirmation is indirectly exercised by the Marketplace tests. Untested paths:
 
 - **Timeout — seller silent**: `resolveTimeout` called after 7 days with state `AWAITING_SHIPMENT` should refund buyer
@@ -44,6 +46,7 @@ Only the happy-path receipt confirmation is indirectly exercised by the Marketpl
 - **`confirmShipment` by non-seller**: should revert with `"Not seller"`
 
 #### `Reputation.sol` (100 lines) — **medium priority**
+
 - `getReputationScore` returns 50 for new users (zero sales)
 - Score after a mix of completions, refunds, and timeouts — verify the formula `(successfulCompletions * 100 / totalSales) - (timeouts * 10)`
 - Score floors at 0, not underflow
@@ -56,16 +59,19 @@ Only the happy-path receipt confirmation is indirectly exercised by the Marketpl
 `backend/src/api/index.ts` is 1,715 lines with no test framework configured. The following endpoint groups carry the most risk:
 
 #### Financial / state-changing endpoints
+
 These touch on-chain state or escrow and are the most critical to get right:
 
 - **`POST /relay`** — submits signed transactions to the chain. Tests should verify that unsigned or tampered payloads are rejected and that the ED25519 signature check cannot be bypassed.
 - **Offer acceptance / rejection flow** — ensure database state is updated atomically with on-chain calls and that partial failures are handled.
 
 #### Data integrity endpoints
+
 - **Listing CRUD** — create, update, cancel. Verify that only the listing owner can mutate their listing, and that invalid inputs (missing fields, wrong types) return 400 not 500.
 - **Image upload** — verify file-type validation, size limits, and that the S3 URL is stored correctly.
 
 #### A practical starting point
+
 Add [Vitest](https://vitest.dev/) (zero-config for TypeScript) or Jest with `supertest` for HTTP-level integration tests. Mock Prisma with `jest-mock-extended` or `prisma-mock`. A sample skeleton:
 
 ```ts
@@ -87,13 +93,13 @@ describe("POST /listings", () => {
 
 Several `lib/` files contain pure or near-pure logic that can be unit-tested without a browser or wallet:
 
-| File | What to test |
-|------|-------------|
-| `lib/formatPrice.ts` | Edge cases: 0, very large numbers, decimal rounding |
-| `lib/formatDate.ts` | Relative/absolute formatting, timezone handling |
-| `lib/bytes32.ts` | Round-trip encode/decode, padding, truncation |
+| File                      | What to test                                                                                |
+| ------------------------- | ------------------------------------------------------------------------------------------- |
+| `lib/formatPrice.ts`      | Edge cases: 0, very large numbers, decimal rounding                                         |
+| `lib/formatDate.ts`       | Relative/absolute formatting, timezone handling                                             |
+| `lib/bytes32.ts`          | Round-trip encode/decode, padding, truncation                                               |
 | `lib/transactionError.ts` | All known revert strings map to user-friendly messages; unknown errors fall back gracefully |
-| `lib/categories.ts` | Category list is non-empty, slugs are unique |
+| `lib/categories.ts`       | Category list is non-empty, slugs are unique                                                |
 
 These require no mocking and are the cheapest tests to write. Adding Vitest to the frontend takes one `npm install` and a `vitest.config.ts`.
 
@@ -137,11 +143,11 @@ Use Vitest + React Testing Library. Keep tests in `hooks/__tests__/`.
 
 ## Summary
 
-| Area | Effort | Risk if untested | Recommended first test |
-|------|--------|-----------------|----------------------|
-| `AuctionHouse.sol` | Low (Hardhat already set up) | HIGH — funds at risk | Anti-sniping + bid increment |
-| `Escrow.sol` timeout paths | Low | HIGH — funds locked forever | `resolveTimeout` both branches |
-| Backend relay endpoint | Medium | HIGH — signed tx bypass | Invalid signature → 401 |
-| `lib/formatPrice` + `transactionError` | Very low | Low | Pure function round-trips |
-| Frontend hooks | Medium | Medium | Wallet-not-connected error state |
-| `indexer/decoder.ts` | Low | Medium | Known event fixture → expected struct |
+| Area                                   | Effort                       | Risk if untested            | Recommended first test                |
+| -------------------------------------- | ---------------------------- | --------------------------- | ------------------------------------- |
+| `AuctionHouse.sol`                     | Low (Hardhat already set up) | HIGH — funds at risk        | Anti-sniping + bid increment          |
+| `Escrow.sol` timeout paths             | Low                          | HIGH — funds locked forever | `resolveTimeout` both branches        |
+| Backend relay endpoint                 | Medium                       | HIGH — signed tx bypass     | Invalid signature → 401               |
+| `lib/formatPrice` + `transactionError` | Very low                     | Low                         | Pure function round-trips             |
+| Frontend hooks                         | Medium                       | Medium                      | Wallet-not-connected error state      |
+| `indexer/decoder.ts`                   | Low                          | Medium                      | Known event fixture → expected struct |

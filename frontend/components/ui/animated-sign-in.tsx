@@ -31,7 +31,7 @@ export default function AnimatedSignIn() {
     if (pairingUri) {
       const deeplink = buildHashPackDeepLink(pairingUri);
       const isMobile = /Android|iPhone|iPad|iPod/i.test(
-        typeof navigator !== "undefined" ? navigator.userAgent : ""
+        typeof navigator !== "undefined" ? navigator.userAgent : "",
       );
       if (isMobile) {
         window.location.href = deeplink;
@@ -48,8 +48,8 @@ export default function AnimatedSignIn() {
   const buttonLabel = !isReady
     ? "Loading wallet..."
     : isConnecting
-    ? "Connecting..."
-    : "Continue with HashPack";
+      ? "Connecting..."
+      : "Continue with HashPack";
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#071b38]">
@@ -110,10 +110,22 @@ export default function AnimatedSignIn() {
 
             {/* Feature list */}
             <div className="mt-6 space-y-3">
-              <Feature title="Trade trusted listings" detail="Buy and sell with transparent on-chain records." />
-              <Feature title="Verify item history" detail="Track listing status, updates, and ownership signals." />
-              <Feature title="Faster marketplace discovery" detail="Swipe featured items or search by category instantly." />
-              <Feature title="Secure wallet-first sign in" detail="No passwords — authenticate directly with HashPack." />
+              <Feature
+                title="Trade trusted listings"
+                detail="Buy and sell with transparent on-chain records."
+              />
+              <Feature
+                title="Verify item history"
+                detail="Track listing status, updates, and ownership signals."
+              />
+              <Feature
+                title="Faster marketplace discovery"
+                detail="Swipe featured items or search by category instantly."
+              />
+              <Feature
+                title="Secure wallet-first sign in"
+                detail="No passwords — authenticate directly with HashPack."
+              />
             </div>
 
             {error ? <p className="mt-3 text-center text-xs text-amber-300">{error}</p> : null}

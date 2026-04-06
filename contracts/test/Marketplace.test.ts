@@ -31,7 +31,7 @@ describe("Marketplace", function () {
       await escrow.getAddress(),
       await treasury.getAddress(),
       await reputation.getAddress(),
-      300 // 3% fee for other flows; direct non-escrow uses fixed 2%
+      300, // 3% fee for other flows; direct non-escrow uses fixed 2%
     );
     await marketplace.waitForDeployment();
     await escrow.setMarketplace(await marketplace.getAddress());
@@ -51,9 +51,7 @@ describe("Marketplace", function () {
     const price = ethers.parseEther("1.0");
 
     await marketplace.connect(seller).createListing(listingId, price, true);
-    await expect(
-      marketplace.connect(buyer).buyNow(listingId, { value: price })
-    )
+    await expect(marketplace.connect(buyer).buyNow(listingId, { value: price }))
       .to.emit(marketplace, "ItemPurchased")
       .withArgs(listingId, buyer.address, seller.address, price);
   });
@@ -74,7 +72,9 @@ describe("Marketplace", function () {
 
     const listing = await marketplace.listings(listingId);
     expect(Number(listing.status)).to.equal(3); // COMPLETED
-    expect(await ethers.provider.getBalance(await treasury.getAddress())).to.equal(treasuryBefore + fee);
+    expect(await ethers.provider.getBalance(await treasury.getAddress())).to.equal(
+      treasuryBefore + fee,
+    );
     expect(await ethers.provider.getBalance(seller.address)).to.equal(sellerBefore + sellerAmount);
   });
 
@@ -99,7 +99,7 @@ describe("Marketplace", function () {
 
     await marketplace.connect(seller).createListing(listingId, initialPrice, true);
     await expect(
-      marketplace.connect(buyer).updateListingPrice(listingId, newPrice)
+      marketplace.connect(buyer).updateListingPrice(listingId, newPrice),
     ).to.be.revertedWith("Not seller");
   });
 
@@ -112,7 +112,7 @@ describe("Marketplace", function () {
     await marketplace.connect(seller).updateListingPrice(listingId, newPrice);
 
     await expect(
-      marketplace.connect(buyer).buyNow(listingId, { value: initialPrice })
+      marketplace.connect(buyer).buyNow(listingId, { value: initialPrice }),
     ).to.be.revertedWith("Price mismatch");
   });
 
@@ -125,7 +125,7 @@ describe("Marketplace", function () {
     await marketplace.connect(buyer).buyNow(listingId, { value: price });
 
     await expect(
-      marketplace.connect(secondBuyer).buyNow(listingId, { value: price })
+      marketplace.connect(secondBuyer).buyNow(listingId, { value: price }),
     ).to.be.revertedWith("Not listed");
   });
 
@@ -137,9 +137,7 @@ describe("Marketplace", function () {
     await escrow.revokeRole(marketplaceRole, await marketplace.getAddress());
     await marketplace.connect(seller).createListing(listingId, price, true);
 
-    await expect(
-      marketplace.connect(buyer).buyNow(listingId, { value: price })
-    ).to.be.reverted;
+    await expect(marketplace.connect(buyer).buyNow(listingId, { value: price })).to.be.reverted;
 
     const listing = await marketplace.listings(listingId);
     expect(Number(listing.status)).to.equal(1); // LISTED
@@ -199,7 +197,7 @@ describe("Marketplace", function () {
     await marketplace.connect(buyer).makeOffer(listingId, { value: offerAmount });
 
     await expect(
-      marketplace.connect(owner).acceptOffer(listingId, buyer.address)
+      marketplace.connect(owner).acceptOffer(listingId, buyer.address),
     ).to.be.revertedWith("Not seller");
   });
 

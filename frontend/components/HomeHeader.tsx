@@ -8,7 +8,11 @@ import { AccountMenu } from "./AccountMenu";
 /** Hashpop logo wordmark with red-blue-green accent palette. */
 function HashpopLogo() {
   return (
-    <Link href="/marketplace" className="inline-flex items-center gap-1.5 font-bold text-2xl tracking-tight" aria-label="Hashpop marketplace">
+    <Link
+      href="/marketplace"
+      className="inline-flex items-center gap-1.5 font-bold text-2xl tracking-tight"
+      aria-label="Hashpop marketplace"
+    >
       <span className="bg-[linear-gradient(100deg,#ff2f3d_0%,#ff8f00_32%,#13a0ff_62%,#6ddf85_100%)] bg-clip-text text-transparent">
         Hashpop
       </span>
@@ -111,8 +115,12 @@ export function HomeHeader() {
             ))}
           </div>
           <div className="flex items-center gap-4">
-            <Link href="/create" className="text-silver hover:text-white font-medium">Sell</Link>
-            <Link href="/watchlist" className="text-silver hover:text-white">Watchlist</Link>
+            <Link href="/create" className="text-silver hover:text-white font-medium">
+              Sell
+            </Link>
+            <Link href="/watchlist" className="text-silver hover:text-white">
+              Watchlist
+            </Link>
             <div
               ref={myHbayRef}
               className="relative inline-block"
@@ -128,7 +136,12 @@ export function HomeHeader() {
               >
                 My Hashpop
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
                 </svg>
               </button>
               {myHbayOpen && (
@@ -157,20 +170,43 @@ export function HomeHeader() {
         {/* Mobile top nav (eBay-like) */}
         <div className="md:hidden space-y-3">
           <div className="flex items-center justify-between">
-            <Link href="/marketplace" className="text-3xl font-extrabold tracking-tight" aria-label="Hashpop marketplace">
+            <Link
+              href="/marketplace"
+              className="text-3xl font-extrabold tracking-tight"
+              aria-label="Hashpop marketplace"
+            >
               <span className="bg-[linear-gradient(100deg,#ff2f3d_0%,#ff8f00_32%,#13a0ff_62%,#6ddf85_100%)] bg-clip-text text-transparent">
                 hashpop
               </span>
             </Link>
-            <Link href="/selling" className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/10 p-2.5" aria-label="Selling">
+            <Link
+              href="/selling"
+              className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/10 p-2.5"
+              aria-label="Selling"
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/hashpop-cart-3d.PNG" alt="Hashpop cart" className="h-6 w-auto object-contain" />
+              <img
+                src="/hashpop-cart-3d.PNG"
+                alt="Hashpop cart"
+                className="h-6 w-auto object-contain"
+              />
             </Link>
           </div>
           <form onSubmit={handleSearch} className="flex items-center gap-2">
             <div className="flex min-w-0 flex-1 items-center rounded-full border border-white/10 bg-white/5 px-3">
-              <svg className="h-5 w-5 text-silver" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M16 10.5A5.5 5.5 0 115 10.5a5.5 5.5 0 0111 0z" />
+              <svg
+                className="h-5 w-5 text-silver"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-4.35-4.35M16 10.5A5.5 5.5 0 115 10.5a5.5 5.5 0 0111 0z"
+                />
               </svg>
               <input
                 type="search"
@@ -179,8 +215,19 @@ export function HomeHeader() {
                 placeholder="Search for anything"
                 className="flex-1 bg-transparent py-2.5 pl-2 text-white placeholder:text-zinc-500 focus:outline-none text-sm"
               />
-              <svg className="h-5 w-5 text-silver" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+              <svg
+                className="h-5 w-5 text-silver"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                />
               </svg>
             </div>
           </form>
@@ -190,9 +237,19 @@ export function HomeHeader() {
         <div className="hidden md:flex items-center gap-3 md:gap-4">
           <HashpopLogo />
           {isHome && (
-            <button type="button" className="hidden sm:flex items-center gap-1 text-sm text-silver hover:text-white border border-white/10 rounded-lg px-3 py-2">
+            <button
+              type="button"
+              className="hidden sm:flex items-center gap-1 text-sm text-silver hover:text-white border border-white/10 rounded-lg px-3 py-2"
+            >
               Shop by category
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
             </button>
           )}
           <form onSubmit={handleSearch} className="flex-1 min-w-0 flex items-center gap-2">
@@ -205,13 +262,22 @@ export function HomeHeader() {
                 className="flex-1 min-w-0 bg-transparent border-0 py-2.5 px-3 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-0 text-sm"
               />
               <span className="hidden sm:flex items-center pr-2 text-silver" aria-hidden>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /></svg>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                  />
+                </svg>
               </span>
               <select className="hidden md:block bg-white/5 border-l border-white/10 text-silver text-sm py-2.5 pl-3 pr-8 focus:outline-none cursor-pointer">
                 <option>All Categories</option>
               </select>
             </div>
-            <button type="submit" className="btn-frost-cta text-sm py-2.5 px-4 shrink-0">Search</button>
+            <button type="submit" className="btn-frost-cta text-sm py-2.5 px-4 shrink-0">
+              Search
+            </button>
             <div ref={advancedRef} className="hidden sm:block relative shrink-0">
               <button
                 type="button"
@@ -276,7 +342,9 @@ export function HomeHeader() {
                           setPostedWithin("");
                           setAdvancedOpen(false);
                           const q = searchQuery.trim();
-                          router.push(q ? `/marketplace?q=${encodeURIComponent(q)}` : "/marketplace");
+                          router.push(
+                            q ? `/marketplace?q=${encodeURIComponent(q)}` : "/marketplace",
+                          );
                         }}
                         className="btn-frost border-white/20 text-xs px-3 py-2"
                       >
@@ -299,7 +367,11 @@ export function HomeHeader() {
         <div className="hidden md:block border-t border-white/5 overflow-x-auto scrollbar-hide">
           <div className="max-w-6xl mx-auto px-4 py-2 flex items-center gap-4 text-sm shrink-0">
             {CATEGORY_LINKS.map(({ href, label, query }) => (
-              <Link key={label} href={query ? `${href}?${query}` : href} className="text-silver hover:text-white whitespace-nowrap">
+              <Link
+                key={label}
+                href={query ? `${href}?${query}` : href}
+                className="text-silver hover:text-white whitespace-nowrap"
+              >
                 {label}
               </Link>
             ))}

@@ -5,7 +5,7 @@ const MIRROR_BASE = process.env.MIRROR_URL || "https://testnet.mirrornode.hedera
 export async function fetchMirrorEvents(
   marketplaceAddr: string,
   auctionHouseAddr: string,
-  sinceTimestamp: number
+  sinceTimestamp: number,
 ): Promise<any[]> {
   try {
     // Fetch contract logs from Mirror Node
@@ -52,11 +52,7 @@ async function fetchContractLogs(contractAddress: string, since: number): Promis
   } catch (err: any) {
     const status = err.response?.status;
     const data = err.response?.data;
-    console.error(
-      `Failed to fetch logs for ${contractAddress}:`,
-      status,
-      data ?? err.message
-    );
+    console.error(`Failed to fetch logs for ${contractAddress}:`, status, data ?? err.message);
     return [];
   }
 }

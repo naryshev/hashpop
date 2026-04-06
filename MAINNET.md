@@ -112,12 +112,12 @@ NEXT_PUBLIC_WC_PROJECT_ID=...
 
 ## Summary
 
-| Step | What to do |
-|------|------------|
-| Get HBAR | Buy on an exchange, withdraw to your mainnet account (e.g. via HashPack Mainnet). |
-| Deploy | Fund an ECDSA mainnet account → set `PRIVATE_KEY` + optional `HEDERA_MAINNET_RPC` → `npm run deploy:mainnet` → save contract addresses. |
-| Backend | Set `HEDERA_RPC_URL`, `MIRROR_URL`, and mainnet contract addresses in backend env. |
-| Frontend | Set `NEXT_PUBLIC_HEDERA_NETWORK=mainnet`, `NEXT_PUBLIC_HEDERA_RPC`, and mainnet contract addresses; rebuild and deploy. |
-| Wallet | In HashPack, select **Mainnet** and connect; all app actions use real HBAR. |
+| Step     | What to do                                                                                                                              |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Get HBAR | Buy on an exchange, withdraw to your mainnet account (e.g. via HashPack Mainnet).                                                       |
+| Deploy   | Fund an ECDSA mainnet account → set `PRIVATE_KEY` + optional `HEDERA_MAINNET_RPC` → `npm run deploy:mainnet` → save contract addresses. |
+| Backend  | Set `HEDERA_RPC_URL`, `MIRROR_URL`, and mainnet contract addresses in backend env.                                                      |
+| Frontend | Set `NEXT_PUBLIC_HEDERA_NETWORK=mainnet`, `NEXT_PUBLIC_HEDERA_RPC`, and mainnet contract addresses; rebuild and deploy.                 |
+| Wallet   | In HashPack, select **Mainnet** and connect; all app actions use real HBAR.                                                             |
 
 Leaving `NEXT_PUBLIC_HEDERA_NETWORK` unset (or not `mainnet`) keeps the app on **Testnet** (default).

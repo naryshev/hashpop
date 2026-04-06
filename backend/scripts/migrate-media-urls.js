@@ -14,7 +14,9 @@ if (!s3PublicUrl) {
 
 function rewriteUrl(url) {
   if (!url) return url;
-  const m = String(url).match(/^https?:\/\/(?:localhost|127\.0\.0\.1):4000\/uploads\/([^?#]+)(?:[?#].*)?$/i);
+  const m = String(url).match(
+    /^https?:\/\/(?:localhost|127\.0\.0\.1):4000\/uploads\/([^?#]+)(?:[?#].*)?$/i,
+  );
   if (!m || !m[1]) return url;
   return `${s3PublicUrl}/uploads/${m[1]}`;
 }

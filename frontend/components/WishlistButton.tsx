@@ -13,7 +13,12 @@ type WishlistButtonProps = {
   compact?: boolean;
 };
 
-export function WishlistButton({ itemId, itemType, className = "", compact = true }: WishlistButtonProps) {
+export function WishlistButton({
+  itemId,
+  itemType,
+  className = "",
+  compact = true,
+}: WishlistButtonProps) {
   const { address } = useHashpackWallet();
   const [inWishlist, setInWishlist] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -21,7 +26,7 @@ export function WishlistButton({ itemId, itemType, className = "", compact = tru
   useEffect(() => {
     if (!address || !itemId) return;
     fetch(`${getApiUrl()}/api/wishlist?address=${encodeURIComponent(address)}`)
-      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((data: { items?: { itemId: string }[] }) => {
         setInWishlist((data.items || []).some((i) => i.itemId === itemId));
       })
@@ -35,7 +40,10 @@ export function WishlistButton({ itemId, itemType, className = "", compact = tru
     setLoading(true);
     try {
       if (inWishlist) {
-        await fetch(`${getApiUrl()}/api/wishlist?address=${encodeURIComponent(address)}&itemId=${encodeURIComponent(itemId)}`, { method: "DELETE" });
+        await fetch(
+          `${getApiUrl()}/api/wishlist?address=${encodeURIComponent(address)}&itemId=${encodeURIComponent(itemId)}`,
+          { method: "DELETE" },
+        );
         setInWishlist(false);
       } else {
         await fetch(`${getApiUrl()}/api/wishlist`, {
@@ -70,7 +78,9 @@ export function WishlistButton({ itemId, itemType, className = "", compact = tru
       onClick={toggle}
       disabled={!address || loading}
       className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
-        inWishlist ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-300" : "border-white/20 bg-white/5 text-silver hover:text-white hover:bg-white/10"
+        inWishlist
+          ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-300"
+          : "border-white/20 bg-white/5 text-silver hover:text-white hover:bg-white/10"
       } ${className}`}
       aria-label={inWishlist ? "In wishlist" : "Add to wishlist"}
     >

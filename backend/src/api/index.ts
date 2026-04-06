@@ -19,7 +19,9 @@ function normalizeListingId(id: string): string {
 }
 
 function normalizeWalletAddress(address?: string | null): string {
-  return String(address || "").trim().toLowerCase();
+  return String(address || "")
+    .trim()
+    .toLowerCase();
 }
 
 /** Convert listing id (0x...64 hex or string) to bytes32 for contract calls. */
@@ -89,7 +91,9 @@ const listingReportRate = new Map<string, number[]>();
 
 function rewriteMediaUrlForClient(url: string | null | undefined): string | null | undefined {
   if (!url || !s3PublicBase) return url;
-  const m = url.match(/^https?:\/\/(?:localhost|127\.0\.0\.1):4000\/uploads\/([^?#]+)(?:[?#].*)?$/i);
+  const m = url.match(
+    /^https?:\/\/(?:localhost|127\.0\.0\.1):4000\/uploads\/([^?#]+)(?:[?#].*)?$/i,
+  );
   if (!m?.[1]) return url;
   return `${s3PublicBase}/uploads/${m[1]}`;
 }
@@ -114,8 +118,10 @@ function isReportRateLimited(key: string): boolean {
 const ESCROW_ABI_VIEW = [
   "function escrows(bytes32) view returns (address buyer, address seller, uint256 amount, uint256 createdAt, uint256 timeoutAt, uint8 state)",
 ];
-const MARKETPLACE_LISTINGS_VIEW_V2 = "function listings(bytes32) view returns (address seller, uint256 price, uint256 createdAt, uint8 status, bytes32 escrowId, bool requireEscrow)";
-const MARKETPLACE_LISTINGS_VIEW_V1 = "function listings(bytes32) view returns (address seller, uint256 price, uint256 createdAt, uint8 status, bytes32 escrowId)";
+const MARKETPLACE_LISTINGS_VIEW_V2 =
+  "function listings(bytes32) view returns (address seller, uint256 price, uint256 createdAt, uint8 status, bytes32 escrowId, bool requireEscrow)";
+const MARKETPLACE_LISTINGS_VIEW_V1 =
+  "function listings(bytes32) view returns (address seller, uint256 price, uint256 createdAt, uint8 status, bytes32 escrowId)";
 
 type MarketplaceListingView = {
   seller: string;
@@ -126,7 +132,7 @@ type MarketplaceListingView = {
 async function readMarketplaceListingCompat(
   provider: ethers.JsonRpcProvider,
   marketplaceAddr: string,
-  listingId: string
+  listingId: string,
 ): Promise<MarketplaceListingView> {
   const ifaceV2 = new ethers.Interface([MARKETPLACE_LISTINGS_VIEW_V2]);
   const ifaceV1 = new ethers.Interface([MARKETPLACE_LISTINGS_VIEW_V1]);
@@ -222,7 +228,8 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     storage: memoryStorage,
     limits: { fileSize: MAX_MEDIA_SIZE },
     fileFilter: (_req, file, cb) => {
-      const ok = /^image\/(jpeg|jpg|png|gif|webp)$/i.test(file.mimetype) ||
+      const ok =
+        /^image\/(jpeg|jpg|png|gif|webp)$/i.test(file.mimetype) ||
         /^video\/(mp4|webm|quicktime)$/i.test(file.mimetype);
       if (ok) cb(null, true);
       else cb(new Error("Only images (JPEG, PNG, GIF, WebP) or videos (MP4, WebM, MOV) allowed"));
@@ -234,7 +241,8 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       try {
         if (err) {
           log.warn({ err, code: err?.code }, "Upload error");
-          if (err.code === "LIMIT_FILE_SIZE") return res.status(400).json({ error: "Image must be 2MB or smaller" });
+          if (err.code === "LIMIT_FILE_SIZE")
+            return res.status(400).json({ error: "Image must be 2MB or smaller" });
           return res.status(400).json({ error: err.message || "Upload failed" });
         }
         if (!req.file?.buffer) return res.status(400).json({ error: "No image file" });
@@ -245,7 +253,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           filename,
           req.file.mimetype,
           baseUrl,
-          uploadsDir
+          uploadsDir,
         );
         res.json({ imageUrl });
       } catch (e: any) {
@@ -260,7 +268,8 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       try {
         if (err) {
           log.warn({ err, code: err?.code }, "Upload media error");
-          if (err.code === "LIMIT_FILE_SIZE") return res.status(400).json({ error: "File must be 15MB or smaller" });
+          if (err.code === "LIMIT_FILE_SIZE")
+            return res.status(400).json({ error: "File must be 15MB or smaller" });
           return res.status(400).json({ error: err.message || "Upload failed" });
         }
         if (!req.file?.buffer) return res.status(400).json({ error: "No file" });
@@ -271,7 +280,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           filename,
           req.file.mimetype,
           baseUrl,
-          uploadsDir
+          uploadsDir,
         );
         res.json({ mediaUrl });
       } catch (e: any) {
@@ -331,11 +340,13 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
                 // ignore per-listing on-chain read errors
               }
               return null;
-            })
+            }),
           );
           const pricePairs: Array<[string, string]> = [];
           const statusPairs: Array<[string, string]> = [];
-          for (const o of overrides as Array<readonly [string, string | null, string | null] | null>) {
+          for (const o of overrides as Array<
+            readonly [string, string | null, string | null] | null
+          >) {
             if (!o) continue;
             if (o[1] != null) pricePairs.push([o[0], o[1]]);
             if (o[2] != null) statusPairs.push([o[0], o[2]]);
@@ -363,11 +374,25 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       });
     } catch (err: unknown) {
       log.error({ err }, "Failed to fetch listings");
-      const code = err && typeof err === "object" && "code" in err ? (err as { code?: string }).code : undefined;
-      const message = err && typeof err === "object" && "message" in err ? String((err as Error).message) : "";
-      const isTlsError = message.includes("SSL") || message.includes("TLS") || message.includes("certificate") || message.includes("self signed") || (code && String(code).startsWith("ERR_TLS"));
+      const code =
+        err && typeof err === "object" && "code" in err
+          ? (err as { code?: string }).code
+          : undefined;
+      const message =
+        err && typeof err === "object" && "message" in err ? String((err as Error).message) : "";
+      const isTlsError =
+        message.includes("SSL") ||
+        message.includes("TLS") ||
+        message.includes("certificate") ||
+        message.includes("self signed") ||
+        (code && String(code).startsWith("ERR_TLS"));
       if (code === "ECONNREFUSED" || message.includes("connect") || isTlsError) {
-        res.status(503).json({ error: "Database unavailable. Start PostgreSQL (e.g. docker compose up -d db) and run backend migrations." });
+        res
+          .status(503)
+          .json({
+            error:
+              "Database unavailable. Start PostgreSQL (e.g. docker compose up -d db) and run backend migrations.",
+          });
         return;
       }
       res.status(500).json({ error: `Internal server error: ${message || String(err)}` });
@@ -380,7 +405,21 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
    * without waiting for the indexer (Mirror/RPC can be slow or limited on Hedera).
    */
   router.post("/sync-listing", async (req, res) => {
-    const { txHash, listingId, seller, price, requireEscrow, imageUrl, mediaUrls, title, subtitle, description, category, condition, yearOfProduction } = (req.body || {}) as {
+    const {
+      txHash,
+      listingId,
+      seller,
+      price,
+      requireEscrow,
+      imageUrl,
+      mediaUrls,
+      title,
+      subtitle,
+      description,
+      category,
+      condition,
+      yearOfProduction,
+    } = (req.body || {}) as {
       txHash?: string;
       listingId?: string;
       seller?: string;
@@ -403,10 +442,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       typeof seller === "string" && /^0x[0-9a-fA-F]{40}$/.test(seller.trim())
         ? seller.trim().toLowerCase()
         : null;
-    const fallbackPrice =
-      typeof price === "string" && price.trim()
-        ? price.trim()
-        : null;
+    const fallbackPrice = typeof price === "string" && price.trim() ? price.trim() : null;
     const canFallbackUpsert = !!(fallbackListingId && fallbackSeller && fallbackPrice);
 
     const imageUrlStr = typeof imageUrl === "string" && imageUrl ? imageUrl : null;
@@ -418,10 +454,15 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           : [];
     const titleStr = typeof title === "string" && title.trim() ? title.trim() : null;
     const subtitleStr = typeof subtitle === "string" && subtitle.trim() ? subtitle.trim() : null;
-    const descriptionStr = typeof description === "string" && description.trim() ? description.trim() : null;
+    const descriptionStr =
+      typeof description === "string" && description.trim() ? description.trim() : null;
     const categoryStr = typeof category === "string" && category.trim() ? category.trim() : null;
-    const conditionStr = typeof condition === "string" && condition.trim() ? condition.trim() : null;
-    const yearStr = typeof yearOfProduction === "string" && yearOfProduction.trim() ? yearOfProduction.trim() : null;
+    const conditionStr =
+      typeof condition === "string" && condition.trim() ? condition.trim() : null;
+    const yearStr =
+      typeof yearOfProduction === "string" && yearOfProduction.trim()
+        ? yearOfProduction.trim()
+        : null;
     const requireEscrowBool = !!requireEscrow;
 
     const upsertFallbackListing = async () => {
@@ -462,7 +503,10 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         update: fallbackUpdateData,
         create: fallbackCreateData,
       });
-      log.info({ listingId: fallbackListingId, seller: fallbackSeller, txHash }, "Synced listing via fallback upsert");
+      log.info(
+        { listingId: fallbackListingId, seller: fallbackSeller, txHash },
+        "Synced listing via fallback upsert",
+      );
       return fallbackListingId;
     };
 
@@ -563,10 +607,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       typeof listingId === "string" && listingId.trim()
         ? normalizeListingId(listingId.trim())
         : null;
-    const fallbackPrice =
-      typeof newPrice === "string" && newPrice.trim()
-        ? newPrice.trim()
-        : null;
+    const fallbackPrice = typeof newPrice === "string" && newPrice.trim() ? newPrice.trim() : null;
     const canFallbackUpdate = !!(fallbackListingId && fallbackPrice);
 
     const applyFallbackPrice = async () => {
@@ -576,20 +617,33 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         data: { price: fallbackPrice! },
       });
       if (result.count === 0) return false;
-      log.info({ listingId: fallbackListingId, txHash }, "Synced listing price via fallback update");
+      log.info(
+        { listingId: fallbackListingId, txHash },
+        "Synced listing price via fallback update",
+      );
       return true;
     };
 
     if (!txHash || typeof txHash !== "string") {
       if (await applyFallbackPrice()) {
-        return res.json({ ok: true, listingId: fallbackListingId, price: fallbackPrice, source: "fallback" });
+        return res.json({
+          ok: true,
+          listingId: fallbackListingId,
+          price: fallbackPrice,
+          source: "fallback",
+        });
       }
       return res.status(400).json({ error: "txHash required" });
     }
     const rpcUrl = process.env.HEDERA_RPC_URL;
     if (!rpcUrl) {
       if (await applyFallbackPrice()) {
-        return res.json({ ok: true, listingId: fallbackListingId, price: fallbackPrice, source: "fallback" });
+        return res.json({
+          ok: true,
+          listingId: fallbackListingId,
+          price: fallbackPrice,
+          source: "fallback",
+        });
       }
       return res.status(503).json({ error: "HEDERA_RPC_URL not set" });
     }
@@ -598,7 +652,12 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       const receipt = await provider.getTransactionReceipt(txHash);
       if (!receipt?.logs?.length) {
         if (await applyFallbackPrice()) {
-          return res.json({ ok: true, listingId: fallbackListingId, price: fallbackPrice, source: "fallback" });
+          return res.json({
+            ok: true,
+            listingId: fallbackListingId,
+            price: fallbackPrice,
+            source: "fallback",
+          });
         }
         return res.status(404).json({ error: "Transaction or logs not found" });
       }
@@ -619,13 +678,23 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         return res.json({ ok: true, listingId, price: newPriceHbar });
       }
       if (await applyFallbackPrice()) {
-        return res.json({ ok: true, listingId: fallbackListingId, price: fallbackPrice, source: "fallback" });
+        return res.json({
+          ok: true,
+          listingId: fallbackListingId,
+          price: fallbackPrice,
+          source: "fallback",
+        });
       }
       return res.status(404).json({ error: "No PriceUpdated event in transaction" });
     } catch (err: any) {
       log.error({ err, txHash }, "Sync price update failed");
       if (await applyFallbackPrice()) {
-        return res.json({ ok: true, listingId: fallbackListingId, price: fallbackPrice, source: "fallback" });
+        return res.json({
+          ok: true,
+          listingId: fallbackListingId,
+          price: fallbackPrice,
+          source: "fallback",
+        });
       }
       return res.status(500).json({ error: err.message || "Sync failed" });
     }
@@ -684,7 +753,10 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         data: { status: "LOCKED" },
       });
       if (updated.count === 0) return false;
-      log.info({ listingId: fallbackListingId, txHash, nextStatus: "LOCKED" }, "Synced purchase via fallback update");
+      log.info(
+        { listingId: fallbackListingId, txHash, nextStatus: "LOCKED" },
+        "Synced purchase via fallback update",
+      );
       return true;
     };
 
@@ -732,7 +804,11 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         const marketplaceAddr = process.env.MARKETPLACE_ADDRESS;
         if (isUsableContractAddress(marketplaceAddr)) {
           try {
-            const chainData = await readMarketplaceListingCompat(provider, marketplaceAddr, purchasedId);
+            const chainData = await readMarketplaceListingCompat(
+              provider,
+              marketplaceAddr,
+              purchasedId,
+            );
             const chainStatus = Number(chainData.status);
             // COMPLETED(3) = direct sale settled immediately; LOCKED(2) = escrow
             if (chainStatus === 3) nextStatus = "SOLD";
@@ -767,7 +843,10 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
    */
   router.post("/sync-escrow-complete", async (req, res) => {
     const { listingId } = (req.body || {}) as { listingId?: string };
-    const normalizedId = typeof listingId === "string" && listingId.trim() ? normalizeListingId(listingId.trim()) : null;
+    const normalizedId =
+      typeof listingId === "string" && listingId.trim()
+        ? normalizeListingId(listingId.trim())
+        : null;
     if (!normalizedId) return res.status(400).json({ error: "listingId required" });
 
     const escrowAddr = process.env.ESCROW_ADDRESS;
@@ -805,7 +884,16 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
    * Sync an auction from createAuction transaction so it shows immediately.
    */
   router.post("/sync-auction", async (req, res) => {
-    const { txHash, title, subtitle, description, condition, yearOfProduction, imageUrl, mediaUrls } = (req.body || {}) as {
+    const {
+      txHash,
+      title,
+      subtitle,
+      description,
+      condition,
+      yearOfProduction,
+      imageUrl,
+      mediaUrls,
+    } = (req.body || {}) as {
       txHash?: string;
       title?: string;
       subtitle?: string;
@@ -829,19 +917,27 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         return res.status(404).json({ error: "Transaction or logs not found" });
       }
       const subtitleStr = typeof subtitle === "string" && subtitle.trim() ? subtitle.trim() : null;
-      const conditionStr = typeof condition === "string" && condition.trim() ? condition.trim() : null;
-      const yearStr = typeof yearOfProduction === "string" && yearOfProduction.trim() ? yearOfProduction.trim() : null;
+      const conditionStr =
+        typeof condition === "string" && condition.trim() ? condition.trim() : null;
+      const yearStr =
+        typeof yearOfProduction === "string" && yearOfProduction.trim()
+          ? yearOfProduction.trim()
+          : null;
       for (const logEntry of receipt.logs) {
         const decoded = decodeEvents(logEntry);
         if (decoded?.type !== "AuctionCreated") continue;
         const auctionId = normalizeListingId(decoded.auctionId);
         const seller = (decoded.seller || "").toLowerCase();
         const titleStr = typeof title === "string" && title.trim() ? title.trim() : null;
-        const descriptionStr = typeof description === "string" && description.trim() ? description.trim() : null;
+        const descriptionStr =
+          typeof description === "string" && description.trim() ? description.trim() : null;
         const imageUrlStr = typeof imageUrl === "string" && imageUrl ? imageUrl : null;
-        const mediaList = Array.isArray(mediaUrls) && mediaUrls.length > 0
-          ? mediaUrls.filter((u): u is string => typeof u === "string" && u.length > 0)
-          : imageUrlStr ? [imageUrlStr] : [];
+        const mediaList =
+          Array.isArray(mediaUrls) && mediaUrls.length > 0
+            ? mediaUrls.filter((u): u is string => typeof u === "string" && u.length > 0)
+            : imageUrlStr
+              ? [imageUrlStr]
+              : [];
         const extra = {
           ...(titleStr != null && { title: titleStr }),
           ...(subtitleStr != null && { subtitle: subtitleStr }),
@@ -877,7 +973,10 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
   router.get("/listing/:id", async (req, res) => {
     try {
       const rawId = req.params.id ?? "";
-      const id = rawId.startsWith("0x") && rawId.length === 66 ? normalizeListingId(rawId) : listingIdToBytes32(rawId);
+      const id =
+        rawId.startsWith("0x") && rawId.length === 66
+          ? normalizeListingId(rawId)
+          : listingIdToBytes32(rawId);
       const listing = await prisma.listing.findUnique({
         where: { id },
       });
@@ -913,13 +1012,16 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         }
       }
 
-      const priceForClient = onChainPrice ? chainAmountToHbar(onChainPrice) : toHbarForClient(listing.price);
+      const priceForClient = onChainPrice
+        ? chainAmountToHbar(onChainPrice)
+        : toHbarForClient(listing.price);
 
       res.json({
         listing: {
           ...listing,
           imageUrl: rewriteMediaUrlForClient((listing as any).imageUrl),
-          mediaUrls: rewriteMediaUrlsForClient((listing as any).mediaUrls) ?? (listing as any).mediaUrls,
+          mediaUrls:
+            rewriteMediaUrlsForClient((listing as any).mediaUrls) ?? (listing as any).mediaUrls,
           status: onChainStatus ?? listing.status,
           price: priceForClient,
         },
@@ -946,7 +1048,9 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         return res.status(400).json({ error: "Valid reporterAddress is required." });
       }
       const allowedReasons = new Set(["scam", "counterfeit", "prohibited", "abuse", "other"]);
-      const reportReason = String(reason || "").trim().toLowerCase();
+      const reportReason = String(reason || "")
+        .trim()
+        .toLowerCase();
       if (!allowedReasons.has(reportReason)) {
         return res.status(400).json({ error: "Invalid report reason." });
       }
@@ -956,10 +1060,16 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       if (listing.seller.toLowerCase() === reporter) {
         return res.status(400).json({ error: "You cannot report your own listing." });
       }
-      const originIpRaw = String((req.headers["x-forwarded-for"] || req.socket.remoteAddress || req.ip || "")).split(",")[0]?.trim();
+      const originIpRaw = String(
+        req.headers["x-forwarded-for"] || req.socket.remoteAddress || req.ip || "",
+      )
+        .split(",")[0]
+        ?.trim();
       const rateKey = `${reporter}:${originIpRaw || "ip-unknown"}`;
       if (isReportRateLimited(rateKey)) {
-        return res.status(429).json({ error: "Too many reports right now. Please try again shortly." });
+        return res
+          .status(429)
+          .json({ error: "Too many reports right now. Please try again shortly." });
       }
 
       const listingUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://hashpop.io"}/listing/${encodeURIComponent(id)}`;
@@ -976,7 +1086,11 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
               { name: "Reporter", value: reporter, inline: true },
               { name: "Seller", value: listing.seller.toLowerCase(), inline: true },
               { name: "Listing URL", value: listingUrl, inline: false },
-              { name: "Details", value: reportDetails || "No additional details provided.", inline: false },
+              {
+                name: "Details",
+                value: reportDetails || "No additional details provided.",
+                inline: false,
+              },
             ],
             timestamp: new Date().toISOString(),
           },
@@ -1038,7 +1152,20 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
   router.patch("/listing/:id", async (req, res) => {
     try {
       const id = normalizeListingId(req.params.id ?? "");
-      const { title, subtitle, description, category, condition, yearOfProduction, imageUrl, mediaUrls, sellerAddress, trackingNumber, trackingCarrier, requireEscrow } = (req.body || {}) as {
+      const {
+        title,
+        subtitle,
+        description,
+        category,
+        condition,
+        yearOfProduction,
+        imageUrl,
+        mediaUrls,
+        sellerAddress,
+        trackingNumber,
+        trackingCarrier,
+        requireEscrow,
+      } = (req.body || {}) as {
         title?: string;
         subtitle?: string;
         description?: string;
@@ -1054,21 +1181,39 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       };
       const listing = await prisma.listing.findUnique({ where: { id } });
       if (!listing) return res.status(404).json({ error: "Listing not found" });
-      const sellerLower = sellerAddress && typeof sellerAddress === "string" ? sellerAddress.toLowerCase() : "";
+      const sellerLower =
+        sellerAddress && typeof sellerAddress === "string" ? sellerAddress.toLowerCase() : "";
       if (sellerLower !== listing.seller.toLowerCase()) {
         return res.status(403).json({ error: "Only the seller can edit this listing" });
       }
-      const update: { title?: string | null; subtitle?: string | null; description?: string | null; category?: string | null; condition?: string | null; yearOfProduction?: string | null; price?: string; imageUrl?: string | null; mediaUrls?: string[]; trackingNumber?: string | null; trackingCarrier?: string | null; shippedAt?: Date | null; requireEscrow?: boolean } = {};
+      const update: {
+        title?: string | null;
+        subtitle?: string | null;
+        description?: string | null;
+        category?: string | null;
+        condition?: string | null;
+        yearOfProduction?: string | null;
+        price?: string;
+        imageUrl?: string | null;
+        mediaUrls?: string[];
+        trackingNumber?: string | null;
+        trackingCarrier?: string | null;
+        shippedAt?: Date | null;
+        requireEscrow?: boolean;
+      } = {};
       if (title !== undefined) update.title = title === "" ? null : title;
       if (subtitle !== undefined) update.subtitle = subtitle === "" ? null : subtitle;
       if (description !== undefined) update.description = description === "" ? null : description;
       if (category !== undefined) update.category = category === "" ? null : category;
       if (condition !== undefined) update.condition = condition === "" ? null : condition;
-      if (yearOfProduction !== undefined) update.yearOfProduction = yearOfProduction === "" ? null : yearOfProduction;
+      if (yearOfProduction !== undefined)
+        update.yearOfProduction = yearOfProduction === "" ? null : yearOfProduction;
       // Intentionally ignore direct price writes here.
       // Listing price must be synced from on-chain events/tx-sync endpoints only.
       if (mediaUrls !== undefined && Array.isArray(mediaUrls)) {
-        update.mediaUrls = mediaUrls.filter((u): u is string => typeof u === "string" && u.length > 0);
+        update.mediaUrls = mediaUrls.filter(
+          (u): u is string => typeof u === "string" && u.length > 0,
+        );
       } else if (imageUrl !== undefined && imageUrl !== "") {
         const record = listing as { imageUrl?: string | null; mediaUrls?: string[] };
         const existing =
@@ -1099,7 +1244,8 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         listing: {
           ...updated,
           imageUrl: rewriteMediaUrlForClient((updated as any).imageUrl),
-          mediaUrls: rewriteMediaUrlsForClient((updated as any).mediaUrls) ?? (updated as any).mediaUrls,
+          mediaUrls:
+            rewriteMediaUrlsForClient((updated as any).mediaUrls) ?? (updated as any).mediaUrls,
         },
       });
     } catch (err) {
@@ -1120,7 +1266,8 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         auction: {
           ...auction,
           imageUrl: rewriteMediaUrlForClient((auction as any).imageUrl),
-          mediaUrls: rewriteMediaUrlsForClient((auction as any).mediaUrls) ?? (auction as any).mediaUrls,
+          mediaUrls:
+            rewriteMediaUrlsForClient((auction as any).mediaUrls) ?? (auction as any).mediaUrls,
           reservePrice: toHbarForClient(auction.reservePrice),
         },
       });
@@ -1133,7 +1280,16 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
   router.patch("/auction/:id", async (req, res) => {
     try {
       const id = normalizeListingId(req.params.id ?? "");
-      const { title, subtitle, description, condition, yearOfProduction, imageUrl, mediaUrls, sellerAddress } = (req.body || {}) as {
+      const {
+        title,
+        subtitle,
+        description,
+        condition,
+        yearOfProduction,
+        imageUrl,
+        mediaUrls,
+        sellerAddress,
+      } = (req.body || {}) as {
         title?: string;
         subtitle?: string;
         description?: string;
@@ -1145,18 +1301,30 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       };
       const auction = await prisma.auction.findUnique({ where: { id } });
       if (!auction) return res.status(404).json({ error: "Auction not found" });
-      const sellerLower = sellerAddress && typeof sellerAddress === "string" ? sellerAddress.toLowerCase() : "";
+      const sellerLower =
+        sellerAddress && typeof sellerAddress === "string" ? sellerAddress.toLowerCase() : "";
       if (sellerLower !== auction.seller.toLowerCase()) {
         return res.status(403).json({ error: "Only the seller can edit this auction" });
       }
-      const update: { title?: string | null; subtitle?: string | null; description?: string | null; condition?: string | null; yearOfProduction?: string | null; imageUrl?: string | null; mediaUrls?: string[] } = {};
+      const update: {
+        title?: string | null;
+        subtitle?: string | null;
+        description?: string | null;
+        condition?: string | null;
+        yearOfProduction?: string | null;
+        imageUrl?: string | null;
+        mediaUrls?: string[];
+      } = {};
       if (title !== undefined) update.title = title === "" ? null : title;
       if (subtitle !== undefined) update.subtitle = subtitle === "" ? null : subtitle;
       if (description !== undefined) update.description = description === "" ? null : description;
       if (condition !== undefined) update.condition = condition === "" ? null : condition;
-      if (yearOfProduction !== undefined) update.yearOfProduction = yearOfProduction === "" ? null : yearOfProduction;
+      if (yearOfProduction !== undefined)
+        update.yearOfProduction = yearOfProduction === "" ? null : yearOfProduction;
       if (mediaUrls !== undefined && Array.isArray(mediaUrls)) {
-        update.mediaUrls = mediaUrls.filter((u): u is string => typeof u === "string" && u.length > 0);
+        update.mediaUrls = mediaUrls.filter(
+          (u): u is string => typeof u === "string" && u.length > 0,
+        );
       } else if (imageUrl !== undefined && imageUrl !== "") {
         const a = auction as { mediaUrls?: string[]; imageUrl?: string | null };
         const existing = a.mediaUrls?.length ? a.mediaUrls : a.imageUrl ? [a.imageUrl] : [];
@@ -1170,7 +1338,8 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         auction: {
           ...updated,
           imageUrl: rewriteMediaUrlForClient((updated as any).imageUrl),
-          mediaUrls: rewriteMediaUrlsForClient((updated as any).mediaUrls) ?? (updated as any).mediaUrls,
+          mediaUrls:
+            rewriteMediaUrlsForClient((updated as any).mediaUrls) ?? (updated as any).mediaUrls,
         },
       });
     } catch (err) {
@@ -1183,30 +1352,31 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     try {
       const { address } = req.params;
       const addrLower = address?.toLowerCase() ?? "";
-      const [activeListings, archivedListings, activeAuctions, archivedAuctions] = await Promise.all([
-        prisma.listing.findMany({
-          where: { seller: addrLower, status: "LISTED" },
-          orderBy: { createdAt: "desc" },
-        }),
-        prisma.listing.findMany({
-          where: {
-            seller: addrLower,
-            status: { in: ["CANCELLED", "LOCKED", "COMPLETED", "SOLD"] },
-          },
-          orderBy: { updatedAt: "desc" },
-        }),
-        prisma.auction.findMany({
-          where: { seller: addrLower, status: "ACTIVE" },
-          orderBy: { createdAt: "desc" },
-        }),
-        prisma.auction.findMany({
-          where: {
-            seller: addrLower,
-            status: { not: "ACTIVE" },
-          },
-          orderBy: { updatedAt: "desc" },
-        }),
-      ]);
+      const [activeListings, archivedListings, activeAuctions, archivedAuctions] =
+        await Promise.all([
+          prisma.listing.findMany({
+            where: { seller: addrLower, status: "LISTED" },
+            orderBy: { createdAt: "desc" },
+          }),
+          prisma.listing.findMany({
+            where: {
+              seller: addrLower,
+              status: { in: ["CANCELLED", "LOCKED", "COMPLETED", "SOLD"] },
+            },
+            orderBy: { updatedAt: "desc" },
+          }),
+          prisma.auction.findMany({
+            where: { seller: addrLower, status: "ACTIVE" },
+            orderBy: { createdAt: "desc" },
+          }),
+          prisma.auction.findMany({
+            where: {
+              seller: addrLower,
+              status: { not: "ACTIVE" },
+            },
+            orderBy: { updatedAt: "desc" },
+          }),
+        ]);
       res.json({
         active: activeListings.map((l) => ({
           ...l,
@@ -1316,7 +1486,8 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       const userAddress = address?.trim()?.toLowerCase();
       const id = itemId?.trim();
       const type = itemType === "auction" ? "auction" : "listing";
-      if (!userAddress || !id) return res.status(400).json({ error: "address and itemId required" });
+      if (!userAddress || !id)
+        return res.status(400).json({ error: "address and itemId required" });
       await prisma.wishlistItem.upsert({
         where: {
           userAddress_itemId: { userAddress, itemId: id },
@@ -1335,7 +1506,8 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     try {
       const address = (req.query.address as string)?.trim()?.toLowerCase();
       const itemId = (req.query.itemId as string)?.trim();
-      if (!address || !itemId) return res.status(400).json({ error: "address and itemId required" });
+      if (!address || !itemId)
+        return res.status(400).json({ error: "address and itemId required" });
       await prisma.wishlistItem.deleteMany({
         where: { userAddress: address, itemId },
       });
@@ -1371,7 +1543,11 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
 
   router.post("/user/public-key", async (req, res) => {
     try {
-      const { address: rawAddr, publicKey, signature } = (req.body || {}) as {
+      const {
+        address: rawAddr,
+        publicKey,
+        signature,
+      } = (req.body || {}) as {
         address?: string;
         publicKey?: string;
         signature?: string;
@@ -1427,7 +1603,8 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       const from = fromAddress?.trim().toLowerCase();
       const to = toAddress?.trim().toLowerCase();
       const text = typeof body === "string" ? body.trim() : "";
-      if (!from || !to) return res.status(400).json({ error: "fromAddress and toAddress required" });
+      if (!from || !to)
+        return res.status(400).json({ error: "fromAddress and toAddress required" });
       if (!text) return res.status(400).json({ error: "body required" });
       if (from === to) return res.status(400).json({ error: "Cannot message yourself" });
 
@@ -1435,9 +1612,10 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       let normalizedListingId: string | null = null;
 
       if (listingInput) {
-        normalizedListingId = listingInput.startsWith("0x") && listingInput.length === 66
-          ? normalizeListingId(listingInput)
-          : listingIdToBytes32(listingInput);
+        normalizedListingId =
+          listingInput.startsWith("0x") && listingInput.length === 66
+            ? normalizeListingId(listingInput)
+            : listingIdToBytes32(listingInput);
         const listing = await prisma.listing.findUnique({ where: { id: normalizedListingId } });
         if (!listing) return res.status(404).json({ error: "Listing not found" });
       }
@@ -1469,7 +1647,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         },
         orderBy: { createdAt: "desc" },
       });
-      const seen = new Map<string, { last: typeof messages[0]; preview: string }>();
+      const seen = new Map<string, { last: (typeof messages)[0]; preview: string }>();
       for (const m of messages) {
         const other = m.fromAddress === address ? m.toAddress : m.fromAddress;
         const key = `${other}-${m.listingId ?? ""}`;
@@ -1490,7 +1668,8 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         };
       });
       const sorted = conversations.sort(
-        (a, b) => new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime()
+        (a, b) =>
+          new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime(),
       );
       res.json({ conversations: sorted });
     } catch (err) {
@@ -1508,9 +1687,10 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
 
       let listingId: string | null = null;
       if (listingIdRaw) {
-        listingId = listingIdRaw.startsWith("0x") && listingIdRaw.length === 66
-          ? normalizeListingId(listingIdRaw)
-          : listingIdToBytes32(listingIdRaw);
+        listingId =
+          listingIdRaw.startsWith("0x") && listingIdRaw.length === 66
+            ? normalizeListingId(listingIdRaw)
+            : listingIdToBytes32(listingIdRaw);
       }
 
       const where: Record<string, unknown> = {
@@ -1563,7 +1743,9 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       const saleRef = saleId?.trim();
       const ratingScore = Number(score);
       if (!reviewer || !rated || !saleRef) {
-        return res.status(400).json({ error: "reviewerAddress, ratedAddress, and saleId are required" });
+        return res
+          .status(400)
+          .json({ error: "reviewerAddress, ratedAddress, and saleId are required" });
       }
       if (reviewer === rated) {
         return res.status(400).json({ error: "Cannot rate yourself" });
@@ -1727,11 +1909,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       return res.json({ error: "MARKETPLACE_ADDRESS or AUCTION_HOUSE_ADDRESS not set" });
     }
     try {
-      const events = await fetchMirrorEvents(
-        marketplaceAddress,
-        auctionHouseAddress,
-        0
-      );
+      const events = await fetchMirrorEvents(marketplaceAddress, auctionHouseAddress, 0);
       const eventsWithDecoded = events.map((ev: any) => {
         const topic0 = ev.topics?.[0] ?? ev.topic0 ?? null;
         const decoded = decodeEvents(ev);
@@ -1741,7 +1919,9 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           timestamp: ev.timestamp,
         };
       });
-      const itemListedCount = eventsWithDecoded.filter((e: any) => e.decodedType === "ItemListed").length;
+      const itemListedCount = eventsWithDecoded.filter(
+        (e: any) => e.decodedType === "ItemListed",
+      ).length;
       return res.json({
         totalLogs: events.length,
         expectedTopic0ItemListed: EXPECTED_TOPIC0_ITEM_LISTED,
@@ -1794,13 +1974,27 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       const stateFile = path.join(process.cwd(), ".indexer-state.json");
       const nowSec = Math.floor(Date.now() / 1000);
       try {
-        fs.writeFileSync(stateFile, JSON.stringify({ lastProcessedTimestamp: nowSec, lastProcessedBlock: 999999999 }), "utf8");
+        fs.writeFileSync(
+          stateFile,
+          JSON.stringify({ lastProcessedTimestamp: nowSec, lastProcessedBlock: 999999999 }),
+          "utf8",
+        );
       } catch {}
 
-      log.info({ sales: sales.count, bids: bids.count, ratings: ratings.count, messages: messages.count }, "Cleared history (kept listings)");
+      log.info(
+        { sales: sales.count, bids: bids.count, ratings: ratings.count, messages: messages.count },
+        "Cleared history (kept listings)",
+      );
       return res.json({
         ok: true,
-        cleared: { sales: sales.count, bids: bids.count, ratings: ratings.count, messages: messages.count, wishlist: wishlist.count, users: users.count },
+        cleared: {
+          sales: sales.count,
+          bids: bids.count,
+          ratings: ratings.count,
+          messages: messages.count,
+          wishlist: wishlist.count,
+          users: users.count,
+        },
       });
     } catch (err: any) {
       log.error({ err }, "Clear history failed");

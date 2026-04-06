@@ -16,14 +16,9 @@ export const hederaPublicClient = createPublicClient({
 
 export const hederaReadTransports = {
   [hederaTestnet.id]: http(
-    activeHederaChain.id === hederaTestnet.id
-      ? activeRpc
-      : fallbackRpcByChain[hederaTestnet.id]
+    activeHederaChain.id === hederaTestnet.id ? activeRpc : fallbackRpcByChain[hederaTestnet.id],
   ),
   [hederaMainnet.id]: http(
-    activeHederaChain.id === hederaMainnet.id
-      ? activeRpc
-      : fallbackRpcByChain[hederaMainnet.id]
+    activeHederaChain.id === hederaMainnet.id ? activeRpc : fallbackRpcByChain[hederaMainnet.id],
   ),
 };
-

@@ -17,6 +17,7 @@ model Listing {
   txHash             String?
   trackingNumber     String?
   trackingCarrier    String?
+    onChainConfirmed  Boolean @default(false)
   shippedAt          DateTime?
   exchangeConfirmedAt DateTime?
   title              String?
@@ -77,6 +78,8 @@ model Sale {
   createdAt DateTime @default(now())
   listing   Listing? @relation(fields: [listingId], references: [id])
   auction   Auction? @relation(fields: [auctionId], references: [id])
+    @@index([listingId])
+      @@index([buyer])
 }
 
 model User {

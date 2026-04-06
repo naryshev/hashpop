@@ -5,6 +5,7 @@ Each task is designed for ~2-5 minutes and includes verification.
 ## Phase A - Core reliability (must pass before feature expansion)
 
 ### Task A1 (done): Price update event propagation
+
 - Files:
   - `contracts/core/Marketplace.sol`
   - `backend/src/indexer/decoder.ts`
@@ -19,6 +20,7 @@ Each task is designed for ~2-5 minutes and includes verification.
   - `npm run build --prefix backend`
 
 ### Task A2 (done): Transaction timeout + receipt fallback
+
 - Files:
   - `frontend/hooks/useRobustContractWrite.ts`
   - `frontend/lib/transactionError.ts`
@@ -31,6 +33,7 @@ Each task is designed for ~2-5 minutes and includes verification.
   - Manual: create/edit listing and observe timeout/error UX when wallet is delayed.
 
 ### Task A3 (done): Wallet communication hardening (HashPack/Testnet)
+
 - Files:
   - `frontend/components/WalletButton.tsx`
   - `frontend/lib/wagmiConfig.ts`
@@ -43,6 +46,7 @@ Each task is designed for ~2-5 minutes and includes verification.
   - Confirm clear user-facing error for rejected/expired requests.
 
 ### Task A4 (done): Edit-listing confirmation flow reliability
+
 - Files:
   - `frontend/hooks/useUpdateListingPrice.ts`
   - `frontend/app/listing/[id]/page.tsx`
@@ -54,6 +58,7 @@ Each task is designed for ~2-5 minutes and includes verification.
   - Confirm listing page on-chain price and API price converge after approval.
 
 ### Task A5 (done): Atomic buy/sell escrow guards
+
 - Files:
   - `contracts/core/Marketplace.sol`
   - `contracts/core/Escrow.sol`
@@ -67,6 +72,7 @@ Each task is designed for ~2-5 minutes and includes verification.
 ## Phase B - Marketplace completeness
 
 ### Task B1 (done): Offer system (make/accept/reject/cancel)
+
 - Files:
   - `contracts/core/Marketplace.sol`
   - `contracts/interfaces/IMarketplace.sol`
@@ -78,6 +84,7 @@ Each task is designed for ~2-5 minutes and includes verification.
   - Contract tests for each state transition and unauthorized actions.
 
 ### Task B2 (done): Messaging via HCS integration seam
+
 - Files:
   - `backend/src/api/index.ts`
   - `frontend/app/dashboard/page.tsx`
@@ -87,6 +94,7 @@ Each task is designed for ~2-5 minutes and includes verification.
   - Send/receive negotiation message path in dashboard thread.
 
 ### Task B3 (done): Ratings after completed sale
+
 - Files:
   - `contracts/core/Reputation.sol`
   - `backend/src/api/index.ts`
@@ -97,6 +105,7 @@ Each task is designed for ~2-5 minutes and includes verification.
 ## Phase C - Deploy + ops polish
 
 ### Task C1 (partially done): Testnet deployment and sync checks
+
 - Files:
   - `deploy/deploy.ts`
   - `backend/.env.example`
@@ -106,6 +115,7 @@ Each task is designed for ~2-5 minutes and includes verification.
   - Mirror node event visibility for create/edit/buy events.
 
 ### Task C2 (done): README operational updates
+
 - Files:
   - `README.md`
   - `SETUP.md`

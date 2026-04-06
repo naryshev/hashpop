@@ -22,7 +22,17 @@ type UseCreateListingOptions = {
 };
 
 export function useCreateListing(options?: UseCreateListingOptions) {
-  const { imageUrlRef, mediaUrlsRef, requireEscrowRef, titleRef, subtitleRef, descriptionRef, categoryRef, conditionRef, yearOfProductionRef } = options || {};
+  const {
+    imageUrlRef,
+    mediaUrlsRef,
+    requireEscrowRef,
+    titleRef,
+    subtitleRef,
+    descriptionRef,
+    categoryRef,
+    conditionRef,
+    yearOfProductionRef,
+  } = options || {};
   const { send, isPending, error, lastHash } = useRobustContractWrite();
   const { address } = useHashpackWallet();
   const [isSuccess, setIsSuccess] = useState(false);

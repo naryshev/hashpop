@@ -10,10 +10,7 @@ const accessKeyId = process.env.S3_ACCESS_KEY_ID;
 const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
 
 const useS3 =
-  Boolean(bucket) &&
-  Boolean(publicBaseUrl) &&
-  Boolean(accessKeyId) &&
-  Boolean(secretAccessKey);
+  Boolean(bucket) && Boolean(publicBaseUrl) && Boolean(accessKeyId) && Boolean(secretAccessKey);
 
 let s3Client: S3Client | null = null;
 if (useS3) {
@@ -38,7 +35,7 @@ export async function saveUpload(
   filename: string,
   contentType: string,
   baseUrl: string,
-  uploadsDir: string
+  uploadsDir: string,
 ): Promise<string> {
   if (useS3 && s3Client) {
     const key = `uploads/${filename}`;
@@ -48,7 +45,7 @@ export async function saveUpload(
         Key: key,
         Body: buffer,
         ContentType: contentType,
-      })
+      }),
     );
     return `${publicBaseUrl}/${key}`;
   }

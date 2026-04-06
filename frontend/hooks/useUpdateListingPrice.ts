@@ -27,10 +27,10 @@ export function useUpdateListingPrice() {
           args: [idBytes, parseUnits(priceHbar.trim(), 8)],
         });
       } catch (e) {
-        throw (e instanceof Error ? e : new Error(String(e)));
+        throw e instanceof Error ? e : new Error(String(e));
       }
     },
-    [send]
+    [send],
   );
 
   return {

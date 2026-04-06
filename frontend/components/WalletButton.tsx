@@ -11,7 +11,8 @@ function formatHbarFromTinybar(value: bigint | null): string {
   if (value === null) return "—";
   const num = Number(value) / 100_000_000;
   if (num >= 1e6) return num.toLocaleString("en-US", { maximumFractionDigits: 0 });
-  if (num >= 1) return num.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 3 });
+  if (num >= 1)
+    return num.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 3 });
   return num.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 4 });
 }
 
@@ -21,15 +22,8 @@ type WalletButtonProps = {
 
 export function WalletButton({ onConnectPress }: WalletButtonProps) {
   const [mounted, setMounted] = useState(false);
-  const {
-    address,
-    isConnected,
-    disconnect,
-    isReady,
-    isConnecting,
-    error,
-    balanceTinybar,
-  } = useHashpackWallet();
+  const { address, isConnected, disconnect, isReady, isConnecting, error, balanceTinybar } =
+    useHashpackWallet();
 
   useEffect(() => setMounted(true), []);
 
@@ -53,14 +47,9 @@ export function WalletButton({ onConnectPress }: WalletButtonProps) {
           <span className="text-sm text-white font-medium tabular-nums">
             <AddressDisplay address={address} />
           </span>
-          <span className="text-sm text-silver tabular-nums">
-            {hbarFormatted} ℏ
-          </span>
+          <span className="text-sm text-silver tabular-nums">{hbarFormatted} ℏ</span>
         </div>
-        <button
-          onClick={() => void disconnect()}
-          className="btn-frost text-sm py-1.5 px-3"
-        >
+        <button onClick={() => void disconnect()} className="btn-frost text-sm py-1.5 px-3">
           Disconnect
         </button>
       </div>
@@ -70,10 +59,7 @@ export function WalletButton({ onConnectPress }: WalletButtonProps) {
   return (
     <div className="flex flex-col items-end gap-1">
       {error && (
-        <span
-          className="text-xs text-amber-400 max-w-[260px] text-right"
-          title={error}
-        >
+        <span className="text-xs text-amber-400 max-w-[260px] text-right" title={error}>
           {error}
         </span>
       )}

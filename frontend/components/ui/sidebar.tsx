@@ -43,7 +43,9 @@ export const SidebarProvider = ({
   const open = openProp !== undefined ? openProp : openState;
   const setOpen = setOpenProp !== undefined ? setOpenProp : setOpenState;
 
-  return <SidebarContext.Provider value={{ open, setOpen, animate }}>{children}</SidebarContext.Provider>;
+  return (
+    <SidebarContext.Provider value={{ open, setOpen, animate }}>{children}</SidebarContext.Provider>
+  );
 };
 
 export const Sidebar = ({
@@ -83,7 +85,7 @@ export const DesktopSidebar = ({
     <motion.div
       className={cn(
         "hidden min-h-screen h-screen flex-shrink-0 self-stretch px-4 py-4 md:flex md:flex-col md:sticky md:top-0 bg-neutral-100 dark:bg-neutral-900 border-r border-white/10",
-        className
+        className,
       )}
       animate={{
         width: animate ? (open ? "280px" : "68px") : "280px",
@@ -97,24 +99,30 @@ export const DesktopSidebar = ({
   );
 };
 
-export const MobileSidebar = ({
-  className,
-  children,
-  ...props
-}: React.ComponentProps<"div">) => {
+export const MobileSidebar = ({ className, children, ...props }: React.ComponentProps<"div">) => {
   const { open, setOpen } = useSidebar();
   return (
     <>
       <div
-        className={cn("h-12 px-4 flex flex-row md:hidden items-center justify-between bg-neutral-100 dark:bg-neutral-900 w-full border-b border-white/10")}
+        className={cn(
+          "h-12 px-4 flex flex-row md:hidden items-center justify-between bg-neutral-100 dark:bg-neutral-900 w-full border-b border-white/10",
+        )}
         {...props}
       >
         <div className="flex justify-start z-20 w-full">
-          <Menu className="text-neutral-800 dark:text-neutral-200 cursor-pointer" onClick={() => setOpen(!open)} />
+          <Menu
+            className="text-neutral-800 dark:text-neutral-200 cursor-pointer"
+            onClick={() => setOpen(!open)}
+          />
         </div>
         <AnimatePresence>
           {open && (
-            <motion.div className="fixed inset-0 z-[100] md:hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <motion.div
+              className="fixed inset-0 z-[100] md:hidden"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
               <button
                 type="button"
                 aria-label="Close sidebar"
@@ -128,7 +136,7 @@ export const MobileSidebar = ({
                 transition={{ type: "spring", stiffness: 320, damping: 34 }}
                 className={cn(
                   "relative h-full w-[82vw] max-w-[280px] bg-white dark:bg-neutral-900 p-6 flex flex-col justify-between border-r border-black/10 dark:border-white/10 shadow-2xl",
-                  className
+                  className,
                 )}
               >
                 <div
