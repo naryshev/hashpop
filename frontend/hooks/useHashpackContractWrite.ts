@@ -193,9 +193,14 @@ export function useHashpackContractWrite() {
               (network === "mainnet" ? sdk.Client.forMainnet() : sdk.Client.forTestnet());
             let receipt: any;
             if (!isPayableRequest && signer && typeof signer.call === "function") {
-              // For non-payable calls let HashConnect own the full lifecycle:
-              // setNodeAccountIds + freezeWith before signer.call() conflicts with
-              // HashConnect's internal tx population and causes CONTRACT_REVERT_EXECUTED.
+              // For non-payable calls, use freezeWithSigner so HashConnect's own signer
+              // populates node account IDs correctly before the transaction is frozen.
+              // Using freezeWith(client) here caused CONTRACT_REVERT_EXECUTED because it
+              // conflicts with HashConnect's internal tx population lifecycle.
+              // freezeWithSigner is the official way to prepare a tx before signer.call().
+              if (typeof (tx as any).freezeWithSigner === "function") {
+                await (tx as any).freezeWithSigner(signer);
+              }
               receipt = await signer.call(tx as any);
               txId = tx.transactionId?.toString?.() ?? receipt?.transactionId?.toString?.() ?? txId;
             } else if (
