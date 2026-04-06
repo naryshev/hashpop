@@ -191,20 +191,11 @@ export function useHashpackContractWrite() {
             const freezeClient =
               (signer && typeof signer.getClient === "function" ? signer.getClient() : null) ??
               (network === "mainnet" ? sdk.Client.forMainnet() : sdk.Client.forTestnet());
-            // HashPack signing requires exactly one node account id on the transaction.
-            if (freezeClient && typeof (tx as any).setNodeAccountIds === "function") {
-              const singleNode = pickSingleNodeAccountId(sdk, freezeClient, network);
-              (tx as any).setNodeAccountIds([singleNode]);
-            }
-            if (
-              freezeClient &&
-              typeof (tx as any).isFrozen === "function" &&
-              !(tx as any).isFrozen()
-            ) {
-              tx.freezeWith(freezeClient);
-            }
             let receipt: any;
             if (!isPayableRequest && signer && typeof signer.call === "function") {
+              // For non-payable calls let HashConnect own the full lifecycle:
+              // setNodeAccountIds + freezeWith before signer.call() conflicts with
+              // HashConnect's internal tx population and causes CONTRACT_REVERT_EXECUTED.
               receipt = await signer.call(tx as any);
               txId = tx.transactionId?.toString?.() ?? receipt?.transactionId?.toString?.() ?? txId;
             } else if (
@@ -215,6 +206,14 @@ export function useHashpackContractWrite() {
             ) {
               // For payable calls, sign with HashPack then execute via Hedera client.
               // This avoids WalletConnect protobuf payload issues and preserves msg.value.
+              // HashPack signing requires exactly one node account id before freeze.
+              if (typeof (tx as any).setNodeAccountIds === "function") {
+                const singleNode = pickSingleNodeAccountId(sdk, freezeClient, network);
+                (tx as any).setNodeAccountIds([singleNode]);
+              }
+              if (typeof (tx as any).isFrozen === "function" && !(tx as any).isFrozen()) {
+                tx.freezeWith(freezeClient);
+              }
               const signedTx = await signer.signTransaction(tx as any);
               const txResponse = await (signedTx as any).execute(freezeClient);
               txId =

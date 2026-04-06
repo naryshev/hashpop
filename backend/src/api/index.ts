@@ -466,10 +466,15 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     const upsertFallbackListing = async () => {
       if (!canFallbackUpsert) return null;
       const txHashStr = typeof txHash === "string" && txHash.trim() ? txHash.trim() : null;
+      // If the wallet returned a txHash the transaction was accepted by the network.
+      // Mark confirmed so the listing is immediately visible; the indexer will
+      // re-confirm and correct the price once it picks up the mirror node event.
+      const confirmedByTxHash = !!txHashStr;
       const fallbackUpdateData: any = {
         status: "LISTED",
         price: fallbackPrice!,
         requireEscrow: requireEscrowBool,
+        ...(confirmedByTxHash && { onChainConfirmed: true }),
         ...(txHashStr != null && { txHash: txHashStr }),
         ...(imageUrlStr != null && { imageUrl: imageUrlStr }),
         ...(mediaList.length > 0 && { mediaUrls: mediaList }),
@@ -486,6 +491,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         price: fallbackPrice!,
         status: "LISTED",
         requireEscrow: requireEscrowBool,
+        onChainConfirmed: confirmedByTxHash,
         ...(txHashStr != null && { txHash: txHashStr }),
         ...(imageUrlStr != null && { imageUrl: imageUrlStr }),
         ...(mediaList.length > 0 && { mediaUrls: mediaList }),
@@ -502,7 +508,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         create: fallbackCreateData,
       });
       log.info(
-        { listingId: fallbackListingId, seller: fallbackSeller, txHash },
+        { listingId: fallbackListingId, seller: fallbackSeller, txHash, confirmedByTxHash },
         "Synced listing via fallback upsert",
       );
       return fallbackListingId;
@@ -523,9 +529,53 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       }
       return res.status(503).json({ error: "HEDERA_RPC_URL not set" });
     }
+
+    /**
+     * HashPack/HashConnect SDK returns Hedera-format transaction IDs
+     * (e.g. "0.0.12345@1609459200.000000000"), not EVM 0x hashes.
+     * ethers.getTransactionReceipt() can't handle that format, so we resolve
+     * the EVM hash via the mirror node first when the txHash looks like a
+     * Hedera transaction ID.
+     */
+    const isHederaTxId = /^\d+\.\d+\.\d+@\d+\.\d+/.test(txHash);
+    let evmTxHash: string = txHash;
+
+    if (isHederaTxId) {
+      try {
+        const mirrorBase = process.env.MIRROR_URL || "https://testnet.mirrornode.hedera.com";
+        // Mirror node format: replace @ with - and all dots with -
+        // e.g. 0.0.12345@1609459200.123456789 → 0-0-12345-1609459200-123456789
+        const mirrorTxId = txHash.replace("@", "-").replace(/\./g, "-");
+        const mirrorRes = await fetch(`${mirrorBase}/api/v1/transactions/${mirrorTxId}`);
+        if (mirrorRes.ok) {
+          const mirrorData = (await mirrorRes.json()) as {
+            transactions?: { ethereum_hash?: string; result?: string }[];
+          };
+          const mirrorTx = mirrorData?.transactions?.[0];
+          if (mirrorTx?.result && mirrorTx.result !== "SUCCESS") {
+            // Transaction was submitted but reverted — do not confirm the listing.
+            log.warn({ txHash, result: mirrorTx.result }, "Hedera tx was not successful; skipping sync");
+            if (canFallbackUpsert) {
+              const id = await upsertFallbackListing();
+              return res.json({ ok: true, listingId: id, source: "fallback" });
+            }
+            return res.status(400).json({ error: `Transaction failed on-chain: ${mirrorTx.result}` });
+          }
+          if (mirrorTx?.ethereum_hash) {
+            evmTxHash = mirrorTx.ethereum_hash.startsWith("0x")
+              ? mirrorTx.ethereum_hash
+              : `0x${mirrorTx.ethereum_hash}`;
+            log.info({ hederaTxId: txHash, evmTxHash }, "Resolved Hedera tx ID to EVM hash");
+          }
+        }
+      } catch (mirrorErr) {
+        log.warn({ err: mirrorErr, txHash }, "Mirror node lookup failed; proceeding with RPC fallback");
+      }
+    }
+
     try {
       const provider = new ethers.JsonRpcProvider(rpcUrl);
-      const receipt = await provider.getTransactionReceipt(txHash);
+      const receipt = await provider.getTransactionReceipt(evmTxHash);
       if (!receipt || !receipt.logs?.length) {
         if (canFallbackUpsert) {
           const id = await upsertFallbackListing();
@@ -543,7 +593,8 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           status: "LISTED",
           price: priceHbar,
           requireEscrow: requireEscrowBool,
-          txHash: txHash,
+          onChainConfirmed: true,
+          txHash: evmTxHash,
           ...(imageUrlStr != null && { imageUrl: imageUrlStr }),
           ...(mediaList.length > 0 && { mediaUrls: mediaList }),
           ...(titleStr != null && { title: titleStr }),
@@ -559,7 +610,8 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           price: priceHbar,
           status: "LISTED",
           requireEscrow: requireEscrowBool,
-          txHash: txHash,
+          onChainConfirmed: true,
+          txHash: evmTxHash,
           ...(imageUrlStr != null && { imageUrl: imageUrlStr }),
           ...(mediaList.length > 0 && { mediaUrls: mediaList }),
           ...(titleStr != null && { title: titleStr }),
@@ -574,7 +626,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           update: updateData,
           create: createData,
         });
-        log.info({ listingId, seller, txHash }, "Synced listing from tx");
+        log.info({ listingId, seller, txHash, evmTxHash }, "Synced listing from tx");
         return res.json({ ok: true, listingId });
       }
       if (canFallbackUpsert) {

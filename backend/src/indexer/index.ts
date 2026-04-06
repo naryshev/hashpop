@@ -56,6 +56,28 @@ function weiToHbar(wei: bigint | string): string {
   return fracStr === "0" ? whole.toString() : `${whole}.${fracStr}`;
 }
 
+/** Tinybar (8 decimals) to HBAR string — the unit the contract stores prices in. */
+function tinybarToHbar(tinybar: bigint | string): string {
+  const tb = typeof tinybar === "string" ? BigInt(tinybar) : tinybar;
+  if (tb === 0n) return "0";
+  const div = 10n ** 8n;
+  const whole = tb / div;
+  const frac = tb % div;
+  const fracStr = frac.toString().padStart(8, "0").replace(/0+$/, "") || "0";
+  return fracStr === "0" ? whole.toString() : `${whole}.${fracStr}`;
+}
+
+/**
+ * Convert an on-chain amount to an HBAR string.
+ * Contracts currently store prices as tinybar (8 decimals, parseUnits(price, 8)).
+ * Legacy listings may have used wei (18 decimals); the >= 1e15 threshold distinguishes them.
+ */
+function chainAmountToHbar(amount: bigint | string): string {
+  const n = typeof amount === "string" ? BigInt(amount) : amount;
+  if (n >= 10n ** 15n) return weiToHbar(n);
+  return tinybarToHbar(n);
+}
+
 export async function startIndexer(prisma: PrismaClient, log: Logger) {
   const marketplaceAddress = normalizeAddress(process.env.MARKETPLACE_ADDRESS);
   const auctionHouseAddress = normalizeAddress(process.env.AUCTION_HOUSE_ADDRESS);
@@ -163,11 +185,12 @@ async function handleEvent(event: any, prisma: PrismaClient, log: Logger) {
         create: {
           id: listingId,
           seller,
-          price: weiToHbar(event.price),
+          price: chainAmountToHbar(event.price),
           status: "LISTED",
           onChainConfirmed: true,
         },
         update: {
+          price: chainAmountToHbar(event.price),
           status: "LISTED",
           onChainConfirmed: true,
         },
@@ -233,7 +256,7 @@ async function handleEvent(event: any, prisma: PrismaClient, log: Logger) {
         create: {
           id: event.auctionId,
           seller: (event.seller || "").toLowerCase(),
-          reservePrice: weiToHbar(event.reservePrice),
+          reservePrice: chainAmountToHbar(event.reservePrice),
           startTime: BigInt(event.startTime),
           endTime: BigInt(event.endTime),
           status: "ACTIVE",
