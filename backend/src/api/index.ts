@@ -554,12 +554,17 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           const mirrorTx = mirrorData?.transactions?.[0];
           if (mirrorTx?.result && mirrorTx.result !== "SUCCESS") {
             // Transaction was submitted but reverted — do not confirm the listing.
-            log.warn({ txHash, result: mirrorTx.result }, "Hedera tx was not successful; skipping sync");
+            log.warn(
+              { txHash, result: mirrorTx.result },
+              "Hedera tx was not successful; skipping sync",
+            );
             if (canFallbackUpsert) {
               const id = await upsertFallbackListing();
               return res.json({ ok: true, listingId: id, source: "fallback" });
             }
-            return res.status(400).json({ error: `Transaction failed on-chain: ${mirrorTx.result}` });
+            return res
+              .status(400)
+              .json({ error: `Transaction failed on-chain: ${mirrorTx.result}` });
           }
           if (mirrorTx?.ethereum_hash) {
             evmTxHash = mirrorTx.ethereum_hash.startsWith("0x")
@@ -569,7 +574,10 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           }
         }
       } catch (mirrorErr) {
-        log.warn({ err: mirrorErr, txHash }, "Mirror node lookup failed; proceeding with RPC fallback");
+        log.warn(
+          { err: mirrorErr, txHash },
+          "Mirror node lookup failed; proceeding with RPC fallback",
+        );
       }
     }
 

@@ -133,7 +133,10 @@ async function reconcileUnconfirmedListings(
         },
       });
       confirmed++;
-      log.info({ listingId: listing.id, priceHbar, status }, "Reconciler confirmed listing on-chain");
+      log.info(
+        { listingId: listing.id, priceHbar, status },
+        "Reconciler confirmed listing on-chain",
+      );
     } catch (err) {
       log.warn({ err, listingId: listing.id }, "Reconciler: contract read failed for listing");
     }
