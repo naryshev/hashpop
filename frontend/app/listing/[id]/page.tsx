@@ -1108,7 +1108,11 @@ export default function ListingPage() {
                     void toggleWishlist();
                   }}
                   wishlistDisabled={!address || wishlistLoading}
-                  onPurchaseComplete={() => fetchListing(0, false)}
+                  onPurchaseComplete={(txHash) => {
+                    router.push(
+                      `/purchase-success/${encodeURIComponent(id)}${txHash ? `?tx=${encodeURIComponent(txHash)}` : ""}`,
+                    );
+                  }}
                   onMessage={async () => {
                     if (!walletConnected || !address || !item?.seller) return;
                     try {
