@@ -26,8 +26,8 @@ const config: Config = {
         inner: "inset 0 1px 0 rgba(255,255,255,0.06)",
       },
       borderRadius: {
-        glass: "12px",
-        "glass-lg": "16px",
+        glass: "2px",
+        "glass-lg": "2px",
       },
       backdropBlur: {
         glass: "12px",
