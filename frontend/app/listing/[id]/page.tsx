@@ -1243,7 +1243,7 @@ export default function ListingPage() {
                   <button
                     type="button"
                     onClick={() => setEditing(true)}
-                    className="btn-frost-cta flex-1 border-white/20 text-silver hover:text-white"
+                    className="btn-frost flex-1"
                   >
                     Configure
                   </button>
@@ -1255,9 +1255,9 @@ export default function ListingPage() {
                       void cancel(listing.id);
                     }}
                     disabled={cancelPending}
-                    className="btn-frost-cta flex-1 border-rose-500/50 text-rose-300 hover:bg-rose-500/20 disabled:opacity-60"
+                    className="flex-1 rounded-glass border border-rose-500/50 bg-rose-500/10 px-4 py-2 font-semibold text-rose-300 transition-all duration-200 hover:bg-rose-500/20 hover:border-rose-400/70 disabled:opacity-50"
                   >
-                    {cancelPending ? "Confirm in wallet" : "Delete"}
+                    {cancelPending ? "Confirm in wallet…" : "Delete"}
                   </button>
                 </div>
               )}
