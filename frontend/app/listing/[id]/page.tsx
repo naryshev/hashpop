@@ -791,8 +791,44 @@ export default function ListingPage() {
           )}
 
         <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_400px]">
-          {/* Left: media gallery (Chrono24-style) */}
+          {/* Left: breadcrumb + title + media gallery */}
           <div className="min-w-0 space-y-4">
+            {/* Breadcrumb + title — above image, left-aligned */}
+            <div>
+              <nav className="flex items-center gap-1 text-sm text-silver flex-wrap mb-3">
+                <Link href="/marketplace" className="hover:text-white">
+                  Marketplace
+                </Link>
+                {categoryLabel && categoryLabel !== "Marketplace" && (
+                  <>
+                    <span>{">"}</span>
+                    <span className="text-white">{categoryLabel}</span>
+                  </>
+                )}
+              </nav>
+              <div className="flex items-start gap-2 flex-wrap">
+                <h1 className="text-2xl font-bold text-white flex-1 min-w-0">
+                  {editing ? editTitle || displayTitle : displayTitle}
+                </h1>
+                {!isListed && !isUnconfirmed && (
+                  <span className="px-2 py-0.5 text-xs font-medium bg-white/10 text-silver border border-white/10 mt-1 flex-shrink-0">
+                    Archived
+                  </span>
+                )}
+              </div>
+              {displaySubtitle && (
+                <p className="text-silver text-sm mt-1">
+                  {editing ? editSubtitle : displaySubtitle}
+                </p>
+              )}
+              {attributesLine && (
+                <p className="text-silver/70 text-sm mt-0.5">
+                  {editing
+                    ? [editCondition, editYearOfProduction].filter(Boolean).join(" | ")
+                    : attributesLine}
+                </p>
+              )}
+            </div>
             <div className="relative aspect-[4/3] max-h-[62vh] overflow-hidden rounded-glass-lg border border-white/10 bg-black">
               {mainImageUrl ? (
                 <>
@@ -1041,40 +1077,8 @@ export default function ListingPage() {
             )}
           </div>
 
-          {/* Right: details panel (Chrono24-style) */}
+          {/* Right: price + buy/escrow panel */}
           <div className="min-w-0 space-y-4">
-            <nav className="flex items-center gap-1 text-sm text-silver flex-wrap">
-              <Link href="/marketplace" className="hover:text-white">
-                Marketplace
-              </Link>
-              {categoryLabel && categoryLabel !== "Marketplace" && (
-                <>
-                  <span>{">"}</span>
-                  <span className="text-white">{categoryLabel}</span>
-                </>
-              )}
-            </nav>
-            <div className="flex items-center gap-2 flex-wrap">
-              {!isListed && !isUnconfirmed && (
-                <span className="px-2 py-0.5 rounded text-xs font-medium bg-white/10 text-silver border border-white/10">
-                  Archived
-                </span>
-              )}
-            </div>
-            <h1 className="text-2xl font-bold text-white">
-              {editing ? editTitle || displayTitle : displayTitle}
-            </h1>
-            {displaySubtitle && (
-              <p className="text-silver text-sm">{editing ? editSubtitle : displaySubtitle}</p>
-            )}
-            {attributesLine && (
-              <p className="text-silver text-sm">
-                {editing
-                  ? [editCondition, editYearOfProduction].filter(Boolean).join(" | ")
-                  : attributesLine}
-              </p>
-            )}
-
             {listing && priceMismatch && onChainPriceHbar && (
               <p className="text-sm text-amber-300/90 mt-1">
                 Listing price: <strong>{formatPriceForDisplay(listing.price)} HBAR</strong>.
@@ -1275,7 +1279,7 @@ export default function ListingPage() {
               <p className="text-silver text-sm flex items-center gap-2">
                 <AddressDisplay address={item!.seller} className="text-chrome font-mono text-xs" />
               </p>
-              {isSeller && isSellerActiveListing && !editing && (
+              {isSeller && isSellerActiveListing && !isLockedOnChain && !editing && (
                 <div className="flex gap-2 mt-2">
                   <button
                     type="button"
@@ -1296,6 +1300,14 @@ export default function ListingPage() {
                   >
                     {cancelPending ? "Confirm in wallet…" : "Delete"}
                   </button>
+                </div>
+              )}
+              {isSeller && (isLockedOnChain || listing.status === "LOCKED") && (
+                <div className="mt-2 border border-amber-500/30 bg-amber-500/5 px-3 py-2">
+                  <p className="text-xs text-amber-300/90">
+                    This listing is in escrow — it cannot be deleted until the transaction is
+                    complete or resolved.
+                  </p>
                 </div>
               )}
               {isSeller &&
