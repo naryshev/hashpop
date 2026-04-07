@@ -11,6 +11,7 @@ import {
   MessageSquare,
   LifeBuoy,
   LogIn,
+  LogOut,
   UserCircle,
 } from "lucide-react";
 import { Sidebar, SidebarBody, SidebarLink } from "./ui/sidebar";
@@ -25,7 +26,7 @@ type NavLink = {
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { isConnected, accountId } = useHashpackWallet();
+  const { isConnected, accountId, disconnect } = useHashpackWallet();
   const [open, setOpen] = useState(false);
   const appVersion = process.env.NEXT_PUBLIC_APP_VERSION?.trim() || "v1.0.0";
 
@@ -89,18 +90,30 @@ export function AppSidebar() {
             })}
           </div>
         </div>
-        {isConnected && accountId ? (
-          <div className="flex items-center gap-2 px-2 pb-2">
-            <UserCircle className="h-5 w-5 flex-shrink-0 text-neutral-500 dark:text-neutral-400" />
-            {open && (
-              <p className="text-xs text-neutral-600 dark:text-neutral-300 truncate">{accountId}</p>
-            )}
+        <div className="space-y-1">
+          {isConnected && accountId ? (
+            <div className="flex items-center gap-2 px-2 py-1">
+              <UserCircle className="h-5 w-5 flex-shrink-0 text-neutral-500 dark:text-neutral-400" />
+              {open && (
+                <p className="text-xs text-neutral-600 dark:text-neutral-300 truncate">{accountId}</p>
+              )}
+            </div>
+          ) : null}
+          {isConnected && (
+            <button
+              type="button"
+              onClick={() => void disconnect()}
+              className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200/50 dark:hover:bg-white/5 hover:text-neutral-900 dark:hover:text-white transition-colors"
+            >
+              <LogOut className="h-4 w-4 flex-shrink-0" />
+              {open && <span className="text-sm">Sign out</span>}
+            </button>
+          )}
+          <div className="border-t border-black/10 dark:border-white/10 pt-2">
+            <p className="text-xs text-neutral-600 dark:text-neutral-300 px-2">
+              {open ? `App ${appVersion}` : appVersion}
+            </p>
           </div>
-        ) : null}
-        <div className="border-t border-black/10 dark:border-white/10 pt-3">
-          <p className="text-xs text-neutral-600 dark:text-neutral-300 px-2">
-            {open ? `App ${appVersion}` : appVersion}
-          </p>
         </div>
       </SidebarBody>
     </Sidebar>
