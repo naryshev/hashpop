@@ -30,7 +30,7 @@ export function BuyButton({
   inWishlist?: boolean;
   onToggleWishlist?: () => void;
   wishlistDisabled?: boolean;
-  onPurchaseComplete?: () => void;
+  onPurchaseComplete?: (txHash?: string) => void;
   onMessage?: () => void;
   onMakeOffer?: () => void;
 }) {
@@ -147,7 +147,7 @@ export function BuyButton({
         body: JSON.stringify({ txHash, listingId }),
       }).catch(() => {});
       setIsSuccess(true);
-      onPurchaseComplete?.();
+      onPurchaseComplete?.(txHash ?? lastTxId ?? undefined);
     } catch (e) {
       const msg =
         e instanceof Error
@@ -227,20 +227,9 @@ export function BuyButton({
       </button>
 
       {isSuccess && (
-        <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 space-y-2 mt-2">
-          <p className="text-sm text-emerald-200">
-            Purchase submitted. You can verify this transaction on-chain.
-          </p>
-          {explorerUrl && (
-            <a
-              href={explorerUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-emerald-100 hover:text-white underline"
-            >
-              View on HashScan
-            </a>
-          )}
+        <div className="border border-[#00ffa3]/30 bg-[#00ffa3]/5 px-4 py-3 flex items-center gap-3 mt-2">
+          <div className="w-4 h-4 rounded-full border-2 border-[#00ffa3] border-t-transparent animate-spin flex-shrink-0" />
+          <p className="text-sm text-[#00ffa3]">Purchase confirmed — loading confirmation…</p>
         </div>
       )}
       {errorMessage && (
