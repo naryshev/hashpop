@@ -8,13 +8,13 @@
   --text-muted: #a9b0bf;
   --border: rgba(95, 130, 180, 0.25);
   --frost: rgba(17, 26, 40, 0.45);
-  --glow: rgba(20, 164, 255, 0.2);
+  --glow: rgba(0, 255, 163, 0.2);
 }
 
 body {
   background:
     radial-gradient(900px 400px at 10% -10%, rgba(255, 47, 61, 0.2), transparent 55%),
-    radial-gradient(900px 500px at 90% -20%, rgba(20, 164, 255, 0.2), transparent 58%),
+    radial-gradient(900px 500px at 90% -20%, rgba(0, 255, 163, 0.15), transparent 58%),
     radial-gradient(900px 600px at 50% 130%, rgba(109, 223, 133, 0.16), transparent 62%), var(--bg);
   color: var(--text);
   font-family:
@@ -51,13 +51,13 @@ a,
     @apply rounded-glass-lg border border-[#4a5e83]/40 bg-gradient-to-b from-[#121a29]/90 to-[#0f1522]/90 backdrop-blur-glass;
   }
   .btn-frost {
-    @apply rounded-glass border border-[#4a5e83]/60 bg-[#172133]/85 backdrop-blur-sm px-4 py-2 font-medium text-chrome transition-all duration-200 hover:bg-[#1b2940]/95 hover:shadow-glow hover:border-[#14a4ff]/50;
+    @apply rounded-glass border border-[#4a5e83]/60 bg-[#172133]/85 backdrop-blur-sm px-4 py-2 font-medium text-chrome transition-all duration-200 hover:bg-[#1b2940]/95 hover:shadow-glow hover:border-[#00ffa3]/50;
   }
   .btn-frost-cta {
-    @apply rounded-glass border border-[#14a4ff]/60 bg-[linear-gradient(110deg,#0d61d9_0%,#14a4ff_45%,#1bcf92_100%)] px-4 py-2 font-semibold text-white transition-all duration-200 hover:brightness-110 hover:shadow-glow-hover shadow-inner;
+    @apply rounded-glass border border-[#00ffa3]/60 bg-[linear-gradient(110deg,#00b37a_0%,#00ffa3_50%,#00e5ff_100%)] px-4 py-2 font-semibold text-black transition-all duration-200 hover:brightness-110 hover:shadow-glow-hover shadow-inner;
   }
   .input-frost {
-    @apply rounded-lg border border-[#4a5e83]/50 bg-[#0f1726]/90 backdrop-blur-sm px-3 py-2 text-white placeholder:text-zinc-500 focus:border-[#14a4ff]/60 focus:outline-none focus:ring-1 focus:ring-[#14a4ff]/40 transition;
+    @apply rounded-lg border border-[#4a5e83]/50 bg-[#0f1726]/90 backdrop-blur-sm px-3 py-2 text-white placeholder:text-zinc-500 focus:border-[#00ffa3]/60 focus:outline-none focus:ring-1 focus:ring-[#00ffa3]/40 transition;
   }
   /* Selects: light gray background + white text; dropdown options match so they're visible */
   select.input-frost {
