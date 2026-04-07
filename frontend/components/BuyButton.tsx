@@ -22,6 +22,8 @@ export function BuyButton({
   onToggleWishlist,
   wishlistDisabled = false,
   onPurchaseComplete,
+  onMessage,
+  onMakeOffer,
 }: {
   listingId: string;
   price: string;
@@ -29,6 +31,8 @@ export function BuyButton({
   onToggleWishlist?: () => void;
   wishlistDisabled?: boolean;
   onPurchaseComplete?: () => void;
+  onMessage?: () => void;
+  onMakeOffer?: () => void;
 }) {
   const idBytes = useMemo(() => listingIdToBytes32(listingId), [listingId]);
 
@@ -60,7 +64,6 @@ export function BuyButton({
           const p = parsePriceWei(data.price);
           const s = Number(data.status ?? 0);
           if (p === 0n && s === 0) {
-            // Listing doesn't exist on-chain (empty struct returned).
             setOnChainListing(undefined);
             setChainReadFailed(true);
             setNotOnChain(true);
@@ -107,7 +110,6 @@ export function BuyButton({
       setLastTxId(null);
       setActionError(null);
       setBuyAttempted(true);
-      // Read the latest on-chain listing at click-time to avoid stale cached price mismatches.
       let latestPrice = 0n;
       let latestStatus = 0;
       try {
@@ -117,7 +119,6 @@ export function BuyButton({
       } catch {
         // Chain read failed — fall through to API fallback below.
       }
-      // If on-chain returned defaults (price=0, status=0) or read failed, fall back to API price.
       if (latestPrice <= 0n || latestStatus === 0) {
         const apiPrice = parseUnits(String(_price || "0"), 8);
         if (apiPrice > 0n) {
@@ -158,59 +159,77 @@ export function BuyButton({
 
   const usdRate = useHbarUsd();
   const listingPriceWithUsd = formatHbarWithUsd(formatPriceForDisplay(_price || "0"), usdRate);
+  const canBuy =
+    (hasPrice || chainReadFailed || hasApiPrice) &&
+    !isWrongNetwork &&
+    !isPending &&
+    !isConfirming &&
+    !isLegacyWeiListing;
 
   return (
-    <div className="glass-card p-4 space-y-4">
-      <h3 className="text-lg font-semibold text-white mb-2">Buy Now</h3>
-      <p className="text-2xl font-semibold text-white">{listingPriceWithUsd}</p>
-      <p className="text-xs text-silver">Excl. shipping · Network fee applies at checkout</p>
+    <div className="space-y-1">
+      {/* Price line */}
+      <p className="text-xl font-semibold text-white mb-3">{listingPriceWithUsd}</p>
+
       {notOnChain && (
-        <p className="text-xs text-amber-300/90 mb-1">
+        <p className="text-xs text-amber-300/90 mb-2">
           This listing does not exist on the smart contract yet. The seller&apos;s creation
-          transaction may not have completed successfully. Ask the seller to delete and recreate
-          this listing.
+          transaction may not have completed successfully.
         </p>
       )}
       {isLegacyWeiListing && (
-        <p className="text-xs text-amber-300/90 mb-1">
-          This listing was created with a legacy price unit and cannot be bought yet. The seller
-          needs to edit the price and save, or relist.
+        <p className="text-xs text-amber-300/90 mb-2">
+          This listing uses a legacy price format. The seller needs to edit and save the price
+          before it can be purchased.
         </p>
       )}
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          onClick={onToggleWishlist}
-          disabled={wishlistDisabled}
-          className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
-            inWishlist
-              ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-300"
-              : "border-white/20 bg-white/5 text-silver hover:text-white hover:bg-white/10"
-          }`}
-          aria-label={inWishlist ? "In wishlist" : "Add to wishlist"}
-        >
-          {inWishlist ? "✓ In wishlist" : "+ Add to wishlist"}
-        </button>
-        <button
-          onClick={() => {
-            if ((!hasPrice && !hasApiPrice) || isWrongNetwork || isPending || isConfirming) return;
-            void buy();
-          }}
-          disabled={
-            (!hasPrice && !chainReadFailed && !hasApiPrice) ||
-            isPending ||
-            isConfirming ||
-            isWrongNetwork
-          }
-          className="btn-frost-cta w-full disabled:opacity-60"
-        >
-          {isPending ? "Confirm in wallet\u2026" : "Buy Now"}
-        </button>
-      </div>
+
+      {/* PURCHASE */}
+      <button
+        onClick={() => { if (canBuy) void buy(); }}
+        disabled={!canBuy}
+        className="w-full bg-white text-black font-bold uppercase tracking-widest py-4 text-sm hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        {isPending ? "Confirm in wallet\u2026" : "Purchase"}
+      </button>
+
+      {/* OFFER */}
+      <button
+        type="button"
+        onClick={onMakeOffer}
+        className="w-full bg-transparent text-white font-bold uppercase tracking-widest py-3.5 text-sm border border-white/40 hover:border-white hover:bg-white/5 transition-colors"
+      >
+        Offer
+      </button>
+
+      {/* MESSAGE */}
+      <button
+        type="button"
+        onClick={onMessage}
+        className="w-full bg-transparent text-white font-bold uppercase tracking-widest py-3.5 text-sm border border-white/40 hover:border-white hover:bg-white/5 transition-colors"
+      >
+        Message
+      </button>
+
+      {/* Wishlist toggle — subtle, below the main actions */}
+      <button
+        type="button"
+        onClick={onToggleWishlist}
+        disabled={wishlistDisabled}
+        className={`w-full py-2 text-xs font-medium transition-colors disabled:opacity-40 mt-1 ${
+          inWishlist
+            ? "text-emerald-400 hover:text-emerald-300"
+            : "text-white/40 hover:text-white/70"
+        }`}
+        aria-label={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
+      >
+        {inWishlist ? "✓ In wishlist" : "+ Add to wishlist"}
+      </button>
+
       {isSuccess && (
-        <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 space-y-2">
+        <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 space-y-2 mt-2">
           <p className="text-sm text-emerald-200">
-            Purchase submitted and synced. You can verify this transaction on-chain.
+            Purchase submitted. You can verify this transaction on-chain.
           </p>
           {explorerUrl && (
             <a
@@ -219,13 +238,13 @@ export function BuyButton({
               rel="noopener noreferrer"
               className="text-xs text-emerald-100 hover:text-white underline"
             >
-              View transaction on HashScan
+              View on HashScan
             </a>
           )}
         </div>
       )}
       {errorMessage && (
-        <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 space-y-2">
+        <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 space-y-2 mt-2">
           <p className="text-sm text-red-300/90 break-words">{errorMessage}</p>
           <a
             href="https://docs.hashpack.app/"
