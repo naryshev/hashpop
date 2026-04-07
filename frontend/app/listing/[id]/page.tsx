@@ -104,6 +104,12 @@ export default function ListingPage() {
   const [reportDetails, setReportDetails] = useState("");
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const [reportMessage, setReportMessage] = useState<string | null>(null);
+  const [chatMessages, setChatMessages] = useState<
+    Array<{ id: string; fromAddress: string; toAddress: string; body: string; createdAt: string }>
+  >([]);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatReply, setChatReply] = useState("");
+  const [chatSending, setChatSending] = useState(false);
   const router = useRouter();
   const { address, accountId } = useHashpackWallet();
   const chainId = activeHederaChain.id;
@@ -261,6 +267,74 @@ export default function ListingPage() {
   useEffect(() => {
     if (listing?.status !== "LISTED" && editing) setEditing(false);
   }, [listing?.status, editing]);
+
+  useEffect(() => {
+    if (!id || !address || !listing?.buyer || !listing?.seller) return;
+    const buyerAddr = listing.buyer.toLowerCase();
+    const sellerAddr = listing.seller.toLowerCase();
+    const myAddr = address.toLowerCase();
+    const myLongZero = accountId ? accountIdToLongZeroAddress(accountId).toLowerCase() : null;
+    const isInvolved =
+      myAddr === buyerAddr ||
+      myAddr === sellerAddr ||
+      (myLongZero !== null && (myLongZero === buyerAddr || myLongZero === sellerAddr));
+    if (!isInvolved) return;
+    const other = myAddr === buyerAddr ? listing.seller : listing.buyer;
+    setChatLoading(true);
+    const q = new URLSearchParams({ address, other, listingId: id });
+    fetch(`${getApiUrl()}/api/messages/thread?${q}`)
+      .then((res) => res.json())
+      .then(
+        (data: {
+          messages?: Array<{
+            id: string;
+            fromAddress: string;
+            toAddress: string;
+            body: string;
+            createdAt: string;
+          }>;
+        }) => {
+          setChatMessages(data.messages ?? []);
+        },
+      )
+      .catch(() => setChatMessages([]))
+      .finally(() => setChatLoading(false));
+  }, [id, address, accountId, listing?.buyer, listing?.seller]);
+
+  const sendChatReply = async () => {
+    if (!address || !chatReply.trim() || chatSending || !listing?.buyer || !listing?.seller) return;
+    const buyerAddr = listing.buyer.toLowerCase();
+    const myAddr = address.toLowerCase();
+    const other = myAddr === buyerAddr ? listing.seller : listing.buyer;
+    setChatSending(true);
+    try {
+      await fetch(`${getApiUrl()}/api/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fromAddress: address,
+          toAddress: other,
+          body: chatReply.trim(),
+          listingId: id,
+        }),
+      });
+      setChatReply("");
+      const q = new URLSearchParams({ address, other, listingId: id });
+      const res = await fetch(`${getApiUrl()}/api/messages/thread?${q}`);
+      const data = (await res.json()) as {
+        messages?: Array<{
+          id: string;
+          fromAddress: string;
+          toAddress: string;
+          body: string;
+          createdAt: string;
+        }>;
+      };
+      setChatMessages(data.messages ?? []);
+    } finally {
+      setChatSending(false);
+    }
+  };
 
   const toggleWishlist = async () => {
     if (!address || !id || wishlistLoading) return;
@@ -1002,6 +1076,42 @@ export default function ListingPage() {
                   }}
                   wishlistDisabled={!address || wishlistLoading}
                   onPurchaseComplete={() => fetchListing(0, false)}
+                  onMessage={async () => {
+                    if (!walletConnected || !address || !item?.seller) return;
+                    try {
+                      await fetch(`${getApiUrl()}/api/messages`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          fromAddress: address,
+                          toAddress: item.seller,
+                          body: "Hi, I'm interested in this listing.",
+                          listingId: id,
+                        }),
+                      });
+                    } catch {}
+                    router.push(
+                      `/messages?openThread=${encodeURIComponent(item.seller)}&listingId=${encodeURIComponent(id)}`,
+                    );
+                  }}
+                  onMakeOffer={async () => {
+                    if (!walletConnected || !address || !item?.seller) return;
+                    try {
+                      await fetch(`${getApiUrl()}/api/messages`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          fromAddress: address,
+                          toAddress: item.seller,
+                          body: "I'd like to make an offer on this listing.",
+                          listingId: id,
+                        }),
+                      });
+                    } catch {}
+                    router.push(
+                      `/messages?openThread=${encodeURIComponent(item.seller)}&listingId=${encodeURIComponent(id)}`,
+                    );
+                  }}
                 />
               ) : (
                 <div className="glass-card p-4 rounded-lg border border-white/10">
@@ -1164,38 +1274,6 @@ export default function ListingPage() {
                     Connect wallet to duplicate
                   </div>
                 ))}
-              {(!isSeller || isListed) && (
-                <button
-                  type="button"
-                  disabled={!walletConnected}
-                  onClick={async () => {
-                    if (!walletConnected || !address || !item?.seller) return;
-                    try {
-                      const msgRes = await fetch(`${getApiUrl()}/api/messages`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          fromAddress: address,
-                          toAddress: item.seller,
-                          body: "Hi, I'm interested in this listing.",
-                          listingId: id,
-                        }),
-                      });
-                      if (!msgRes.ok) {
-                        // ignore non-OK status; navigation still opens conversation view
-                      }
-                      router.push(
-                        `/messages?openThread=${encodeURIComponent(item.seller)}&listingId=${encodeURIComponent(id)}`,
-                      );
-                    } catch {
-                      // ignore
-                    }
-                  }}
-                  className={`btn-frost-cta w-full mt-2 border-white/20 text-silver hover:text-white ${!walletConnected ? "opacity-50 cursor-not-allowed" : ""}`}
-                >
-                  Contact seller
-                </button>
-              )}
             </div>
           </div>
         </div>
@@ -1210,6 +1288,65 @@ export default function ListingPage() {
             </p>
           </div>
         )}
+
+        {/* Chat thread — shown when user is buyer or seller of a purchased listing */}
+        {listing?.buyer &&
+          address &&
+          (listing.buyer.toLowerCase() === address.toLowerCase() || isSeller) && (
+            <div className="mt-8 glass-card p-6 rounded-xl">
+              <h2 className="text-lg font-semibold text-white mb-4">Messages</h2>
+              {chatLoading ? (
+                <p className="text-silver text-sm">Loading…</p>
+              ) : chatMessages.length === 0 ? (
+                <p className="text-silver text-sm">No messages yet. Start the conversation below.</p>
+              ) : (
+                <div className="space-y-3 mb-4 max-h-80 overflow-y-auto">
+                  {chatMessages.map((msg) => {
+                    const isMe = msg.fromAddress.toLowerCase() === address.toLowerCase();
+                    return (
+                      <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
+                        <div
+                          className={`max-w-xs lg:max-w-md rounded-lg px-3 py-2 text-sm ${
+                            isMe
+                              ? "bg-white/15 text-white"
+                              : "bg-white/5 text-silver border border-white/10"
+                          }`}
+                        >
+                          <p className="break-words">{msg.body}</p>
+                          <p className="text-xs text-white/40 mt-1">
+                            {new Date(msg.createdAt).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <div className="flex gap-2 mt-4">
+                <input
+                  type="text"
+                  value={chatReply}
+                  onChange={(e) => setChatReply(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      void sendChatReply();
+                    }
+                  }}
+                  placeholder="Type a message…"
+                  className="flex-1 bg-white/5 border border-white/20 rounded px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-white/40"
+                />
+                <button
+                  type="button"
+                  onClick={() => void sendChatReply()}
+                  disabled={chatSending || !chatReply.trim()}
+                  className="px-4 py-2 bg-white/10 border border-white/20 text-white text-sm font-medium rounded hover:bg-white/20 transition-colors disabled:opacity-40"
+                >
+                  {chatSending ? "…" : "Send"}
+                </button>
+              </div>
+            </div>
+          )}
       </div>
     </main>
   );
