@@ -19,6 +19,7 @@ const MAX_BACKOFF_MS = 30_000;
 const BACKOFF_MULTIPLIER = 2;
 const DEFAULT_GAS_LIMIT = 1_200_000;
 const WEI_PER_TINYBAR = 10_000_000_000n;
+const RECEIPT_TIMEOUT_MS = 30_000;
 
 function isRetryableWalletError(message: string): boolean {
   const m = message.toLowerCase();
@@ -72,6 +73,17 @@ function normalizePayableToTinybar(value: bigint): bigint {
 
 function isZeroAddress(address: string): boolean {
   return /^0x0{40}$/i.test(address);
+}
+
+async function getReceiptWithTimeout(txResponse: any, client: any): Promise<any> {
+  const timeoutErr = Object.assign(
+    new Error("getReceipt timed out after 30s — falling back to mirror node"),
+    { isReceiptTimeout: true },
+  );
+  return Promise.race([
+    txResponse.getReceipt(client),
+    new Promise<never>((_, reject) => setTimeout(() => reject(timeoutErr), RECEIPT_TIMEOUT_MS)),
+  ]);
 }
 
 function pickSingleNodeAccountId(sdk: any, client: any, network: "mainnet" | "testnet") {
@@ -159,6 +171,9 @@ export function useHashpackContractWrite() {
       safeSetError(null);
       let lastError: Error | null = null;
       let txId: string | null = null;
+      // Once the wallet has been prompted (signTransaction / signer.call fired),
+      // never retry — showing HashPack multiple times confuses the user.
+      let walletPrompted = false;
 
       try {
         for (let attempt = 0; attempt < MAX_RETRIES; attempt += 1) {
@@ -217,11 +232,17 @@ export function useHashpackContractWrite() {
               if (typeof (tx as any).isFrozen === "function" && !(tx as any).isFrozen()) {
                 tx.freezeWith(freezeClient);
               }
+              walletPrompted = true;
               const signedTx = await signer.signTransaction(tx as any);
               const txResponse = await (signedTx as any).execute(freezeClient);
               txId =
                 txResponse?.transactionId?.toString?.() ?? tx.transactionId?.toString?.() ?? txId;
-              receipt = await txResponse.getReceipt(freezeClient);
+              // Use a 30s timeout on getReceipt — it can hang indefinitely on node issues.
+              // If it times out, receipt stays null and we fall through to mirror node polling.
+              receipt = await getReceiptWithTimeout(txResponse, freezeClient).catch((e) => {
+                if (e.isReceiptTimeout) return null;
+                throw e;
+              });
             } else if (
               isPayableRequest &&
               signer &&
@@ -238,13 +259,20 @@ export function useHashpackContractWrite() {
               if (typeof (tx as any).isFrozen === "function" && !(tx as any).isFrozen()) {
                 tx.freezeWith(freezeClient);
               }
+              walletPrompted = true;
               const signedTx = await signer.signTransaction(tx as any);
               const txResponse = await (signedTx as any).execute(freezeClient);
               txId =
                 txResponse?.transactionId?.toString?.() ?? tx.transactionId?.toString?.() ?? txId;
-              receipt = await txResponse.getReceipt(freezeClient);
+              // Use a 30s timeout on getReceipt — it can hang indefinitely on node issues.
+              // If it times out, receipt stays null and we fall through to mirror node polling.
+              receipt = await getReceiptWithTimeout(txResponse, freezeClient).catch((e) => {
+                if (e.isReceiptTimeout) return null;
+                throw e;
+              });
             } else {
               // Fallback for older HashConnect behavior
+              walletPrompted = true;
               receipt = await (hashconnect as any).sendTransaction(accountObj as any, tx as any);
               txId = tx.transactionId?.toString?.() ?? receipt?.transactionId?.toString?.() ?? txId;
             }
@@ -317,7 +345,14 @@ export function useHashpackContractWrite() {
           } catch (e) {
             const err = e instanceof Error ? e : new Error(String(e));
             lastError = err;
-            if (attempt < MAX_RETRIES - 1 && isRetryableWalletError(err.message)) continue;
+            // Never retry once the wallet has been prompted — showing HashPack multiple
+            // times in a row is disorienting and typically means the tx was rejected or
+            // the network is unreachable (retrying won't help).
+            const canRetry =
+              !walletPrompted &&
+              attempt < MAX_RETRIES - 1 &&
+              isRetryableWalletError(err.message);
+            if (canRetry) continue;
             safeSetError(err);
             throw err;
           }
