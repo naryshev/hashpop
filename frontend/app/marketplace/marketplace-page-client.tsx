@@ -244,15 +244,15 @@ export default function MarketplacePageClient({
                     </span>
                   </div>
                   <div className="p-3">
-                    <h2 className="text-sm font-medium text-white line-clamp-2 leading-tight">
+                    <h2 className="text-sm font-semibold text-white line-clamp-2 leading-tight">
                       {item.title || formatListingId(item.id) || "Untitled"}
                     </h2>
                     {item.seller && (
-                      <p className="text-silver/60 text-[10px] mt-0.5 font-mono truncate">
-                        by {formatSellerDisplay(item.seller)}
+                      <p className="text-silver/50 text-[10px] mt-1 font-mono truncate">
+                        {formatSellerDisplay(item.seller)}
                       </p>
                     )}
-                    <p className="text-chrome font-semibold mt-1">
+                    <p className="text-chrome font-semibold mt-1.5">
                       {formatHbarWithUsd(formatPriceForDisplay(item.price || "0"), usdRate)}
                     </p>
                   </div>
@@ -288,15 +288,15 @@ export default function MarketplacePageClient({
                     </span>
                   </div>
                   <div className="p-4">
-                    <h2 className="text-base font-medium text-white line-clamp-2 leading-snug min-h-[2.75rem]">
+                    <h2 className="text-base font-semibold text-white line-clamp-2 leading-snug">
                       {item.title || formatListingId(item.id) || "Untitled"}
                     </h2>
                     {item.seller && (
-                      <p className="text-silver/60 text-[11px] mt-0.5 font-mono truncate">
-                        by {formatSellerDisplay(item.seller)}
+                      <p className="text-silver/50 text-[11px] mt-1 font-mono truncate">
+                        {formatSellerDisplay(item.seller)}
                       </p>
                     )}
-                    <p className="text-chrome font-semibold mt-1.5 text-lg">
+                    <p className="text-chrome font-semibold mt-2 text-lg">
                       {formatHbarWithUsd(formatPriceForDisplay(item.price || "0"), usdRate)}
                     </p>
                   </div>
