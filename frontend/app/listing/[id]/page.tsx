@@ -104,6 +104,8 @@ export default function ListingPage() {
   const [reportDetails, setReportDetails] = useState("");
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const [reportMessage, setReportMessage] = useState<string | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<
     Array<{ id: string; fromAddress: string; toAddress: string; body: string; createdAt: string }>
   >([]);
@@ -639,11 +641,35 @@ export default function ListingPage() {
     <main className="min-h-screen overflow-x-hidden">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 relative overflow-x-hidden">
         {cancelSuccess && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity duration-300">
-            <div className="glass-card p-8 max-w-sm text-center space-y-4">
-              <div className="w-12 h-12 mx-auto rounded-full border-2 border-emerald-400 border-t-transparent animate-spin" />
-              <p className="text-lg font-semibold text-white">Listing deleted</p>
-              <p className="text-sm text-silver">Redirecting to dashboard…</p>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity duration-300 p-4">
+            <div className="glass-card p-8 max-w-sm w-full text-center space-y-5">
+              <div className="w-14 h-14 mx-auto rounded-full border-2 border-rose-400/80 flex items-center justify-center">
+                <svg className="w-7 h-7 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <div className="space-y-1">
+                <p className="text-lg font-semibold text-white">Listing deleted</p>
+                <p className="text-sm text-silver">The listing has been cancelled on-chain and removed.</p>
+              </div>
+              {cancelTxHash && (
+                <a
+                  href={`https://hashscan.io/mainnet/transaction/${cancelTxHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-rose-300/80 hover:text-white underline block"
+                >
+                  View transaction on HashScan
+                </a>
+              )}
+              <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                <Link href="/dashboard" className="btn-frost-cta flex-1 text-center">
+                  Go to Dashboard
+                </Link>
+                <Link href="/create" className="btn-frost flex-1 text-center border-white/20">
+                  New Listing
+                </Link>
+              </div>
             </div>
           </div>
         )}
@@ -707,6 +733,61 @@ export default function ListingPage() {
                   className="btn-frost-cta flex-1 disabled:opacity-60"
                 >
                   {reportSubmitting ? "Sending…" : "Send report"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete confirmation modal */}
+        {deleteConfirmOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div className="glass-card p-6 w-full max-w-sm space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-full border border-rose-500/40 bg-rose-500/10 flex items-center justify-center shrink-0">
+                  <svg className="w-4 h-4 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold text-white">Delete listing?</h2>
+                  <p className="text-sm text-silver mt-1">
+                    This will cancel the listing on-chain and remove it permanently. You&apos;ll need to approve the transaction in your wallet.
+                  </p>
+                </div>
+              </div>
+              {deleteError && (
+                <p className="text-sm text-rose-300 border border-rose-500/30 bg-rose-500/5 px-3 py-2">
+                  {deleteError}
+                </p>
+              )}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeleteConfirmOpen(false);
+                    setDeleteError(null);
+                  }}
+                  disabled={cancelPending}
+                  className="btn-frost flex-1 border-white/20 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setDeleteError(null);
+                    const ok = await cancel(listing!.id);
+                    if (ok) {
+                      setDeleteConfirmOpen(false);
+                    } else {
+                      setDeleteError("Transaction failed or was rejected. Please try again.");
+                    }
+                  }}
+                  disabled={cancelPending}
+                  className="flex-1 rounded-glass border border-rose-500/50 bg-rose-500/10 px-4 py-2 font-semibold text-rose-300 transition-all duration-200 hover:bg-rose-500/20 hover:border-rose-400/70 disabled:opacity-50"
+                >
+                  {cancelPending ? "Confirm in wallet…" : "Delete listing"}
                 </button>
               </div>
             </div>
@@ -1296,9 +1377,8 @@ export default function ListingPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      const confirmed = window.confirm("This will delete all record of this item.");
-                      if (!confirmed) return;
-                      void cancel(listing.id);
+                      setDeleteError(null);
+                      setDeleteConfirmOpen(true);
                     }}
                     disabled={cancelPending}
                     className="flex-1 rounded-glass border border-rose-500/50 bg-rose-500/10 px-4 py-2 font-semibold text-rose-300 transition-all duration-200 hover:bg-rose-500/20 hover:border-rose-400/70 disabled:opacity-50"
