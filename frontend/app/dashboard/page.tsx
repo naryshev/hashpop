@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { MessageSquare, ChevronDown, ChevronUp } from "lucide-react";
 import { formatPriceForDisplay } from "../../lib/formatPrice";
 import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
@@ -23,11 +24,197 @@ function formatListingId(id: string): string {
   }
 }
 
+function shortAddr(addr: string): string {
+  if (!addr) return "";
+  if (/^\d+\.\d+\.\d+$/.test(addr)) return addr;
+  if (addr.startsWith("0x") && addr.length > 12) return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+  return addr;
+}
+
+type SaleItem = {
+  id: string;
+  listingId: string | null;
+  buyer: string;
+  seller: string;
+  amount: string;
+  txHash: string | null;
+  createdAt: string;
+  role: "buyer" | "seller";
+  listing: { id: string; title: string | null; status: string; imageUrl: string | null } | null;
+};
+
+type ChatMsg = {
+  id: string;
+  fromAddress: string;
+  toAddress: string;
+  body: string;
+  createdAt: string;
+};
+
+function SoldItemCard({
+  sale,
+  myAddress,
+  usdRate,
+}: {
+  sale: SaleItem;
+  myAddress: string;
+  usdRate: number | null;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [msgs, setMsgs] = useState<ChatMsg[]>([]);
+  const [msgsLoading, setMsgsLoading] = useState(false);
+  const [reply, setReply] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const targetId = sale.listingId ?? sale.listing?.id ?? "";
+  const listingTitle =
+    sale.listing?.title || (targetId ? formatListingId(targetId) : "Untitled sale");
+
+  const fetchMsgs = useCallback(async () => {
+    if (!sale.buyer || !targetId) return;
+    setMsgsLoading(true);
+    try {
+      const q = new URLSearchParams({ address: myAddress, other: sale.buyer, listingId: targetId });
+      const res = await fetch(`${getApiUrl()}/api/messages/thread?${q}`);
+      const data = (await res.json()) as { messages?: ChatMsg[] };
+      setMsgs(data.messages ?? []);
+    } catch {
+      setMsgs([]);
+    } finally {
+      setMsgsLoading(false);
+    }
+  }, [sale.buyer, targetId, myAddress]);
+
+  useEffect(() => {
+    if (expanded) void fetchMsgs();
+  }, [expanded, fetchMsgs]);
+
+  const sendReply = async () => {
+    if (!reply.trim() || sending || !sale.buyer || !targetId) return;
+    setSending(true);
+    try {
+      await fetch(`${getApiUrl()}/api/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fromAddress: myAddress,
+          toAddress: sale.buyer,
+          body: reply.trim(),
+          listingId: targetId,
+        }),
+      });
+      setReply("");
+      await fetchMsgs();
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="glass-card rounded-xl overflow-hidden">
+      {/* Summary row */}
+      <div className="p-4 flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          {targetId ? (
+            <Link
+              href={`/listing/${encodeURIComponent(targetId)}`}
+              className="text-white font-semibold hover:text-chrome truncate block"
+            >
+              {listingTitle}
+            </Link>
+          ) : (
+            <p className="text-white font-semibold truncate">{listingTitle}</p>
+          )}
+          <p className="text-silver/70 text-xs mt-0.5 font-mono">
+            Buyer: {shortAddr(sale.buyer)}
+          </p>
+          <p className="text-chrome font-semibold text-sm mt-1">
+            {formatHbarWithUsd(sale.amount, usdRate)}
+          </p>
+          <p className="text-silver/50 text-xs mt-0.5">{formatListingDate(sale.createdAt)}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setExpanded((e) => !e)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/20 text-silver hover:text-white hover:border-white/30 text-xs font-medium transition-colors shrink-0"
+        >
+          <MessageSquare className="h-3.5 w-3.5" />
+          <span>Messages</span>
+          {expanded ? (
+            <ChevronUp className="h-3 w-3" />
+          ) : (
+            <ChevronDown className="h-3 w-3" />
+          )}
+        </button>
+      </div>
+
+      {/* Expandable chat */}
+      {expanded && (
+        <div className="border-t border-white/10 p-4 space-y-3">
+          {msgsLoading ? (
+            <p className="text-silver text-sm">Loading…</p>
+          ) : msgs.length === 0 ? (
+            <p className="text-silver/60 text-sm">
+              No messages yet. Use the box below to coordinate shipping or meetup with the buyer.
+            </p>
+          ) : (
+            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+              {msgs.map((m) => {
+                const isMe = m.fromAddress.toLowerCase() === myAddress.toLowerCase();
+                return (
+                  <div key={m.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
+                    <div
+                      className={`max-w-xs lg:max-w-sm rounded-lg px-3 py-2 text-sm ${
+                        isMe
+                          ? "bg-white/15 text-white"
+                          : "bg-white/5 text-silver border border-white/10"
+                      }`}
+                    >
+                      <p className="break-words">{m.body}</p>
+                      <p className="text-[10px] text-white/40 mt-1">
+                        {new Date(m.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={reply}
+              onChange={(e) => setReply(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void sendReply();
+                }
+              }}
+              placeholder="Message buyer about shipping / meetup…"
+              className="flex-1 bg-white/5 border border-white/20 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#00ffa3]/50 transition-colors"
+            />
+            <button
+              type="button"
+              onClick={() => void sendReply()}
+              disabled={sending || !reply.trim()}
+              className="px-4 py-2 bg-white/10 border border-white/20 text-white text-sm font-medium rounded-lg hover:bg-white/20 transition-colors disabled:opacity-40"
+            >
+              {sending ? "…" : "Send"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const { address, accountId, disconnect } = useHashpackWallet();
   const [mounted, setMounted] = useState(false);
   const [stats, setStats] = useState<any>(null);
   const [activeListings, setActiveListings] = useState<any[]>([]);
+  const [soldItems, setSoldItems] = useState<SaleItem[]>([]);
   const [wishlistItems, setWishlistItems] = useState<
     { itemId: string; itemType: string; title?: string; price?: string; reservePrice?: string }[]
   >([]);
@@ -41,6 +228,7 @@ export default function DashboardPage() {
     let cancelled = false;
     setStats(null);
     setActiveListings([]);
+    setSoldItems([]);
     setWishlistItems([]);
     setPurchaseCount(0);
     if (!address) {
@@ -92,11 +280,18 @@ export default function DashboardPage() {
         }),
       fetch(`${getApiUrl()}/api/user/${address}/purchases`)
         .then((res) => (res.ok ? res.json() : Promise.reject(res)))
-        .then((data: { purchases?: any[] }) => {
-          if (!cancelled) setPurchaseCount((data.purchases ?? []).length);
+        .then((data: { purchases?: SaleItem[] }) => {
+          if (!cancelled) {
+            const all = data.purchases ?? [];
+            setPurchaseCount(all.filter((s) => s.role === "buyer").length);
+            setSoldItems(all.filter((s) => s.role === "seller"));
+          }
         })
         .catch(() => {
-          if (!cancelled) setPurchaseCount(0);
+          if (!cancelled) {
+            setPurchaseCount(0);
+            setSoldItems([]);
+          }
         }),
     ]).finally(() => {
       if (!cancelled) setLoading(false);
@@ -128,6 +323,7 @@ export default function DashboardPage() {
             <p className="text-silver">Please connect your wallet to see your dashboard.</p>
           ) : (
             <>
+              {/* Stats */}
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="glass-card p-4 rounded-xl">
                   <p className="text-sm text-silver">Sales</p>
@@ -151,6 +347,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
+              {/* Active Listings */}
               <section>
                 <h2 className="text-lg font-semibold text-white mb-3">Current Listings</h2>
                 {loading ? (
@@ -219,6 +416,28 @@ export default function DashboardPage() {
                 )}
               </section>
 
+              {/* Sold Items */}
+              <section>
+                <h2 className="text-lg font-semibold text-white mb-3">Sold Items</h2>
+                {loading ? (
+                  <p className="text-silver">Loading…</p>
+                ) : soldItems.length === 0 ? (
+                  <p className="text-silver">No sold items yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {soldItems.map((sale) => (
+                      <SoldItemCard
+                        key={sale.id}
+                        sale={sale}
+                        myAddress={address}
+                        usdRate={usdRate}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              {/* Watchlist */}
               <section>
                 <h2 className="text-lg font-semibold text-white mb-3">Watchlist</h2>
                 {loading ? (
