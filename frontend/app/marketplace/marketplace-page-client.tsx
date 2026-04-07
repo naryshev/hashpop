@@ -42,32 +42,39 @@ function getStatusBadge(
     if (onChainConfirmed === false) {
       return {
         label: "PENDING",
-        className: "bg-amber-500\/20 border-amber-400\/40 text-amber-200",
+        className: "bg-amber-400 border-amber-300 text-black",
       };
     }
     return {
       label: "ACTIVE",
-      className:
-        "bg-green-500/10 text-green-600 border-green-500/20 dark:bg-green-500/20 dark:text-green-400 dark:border-green-500/30",
+      className: "bg-[#00ffa3] border-[#00ffa3] text-black",
       pulseDot: true,
     };
   }
   if (normalized === "LOCKED") {
     return {
       label: "LOCKED",
-      className: "bg-amber-500/20 border-amber-400/40 text-amber-200",
+      className: "bg-orange-400 border-orange-300 text-black",
     };
   }
   if (normalized === "CANCELLED") {
     return {
       label: "CANCELLED",
-      className: "bg-zinc-500/20 border-zinc-300/40 text-zinc-200",
+      className: "bg-zinc-600 border-zinc-500 text-white",
     };
   }
   return {
     label: "SOLD",
-    className: "bg-rose-500/20 border-rose-400/40 text-rose-200",
+    className: "bg-rose-500 border-rose-400 text-white",
   };
+}
+
+function formatSellerDisplay(seller?: string): string {
+  if (!seller) return "";
+  if (/^\d+\.\d+\.\d+$/.test(seller)) return seller;
+  if (seller.startsWith("0x") && seller.length > 12)
+    return `${seller.slice(0, 6)}…${seller.slice(-4)}`;
+  return seller;
 }
 
 function parsePostedWithinDays(value: string): number | null {
@@ -240,6 +247,11 @@ export default function MarketplacePageClient({
                     <h2 className="text-sm font-medium text-white line-clamp-2 leading-tight">
                       {item.title || formatListingId(item.id) || "Untitled"}
                     </h2>
+                    {item.seller && (
+                      <p className="text-silver/60 text-[10px] mt-0.5 font-mono truncate">
+                        by {formatSellerDisplay(item.seller)}
+                      </p>
+                    )}
                     <p className="text-chrome font-semibold mt-1">
                       {formatHbarWithUsd(formatPriceForDisplay(item.price || "0"), usdRate)}
                     </p>
@@ -279,6 +291,11 @@ export default function MarketplacePageClient({
                     <h2 className="text-base font-medium text-white line-clamp-2 leading-snug min-h-[2.75rem]">
                       {item.title || formatListingId(item.id) || "Untitled"}
                     </h2>
+                    {item.seller && (
+                      <p className="text-silver/60 text-[11px] mt-0.5 font-mono truncate">
+                        by {formatSellerDisplay(item.seller)}
+                      </p>
+                    )}
                     <p className="text-chrome font-semibold mt-1.5 text-lg">
                       {formatHbarWithUsd(formatPriceForDisplay(item.price || "0"), usdRate)}
                     </p>
