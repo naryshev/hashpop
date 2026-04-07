@@ -22,7 +22,7 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
       <QueryClientProvider client={qc}>
         <WalletAccountSync />
         {useSidebarNav ? (
-          <div className="min-h-screen pb-20 md:pb-0 flex flex-col md:flex-row">
+          <div className="min-h-screen pt-14 md:pt-0 flex flex-col md:flex-row">
             <AppSidebar />
             <div className="min-w-0 flex-1 flex flex-col">
               {children}
@@ -34,7 +34,7 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
             className={
               isFullscreenRoute
                 ? "h-screen overflow-hidden flex flex-col"
-                : "min-h-screen pb-20 md:pb-0 flex flex-col"
+                : "min-h-screen pt-14 md:pt-0 flex flex-col"
             }
           >
             {children}
