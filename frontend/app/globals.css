@@ -57,7 +57,7 @@ a,
     @apply rounded-glass border border-[#00ffa3]/60 bg-[linear-gradient(110deg,#00b37a_0%,#00ffa3_50%,#00e5ff_100%)] px-4 py-2 font-semibold text-black transition-all duration-200 hover:brightness-110 hover:shadow-glow-hover shadow-inner;
   }
   .input-frost {
-    @apply rounded-lg border border-[#4a5e83]/50 bg-[#0f1726]/90 backdrop-blur-sm px-3 py-2 text-white placeholder:text-zinc-500 focus:border-[#00ffa3]/60 focus:outline-none focus:ring-1 focus:ring-[#00ffa3]/40 transition;
+    @apply rounded-[2px] border border-[#4a5e83]/50 bg-[#0f1726]/90 backdrop-blur-sm px-3 py-2 text-white placeholder:text-zinc-500 focus:border-[#00ffa3]/60 focus:outline-none focus:ring-1 focus:ring-[#00ffa3]/40 transition;
   }
   /* Selects: light gray background + white text; dropdown options match so they're visible */
   select.input-frost {
