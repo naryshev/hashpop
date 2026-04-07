@@ -361,57 +361,62 @@ export default function DashboardPage() {
                     .
                   </p>
                 ) : (
-                  <div className="glass-card overflow-hidden rounded-xl">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left">
-                        <thead>
-                          <tr className="border-b border-white/10">
-                            <th className="p-3 text-silver text-sm font-medium">Listing</th>
-                            <th className="p-3 text-silver text-sm font-medium">Type</th>
-                            <th className="p-3 text-silver text-sm font-medium">Price</th>
-                            <th className="p-3 text-silver text-sm font-medium">Date</th>
-                            <th className="p-3 text-silver text-sm font-medium">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {activeListings.map((row) => (
-                            <tr
-                              key={`${row.itemType || "listing"}-${row.id}`}
-                              className="border-b border-white/5 hover:bg-white/5"
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {activeListings.map((row) => {
+                      const thumb = row.imageUrl || (Array.isArray(row.mediaUrls) && row.mediaUrls[0]) || null;
+                      const statusColor =
+                        row.status === "LOCKED"
+                          ? "text-amber-400 border-amber-500/40 bg-amber-500/10"
+                          : row.status === "SOLD"
+                          ? "text-rose-400 border-rose-500/40 bg-rose-500/10"
+                          : "text-[#00ffa3] border-[#00ffa3]/30 bg-[#00ffa3]/5";
+                      return (
+                        <Link
+                          key={`${row.itemType || "listing"}-${row.id}`}
+                          href={`/listing/${encodeURIComponent(row.id)}`}
+                          className="glass-card group flex flex-col overflow-hidden hover:border-white/20 transition-colors"
+                        >
+                          {/* Thumbnail */}
+                          <div className="relative aspect-[4/3] w-full bg-white/5 overflow-hidden">
+                            {thumb ? (
+                              <img
+                                src={thumb}
+                                alt={row.title || ""}
+                                className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <span className="text-white/20 text-4xl select-none">□</span>
+                              </div>
+                            )}
+                            {/* Status badge */}
+                            <span
+                              className={`absolute top-2 right-2 text-[10px] font-semibold uppercase tracking-widest px-2 py-0.5 border ${statusColor}`}
                             >
-                              <td className="p-3">
-                                <Link
-                                  href={`/listing/${encodeURIComponent(row.id)}`}
-                                  className="text-white hover:text-chrome font-medium"
-                                >
-                                  {row.title ||
-                                    formatListingId(row.id) ||
-                                    row.id.slice(0, 10) + "…"}
-                                </Link>
-                              </td>
-                              <td className="p-3 text-silver text-sm">Buy now</td>
-                              <td className="p-3 text-chrome">
-                                {formatHbarWithUsd(
-                                  formatPriceForDisplay(row.price || row.reservePrice || "0"),
-                                  usdRate,
-                                )}
-                              </td>
-                              <td className="p-3 text-silver text-sm">
-                                {formatListingDate(row.createdAt)}
-                              </td>
-                              <td className="p-3">
-                                <Link
-                                  href={`/listing/${encodeURIComponent(row.id)}`}
-                                  className="text-chrome hover:text-white text-sm"
-                                >
-                                  View
-                                </Link>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                              {row.status === "ACTIVE"
+                                ? "Active"
+                                : row.status === "LOCKED"
+                                ? "In Escrow"
+                                : row.status || "Active"}
+                            </span>
+                          </div>
+
+                          {/* Info */}
+                          <div className="flex flex-col flex-1 p-4 gap-1">
+                            <p className="text-white font-semibold text-sm leading-snug line-clamp-2 group-hover:text-chrome transition-colors">
+                              {row.title || formatListingId(row.id) || row.id.slice(0, 10) + "…"}
+                            </p>
+                            <p className="text-chrome font-semibold text-sm mt-auto pt-2">
+                              {formatHbarWithUsd(
+                                formatPriceForDisplay(row.price || row.reservePrice || "0"),
+                                usdRate,
+                              )}
+                            </p>
+                            <p className="text-silver/50 text-xs">{formatListingDate(row.createdAt)}</p>
+                          </div>
+                        </Link>
+                      );
+                    })}
                   </div>
                 )}
               </section>
