@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const links = [
-  { href: "/", label: "Home", icon: "home" },
   { href: "/dashboard", label: "My Hashpop", icon: "dashboard" },
   { href: "/marketplace", label: "Search", icon: "search" },
   { href: "/messages", label: "Alerts", icon: "bell" },
@@ -12,7 +11,6 @@ const links = [
 ];
 
 const signInLinks = [
-  { href: "/", label: "Home", icon: "home" },
   { href: "/dashboard", label: "My Hashpop", icon: "dashboard" },
   { href: "/marketplace", label: "Search", icon: "search" },
   { href: "/messages", label: "Alerts", icon: "bell" },
@@ -98,17 +96,17 @@ export function BottomNav({ signInMode = false }: { signInMode?: boolean }) {
 
   return (
     <nav
-      className={`fixed bottom-2 left-1/2 z-30 w-[calc(100%-16px)] max-w-md -translate-x-1/2 rounded-3xl border border-white/10 bg-black/90 shadow-[0_16px_30px_rgba(0,0,0,0.45)] backdrop-blur-[20px] ${signInMode ? "" : "md:hidden"}`}
-      style={{ paddingBottom: "env(safe-area-inset-bottom, 0)" }}
+      className={`fixed top-0 left-0 right-0 z-30 border-b border-white/10 bg-black/90 backdrop-blur-[20px] shadow-[0_4px_16px_rgba(0,0,0,0.4)] ${signInMode ? "" : "md:hidden"}`}
+      style={{ paddingTop: "env(safe-area-inset-top, 0)" }}
     >
-      <div className={`grid items-center ${signInMode ? "grid-cols-4" : "grid-cols-5"}`}>
+      <div className={`grid items-center ${signInMode ? "grid-cols-3" : "grid-cols-4"}`}>
         {navLinks.map(({ href, label, icon }) => {
           const isActive = pathname === href || (href !== "/" && pathname.startsWith(href));
           return (
             <Link
               key={href}
               href={href}
-              className={`flex flex-col items-center justify-center gap-0.5 py-2.5 px-1 transition-colors ${
+              className={`flex flex-col items-center justify-center gap-0.5 py-2 px-1 transition-colors ${
                 isActive ? "text-chrome" : "text-silver hover:text-white"
               }`}
             >
