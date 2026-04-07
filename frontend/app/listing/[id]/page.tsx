@@ -110,6 +110,16 @@ export default function ListingPage() {
   const [chatLoading, setChatLoading] = useState(false);
   const [chatReply, setChatReply] = useState("");
   const [chatSending, setChatSending] = useState(false);
+  type SimilarItem = {
+    id: string;
+    title?: string | null;
+    price: string;
+    imageUrl?: string | null;
+    mediaUrls?: string[];
+    category?: string | null;
+    status: string;
+  };
+  const [similarListings, setSimilarListings] = useState<SimilarItem[]>([]);
   const router = useRouter();
   const { address, accountId } = useHashpackWallet();
   const chainId = activeHederaChain.id;
@@ -300,6 +310,19 @@ export default function ListingPage() {
       .catch(() => setChatMessages([]))
       .finally(() => setChatLoading(false));
   }, [id, address, accountId, listing?.buyer, listing?.seller]);
+
+  useEffect(() => {
+    if (!listing?.category || !listing?.id) return;
+    fetch(`${getApiUrl()}/api/listings`)
+      .then((r) => r.json())
+      .then((data: { listings?: Array<{ id: string; title?: string | null; price: string; imageUrl?: string | null; mediaUrls?: string[]; category?: string | null; status: string }> }) => {
+        const similar = (data.listings ?? [])
+          .filter((l) => l.category === listing.category && l.id !== listing.id)
+          .slice(0, 4);
+        setSimilarListings(similar);
+      })
+      .catch(() => {});
+  }, [listing?.category, listing?.id]);
 
   const sendChatReply = async () => {
     if (!address || !chatReply.trim() || chatSending || !listing?.buyer || !listing?.seller) return;
@@ -692,7 +715,7 @@ export default function ListingPage() {
 
         {galleryOpen && mainImageUrl && (
           <div className="fixed inset-0 z-[70] bg-black/85 backdrop-blur-md p-4 sm:p-6">
-            <div className="mx-auto flex h-full w-full max-w-6xl flex-col rounded-2xl border border-white/10 bg-[#07152a]/95 shadow-2xl">
+            <div className="mx-auto flex h-full w-full max-w-6xl flex-col rounded-[2px] border border-white/10 bg-[#07152a]/95 shadow-2xl">
               <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
                 <p className="truncate text-sm text-silver">
                   Media {safeMediaIndex + 1} of {keptMediaUrls.length}
@@ -700,7 +723,7 @@ export default function ListingPage() {
                 <button
                   type="button"
                   onClick={() => setGalleryOpen(false)}
-                  className="rounded-md border border-white/20 px-3 py-1 text-xs font-medium text-silver hover:text-white hover:bg-white/10"
+                  className="rounded-[2px] border border-white/20 px-3 py-1 text-xs font-medium text-silver hover:text-white hover:bg-white/10"
                 >
                   Close
                 </button>
@@ -709,7 +732,7 @@ export default function ListingPage() {
                 {isVideoMedia(mainImageUrl) ? (
                   <video
                     src={mainImageUrl}
-                    className="h-full w-full rounded-xl object-contain"
+                    className="h-full w-full object-contain"
                     controls
                     playsInline
                     autoPlay
@@ -719,7 +742,7 @@ export default function ListingPage() {
                   <img
                     src={mainImageUrl}
                     alt=""
-                    className="h-full w-full rounded-xl object-contain"
+                    className="h-full w-full object-contain"
                   />
                 )}
                 {keptMediaUrls.length > 1 && (
@@ -748,7 +771,7 @@ export default function ListingPage() {
         )}
 
         {priceUpdateFailedBanner && (
-          <div className="mb-4 rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          <div className="mb-4 rounded-[2px] border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
             {priceUpdateFailedBanner}
           </div>
         )}
@@ -758,7 +781,7 @@ export default function ListingPage() {
           apiPriceHbar &&
           onChainPriceHbar &&
           Number(apiPriceHbar) < Number(onChainPriceHbar) && (
-            <div className="mb-4 rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+            <div className="mb-4 rounded-[2px] border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
               <strong>Complete the price update:</strong> Your listing is set to {apiPriceHbar} HBAR
               but buyers still see {onChainPriceHbar} HBAR. Click &quot;Configure&quot;, set the
               price to {apiPriceHbar} HBAR, then &quot;Save&quot; and{" "}
@@ -831,7 +854,7 @@ export default function ListingPage() {
                     onKeyDown={(e) =>
                       !editing && (e.key === "Enter" || e.key === " ") && setSelectedMediaIndex(i)
                     }
-                    className={`relative flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-colors cursor-pointer ${i === safeMediaIndex ? "border-chrome" : "border-white/20 hover:border-white/40"}`}
+                    className={`relative flex-shrink-0 w-20 h-20 rounded-[2px] overflow-hidden border-2 transition-colors cursor-pointer ${i === safeMediaIndex ? "border-chrome" : "border-white/20 hover:border-white/40"}`}
                   >
                     {isVideoMedia(url) ? (
                       <video
@@ -885,6 +908,16 @@ export default function ListingPage() {
                 </>
               )}
             </div>
+            {/* Description — shown inline under image gallery when not editing */}
+            {listing?.description && !editing && (
+              <div className="border border-[#4a5e83]/40 bg-gradient-to-b from-[#121a29]/80 to-[#0f1522]/80 p-5">
+                <h3 className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-3">Description</h3>
+                <p className="text-silver text-sm whitespace-pre-wrap leading-relaxed">{listing.description}</p>
+                <p className="text-white/30 text-xs mt-4 pt-3 border-t border-white/5">
+                  Listed: {formatListingDate(listing.createdAt)} · {listing.status}
+                </p>
+              </div>
+            )}
             {isSeller && isSellerActiveListing && editing && (
               <div className="glass-card p-4 space-y-3">
                 <h3 className="text-white font-medium">Configure</h3>
@@ -949,7 +982,7 @@ export default function ListingPage() {
                       {keptMediaUrls.map((url) => (
                         <div
                           key={url}
-                          className="relative w-16 h-16 rounded-lg overflow-hidden border border-white/10 flex-shrink-0"
+                          className="relative w-16 h-16 rounded-[2px] overflow-hidden border border-white/10 flex-shrink-0"
                         >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={url} alt="" className="object-cover w-full h-full" />
@@ -1114,7 +1147,7 @@ export default function ListingPage() {
                   }}
                 />
               ) : (
-                <div className="glass-card p-4 rounded-lg border border-white/10">
+                <div className="glass-card p-4 rounded-[2px] border border-white/10">
                   <p className="text-silver text-sm mb-3">
                     Connect your wallet to buy this listing.
                   </p>
@@ -1127,7 +1160,7 @@ export default function ListingPage() {
               listing.buyer &&
               address &&
               listing.buyer.toLowerCase() === address.toLowerCase() && (
-                <div className="glass-card p-4 rounded-lg border border-emerald-500/30 bg-emerald-500/5">
+                <div className="glass-card p-4 rounded-[2px] border border-emerald-500/30 bg-emerald-500/5">
                   <h3 className="text-lg font-semibold text-emerald-300 mb-2">Purchase Complete</h3>
                   <p className="text-sm text-silver">
                     You bought this item. Payment of{" "}
@@ -1153,14 +1186,14 @@ export default function ListingPage() {
                 listing.buyer.toLowerCase() === address.toLowerCase()
               ) &&
               !(listing.status === "LOCKED" || isLockedOnChain) && (
-                <div className="glass-card p-4 rounded-lg border border-white/10">
+                <div className="glass-card p-4 rounded-[2px] border border-white/10">
                   <p className="text-silver text-sm">
                     This listing is no longer available for purchase.
                   </p>
                 </div>
               )}
             {listing && (isListed || isUnconfirmed) && isSeller && (
-              <div className="glass-card p-4 rounded-lg border border-white/10 space-y-3">
+              <div className="glass-card p-4 rounded-[2px] border border-white/10 space-y-3">
                 <div>
                   <p className="text-xs text-silver uppercase tracking-wider mb-1">
                     Your listing price
@@ -1179,7 +1212,7 @@ export default function ListingPage() {
               onChainListing !== undefined &&
               Number(onChainListing.status) === 0 &&
               listing.status === "LISTED" && (
-                <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 space-y-2">
+                <div className="rounded-[2px] border border-amber-500/40 bg-amber-500/10 p-4 space-y-2">
                   <p className="text-sm font-medium text-amber-200">Not confirmed on-chain</p>
                   <p className="text-xs text-silver">
                     This listing does not exist on the smart contract yet. The creation transaction
@@ -1195,7 +1228,7 @@ export default function ListingPage() {
               )}
 
             {listing?.txHash && (
-              <div className="glass-card p-4 rounded-lg border border-white/10">
+              <div className="glass-card p-4 rounded-[2px] border border-white/10">
                 <h3 className="text-white font-medium mb-2">Transaction</h3>
                 <div className="text-sm text-silver space-y-1">
                   <p className="font-mono text-xs text-silver/80 break-all">{listing.txHash}</p>
@@ -1216,7 +1249,7 @@ export default function ListingPage() {
               </div>
             )}
 
-            <div className="glass-card p-4 rounded-lg border border-white/10">
+            <div className="glass-card p-4 rounded-[2px] border border-white/10">
               <h3 className="text-white font-medium mb-2">Security</h3>
               <ul className="text-sm text-silver space-y-1">
                 <li className="flex items-center gap-2">✓ Payment via escrow</li>
@@ -1270,7 +1303,7 @@ export default function ListingPage() {
                     Duplicate listing
                   </Link>
                 ) : (
-                  <div className="rounded-lg border border-white/20 bg-white/5 px-4 py-3 text-center text-silver text-sm mt-2">
+                  <div className="rounded-[2px] border border-white/20 bg-white/5 px-4 py-3 text-center text-silver text-sm mt-2">
                     Connect wallet to duplicate
                   </div>
                 ))}
@@ -1278,22 +1311,11 @@ export default function ListingPage() {
           </div>
         </div>
 
-        {/* Full description below grid */}
-        {listing?.description && (
-          <div className="mt-8 glass-card p-6 rounded-xl">
-            <h2 className="text-lg font-semibold text-white mb-2">Description</h2>
-            <p className="text-silver text-sm whitespace-pre-wrap">{listing.description}</p>
-            <p className="text-silver text-xs mt-4">
-              Listed: {formatListingDate(listing.createdAt)} · Status: {listing.status}
-            </p>
-          </div>
-        )}
-
         {/* Chat thread — shown when user is buyer or seller of a purchased listing */}
         {listing?.buyer &&
           address &&
           (listing.buyer.toLowerCase() === address.toLowerCase() || isSeller) && (
-            <div className="mt-8 glass-card p-6 rounded-xl">
+            <div className="mt-8 glass-card p-6">
               <h2 className="text-lg font-semibold text-white mb-4">Messages</h2>
               {chatLoading ? (
                 <p className="text-silver text-sm">Loading…</p>
@@ -1306,7 +1328,7 @@ export default function ListingPage() {
                     return (
                       <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
                         <div
-                          className={`max-w-xs lg:max-w-md rounded-lg px-3 py-2 text-sm ${
+                          className={`max-w-xs lg:max-w-md rounded-[2px] px-3 py-2 text-sm ${
                             isMe
                               ? "bg-white/15 text-white"
                               : "bg-white/5 text-silver border border-white/10"
@@ -1334,19 +1356,63 @@ export default function ListingPage() {
                     }
                   }}
                   placeholder="Type a message…"
-                  className="flex-1 bg-white/5 border border-white/20 rounded px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-white/40"
+                  className="flex-1 bg-white/5 border border-white/20 rounded-[2px] px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#00ffa3]/40"
                 />
                 <button
                   type="button"
                   onClick={() => void sendChatReply()}
                   disabled={chatSending || !chatReply.trim()}
-                  className="px-4 py-2 bg-white/10 border border-white/20 text-white text-sm font-medium rounded hover:bg-white/20 transition-colors disabled:opacity-40"
+                  className="px-4 py-2 bg-white/10 border border-white/20 text-white text-sm font-medium rounded-[2px] hover:bg-white/20 transition-colors disabled:opacity-40"
                 >
                   {chatSending ? "…" : "Send"}
                 </button>
               </div>
             </div>
           )}
+
+        {/* Similar listings */}
+        {similarListings.length > 0 && (
+          <div className="mt-12">
+            <h2 className="text-base font-semibold text-white/70 uppercase tracking-widest mb-4">
+              Similar listings
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {similarListings.map((item) => {
+                const thumb = item.mediaUrls?.[0] ?? item.imageUrl ?? null;
+                return (
+                  <Link
+                    key={item.id}
+                    href={`/listing/${encodeURIComponent(item.id)}`}
+                    className="glass-card overflow-hidden group transition-all duration-200 hover:border-white/20 hover:shadow-glow"
+                  >
+                    <div className="aspect-square bg-black/40 overflow-hidden">
+                      {thumb ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={thumb}
+                          alt=""
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-white/20 text-sm">
+                          No image
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-3">
+                      <p className="text-white text-sm font-medium line-clamp-2 leading-tight">
+                        {item.title || "Untitled"}
+                      </p>
+                      <p className="text-chrome text-sm font-semibold mt-1">
+                        {item.price ? `${formatPriceForDisplay(item.price)} ℏ` : "—"}
+                      </p>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );
