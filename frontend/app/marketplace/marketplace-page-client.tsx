@@ -223,7 +223,7 @@ export default function MarketplacePageClient({
                 <Link
                   key={`${item.itemType}-${item.id}`}
                   href={`/listing/${encodeURIComponent(item.id)}`}
-                  className="block glass-card overflow-hidden transition-all duration-200 active:border-white/20 rounded-xl"
+                  className="block glass-card overflow-hidden transition-all duration-200 active:border-white/20"
                 >
                   <div className="relative bg-white/5">
                     <ListingMedia
@@ -264,7 +264,7 @@ export default function MarketplacePageClient({
                 <Link
                   key={`${item.itemType}-${item.id}`}
                   href={`/listing/${encodeURIComponent(item.id)}`}
-                  className="glass-card overflow-hidden transition-all duration-200 hover:border-white/20 hover:shadow-glow rounded-xl"
+                  className="glass-card overflow-hidden transition-all duration-200 hover:border-white/20 hover:shadow-glow"
                 >
                   <div className="relative bg-white/5">
                     <ListingMedia
