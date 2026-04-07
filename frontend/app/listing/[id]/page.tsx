@@ -790,45 +790,50 @@ export default function ListingPage() {
             </div>
           )}
 
-        <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_400px]">
-          {/* Left: breadcrumb + title + media gallery */}
-          <div className="min-w-0 space-y-4">
-            {/* Breadcrumb + title — above image, left-aligned */}
-            <div>
-              <nav className="flex items-center gap-1 text-sm text-silver flex-wrap mb-3">
-                <Link href="/marketplace" className="hover:text-white">
-                  Marketplace
-                </Link>
-                {categoryLabel && categoryLabel !== "Marketplace" && (
-                  <>
-                    <span>{">"}</span>
-                    <span className="text-white">{categoryLabel}</span>
-                  </>
-                )}
-              </nav>
-              <div className="flex items-start gap-2 flex-wrap">
-                <h1 className="text-2xl font-bold text-white flex-1 min-w-0">
-                  {editing ? editTitle || displayTitle : displayTitle}
-                </h1>
-                {!isListed && !isUnconfirmed && (
-                  <span className="px-2 py-0.5 text-xs font-medium bg-white/10 text-silver border border-white/10 mt-1 flex-shrink-0">
-                    Archived
-                  </span>
-                )}
-              </div>
-              {displaySubtitle && (
-                <p className="text-silver text-sm mt-1">
-                  {editing ? editSubtitle : displaySubtitle}
-                </p>
+        {/* Title row — left column only, right side intentionally empty so image aligns with panel top */}
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-x-8 mb-4">
+          <div>
+            <nav className="flex items-center gap-1 text-sm text-silver flex-wrap mb-3">
+              <Link href="/marketplace" className="hover:text-white">
+                Marketplace
+              </Link>
+              {categoryLabel && categoryLabel !== "Marketplace" && (
+                <>
+                  <span>{">"}</span>
+                  <span className="text-white">{categoryLabel}</span>
+                </>
               )}
-              {attributesLine && (
-                <p className="text-silver/70 text-sm mt-0.5">
-                  {editing
-                    ? [editCondition, editYearOfProduction].filter(Boolean).join(" | ")
-                    : attributesLine}
-                </p>
+            </nav>
+            <div className="flex items-start gap-2 flex-wrap">
+              <h1 className="text-2xl font-bold text-white flex-1 min-w-0">
+                {editing ? editTitle || displayTitle : displayTitle}
+              </h1>
+              {!isListed && !isUnconfirmed && (
+                <span className="px-2 py-0.5 text-xs font-medium bg-white/10 text-silver border border-white/10 mt-1 flex-shrink-0">
+                  Archived
+                </span>
               )}
             </div>
+            {displaySubtitle && (
+              <p className="text-silver text-sm mt-1">
+                {editing ? editSubtitle : displaySubtitle}
+              </p>
+            )}
+            {attributesLine && (
+              <p className="text-silver/70 text-sm mt-0.5">
+                {editing
+                  ? [editCondition, editYearOfProduction].filter(Boolean).join(" | ")
+                  : attributesLine}
+              </p>
+            )}
+          </div>
+          {/* right side empty — right panel starts at image level below */}
+        </div>
+
+        {/* Content grid — image left, action panels right */}
+        <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_400px]">
+          {/* Left: media gallery */}
+          <div className="min-w-0 space-y-4">
             <div className="relative aspect-[4/3] max-h-[62vh] overflow-hidden rounded-glass-lg border border-white/10 bg-black">
               {mainImageUrl ? (
                 <>
