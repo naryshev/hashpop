@@ -171,16 +171,40 @@ export function EscrowPanel({
 
   if (loading) {
     return (
-      <div className="glass-card p-5 rounded-xl border border-white/10">
+      <div className="glass-card p-5 border border-white/10">
         <p className="text-silver text-sm">Loading escrow status…</p>
       </div>
     );
   }
 
-  if (fetchError || !escrow) {
+  if (fetchError) {
     return (
-      <div className="glass-card p-5 rounded-xl border border-white/10">
-        <p className="text-silver text-sm">{fetchError ?? "No escrow data"}</p>
+      <div className="glass-card p-5 border border-white/10">
+        <p className="text-silver text-sm">{fetchError}</p>
+      </div>
+    );
+  }
+
+  if (!escrow) {
+    return (
+      <div className="glass-card border border-white/10 overflow-hidden">
+        <div className="px-5 pt-5 pb-2">
+          <h3 className="text-lg font-semibold text-white">Escrow Transaction</h3>
+          <p className="text-xs text-silver mt-1">
+            Funds held by platform escrow until both parties fulfill their obligations.
+          </p>
+        </div>
+        <div className="px-5 pb-2">
+          <TransactionProgress escrowState="AWAITING_SHIPMENT" compact />
+        </div>
+        <div className="border-t border-white/[0.06] px-5 py-4 bg-white/[0.02] space-y-1">
+          <p className="text-sm font-medium text-white">Payment received — awaiting shipment</p>
+          <p className="text-xs text-silver">
+            {requireEscrow
+              ? "Your payment is secured on-chain. The escrow record is initializing — this can take a moment after purchase."
+              : "Escrow is active. The seller will confirm shipment and funds will be released once you confirm receipt."}
+          </p>
+        </div>
       </div>
     );
   }
@@ -188,7 +212,7 @@ export function EscrowPanel({
   const roleLabel = isSeller ? "Seller" : isBuyer ? "Buyer" : "Observer";
 
   return (
-    <div className="glass-card rounded-xl border border-white/10 overflow-hidden">
+    <div className="glass-card border border-white/10 overflow-hidden">
       {/* Header */}
       <div className="px-5 pt-5 pb-3">
         <div className="flex items-center justify-between">
@@ -217,7 +241,7 @@ export function EscrowPanel({
 
       {/* Transaction Details */}
       <div className="px-5 pb-4">
-        <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-3 space-y-2">
+        <div className="rounded-[2px] bg-white/[0.03] border border-white/[0.06] p-3 space-y-2">
           <div className="grid grid-cols-3 gap-3 text-sm">
             <div>
               <p className="text-[10px] uppercase tracking-wider text-white/40 mb-0.5">Buyer</p>
@@ -301,7 +325,7 @@ export function EscrowPanel({
               released from escrow to the seller&apos;s wallet.
             </p>
             {trackingNumber && (
-              <div className="rounded-lg bg-white/5 border border-white/10 px-3 py-2">
+              <div className="rounded-[2px] bg-white/5 border border-white/10 px-3 py-2">
                 <p className="text-xs text-chrome">
                   Tracking: {trackingNumber}
                   {trackingCarrier ? ` (${trackingCarrier})` : ""}
@@ -370,7 +394,7 @@ export function EscrowPanel({
         )}
 
         {errorMessage && (
-          <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 mt-3">
+          <div className="rounded-[2px] bg-red-500/10 border border-red-500/30 px-3 py-2 mt-3">
             <p className="text-sm text-red-400">{errorMessage}</p>
           </div>
         )}
