@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Fuse from "fuse.js";
 import { ListingMedia } from "../../components/ListingMedia";
 import { WishlistButton } from "../../components/WishlistButton";
@@ -115,6 +115,7 @@ export default function MarketplacePageClient({
   initialError: string | null;
 }) {
   const { isConnected } = useHashpackWallet();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const query = searchParams.get("q")?.trim() ?? "";
   const categoryQuery = canonicalizeCategory(searchParams.get("category")?.trim() ?? "");
@@ -204,29 +205,59 @@ export default function MarketplacePageClient({
           </Link>
         </div>
         {(() => {
-          const activeFilters: string[] = [];
-          if (query) activeFilters.push(`"${query}"`);
-          if (categoryQuery) activeFilters.push(categoryQuery);
+          const removeFilter = (keys: string[]) => {
+            const p = new URLSearchParams(searchParams.toString());
+            keys.forEach((k) => p.delete(k));
+            const qs = p.toString();
+            router.push(qs ? `/marketplace?${qs}` : "/marketplace");
+          };
+
+          const pills: { label: string; keys: string[] }[] = [];
+          if (query) pills.push({ label: `"${query}"`, keys: ["q"] });
+          if (categoryQuery) pills.push({ label: categoryQuery, keys: ["category"] });
           if (minPriceQuery && maxPriceQuery)
-            activeFilters.push(`${minPriceQuery}–${maxPriceQuery} HBAR`);
-          else if (minPriceQuery) activeFilters.push(`\u2265 ${minPriceQuery} HBAR`);
-          else if (maxPriceQuery) activeFilters.push(`\u2264 ${maxPriceQuery} HBAR`);
+            pills.push({ label: `${minPriceQuery}–${maxPriceQuery} HBAR`, keys: ["minPrice", "maxPrice"] });
+          else if (minPriceQuery)
+            pills.push({ label: `\u2265 ${minPriceQuery} HBAR`, keys: ["minPrice"] });
+          else if (maxPriceQuery)
+            pills.push({ label: `\u2264 ${maxPriceQuery} HBAR`, keys: ["maxPrice"] });
           if (postedWithinQuery) {
             const labelMap: Record<string, string> = {
               "1d": "Last day", "1w": "Last week", "1m": "Last month",
               "3m": "Last 3 months", "6m": "Last 6 months", "1y": "Last year", "2y": "Last 2 years",
             };
-            activeFilters.push(labelMap[postedWithinQuery] ?? postedWithinQuery);
+            pills.push({ label: labelMap[postedWithinQuery] ?? postedWithinQuery, keys: ["postedWithin"] });
           }
-          if (!activeFilters.length) return null;
+
+          if (!pills.length) return null;
           return (
-            <div className="flex items-center gap-2 mb-4 flex-wrap">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-sm text-silver">
-                {activeFilters.join(" · ")}
-                <span className="text-chrome font-medium ml-1">
-                  · {filteredItems.length} result{filteredItems.length !== 1 ? "s" : ""}
+            <div className="mb-6 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-semibold tracking-widest text-silver uppercase">
+                  Active Filters{" "}
+                  <span className="text-[#00ffa3]">· {filteredItems.length} Result{filteredItems.length !== 1 ? "s" : ""}</span>
                 </span>
-              </span>
+                <button
+                  type="button"
+                  onClick={() => router.push("/marketplace")}
+                  className="text-sm text-silver hover:text-white transition-colors"
+                >
+                  Clear all
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {pills.map(({ label, keys }) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => removeFilter(keys)}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[#00ffa3]/60 bg-[#00ffa3]/10 px-3 py-1 text-sm text-[#00ffa3] hover:bg-[#00ffa3]/20 transition-colors"
+                  >
+                    {label}
+                    <span aria-hidden className="text-[#00ffa3]/70 text-base leading-none">×</span>
+                  </button>
+                ))}
+              </div>
             </div>
           );
         })()}
