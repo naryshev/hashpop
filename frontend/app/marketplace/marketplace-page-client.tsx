@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Fuse from "fuse.js";
 import { ListingMedia } from "../../components/ListingMedia";
 import { WishlistButton } from "../../components/WishlistButton";
@@ -107,6 +107,16 @@ export type ListingItem = {
   itemType: "listing";
 };
 
+const POSTED_WITHIN_LABELS: Record<string, string> = {
+  "1d": "Last day",
+  "1w": "Last week",
+  "1m": "Last month",
+  "3m": "Last 3 months",
+  "6m": "Last 6 months",
+  "1y": "Last year",
+  "2y": "Last 2 years",
+};
+
 export default function MarketplacePageClient({
   initialItems,
   initialError,
@@ -115,12 +125,34 @@ export default function MarketplacePageClient({
   initialError: string | null;
 }) {
   const { isConnected } = useHashpackWallet();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const query = searchParams.get("q")?.trim() ?? "";
   const categoryQuery = canonicalizeCategory(searchParams.get("category")?.trim() ?? "");
   const minPriceQuery = searchParams.get("minPrice")?.trim() ?? "";
   const maxPriceQuery = searchParams.get("maxPrice")?.trim() ?? "";
   const postedWithinQuery = searchParams.get("postedWithin")?.trim() ?? "";
+
+  const activeFilters = useMemo(() => {
+    const filters: { key: string; label: string }[] = [];
+    if (query) filters.push({ key: "q", label: `"${query}"` });
+    if (categoryQuery) filters.push({ key: "category", label: categoryQuery });
+    if (minPriceQuery) filters.push({ key: "minPrice", label: `Min ${minPriceQuery} ℏ` });
+    if (maxPriceQuery) filters.push({ key: "maxPrice", label: `Max ${maxPriceQuery} ℏ` });
+    if (postedWithinQuery)
+      filters.push({
+        key: "postedWithin",
+        label: POSTED_WITHIN_LABELS[postedWithinQuery] ?? postedWithinQuery,
+      });
+    return filters;
+  }, [query, categoryQuery, minPriceQuery, maxPriceQuery, postedWithinQuery]);
+
+  const removeFilter = (key: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete(key);
+    const qs = params.toString();
+    router.push(qs ? `/marketplace?${qs}` : "/marketplace");
+  };
   const items = initialItems;
   const listingsError = initialError;
   const usdRate = useHbarUsd();
@@ -203,6 +235,32 @@ export default function MarketplacePageClient({
             Create Listing
           </Link>
         </div>
+
+        {/* Active filter chips */}
+        {activeFilters.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 mb-5">
+            {activeFilters.map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => removeFilter(key)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-[#00ffa3]/40 bg-[#00ffa3]/8 px-3 py-1 text-xs font-medium text-[#00ffa3] transition-all duration-150 hover:bg-[#00ffa3]/15 hover:border-[#00ffa3]/70"
+              >
+                {label}
+                <svg className="w-3 h-3 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            ))}
+            <Link
+              href="/marketplace"
+              className="text-xs text-silver hover:text-white transition-colors ml-1"
+            >
+              Clear all
+            </Link>
+          </div>
+        )}
+
         {listingsError ? (
           <p className="text-amber-400/90 text-sm">
             {listingsError} Ensure the backend is running and PostgreSQL is up (e.g.{" "}
