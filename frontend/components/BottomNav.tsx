@@ -115,6 +115,7 @@ export function BottomNav({
     if (!searchOpen) return;
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        searchInputRef.current?.blur();
         setSearchOpen(false);
         setSearchQuery("");
       }
@@ -125,6 +126,7 @@ export function BottomNav({
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    searchInputRef.current?.blur();
     setSearchOpen(false);
     const q = searchQuery.trim();
     router.push(q ? `/marketplace?q=${encodeURIComponent(q)}` : "/marketplace");
@@ -198,8 +200,9 @@ export function BottomNav({
       {/* Sliding green search panel */}
       <div
         className={`overflow-hidden transition-all duration-300 ease-out ${
-          searchOpen ? "max-h-20 opacity-100" : "max-h-0 opacity-0"
+          searchOpen ? "max-h-20 opacity-100" : "max-h-0 opacity-0 pointer-events-none"
         }`}
+        aria-hidden={!searchOpen}
       >
         <form onSubmit={handleSearch} className="px-3 py-2.5">
           <div className="flex items-center gap-2 rounded-full border border-[#00ffa3]/50 bg-[#00ffa3]/8 px-3.5 py-2 shadow-[0_0_20px_rgba(0,255,163,0.15),inset_0_0_12px_rgba(0,255,163,0.04)]">
@@ -229,6 +232,7 @@ export function BottomNav({
             <button
               type="button"
               onClick={() => {
+                searchInputRef.current?.blur();
                 setSearchOpen(false);
                 setSearchQuery("");
               }}
