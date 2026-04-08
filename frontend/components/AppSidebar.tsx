@@ -24,10 +24,18 @@ type NavLink = {
   icon: JSX.Element;
 };
 
-export function AppSidebar() {
+export function AppSidebar({
+  open: openProp,
+  setOpen: setOpenProp,
+}: {
+  open?: boolean;
+  setOpen?: (v: boolean) => void;
+}) {
   const pathname = usePathname();
   const { isConnected, accountId, disconnect } = useHashpackWallet();
-  const [open, setOpen] = useState(false);
+  const [openState, setOpenState] = useState(false);
+  const open = openProp !== undefined ? openProp : openState;
+  const setOpen = setOpenProp !== undefined ? setOpenProp : setOpenState;
   const appVersion = process.env.NEXT_PUBLIC_APP_VERSION?.trim() || "v1.0.0";
 
   const links = useMemo<NavLink[]>(
@@ -62,7 +70,7 @@ export function AppSidebar() {
 
   return (
     <Sidebar open={open} setOpen={setOpen}>
-      <SidebarBody className="justify-between gap-8">
+      <SidebarBody className="justify-between gap-8" hideHeader={true}>
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden">
           <Link href="/marketplace" className="mb-6 inline-flex items-center gap-2 py-1">
             {/* eslint-disable-next-line @next/next/no-img-element */}
