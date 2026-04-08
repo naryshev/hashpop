@@ -188,12 +188,16 @@ export default function MarketplacePageClient({
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <h1 className="text-xl sm:text-2xl font-bold text-white">Marketplace</h1>
-            <StatusBadge
-              status={isConnected ? "success" : "error"}
-              className="h-6 px-2.5 text-[11px]"
-            >
-              {isConnected ? "Authenticated" : "Connect"}
-            </StatusBadge>
+            {isConnected ? (
+              <span className="inline-flex items-center gap-1 h-6 px-2.5 text-[11px] font-medium border border-[#00ffa3]/40 bg-[#00ffa3]/10 text-[#00ffa3] shadow-[0_0_8px_rgba(0,255,163,0.2)]">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#00ffa3] shadow-[0_0_4px_rgba(0,255,163,0.8)]" />
+                Authenticated
+              </span>
+            ) : (
+              <StatusBadge status="error" className="h-6 px-2.5 text-[11px]">
+                Connect
+              </StatusBadge>
+            )}
           </div>
           <Link href="/create" className="text-sm text-chrome hover:text-white font-medium">
             Create Listing
