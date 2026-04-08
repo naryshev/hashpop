@@ -29,7 +29,7 @@ export function AppSidebar({
   setOpen: setOpenProp,
 }: {
   open?: boolean;
-  setOpen?: (v: boolean) => void;
+  setOpen?: React.Dispatch<React.SetStateAction<boolean>>;
 }) {
   const pathname = usePathname();
   const { isConnected, accountId, disconnect } = useHashpackWallet();
