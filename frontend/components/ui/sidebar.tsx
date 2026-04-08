@@ -144,7 +144,7 @@ export const MobileSidebar = ({
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
-              transition={{ type: "tween", duration: 0.22, ease: [0.25, 0.46, 0.45, 0.94] }}
+              transition={{ type: "tween", duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
               style={{ willChange: "transform" }}
               className={cn(
                 "relative h-full w-[82vw] max-w-[280px] bg-white dark:bg-neutral-900 p-6 flex flex-col justify-between border-r border-black/10 dark:border-white/10 shadow-2xl",
