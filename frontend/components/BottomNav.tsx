@@ -1,7 +1,8 @@
 "use client";
 
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 const links = [
   { href: "/dashboard", label: "My Hashpop", icon: "dashboard" },
@@ -95,18 +96,48 @@ export function BottomNav({
   onMenuClick?: () => void;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const navLinks = signInMode ? signInLinks : links;
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // total cols = menu button (if shown) + nav links
   const totalCols = (showMenu ? 1 : 0) + navLinks.length;
+
+  useEffect(() => {
+    if (searchOpen) {
+      const t = setTimeout(() => searchInputRef.current?.focus(), 50);
+      return () => clearTimeout(t);
+    }
+  }, [searchOpen]);
+
+  useEffect(() => {
+    if (!searchOpen) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setSearchOpen(false);
+        setSearchQuery("");
+      }
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [searchOpen]);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSearchOpen(false);
+    const q = searchQuery.trim();
+    router.push(q ? `/marketplace?q=${encodeURIComponent(q)}` : "/marketplace");
+    setSearchQuery("");
+  };
 
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-30 border-b border-white/10 bg-black/90 backdrop-blur-[20px] shadow-[0_4px_16px_rgba(0,0,0,0.4)] ${signInMode ? "" : "md:hidden"}`}
+      className={`fixed top-0 left-0 right-0 z-30 bg-black/90 backdrop-blur-[20px] shadow-[0_4px_16px_rgba(0,0,0,0.4)] ${signInMode ? "" : "md:hidden"}`}
       style={{ paddingTop: "env(safe-area-inset-top, 0)" }}
     >
       <div
-        className="grid items-center"
+        className="grid items-center border-b border-white/10"
         style={{ gridTemplateColumns: `repeat(${totalCols}, minmax(0, 1fr))` }}
       >
         {/* Hamburger — leftmost, only when sidebar is present */}
@@ -125,25 +156,27 @@ export function BottomNav({
         {navLinks.map(({ href, label, icon }) => {
           const isActive = pathname === href || (href !== "/" && pathname.startsWith(href));
 
-          // Search gets a special glowing bubble treatment
+          // Search gets a special glowing bubble + slide-down panel
           if (icon === "search") {
             return (
-              <Link
-                key={href}
-                href={href}
+              <button
+                key="search"
+                type="button"
+                onClick={() => setSearchOpen((o) => !o)}
                 className="flex flex-col items-center justify-center py-2 px-1"
-                aria-label="Search"
+                aria-label={searchOpen ? "Close search" : "Open search"}
+                aria-expanded={searchOpen}
               >
                 <span
                   className={`inline-flex items-center justify-center rounded-lg px-4 py-1.5 transition-all duration-200 ${
-                    isActive
+                    searchOpen || isActive
                       ? "bg-[#00ffa3]/15 border border-[#00ffa3]/60 text-[#00ffa3] shadow-[0_0_10px_rgba(0,255,163,0.35)]"
                       : "bg-white/5 border border-white/15 text-silver hover:bg-[#00ffa3]/10 hover:border-[#00ffa3]/40 hover:text-[#00ffa3] hover:shadow-[0_0_8px_rgba(0,255,163,0.25)]"
                   }`}
                 >
                   <Icon name="search" />
                 </span>
-              </Link>
+              </button>
             );
           }
 
@@ -160,6 +193,59 @@ export function BottomNav({
             </Link>
           );
         })}
+      </div>
+
+      {/* Sliding green search panel */}
+      <div
+        className={`overflow-hidden transition-all duration-300 ease-out ${
+          searchOpen ? "max-h-20 opacity-100" : "max-h-0 opacity-0"
+        }`}
+      >
+        <form onSubmit={handleSearch} className="px-3 py-2.5">
+          <div className="flex items-center gap-2 rounded-full border border-[#00ffa3]/50 bg-[#00ffa3]/8 px-3.5 py-2 shadow-[0_0_20px_rgba(0,255,163,0.15),inset_0_0_12px_rgba(0,255,163,0.04)]">
+            <svg
+              className="h-4 w-4 shrink-0 text-[#00ffa3]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-4.35-4.35M16 10.5A5.5 5.5 0 115 10.5a5.5 5.5 0 0111 0z"
+              />
+            </svg>
+            <input
+              ref={searchInputRef}
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search Hashpop..."
+              className="flex-1 bg-transparent text-sm text-white placeholder:text-[#00ffa3]/40 focus:outline-none"
+              aria-label="Search query"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setSearchOpen(false);
+                setSearchQuery("");
+              }}
+              className="shrink-0 text-[#00ffa3]/50 hover:text-[#00ffa3] transition-colors"
+              aria-label="Close search"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+        </form>
       </div>
     </nav>
   );
