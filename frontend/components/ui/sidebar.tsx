@@ -137,14 +137,15 @@ export const MobileSidebar = ({
             <button
               type="button"
               aria-label="Close sidebar"
-              className="absolute inset-0 bg-black/30 backdrop-blur-[1px]"
+              className="absolute inset-0 bg-black/30"
               onClick={() => setOpen(false)}
             />
             <motion.aside
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
-              transition={{ type: "spring", stiffness: 320, damping: 34 }}
+              transition={{ type: "tween", duration: 0.22, ease: [0.25, 0.46, 0.45, 0.94] }}
+              style={{ willChange: "transform" }}
               className={cn(
                 "relative h-full w-[82vw] max-w-[280px] bg-white dark:bg-neutral-900 p-6 flex flex-col justify-between border-r border-black/10 dark:border-white/10 shadow-2xl",
                 className,
