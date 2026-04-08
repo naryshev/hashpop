@@ -66,11 +66,14 @@ export const Sidebar = ({
   );
 };
 
-export const SidebarBody = (props: React.ComponentProps<typeof motion.div>) => {
+export const SidebarBody = (
+  props: React.ComponentProps<typeof motion.div> & { hideHeader?: boolean },
+) => {
+  const { hideHeader, ...rest } = props;
   return (
     <>
-      <DesktopSidebar {...props} />
-      <MobileSidebar {...(props as React.ComponentProps<"div">)} />
+      <DesktopSidebar {...rest} />
+      <MobileSidebar {...(rest as React.ComponentProps<"div">)} hideHeader={hideHeader} />
     </>
   );
 };
@@ -99,58 +102,65 @@ export const DesktopSidebar = ({
   );
 };
 
-export const MobileSidebar = ({ className, children, ...props }: React.ComponentProps<"div">) => {
+export const MobileSidebar = ({
+  className,
+  children,
+  hideHeader,
+  ...props
+}: React.ComponentProps<"div"> & { hideHeader?: boolean }) => {
   const { open, setOpen } = useSidebar();
   return (
     <>
-      <div
-        className={cn(
-          "h-12 px-4 flex flex-row md:hidden items-center justify-between bg-neutral-100 dark:bg-neutral-900 w-full border-b border-white/10",
-        )}
-        {...props}
-      >
-        <div className="flex justify-start z-20 w-full">
-          <Menu
-            className="text-neutral-800 dark:text-neutral-200 cursor-pointer"
-            onClick={() => setOpen(!open)}
-          />
-        </div>
-        <AnimatePresence>
-          {open && (
-            <motion.div
-              className="fixed inset-0 z-[100] md:hidden"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              <button
-                type="button"
-                aria-label="Close sidebar"
-                className="absolute inset-0 bg-black/30 backdrop-blur-[1px]"
-                onClick={() => setOpen(false)}
-              />
-              <motion.aside
-                initial={{ x: "-100%" }}
-                animate={{ x: 0 }}
-                exit={{ x: "-100%" }}
-                transition={{ type: "spring", stiffness: 320, damping: 34 }}
-                className={cn(
-                  "relative h-full w-[82vw] max-w-[280px] bg-white dark:bg-neutral-900 p-6 flex flex-col justify-between border-r border-black/10 dark:border-white/10 shadow-2xl",
-                  className,
-                )}
-              >
-                <div
-                  className="absolute right-4 top-4 z-50 text-neutral-800 dark:text-neutral-200 cursor-pointer"
-                  onClick={() => setOpen(false)}
-                >
-                  <X />
-                </div>
-                {children}
-              </motion.aside>
-            </motion.div>
+      {!hideHeader && (
+        <div
+          className={cn(
+            "h-12 px-4 flex flex-row md:hidden items-center justify-between bg-neutral-100 dark:bg-neutral-900 w-full border-b border-white/10",
           )}
-        </AnimatePresence>
-      </div>
+          {...props}
+        >
+          <div className="flex justify-start z-20 w-full">
+            <Menu
+              className="text-neutral-800 dark:text-neutral-200 cursor-pointer"
+              onClick={() => setOpen(!open)}
+            />
+          </div>
+        </div>
+      )}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            className="fixed inset-0 z-[100] md:hidden"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <button
+              type="button"
+              aria-label="Close sidebar"
+              className="absolute inset-0 bg-black/30 backdrop-blur-[1px]"
+              onClick={() => setOpen(false)}
+            />
+            <motion.aside
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "spring", stiffness: 320, damping: 34 }}
+              className={cn(
+                "relative h-full w-[82vw] max-w-[280px] bg-white dark:bg-neutral-900 p-6 flex flex-col justify-between border-r border-black/10 dark:border-white/10 shadow-2xl",
+                className,
+              )}
+            >
+              <div
+                className="absolute right-4 top-4 z-50 text-neutral-800 dark:text-neutral-200 cursor-pointer"
+                onClick={() => setOpen(false)}
+              >
+                <X />
+              </div>
+              {children}
+            </motion.aside>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 };
