@@ -19,15 +19,10 @@ const signInLinks = [
 function Icon({ name }: { name: string }) {
   const c = "w-5 h-5";
   switch (name) {
-    case "home":
+    case "menu":
       return (
         <svg className={c} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-          />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
         </svg>
       );
     case "browse":
@@ -90,18 +85,68 @@ function Icon({ name }: { name: string }) {
   }
 }
 
-export function BottomNav({ signInMode = false }: { signInMode?: boolean }) {
+export function BottomNav({
+  signInMode = false,
+  showMenu = false,
+  onMenuClick,
+}: {
+  signInMode?: boolean;
+  showMenu?: boolean;
+  onMenuClick?: () => void;
+}) {
   const pathname = usePathname();
   const navLinks = signInMode ? signInLinks : links;
+
+  // total cols = menu button (if shown) + nav links
+  const totalCols = (showMenu ? 1 : 0) + navLinks.length;
 
   return (
     <nav
       className={`fixed top-0 left-0 right-0 z-30 border-b border-white/10 bg-black/90 backdrop-blur-[20px] shadow-[0_4px_16px_rgba(0,0,0,0.4)] ${signInMode ? "" : "md:hidden"}`}
       style={{ paddingTop: "env(safe-area-inset-top, 0)" }}
     >
-      <div className={`grid items-center ${signInMode ? "grid-cols-3" : "grid-cols-4"}`}>
+      <div
+        className="grid items-center"
+        style={{ gridTemplateColumns: `repeat(${totalCols}, minmax(0, 1fr))` }}
+      >
+        {/* Hamburger — leftmost, only when sidebar is present */}
+        {showMenu && (
+          <button
+            type="button"
+            onClick={onMenuClick}
+            className="flex flex-col items-center justify-center gap-0.5 py-2 px-1 text-silver hover:text-white transition-colors"
+            aria-label="Open menu"
+          >
+            <Icon name="menu" />
+            <span className="text-[11px] font-medium">Menu</span>
+          </button>
+        )}
+
         {navLinks.map(({ href, label, icon }) => {
           const isActive = pathname === href || (href !== "/" && pathname.startsWith(href));
+
+          // Search gets a special glowing bubble treatment
+          if (icon === "search") {
+            return (
+              <Link
+                key={href}
+                href={href}
+                className="flex flex-col items-center justify-center py-2 px-1"
+                aria-label="Search"
+              >
+                <span
+                  className={`inline-flex items-center justify-center rounded-lg px-4 py-1.5 transition-all duration-200 ${
+                    isActive
+                      ? "bg-[#00ffa3]/15 border border-[#00ffa3]/60 text-[#00ffa3] shadow-[0_0_10px_rgba(0,255,163,0.35)]"
+                      : "bg-white/5 border border-white/15 text-silver hover:bg-[#00ffa3]/10 hover:border-[#00ffa3]/40 hover:text-[#00ffa3] hover:shadow-[0_0_8px_rgba(0,255,163,0.25)]"
+                  }`}
+                >
+                  <Icon name="search" />
+                </span>
+              </Link>
+            );
+          }
+
           return (
             <Link
               key={href}
