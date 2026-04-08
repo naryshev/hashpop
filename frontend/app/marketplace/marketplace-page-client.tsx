@@ -238,26 +238,36 @@ export default function MarketplacePageClient({
 
         {/* Active filter chips */}
         {activeFilters.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 mb-5">
-            {activeFilters.map(({ key, label }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => removeFilter(key)}
-                className="inline-flex items-center gap-1.5 rounded-full border border-[#00ffa3]/40 bg-[#00ffa3]/8 px-3 py-1 text-xs font-medium text-[#00ffa3] transition-all duration-150 hover:bg-[#00ffa3]/15 hover:border-[#00ffa3]/70"
+          <div className="mb-5 rounded-xl border border-white/10 bg-white/5 px-3 py-3">
+            <div className="flex items-center justify-between mb-2.5">
+              <span className="text-xs font-semibold uppercase tracking-wider text-silver">
+                Active filters
+                <span className="ml-1.5 text-[#00ffa3]">
+                  · {filteredItems.length} result{filteredItems.length !== 1 ? "s" : ""}
+                </span>
+              </span>
+              <Link
+                href="/marketplace"
+                className="text-xs font-medium text-silver underline-offset-2 hover:text-white hover:underline transition-colors"
               >
-                {label}
-                <svg className="w-3 h-3 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            ))}
-            <Link
-              href="/marketplace"
-              className="text-xs text-silver hover:text-white transition-colors ml-1"
-            >
-              Clear all
-            </Link>
+                Clear all
+              </Link>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {activeFilters.map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => removeFilter(key)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[#00ffa3]/50 bg-[rgba(0,255,163,0.12)] px-3 py-1.5 text-sm font-medium text-[#00ffa3] transition-all duration-150 active:scale-95 hover:bg-[rgba(0,255,163,0.2)] hover:border-[#00ffa3]/80"
+                >
+                  {label}
+                  <svg className="w-3.5 h-3.5 opacity-75" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
