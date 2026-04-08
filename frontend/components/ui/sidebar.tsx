@@ -3,7 +3,7 @@
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import React, { createContext, useContext, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { Menu, X } from "lucide-react";
 
 interface Links {
@@ -126,42 +126,35 @@ export const MobileSidebar = ({
           </div>
         </div>
       )}
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            className="fixed inset-0 z-[100] md:hidden"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <button
-              type="button"
-              aria-label="Close sidebar"
-              className="absolute inset-0 bg-black/30"
-              onClick={() => setOpen(false)}
-            />
-            <motion.aside
-              initial={{ x: "-100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "-100%" }}
-              transition={{ type: "tween", duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
-              style={{ willChange: "transform" }}
-              className={cn(
-                "relative h-full w-[82vw] max-w-[280px] bg-white dark:bg-neutral-900 p-6 flex flex-col justify-between border-r border-black/10 dark:border-white/10 shadow-2xl",
-                className,
-              )}
-            >
-              <div
-                className="absolute right-4 top-4 z-50 text-neutral-800 dark:text-neutral-200 cursor-pointer"
-                onClick={() => setOpen(false)}
-              >
-                <X />
-              </div>
-              {children}
-            </motion.aside>
-          </motion.div>
+      <div
+        className={cn(
+          "fixed inset-0 z-[100] md:hidden transition-opacity duration-150",
+          open ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0",
         )}
-      </AnimatePresence>
+      >
+        <button
+          type="button"
+          aria-label="Close sidebar"
+          className="absolute inset-0 bg-black/30"
+          onClick={() => setOpen(false)}
+        />
+        <aside
+          className={cn(
+            "relative h-full w-[82vw] max-w-[280px] bg-white dark:bg-neutral-900 p-6 flex flex-col justify-between border-r border-black/10 dark:border-white/10 shadow-2xl",
+            "transition-transform duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform",
+            open ? "translate-x-0" : "-translate-x-full",
+            className,
+          )}
+        >
+          <div
+            className="absolute right-4 top-4 z-50 text-neutral-800 dark:text-neutral-200 cursor-pointer"
+            onClick={() => setOpen(false)}
+          >
+            <X />
+          </div>
+          {children}
+        </aside>
+      </div>
     </>
   );
 };
