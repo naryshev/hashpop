@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { usePathname } from "next/navigation";
 import { HashpackWalletProvider } from "../lib/hashpackWallet";
@@ -17,13 +18,15 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
   const isFullscreenRoute = isHome;
   const useSidebarNav = !isHome && !isSignIn;
 
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   return (
     <HashpackWalletProvider>
       <QueryClientProvider client={qc}>
         <WalletAccountSync />
         {useSidebarNav ? (
           <div className="min-h-screen pt-14 md:pt-0 flex flex-col md:flex-row">
-            <AppSidebar />
+            <AppSidebar open={sidebarOpen} setOpen={setSidebarOpen} />
             <div className="min-w-0 flex-1 flex flex-col">
               {children}
               <Footer />
@@ -41,7 +44,13 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
             {!isFullscreenRoute && !isSignIn && <Footer />}
           </div>
         )}
-        {!isFullscreenRoute && <BottomNav signInMode={isSignIn} />}
+        {!isFullscreenRoute && (
+          <BottomNav
+            signInMode={isSignIn}
+            showMenu={useSidebarNav}
+            onMenuClick={() => setSidebarOpen(true)}
+          />
+        )}
       </QueryClientProvider>
     </HashpackWalletProvider>
   );
