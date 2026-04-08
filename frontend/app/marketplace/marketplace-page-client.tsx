@@ -203,6 +203,33 @@ export default function MarketplacePageClient({
             Create Listing
           </Link>
         </div>
+        {(() => {
+          const activeFilters: string[] = [];
+          if (query) activeFilters.push(`"${query}"`);
+          if (categoryQuery) activeFilters.push(categoryQuery);
+          if (minPriceQuery && maxPriceQuery)
+            activeFilters.push(`${minPriceQuery}–${maxPriceQuery} HBAR`);
+          else if (minPriceQuery) activeFilters.push(`\u2265 ${minPriceQuery} HBAR`);
+          else if (maxPriceQuery) activeFilters.push(`\u2264 ${maxPriceQuery} HBAR`);
+          if (postedWithinQuery) {
+            const labelMap: Record<string, string> = {
+              "1d": "Last day", "1w": "Last week", "1m": "Last month",
+              "3m": "Last 3 months", "6m": "Last 6 months", "1y": "Last year", "2y": "Last 2 years",
+            };
+            activeFilters.push(labelMap[postedWithinQuery] ?? postedWithinQuery);
+          }
+          if (!activeFilters.length) return null;
+          return (
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-sm text-silver">
+                {activeFilters.join(" · ")}
+                <span className="text-chrome font-medium ml-1">
+                  · {filteredItems.length} result{filteredItems.length !== 1 ? "s" : ""}
+                </span>
+              </span>
+            </div>
+          );
+        })()}
         {listingsError ? (
           <p className="text-amber-400/90 text-sm">
             {listingsError} Ensure the backend is running and PostgreSQL is up (e.g.{" "}
