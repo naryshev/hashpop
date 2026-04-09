@@ -44,7 +44,7 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
             {!isFullscreenRoute && !isSignIn && <Footer />}
           </div>
         )}
-        {!isFullscreenRoute && (
+        {!isFullscreenRoute && !isSignIn && (
           <BottomNav
             signInMode={isSignIn}
             showMenu={useSidebarNav}
