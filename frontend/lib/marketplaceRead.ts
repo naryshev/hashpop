@@ -34,7 +34,7 @@ const listingsAbiV1 = [
   },
 ] as const;
 
-export type ChainListing = {
+type ChainListing = {
   seller: string;
   price: bigint;
   createdAt: bigint;

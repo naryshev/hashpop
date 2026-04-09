@@ -17,18 +17,30 @@ async function loadInitialMarketplaceListings(): Promise<{
   error: string | null;
 }> {
   try {
-    const res = await fetch(`${getApiUrl()}/api/listings`, { cache: "no-store" });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}) as { error?: string });
+    const [listingsRes, countsRes] = await Promise.all([
+      fetch(`${getApiUrl()}/api/listings`, { cache: "no-store" }),
+      fetch(`${getApiUrl()}/api/wishlist/counts`, { cache: "no-store" }),
+    ]);
+    if (!listingsRes.ok) {
+      const body = await listingsRes.json().catch(() => ({}) as { error?: string });
       return {
         items: [],
         error:
           body?.error ||
-          (res.status === 503 ? "Backend or database unavailable." : "Failed to load listings."),
+          (listingsRes.status === 503
+            ? "Backend or database unavailable."
+            : "Failed to load listings."),
       };
     }
-    const data = (await res.json()) as { listings?: ListingItem[] };
-    const list = (data.listings || []).map((l) => ({ ...l, itemType: "listing" as const }));
+    const data = (await listingsRes.json()) as { listings?: ListingItem[] };
+    const counts: Record<string, number> = countsRes.ok
+      ? ((await countsRes.json()) as { counts?: Record<string, number> }).counts ?? {}
+      : {};
+    const list = (data.listings || []).map((l) => ({
+      ...l,
+      itemType: "listing" as const,
+      watchlistCount: counts[l.id] ?? 0,
+    }));
     const sorted = list.sort((a, b) => {
       const aActive = isActiveStatus(a.status);
       const bActive = isActiveStatus(b.status);

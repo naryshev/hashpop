@@ -17,7 +17,7 @@ export type CardStackItem = {
   tag?: string;
 };
 
-export type CardStackProps<T extends CardStackItem> = {
+type CardStackProps<T extends CardStackItem> = {
   items: T[];
   initialIndex?: number;
   maxVisible?: number;

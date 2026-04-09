@@ -20,7 +20,7 @@ interface SidebarContextProps {
 
 const SidebarContext = createContext<SidebarContextProps | undefined>(undefined);
 
-export const useSidebar = () => {
+const useSidebar = () => {
   const context = useContext(SidebarContext);
   if (!context) {
     throw new Error("useSidebar must be used within a SidebarProvider");
@@ -28,7 +28,7 @@ export const useSidebar = () => {
   return context;
 };
 
-export const SidebarProvider = ({
+const SidebarProvider = ({
   children,
   open: openProp,
   setOpen: setOpenProp,
@@ -78,7 +78,7 @@ export const SidebarBody = (
   );
 };
 
-export const DesktopSidebar = ({
+const DesktopSidebar = ({
   className,
   children,
   ...props
@@ -102,7 +102,7 @@ export const DesktopSidebar = ({
   );
 };
 
-export const MobileSidebar = ({
+const MobileSidebar = ({
   className,
   children,
   hideHeader,

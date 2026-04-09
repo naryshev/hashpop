@@ -253,6 +253,11 @@ function CreatePageContent() {
       return;
     }
 
+    if (!category.trim()) {
+      setSubmitError("Select a category.");
+      return;
+    }
+
     let urls: string[] = fromDuplicate ? [...duplicateMediaUrlsRef.current] : [];
     if (mediaItems.length > 0) {
       try {
@@ -518,7 +523,7 @@ function CreatePageContent() {
           </label>
 
           <label className="block">
-            <span className="text-sm text-silver">Category</span>
+            <span className="text-sm text-silver">Category <span className="text-rose-400">*</span></span>
             <CategorySearch
               value={category}
               onChange={setCategory}

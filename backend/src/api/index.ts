@@ -771,8 +771,35 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       return res.status(503).json({ error: "HEDERA_RPC_URL not set" });
     }
     try {
+      // Hedera SDK returns transaction IDs in format "0.0.XXXX@seconds.nanos".
+      // JSON-RPC (Hashio) requires the EVM tx hash (0x...64hex).
+      // If we receive a Hedera tx ID, resolve the EVM hash via mirror node first.
+      let evmTxHash = txHash;
+      const isHederaTxId = /^\d+\.\d+\.\d+@\d+\.\d+$/.test(txHash);
+      if (isHederaTxId) {
+        const network = rpcUrl.includes("mainnet") ? "mainnet" : "testnet";
+        const mirrorBase =
+          network === "mainnet"
+            ? "https://mainnet.mirrornode.hedera.com"
+            : "https://testnet.mirrornode.hedera.com";
+        // Convert "0.0.XXXX@seconds.nanos" → "0.0.XXXX-seconds-nanos"
+        const [accountPart, timePart] = txHash.split("@");
+        const mirrorTxId = `${accountPart}-${(timePart || "").replace(".", "-")}`;
+        const mirrorRes = await fetch(
+          `${mirrorBase}/api/v1/contracts/results/${encodeURIComponent(mirrorTxId)}`,
+        );
+        if (!mirrorRes.ok) {
+          return res.status(404).json({ error: "Transaction not found in mirror node" });
+        }
+        const mirrorData = (await mirrorRes.json()) as { hash?: string };
+        if (!mirrorData.hash) {
+          return res.status(404).json({ error: "No EVM hash found for Hedera transaction" });
+        }
+        evmTxHash = mirrorData.hash;
+      }
+
       const provider = new ethers.JsonRpcProvider(rpcUrl);
-      const receipt = await provider.getTransactionReceipt(txHash);
+      const receipt = await provider.getTransactionReceipt(evmTxHash);
       if (!receipt?.logs?.length) {
         return res.status(404).json({ error: "Transaction or logs not found" });
       }
@@ -784,7 +811,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           where: { id: listingId },
           data: { status: "CANCELLED" },
         });
-        log.info({ listingId, txHash }, "Synced cancel from tx");
+        log.info({ listingId, txHash, evmTxHash }, "Synced cancel from tx");
         return res.json({ ok: true, listingId });
       }
       return res.status(404).json({ error: "No ListingCancelled event in transaction" });
@@ -795,8 +822,38 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
   });
 
   /**
-   * Sync a listing purchase from tx so sold state appears immediately.
+   * Cancel a listing that was never confirmed on-chain (no blockchain tx needed).
+   * Only works when onChainConfirmed is false and the caller is the seller.
    */
+  router.post("/listing/:id/cancel-offchain", async (req, res) => {
+    const { id } = req.params;
+    const { address, force } = (req.body || {}) as { address?: string; force?: boolean };
+    const seller = address?.trim()?.toLowerCase();
+    if (!seller) return res.status(400).json({ error: "address required" });
+    try {
+      const listing = await prisma.listing.findUnique({ where: { id } });
+      if (!listing) return res.status(404).json({ error: "Listing not found" });
+      if (listing.seller?.toLowerCase() !== seller)
+        return res.status(403).json({ error: "Not the seller" });
+      // Without force=true, block confirmed listings (must cancel via contract).
+      // With force=true, the seller explicitly wants the listing removed from the app
+      // regardless of on-chain state (e.g. contract was redeployed, tx failed, etc.).
+      if (listing.onChainConfirmed && !force)
+        return res.status(400).json({ error: "Listing is confirmed on-chain; cancel via contract" });
+      if (listing.status === "CANCELLED")
+        return res.json({ ok: true }); // already done
+      await prisma.listing.update({
+        where: { id },
+        data: { status: "CANCELLED" },
+      });
+      log.info({ id, seller, force: !!force }, force ? "Force-cancelled on-chain listing" : "Cancelled off-chain unconfirmed listing");
+      return res.json({ ok: true });
+    } catch (err) {
+      log.error({ err, id }, "Off-chain cancel failed");
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   router.post("/sync-purchase", async (req, res) => {
     const { txHash, listingId } = (req.body || {}) as { txHash?: string; listingId?: string };
     const fallbackListingId =
@@ -1515,6 +1572,21 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       });
     } catch (err) {
       log.error({ err }, "Failed to fetch purchases");
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  router.get("/wishlist/counts", async (_req, res) => {
+    try {
+      const rows = await prisma.wishlistItem.groupBy({
+        by: ["itemId"],
+        _count: { itemId: true },
+      });
+      const counts: Record<string, number> = {};
+      for (const r of rows) counts[r.itemId] = r._count.itemId;
+      res.json({ counts });
+    } catch (err) {
+      log.error({ err }, "Failed to fetch wishlist counts");
       res.status(500).json({ error: "Internal server error" });
     }
   });

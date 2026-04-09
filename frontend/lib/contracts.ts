@@ -85,35 +85,6 @@ export const marketplaceAbi: Abi = [
   },
 ];
 
-export const auctionHouseAbi: Abi = [
-  {
-    name: "createAuction",
-    type: "function",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "auctionId", type: "bytes32" },
-      { name: "reservePrice", type: "uint256" },
-      { name: "startTime", type: "uint256" },
-      { name: "duration", type: "uint256" },
-    ],
-    outputs: [],
-  },
-  {
-    name: "placeBid",
-    type: "function",
-    stateMutability: "payable",
-    inputs: [{ name: "auctionId", type: "bytes32" }],
-    outputs: [],
-  },
-  {
-    name: "settleAuction",
-    type: "function",
-    stateMutability: "nonpayable",
-    inputs: [{ name: "auctionId", type: "bytes32" }],
-    outputs: [],
-  },
-];
-
 export const escrowAbi: Abi = [
   {
     name: "confirmShipment",
@@ -147,9 +118,6 @@ export const pausableAdminAbi: Abi = [
     outputs: [],
   },
 ];
-
-/** @deprecated use pausableAdminAbi */
-export const marketplaceAdminAbi = pausableAdminAbi;
 
 export const marketplaceAddress = (process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS ||
   "0x0000000000000000000000000000000000000000") as `0x${string}`;
