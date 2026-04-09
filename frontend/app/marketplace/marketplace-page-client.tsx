@@ -149,19 +149,30 @@ export default function MarketplacePageClient({
 
     let queryMatched = categoryMatched;
     if (query) {
-      const fuse = new Fuse(categoryMatched, {
-        includeScore: true,
-        threshold: 0.2,
-        ignoreLocation: true,
-        minMatchCharLength: 2,
-        keys: [
-          { name: "title", weight: 0.5 },
-          { name: "subtitle", weight: 0.15 },
-          { name: "description", weight: 0.2 },
-          { name: "category", weight: 0.15 },
-        ],
-      });
-      queryMatched = fuse.search(query).map((r) => r.item);
+      const q = query.toLowerCase();
+      // Substring match first — exact word/phrase hits in any field
+      const substringHits = categoryMatched.filter((item) =>
+        [item.title, item.subtitle, item.description, item.category]
+          .some((f) => f?.toLowerCase().includes(q)),
+      );
+      if (substringHits.length > 0) {
+        queryMatched = substringHits;
+      } else {
+        // Tight fuzzy fallback (threshold 0.2 ≈ only near-exact matches)
+        const fuse = new Fuse(categoryMatched, {
+          includeScore: true,
+          threshold: 0.2,
+          minMatchCharLength: 3,
+          ignoreLocation: true,
+          keys: [
+            { name: "title", weight: 0.55 },
+            { name: "subtitle", weight: 0.15 },
+            { name: "description", weight: 0.2 },
+            { name: "category", weight: 0.1 },
+          ],
+        });
+        queryMatched = fuse.search(query).map((r) => r.item);
+      }
     }
 
     const minPrice = minPriceQuery !== "" ? Number(minPriceQuery) : null;
