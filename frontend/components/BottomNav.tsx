@@ -5,9 +5,9 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 const links = [
-  { href: "/dashboard", label: "My Hashpop", icon: "dashboard" },
-  { href: "/marketplace", label: "Search", icon: "search" },
   { href: "/messages", label: "Alerts", icon: "bell" },
+  { href: "/marketplace", label: "Search", icon: "search" },
+  { href: "/dashboard", label: "My Hashpop", icon: "dashboard" },
   { href: "/selling", label: "Selling", icon: "sell" },
 ];
 
