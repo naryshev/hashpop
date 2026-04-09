@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { getListingMediaUrls } from "../lib/listingMedia";
 
 /** Standard height for card media so all marketplace/home cards are the same size */
@@ -31,6 +31,7 @@ export function ListingMedia({
 }: ListingMediaProps) {
   const [failed, setFailed] = useState<Set<number>>(new Set());
   const [index, setIndex] = useState(0);
+  const touchStartX = useRef<number | null>(null);
   const urls = getListingMediaUrls(listing);
   const ratioClass = aspectRatio === "video" ? "aspect-video" : "aspect-square";
   const useArrows = navigation === "arrows" && urls.length > 1;
@@ -92,6 +93,20 @@ export function ListingMedia({
       <div
         className={`rounded-glass-lg border border-white/10 overflow-hidden relative ${cardSize ? "" : ratioClass} ${sizeClass} ${className}`}
         style={heightStyle}
+        onTouchStart={(e) => {
+          touchStartX.current = e.touches[0].clientX;
+        }}
+        onTouchEnd={(e) => {
+          if (touchStartX.current === null) return;
+          const delta = e.changedTouches[0].clientX - touchStartX.current;
+          touchStartX.current = null;
+          if (Math.abs(delta) < 30) return;
+          if (delta < 0) {
+            setIndex((i) => (i + 1) % urls.length);
+          } else {
+            setIndex((i) => (i - 1 + urls.length) % urls.length);
+          }
+        }}
       >
         {failed.has(safeIndex) ? (
           <div className="absolute inset-0 flex items-center justify-center bg-white/5 text-silver">

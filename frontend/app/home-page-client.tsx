@@ -293,6 +293,9 @@ export default function HomePageClient({
               {listingsError} Ensure backend and database are running.
             </p>
           ) : null}
+          <p className="mt-2 text-center text-[10px] text-white/30 select-none">
+            Hashpop &copy; {new Date().getFullYear()}
+          </p>
         </div>
       </section>
     </main>

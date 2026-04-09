@@ -5,15 +5,14 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 const links = [
-  { href: "/dashboard", label: "My Hashpop", icon: "dashboard" },
-  { href: "/marketplace", label: "Search", icon: "search" },
   { href: "/messages", label: "Alerts", icon: "bell" },
+  { href: "/marketplace", label: "Search", icon: "search" },
+  { href: "/dashboard", label: "My Hashpop", icon: "dashboard" },
   { href: "/selling", label: "Selling", icon: "sell" },
 ];
 
 const signInLinks = [
   { href: "/dashboard", label: "My Hashpop", icon: "dashboard" },
-  { href: "/marketplace", label: "Search", icon: "search" },
   { href: "/messages", label: "Alerts", icon: "bell" },
 ];
 
@@ -111,24 +110,27 @@ export function BottomNav({
     }
   }, [searchOpen]);
 
+  const closeSearch = () => {
+    setSearchOpen(false);
+    setSearchQuery("");
+    searchInputRef.current?.blur();
+  };
+
   useEffect(() => {
     if (!searchOpen) return;
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setSearchOpen(false);
-        setSearchQuery("");
-      }
+      if (e.key === "Escape") closeSearch();
     };
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchOpen]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setSearchOpen(false);
+    closeSearch();
     const q = searchQuery.trim();
     router.push(q ? `/marketplace?q=${encodeURIComponent(q)}` : "/marketplace");
-    setSearchQuery("");
   };
 
   return (
@@ -162,7 +164,7 @@ export function BottomNav({
               <button
                 key="search"
                 type="button"
-                onClick={() => setSearchOpen((o) => !o)}
+                onClick={() => (searchOpen ? closeSearch() : setSearchOpen(true))}
                 className="flex flex-col items-center justify-center py-2 px-1"
                 aria-label={searchOpen ? "Close search" : "Open search"}
                 aria-expanded={searchOpen}
@@ -228,10 +230,7 @@ export function BottomNav({
             />
             <button
               type="button"
-              onClick={() => {
-                setSearchOpen(false);
-                setSearchQuery("");
-              }}
+              onClick={closeSearch}
               className="shrink-0 text-[#00ffa3]/50 hover:text-[#00ffa3] transition-colors"
               aria-label="Close search"
             >

@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Fuse from "fuse.js";
 import { ListingMedia } from "../../components/ListingMedia";
 import { WishlistButton } from "../../components/WishlistButton";
@@ -115,7 +115,9 @@ export default function MarketplacePageClient({
   initialError: string | null;
 }) {
   const { isConnected } = useHashpackWallet();
+  const router = useRouter();
   const searchParams = useSearchParams();
+  const [searchInput, setSearchInput] = useState("");
   const query = searchParams.get("q")?.trim() ?? "";
   const categoryQuery = canonicalizeCategory(searchParams.get("category")?.trim() ?? "");
   const minPriceQuery = searchParams.get("minPrice")?.trim() ?? "";
@@ -186,7 +188,7 @@ export default function MarketplacePageClient({
   return (
     <main className="min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <h1 className="text-xl sm:text-2xl font-bold text-white">Marketplace</h1>
             {isConnected ? (
@@ -200,10 +202,101 @@ export default function MarketplacePageClient({
               </StatusBadge>
             )}
           </div>
-          <Link href="/create" className="text-sm text-chrome hover:text-white font-medium">
-            Create Listing
-          </Link>
+          <div className="flex items-center gap-3">
+            {/* Desktop: always-visible inline search */}
+            <form
+              className="hidden md:flex"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const q = searchInput.trim();
+                const p = new URLSearchParams(searchParams.toString());
+                if (q) p.set("q", q); else p.delete("q");
+                router.push(p.toString() ? `/marketplace?${p.toString()}` : "/marketplace");
+                setSearchInput("");
+              }}
+            >
+              <div className="flex items-center gap-1.5 rounded-full border border-[#00ffa3]/50 bg-[#00ffa3]/[0.08] px-3 py-1.5 shadow-[0_0_14px_rgba(0,255,163,0.12),inset_0_0_8px_rgba(0,255,163,0.04)]">
+                <svg className="h-3.5 w-3.5 shrink-0 text-[#00ffa3]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M16 10.5A5.5 5.5 0 115 10.5a5.5 5.5 0 0111 0z" />
+                </svg>
+                <input
+                  type="search"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  placeholder="Search listings…"
+                  className="w-36 bg-transparent text-sm text-white placeholder:text-[#00ffa3]/40 focus:outline-none"
+                />
+                {searchInput && (
+                  <button type="button" onClick={() => setSearchInput("")} className="shrink-0 text-[#00ffa3]/50 hover:text-[#00ffa3] transition-colors" aria-label="Clear">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            </form>
+            <Link href="/create" className="text-sm text-chrome hover:text-white font-medium">
+              Create Listing
+            </Link>
+          </div>
         </div>
+        {(() => {
+          const removeFilter = (keys: string[]) => {
+            const p = new URLSearchParams(searchParams.toString());
+            keys.forEach((k) => p.delete(k));
+            const qs = p.toString();
+            router.push(qs ? `/marketplace?${qs}` : "/marketplace");
+          };
+
+          const pills: { label: string; keys: string[] }[] = [];
+          if (query) pills.push({ label: `"${query}"`, keys: ["q"] });
+          if (categoryQuery) pills.push({ label: categoryQuery, keys: ["category"] });
+          if (minPriceQuery && maxPriceQuery)
+            pills.push({ label: `${minPriceQuery}–${maxPriceQuery} HBAR`, keys: ["minPrice", "maxPrice"] });
+          else if (minPriceQuery)
+            pills.push({ label: `\u2265 ${minPriceQuery} HBAR`, keys: ["minPrice"] });
+          else if (maxPriceQuery)
+            pills.push({ label: `\u2264 ${maxPriceQuery} HBAR`, keys: ["maxPrice"] });
+          if (postedWithinQuery) {
+            const labelMap: Record<string, string> = {
+              "1d": "Last day", "1w": "Last week", "1m": "Last month",
+              "3m": "Last 3 months", "6m": "Last 6 months", "1y": "Last year", "2y": "Last 2 years",
+            };
+            pills.push({ label: labelMap[postedWithinQuery] ?? postedWithinQuery, keys: ["postedWithin"] });
+          }
+
+          if (!pills.length) return null;
+          return (
+            <div className="mb-6 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-semibold tracking-widest text-silver uppercase">
+                  Active Filters{" "}
+                  <span className="text-[#00ffa3]">· {filteredItems.length} Result{filteredItems.length !== 1 ? "s" : ""}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => router.push("/marketplace")}
+                  className="text-sm text-silver hover:text-white transition-colors"
+                >
+                  Clear all
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {pills.map(({ label, keys }) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => removeFilter(keys)}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[#00ffa3]/60 bg-[#00ffa3]/10 px-3 py-1 text-sm text-[#00ffa3] hover:bg-[#00ffa3]/20 transition-colors"
+                  >
+                    {label}
+                    <span aria-hidden className="text-[#00ffa3]/70 text-base leading-none">×</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
         {listingsError ? (
           <p className="text-amber-400/90 text-sm">
             {listingsError} Ensure the backend is running and PostgreSQL is up (e.g.{" "}
