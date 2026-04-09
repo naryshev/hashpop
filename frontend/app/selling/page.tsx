@@ -24,7 +24,10 @@ export default function SellingPage() {
     isPending: cancelPending,
     isSuccess: cancelSuccess,
     hash: cancelTxHash,
+    error: cancelHookError,
   } = useCancelListing();
+  const [canForceCancel, setCanForceCancel] = useState(false);
+  const [forceDeleting, setForceDeleting] = useState(false);
 
   const fetchListings = useCallback(() => {
     if (!address) return;
@@ -50,16 +53,45 @@ export default function SellingPage() {
   }, [address, fetchListings]);
 
   useEffect(() => {
-    if (!cancelSuccess || !cancelTxHash) return;
-    fetch(`${getApiUrl()}/api/sync-cancel`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ txHash: cancelTxHash }),
-    }).catch(() => {});
+    if (!cancelSuccess) return;
+    if (cancelTxHash) {
+      fetch(`${getApiUrl()}/api/sync-cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ txHash: cancelTxHash }),
+      }).catch(() => {});
+    }
     setCancellingId(null);
+    setCanForceCancel(false);
     setDeleteTarget(null);
     fetchListings();
   }, [cancelSuccess, cancelTxHash, fetchListings]);
+
+  const handleForceCancel = useCallback(async () => {
+    if (!deleteTarget || forceDeleting) return;
+    setDeleteError(null);
+    setForceDeleting(true);
+    try {
+      const res = await fetch(
+        `${getApiUrl()}/api/listing/${encodeURIComponent(deleteTarget.id)}/cancel-offchain`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ address, force: true }),
+        },
+      );
+      if (!res.ok) throw new Error((await res.json()).error || "Failed");
+      setCanForceCancel(false);
+      setCancellingId(null);
+      setDeleteTarget(null);
+      setDeleteError(null);
+      fetchListings();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Force cancel failed.");
+    } finally {
+      setForceDeleting(false);
+    }
+  }, [deleteTarget, forceDeleting, address, fetchListings]);
 
   return (
     <main className="min-h-screen">
@@ -83,57 +115,83 @@ export default function SellingPage() {
                 </p>
               </div>
             </div>
-            {deleteError && (
+            {(deleteError || cancelHookError) && (
               <p className="text-sm text-rose-300 border border-rose-500/30 bg-rose-500/5 px-3 py-2">
-                {deleteError}
+                {cancelHookError?.message || deleteError}
               </p>
             )}
-            <div className="flex gap-2">
+            {canForceCancel && (
+              <p className="text-xs text-silver/70 border border-white/10 bg-white/5 px-3 py-2">
+                The on-chain transaction did not go through. You can try again or remove the listing from your account without a blockchain transaction.
+              </p>
+            )}
+            <div className="flex gap-2 flex-wrap">
               <button
                 type="button"
-                onClick={() => { setDeleteTarget(null); setDeleteError(null); }}
-                disabled={cancelPending}
+                onClick={() => { setDeleteTarget(null); setDeleteError(null); setCanForceCancel(false); }}
+                disabled={cancelPending || forceDeleting}
                 className="btn-frost flex-1 border-white/20 disabled:opacity-50"
               >
                 Cancel
               </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  setDeleteError(null);
-                  setCancellingId(deleteTarget.id);
-                  if (!deleteTarget.onChainConfirmed) {
-                    // Never reached the chain — cancel directly in DB, no wallet tx needed
-                    try {
-                      const res = await fetch(
-                        `${getApiUrl()}/api/listing/${encodeURIComponent(deleteTarget.id)}/cancel-offchain`,
-                        {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ address }),
-                        },
-                      );
-                      if (!res.ok) throw new Error((await res.json()).error || "Failed");
-                      setCancellingId(null);
-                      setDeleteTarget(null);
-                      fetchListings();
-                    } catch (err) {
-                      setDeleteError(err instanceof Error ? err.message : "Delete failed.");
+              {canForceCancel ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => { setCanForceCancel(false); setDeleteError(null); }}
+                    disabled={forceDeleting}
+                    className="flex-1 rounded-glass border border-white/20 bg-white/5 px-4 py-2 font-semibold text-silver transition-all hover:bg-white/10 disabled:opacity-50"
+                  >
+                    Try again
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleForceCancel}
+                    disabled={forceDeleting}
+                    className="flex-1 rounded-glass border border-rose-500/50 bg-rose-500/10 px-4 py-2 font-semibold text-rose-300 transition-all hover:bg-rose-500/20 hover:border-rose-400/70 disabled:opacity-50"
+                  >
+                    {forceDeleting ? "Removing…" : "Remove from account"}
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setDeleteError(null);
+                    setCancellingId(deleteTarget.id);
+                    if (!deleteTarget.onChainConfirmed) {
+                      try {
+                        const res = await fetch(
+                          `${getApiUrl()}/api/listing/${encodeURIComponent(deleteTarget.id)}/cancel-offchain`,
+                          {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ address }),
+                          },
+                        );
+                        if (!res.ok) throw new Error((await res.json()).error || "Failed");
+                        setCancellingId(null);
+                        setDeleteTarget(null);
+                        fetchListings();
+                      } catch (err) {
+                        setDeleteError(err instanceof Error ? err.message : "Delete failed.");
+                        setCancellingId(null);
+                      }
+                      return;
+                    }
+                    const ok = await cancel(deleteTarget.id);
+                    if (!ok) {
+                      setDeleteError("Transaction failed or was rejected.");
+                      setCanForceCancel(true);
                       setCancellingId(null);
                     }
-                    return;
-                  }
-                  const ok = await cancel(deleteTarget.id);
-                  if (!ok) {
-                    setDeleteError("Transaction failed or was rejected. Please try again.");
-                    setCancellingId(null);
-                  }
-                }}
-                disabled={cancelPending}
-                className="flex-1 rounded-glass border border-rose-500/50 bg-rose-500/10 px-4 py-2 font-semibold text-rose-300 transition-all hover:bg-rose-500/20 hover:border-rose-400/70 disabled:opacity-50"
-              >
-                {cancelPending && cancellingId === deleteTarget.id ? "Confirm in wallet…" : "Delete listing"}
-              </button>
+                  }}
+                  disabled={cancelPending || forceDeleting}
+                  className="flex-1 rounded-glass border border-rose-500/50 bg-rose-500/10 px-4 py-2 font-semibold text-rose-300 transition-all hover:bg-rose-500/20 hover:border-rose-400/70 disabled:opacity-50"
+                >
+                  {cancelPending && cancellingId === deleteTarget.id ? "Confirm in wallet…" : "Delete listing"}
+                </button>
+              )}
             </div>
           </div>
         </div>
