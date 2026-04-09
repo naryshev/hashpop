@@ -99,6 +99,7 @@ export type ListingItem = {
   description?: string | null;
   category?: string | null;
   condition?: string | null;
+  watchlistCount?: number;
   seller?: string;
   imageUrl?: string | null;
   mediaUrls?: string[];
@@ -475,9 +476,16 @@ export default function MarketplacePageClient({
                         {formatSellerDisplay(item.seller)}
                       </p>
                     )}
-                    <p className="text-chrome font-semibold mt-1.5">
-                      {formatHbarWithUsd(formatPriceForDisplay(item.price || "0"), usdRate)}
-                    </p>
+                    <div className="flex items-center justify-between mt-1.5">
+                      <p className="text-chrome font-semibold">
+                        {formatHbarWithUsd(formatPriceForDisplay(item.price || "0"), usdRate)}
+                      </p>
+                      {(item.watchlistCount ?? 0) > 0 && (
+                        <span className="text-[10px] text-silver/50 flex items-center gap-0.5">
+                          ♡ {item.watchlistCount}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </Link>
               ))}
@@ -519,9 +527,16 @@ export default function MarketplacePageClient({
                         {formatSellerDisplay(item.seller)}
                       </p>
                     )}
-                    <p className="text-chrome font-semibold mt-2 text-lg">
-                      {formatHbarWithUsd(formatPriceForDisplay(item.price || "0"), usdRate)}
-                    </p>
+                    <div className="flex items-center justify-between mt-2">
+                      <p className="text-chrome font-semibold text-lg">
+                        {formatHbarWithUsd(formatPriceForDisplay(item.price || "0"), usdRate)}
+                      </p>
+                      {(item.watchlistCount ?? 0) > 0 && (
+                        <span className="text-xs text-silver/50 flex items-center gap-1">
+                          ♡ {item.watchlistCount}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </Link>
               ))}

@@ -1519,6 +1519,21 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     }
   });
 
+  router.get("/wishlist/counts", async (_req, res) => {
+    try {
+      const rows = await prisma.wishlistItem.groupBy({
+        by: ["itemId"],
+        _count: { itemId: true },
+      });
+      const counts: Record<string, number> = {};
+      for (const r of rows) counts[r.itemId] = r._count.itemId;
+      res.json({ counts });
+    } catch (err) {
+      log.error({ err }, "Failed to fetch wishlist counts");
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   router.get("/wishlist", async (req, res) => {
     try {
       const address = (req.query.address as string)?.trim()?.toLowerCase();
