@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Fuse from "fuse.js";
@@ -117,6 +117,8 @@ export default function MarketplacePageClient({
   const { isConnected } = useHashpackWallet();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
   const query = searchParams.get("q")?.trim() ?? "";
   const categoryQuery = canonicalizeCategory(searchParams.get("category")?.trim() ?? "");
   const minPriceQuery = searchParams.get("minPrice")?.trim() ?? "";
@@ -186,7 +188,7 @@ export default function MarketplacePageClient({
   return (
     <main className="min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <h1 className="text-xl sm:text-2xl font-bold text-white">Marketplace</h1>
             {isConnected ? (
@@ -200,9 +202,60 @@ export default function MarketplacePageClient({
               </StatusBadge>
             )}
           </div>
-          <Link href="/create" className="text-sm text-chrome hover:text-white font-medium">
-            Create Listing
-          </Link>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setSearchOpen((o) => !o)}
+              aria-label={searchOpen ? "Close search" : "Open search"}
+              aria-expanded={searchOpen}
+              className={`inline-flex items-center justify-center rounded-lg p-2 transition-all duration-200 ${
+                searchOpen || query
+                  ? "bg-[#00ffa3]/15 border border-[#00ffa3]/60 text-[#00ffa3] shadow-[0_0_10px_rgba(0,255,163,0.35)]"
+                  : "border border-white/15 bg-white/5 text-silver hover:bg-[#00ffa3]/10 hover:border-[#00ffa3]/40 hover:text-[#00ffa3]"
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M16 10.5A5.5 5.5 0 115 10.5a5.5 5.5 0 0111 0z" />
+              </svg>
+            </button>
+            <Link href="/create" className="text-sm text-chrome hover:text-white font-medium">
+              Create Listing
+            </Link>
+          </div>
+        </div>
+        <div className={`overflow-hidden transition-all duration-300 ease-out ${searchOpen ? "max-h-20 opacity-100 mb-4" : "max-h-0 opacity-0"}`}>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const q = searchInput.trim();
+              const p = new URLSearchParams(searchParams.toString());
+              if (q) p.set("q", q); else p.delete("q");
+              router.push(p.toString() ? `/marketplace?${p.toString()}` : "/marketplace");
+              setSearchOpen(false);
+              setSearchInput("");
+            }}
+          >
+            <div className="flex items-center gap-2 rounded-full border border-[#00ffa3]/50 bg-[#00ffa3]/[0.08] px-3.5 py-2 shadow-[0_0_20px_rgba(0,255,163,0.15),inset_0_0_12px_rgba(0,255,163,0.04)]">
+              <svg className="h-4 w-4 shrink-0 text-[#00ffa3]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M16 10.5A5.5 5.5 0 115 10.5a5.5 5.5 0 0111 0z" />
+              </svg>
+              <input
+                type="search"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="Search listings…"
+                className="flex-1 bg-transparent text-sm text-white placeholder:text-[#00ffa3]/40 focus:outline-none"
+                autoFocus={searchOpen}
+              />
+              {searchInput && (
+                <button type="button" onClick={() => setSearchInput("")} className="shrink-0 text-[#00ffa3]/50 hover:text-[#00ffa3] transition-colors" aria-label="Clear">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </form>
         </div>
         {(() => {
           const removeFilter = (keys: string[]) => {

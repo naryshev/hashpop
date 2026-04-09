@@ -12,13 +12,16 @@ export function Footer() {
           at your own risk. This is not financial or legal advice. We do not guarantee security,
           uptime, or any particular outcome.
         </p>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-          <Link href="/terms" className="text-chrome hover:text-white">
-            Terms of Service
-          </Link>
-          <Link href="/privacy" className="text-chrome hover:text-white">
-            Privacy Policy
-          </Link>
+        <div className="flex flex-wrap items-center justify-between gap-y-2">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+            <Link href="/terms" className="text-chrome hover:text-white">
+              Terms of Service
+            </Link>
+            <Link href="/privacy" className="text-chrome hover:text-white">
+              Privacy Policy
+            </Link>
+          </div>
+          <p className="text-xs text-silver/50">Hashpop &copy; {new Date().getFullYear()}</p>
         </div>
       </div>
     </footer>

@@ -13,7 +13,6 @@ const links = [
 
 const signInLinks = [
   { href: "/dashboard", label: "My Hashpop", icon: "dashboard" },
-  { href: "/marketplace", label: "Search", icon: "search" },
   { href: "/messages", label: "Alerts", icon: "bell" },
 ];
 
