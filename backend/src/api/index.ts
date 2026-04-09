@@ -795,8 +795,33 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
   });
 
   /**
-   * Sync a listing purchase from tx so sold state appears immediately.
+   * Cancel a listing that was never confirmed on-chain (no blockchain tx needed).
+   * Only works when onChainConfirmed is false and the caller is the seller.
    */
+  router.post("/listing/:id/cancel-offchain", async (req, res) => {
+    const { id } = req.params;
+    const { address } = (req.body || {}) as { address?: string };
+    const seller = address?.trim()?.toLowerCase();
+    if (!seller) return res.status(400).json({ error: "address required" });
+    try {
+      const listing = await prisma.listing.findUnique({ where: { id } });
+      if (!listing) return res.status(404).json({ error: "Listing not found" });
+      if (listing.seller?.toLowerCase() !== seller)
+        return res.status(403).json({ error: "Not the seller" });
+      if (listing.onChainConfirmed)
+        return res.status(400).json({ error: "Listing is confirmed on-chain; cancel via contract" });
+      await prisma.listing.update({
+        where: { id },
+        data: { status: "CANCELLED" },
+      });
+      log.info({ id, seller }, "Cancelled off-chain unconfirmed listing");
+      return res.json({ ok: true });
+    } catch (err) {
+      log.error({ err, id }, "Off-chain cancel failed");
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   router.post("/sync-purchase", async (req, res) => {
     const { txHash, listingId } = (req.body || {}) as { txHash?: string; listingId?: string };
     const fallbackListingId =

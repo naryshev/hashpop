@@ -16,7 +16,7 @@ export default function SellingPage() {
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<any[]>([]);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string; onChainConfirmed: boolean } | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const {
@@ -77,7 +77,9 @@ export default function SellingPage() {
                 <h2 className="text-base font-semibold text-white">Delete listing?</h2>
                 <p className="text-sm text-silver mt-1 line-clamp-1">{deleteTarget.title}</p>
                 <p className="text-sm text-silver mt-1">
-                  This will cancel the listing on-chain. You&apos;ll need to approve the transaction in your wallet.
+                  {deleteTarget.onChainConfirmed
+                    ? "This will cancel the listing on-chain. You'll need to approve the transaction in your wallet."
+                    : "This listing was never confirmed on-chain and will be removed directly — no wallet approval needed."}
                 </p>
               </div>
             </div>
@@ -100,6 +102,27 @@ export default function SellingPage() {
                 onClick={async () => {
                   setDeleteError(null);
                   setCancellingId(deleteTarget.id);
+                  if (!deleteTarget.onChainConfirmed) {
+                    // Never reached the chain — cancel directly in DB, no wallet tx needed
+                    try {
+                      const res = await fetch(
+                        `${getApiUrl()}/api/listing/${encodeURIComponent(deleteTarget.id)}/cancel-offchain`,
+                        {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ address }),
+                        },
+                      );
+                      if (!res.ok) throw new Error((await res.json()).error || "Failed");
+                      setCancellingId(null);
+                      setDeleteTarget(null);
+                      fetchListings();
+                    } catch (err) {
+                      setDeleteError(err instanceof Error ? err.message : "Delete failed.");
+                      setCancellingId(null);
+                    }
+                    return;
+                  }
                   const ok = await cancel(deleteTarget.id);
                   if (!ok) {
                     setDeleteError("Transaction failed or was rejected. Please try again.");
@@ -200,7 +223,7 @@ export default function SellingPage() {
                                 type="button"
                                 onClick={() => {
                                   setDeleteError(null);
-                                  setDeleteTarget({ id: row.id, title: row.title || row.id });
+                                  setDeleteTarget({ id: row.id, title: row.title || row.id, onChainConfirmed: !!row.onChainConfirmed });
                                 }}
                                 disabled={cancelPending}
                                 className="flex-1 rounded-glass border border-rose-500/50 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 hover:border-rose-400/70 disabled:opacity-50 transition-all"

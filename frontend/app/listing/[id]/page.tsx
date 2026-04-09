@@ -752,7 +752,9 @@ export default function ListingPage() {
                 <div>
                   <h2 className="text-base font-semibold text-white">Delete listing?</h2>
                   <p className="text-sm text-silver mt-1">
-                    This will cancel the listing on-chain and remove it permanently. You&apos;ll need to approve the transaction in your wallet.
+                    {listing?.onChainConfirmed
+                      ? "This will cancel the listing on-chain and remove it permanently. You'll need to approve the transaction in your wallet."
+                      : "This listing was never confirmed on-chain and will be removed directly — no wallet approval needed."}
                   </p>
                 </div>
               </div>
@@ -777,6 +779,24 @@ export default function ListingPage() {
                   type="button"
                   onClick={async () => {
                     setDeleteError(null);
+                    if (!listing?.onChainConfirmed) {
+                      try {
+                        const res = await fetch(
+                          `${getApiUrl()}/api/listing/${encodeURIComponent(listing!.id)}/cancel-offchain`,
+                          {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ address }),
+                          },
+                        );
+                        if (!res.ok) throw new Error((await res.json()).error || "Failed");
+                        setDeleteConfirmOpen(false);
+                        router.push("/selling");
+                      } catch (err) {
+                        setDeleteError(err instanceof Error ? err.message : "Delete failed.");
+                      }
+                      return;
+                    }
                     const ok = await cancel(listing!.id);
                     if (ok) {
                       setDeleteConfirmOpen(false);
