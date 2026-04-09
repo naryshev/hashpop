@@ -66,6 +66,7 @@ type Listing = {
   mediaUrls?: string[];
   txHash?: string | null;
   createdAt?: string;
+  onChainConfirmed?: boolean;
 };
 
 export default function ListingPage() {
