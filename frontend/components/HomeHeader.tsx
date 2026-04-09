@@ -253,27 +253,40 @@ export function HomeHeader() {
             </button>
           )}
           <form onSubmit={handleSearch} className="flex-1 min-w-0 flex items-center gap-2">
-            <div className="flex-1 min-w-0 flex rounded-lg border border-white/10 bg-white/5 overflow-hidden">
+            <div className="flex-1 min-w-0 flex items-center gap-2 rounded-full border border-[#00ffa3]/50 bg-[#00ffa3]/[0.08] px-3.5 py-2 shadow-[0_0_20px_rgba(0,255,163,0.15),inset_0_0_12px_rgba(0,255,163,0.04)]">
+              <svg
+                className="h-4 w-4 shrink-0 text-[#00ffa3]"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-4.35-4.35M16 10.5A5.5 5.5 0 115 10.5a5.5 5.5 0 0111 0z"
+                />
+              </svg>
               <input
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search for anything"
-                className="flex-1 min-w-0 bg-transparent border-0 py-2.5 px-3 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-0 text-sm"
+                placeholder="Search Hashpop..."
+                className="flex-1 min-w-0 bg-transparent text-sm text-white placeholder:text-[#00ffa3]/40 focus:outline-none"
               />
-              <span className="hidden sm:flex items-center pr-2 text-silver" aria-hidden>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-                  />
-                </svg>
-              </span>
-              <select className="hidden md:block bg-white/5 border-l border-white/10 text-silver text-sm py-2.5 pl-3 pr-8 focus:outline-none cursor-pointer">
-                <option>All Categories</option>
-              </select>
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="shrink-0 text-[#00ffa3]/50 hover:text-[#00ffa3] transition-colors"
+                  aria-label="Clear search"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
             </div>
             <button type="submit" className="btn-frost-cta text-sm py-2.5 px-4 shrink-0">
               Search
