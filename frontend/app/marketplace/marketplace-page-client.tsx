@@ -149,8 +149,9 @@ export default function MarketplacePageClient({
     if (query) {
       const fuse = new Fuse(categoryMatched, {
         includeScore: true,
-        threshold: 0.38,
+        threshold: 0.2,
         ignoreLocation: true,
+        minMatchCharLength: 2,
         keys: [
           { name: "title", weight: 0.5 },
           { name: "subtitle", weight: 0.15 },
