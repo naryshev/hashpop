@@ -4,7 +4,7 @@ import { AlertCircle, CheckCircle, Clock, Info, MinusCircle, XCircle } from "luc
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
-export type StatusType = "success" | "error" | "warning" | "info" | "pending" | "default";
+type StatusType = "success" | "error" | "warning" | "info" | "pending" | "default";
 
 interface StatusConfig {
   icon: React.ElementType;
@@ -51,7 +51,7 @@ const STATUS_MAP: Record<StatusType, StatusConfig> = {
   },
 };
 
-export interface StatusBadgeProps {
+interface StatusBadgeProps {
   children: React.ReactNode;
   status: StatusType;
   className?: string;
@@ -83,4 +83,3 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
   );
 };
 
-export default StatusBadge;

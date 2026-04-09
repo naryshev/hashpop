@@ -4,7 +4,7 @@ const MAX_SIZE_MB = 1.8;
 const MAX_WIDTH_OR_HEIGHT = 1920;
 const DEFAULT_QUALITY = 0.85;
 
-export interface CompressOptions {
+interface CompressOptions {
   maxSizeMB?: number;
   maxWidthOrHeight?: number;
   initialQuality?: number;

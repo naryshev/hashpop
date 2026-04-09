@@ -54,7 +54,3 @@ export async function saveUpload(
   const base = baseUrl.replace(/\/$/, "");
   return `${base}/uploads/${filename}`;
 }
-
-export function isS3Configured(): boolean {
-  return useS3;
-}

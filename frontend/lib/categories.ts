@@ -1,7 +1,7 @@
 import Fuse from "fuse.js";
 
 /** Canonical listing categories used across header filters and create form. */
-export const LISTING_CATEGORIES: string[] = [
+const LISTING_CATEGORIES: string[] = [
   // Electronics
   "Smartphones & Phones",
   "Laptops",

@@ -1,6 +1,6 @@
 import { defineChain } from "viem";
 
-export const hederaTestnet = defineChain({
+const hederaTestnet = defineChain({
   id: 296,
   name: "Hedera Testnet",
   nativeCurrency: { name: "HBAR", symbol: "HBAR", decimals: 18 },
@@ -13,7 +13,7 @@ export const hederaTestnet = defineChain({
   },
 });
 
-export const hederaMainnet = defineChain({
+const hederaMainnet = defineChain({
   id: 295,
   name: "Hedera Mainnet",
   nativeCurrency: { name: "HBAR", symbol: "HBAR", decimals: 18 },
