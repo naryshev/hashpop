@@ -20,6 +20,7 @@ type UseCreateListingOptions = {
   categoryRef?: React.MutableRefObject<string | null>;
   conditionRef?: React.MutableRefObject<string | null>;
   yearOfProductionRef?: React.MutableRefObject<string | null>;
+  locationRef?: React.MutableRefObject<string | null>;
 };
 
 export function useCreateListing(options?: UseCreateListingOptions) {
@@ -33,6 +34,7 @@ export function useCreateListing(options?: UseCreateListingOptions) {
     categoryRef,
     conditionRef,
     yearOfProductionRef,
+    locationRef,
   } = options || {};
   const { send, isPending, error, lastHash } = useRobustContractWrite();
   const { address } = useHashpackWallet();
@@ -71,6 +73,7 @@ export function useCreateListing(options?: UseCreateListingOptions) {
     const category = categoryRef?.current ?? undefined;
     const condition = conditionRef?.current ?? undefined;
     const yearOfProduction = yearOfProductionRef?.current ?? undefined;
+    const location = locationRef?.current ?? undefined;
     const syncRes = await fetch(`${getApiUrl()}/api/sync-listing`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -88,6 +91,7 @@ export function useCreateListing(options?: UseCreateListingOptions) {
         ...(category && { category }),
         ...(condition && { condition }),
         ...(yearOfProduction && { yearOfProduction }),
+        ...(location && { location }),
       }),
     }).catch(() => null);
     if (!syncRes?.ok) {

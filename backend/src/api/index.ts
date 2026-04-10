@@ -417,6 +417,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       category,
       condition,
       yearOfProduction,
+      location,
     } = (req.body || {}) as {
       txHash?: string;
       listingId?: string;
@@ -431,6 +432,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       category?: string;
       condition?: string;
       yearOfProduction?: string;
+      location?: string;
     };
     const fallbackListingId =
       typeof listingId === "string" && listingId.trim()
@@ -461,6 +463,8 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       typeof yearOfProduction === "string" && yearOfProduction.trim()
         ? yearOfProduction.trim()
         : null;
+    const locationStr =
+      typeof location === "string" && location.trim() ? location.trim() : null;
     const requireEscrowBool = !!requireEscrow;
 
     const upsertFallbackListing = async () => {
@@ -484,6 +488,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         ...(categoryStr != null && { category: categoryStr }),
         ...(conditionStr != null && { condition: conditionStr }),
         ...(yearStr != null && { yearOfProduction: yearStr }),
+        ...(locationStr != null && { location: locationStr }),
       };
       const fallbackCreateData: any = {
         id: fallbackListingId!,
@@ -501,6 +506,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         ...(categoryStr != null && { category: categoryStr }),
         ...(conditionStr != null && { condition: conditionStr }),
         ...(yearStr != null && { yearOfProduction: yearStr }),
+        ...(locationStr != null && { location: locationStr }),
       };
       await prisma.listing.upsert({
         where: { id: fallbackListingId! },
@@ -1280,6 +1286,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         trackingNumber,
         trackingCarrier,
         requireEscrow,
+        location,
       } = (req.body || {}) as {
         title?: string;
         subtitle?: string;
@@ -1293,6 +1300,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         trackingNumber?: string;
         trackingCarrier?: string;
         requireEscrow?: boolean;
+        location?: string;
       };
       const listing = await prisma.listing.findUnique({ where: { id } });
       if (!listing) return res.status(404).json({ error: "Listing not found" });
@@ -1308,6 +1316,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         category?: string | null;
         condition?: string | null;
         yearOfProduction?: string | null;
+        location?: string | null;
         price?: string;
         imageUrl?: string | null;
         mediaUrls?: string[];
@@ -1323,6 +1332,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       if (condition !== undefined) update.condition = condition === "" ? null : condition;
       if (yearOfProduction !== undefined)
         update.yearOfProduction = yearOfProduction === "" ? null : yearOfProduction;
+      if (location !== undefined) update.location = location === "" ? null : location;
       // Intentionally ignore direct price writes here.
       // Listing price must be synced from on-chain events/tx-sync endpoints only.
       if (mediaUrls !== undefined && Array.isArray(mediaUrls)) {

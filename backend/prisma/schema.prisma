@@ -28,6 +28,7 @@ model Listing {
   yearOfProduction   String?
   originalBox        String?
   originalPapers     String?
+  location           String?
   imageUrl           String?
   mediaUrls          String[] @default([])
   createdAt          DateTime @default(now())

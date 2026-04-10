@@ -324,23 +324,23 @@ export default function DashboardPage() {
           ) : (
             <>
               {/* Stats */}
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="glass-card p-4 rounded-xl">
-                  <p className="text-sm text-silver">Sales</p>
-                  <p className="text-2xl font-semibold text-white mt-1">{stats?.totalSales ?? 0}</p>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="glass-card p-3 sm:p-4 rounded-xl">
+                  <p className="text-xs sm:text-sm text-silver">Sales</p>
+                  <p className="text-xl sm:text-2xl font-semibold text-white mt-1">{stats?.totalSales ?? 0}</p>
                 </div>
-                <div className="glass-card p-4 rounded-xl">
-                  <p className="text-sm text-silver">Listings</p>
-                  <p className="text-2xl font-semibold text-white mt-1">
+                <div className="glass-card p-3 sm:p-4 rounded-xl">
+                  <p className="text-xs sm:text-sm text-silver">Listings</p>
+                  <p className="text-xl sm:text-2xl font-semibold text-white mt-1">
                     {stats?.activeListings ?? 0}
                   </p>
                 </div>
-                <div className="glass-card p-4 rounded-xl">
-                  <p className="text-sm text-silver">Purchases</p>
-                  <p className="text-2xl font-semibold text-white mt-1">{purchaseCount}</p>
+                <div className="glass-card p-3 sm:p-4 rounded-xl">
+                  <p className="text-xs sm:text-sm text-silver">Purchases</p>
+                  <p className="text-xl sm:text-2xl font-semibold text-white mt-1">{purchaseCount}</p>
                   <Link
                     href="/purchases"
-                    className="text-xs text-chrome hover:text-white mt-1 inline-block"
+                    className="text-[10px] sm:text-xs text-chrome hover:text-white mt-1 inline-block"
                   >
                     View history
                   </Link>

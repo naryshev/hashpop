@@ -15,6 +15,7 @@ export default function SellingPage() {
   const usdRate = useHbarUsd();
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<any[]>([]);
+  const [wishlistCounts, setWishlistCounts] = useState<Record<string, number>>({});
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string; onChainConfirmed: boolean } | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -31,10 +32,17 @@ export default function SellingPage() {
 
   const fetchListings = useCallback(() => {
     if (!address) return;
-    fetch(`${getApiUrl()}/api/user/${address}/listings`)
-      .then((res) => (res.ok ? res.json() : Promise.reject()))
-      .then((data: { active?: any[] }) => {
-        setActive(data.active ?? []);
+    Promise.all([
+      fetch(`${getApiUrl()}/api/user/${address}/listings`).then((res) =>
+        res.ok ? res.json() : Promise.reject(),
+      ),
+      fetch(`${getApiUrl()}/api/wishlist/counts`).then((res) =>
+        res.ok ? res.json() : { counts: {} },
+      ),
+    ])
+      .then(([listingData, countData]: [{ active?: any[] }, { counts?: Record<string, number> }]) => {
+        setActive(listingData.active ?? []);
+        setWishlistCounts(countData.counts ?? {});
       })
       .catch(() => {
         setActive([]);
@@ -263,9 +271,19 @@ export default function SellingPage() {
                           >
                             {row.title || row.id}
                           </Link>
-                          <p className="text-chrome font-semibold text-sm mt-1">
-                            {formatHbarWithUsd(formatPriceForDisplay(row.price || "0"), usdRate)}
-                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <p className="text-chrome font-semibold text-sm">
+                              {formatHbarWithUsd(formatPriceForDisplay(row.price || "0"), usdRate)}
+                            </p>
+                            {(wishlistCounts[row.id] ?? 0) > 0 && (
+                              <span className="text-[10px] text-silver/50 flex items-center gap-0.5">
+                                ♡ {wishlistCounts[row.id]}
+                              </span>
+                            )}
+                          </div>
+                          {row.location && (
+                            <p className="text-xs text-silver/50 mt-0.5 truncate">📍 {row.location}</p>
+                          )}
                           <p className="text-silver/50 text-xs">{formatListingDate(row.createdAt)}</p>
 
                           {/* Actions */}

@@ -99,6 +99,7 @@ export type ListingItem = {
   description?: string | null;
   category?: string | null;
   condition?: string | null;
+  location?: string | null;
   watchlistCount?: number;
   seller?: string;
   imageUrl?: string | null;
@@ -486,6 +487,11 @@ export default function MarketplacePageClient({
                         </span>
                       )}
                     </div>
+                    {item.location && (
+                      <p className="text-[10px] text-silver/50 mt-1 truncate">
+                        📍 {item.location}
+                      </p>
+                    )}
                   </div>
                 </Link>
               ))}
@@ -537,6 +543,11 @@ export default function MarketplacePageClient({
                         </span>
                       )}
                     </div>
+                    {item.location && (
+                      <p className="text-xs text-silver/50 mt-1 truncate">
+                        📍 {item.location}
+                      </p>
+                    )}
                   </div>
                 </Link>
               ))}
