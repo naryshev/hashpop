@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
+import { ConnectWalletButton } from "../../components/ConnectWalletButton";
 import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { formatPriceForDisplay } from "../../lib/formatPrice";
@@ -143,7 +144,10 @@ export default function PurchasesPage() {
 
         <div className="space-y-6">
           {!address ? (
-            <p className="text-silver">Connect your wallet to view transaction history.</p>
+            <div className="flex flex-col items-start gap-3">
+              <p className="text-silver">Connect your wallet to view transaction history.</p>
+              <ConnectWalletButton className="btn-frost-cta disabled:opacity-50" />
+            </div>
           ) : loading ? (
             <p className="text-silver">Loading…</p>
           ) : (

@@ -8,6 +8,7 @@ import { getApiUrl } from "../../lib/apiUrl";
 import { useEncryptionKey } from "../../lib/useEncryptionKey";
 import { encryptMessage, decryptMessage } from "../../lib/chatEncryption";
 import { formatPriceForDisplay } from "../../lib/formatPrice";
+import { ConnectWalletButton } from "../../components/ConnectWalletButton";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -337,7 +338,10 @@ function MessagesPageContent() {
       <div className="max-w-5xl mx-auto px-0 sm:px-4 sm:px-6 py-0 sm:py-6">
 
         {!address ? (
-          <div className="px-4 py-8 text-silver">Connect your wallet to view messages.</div>
+          <div className="px-4 py-8 flex flex-col items-start gap-3">
+            <p className="text-silver">Connect your wallet to view messages.</p>
+            <ConnectWalletButton className="btn-frost-cta disabled:opacity-50" />
+          </div>
         ) : (
           <div className="glass-card overflow-hidden flex h-[calc(100vh-80px)] sm:h-[calc(100vh-120px)] sm:rounded-xl">
 

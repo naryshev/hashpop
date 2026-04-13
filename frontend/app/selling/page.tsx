@@ -9,6 +9,7 @@ import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { formatListingDate } from "../../lib/formatDate";
 import { useCancelListing } from "../../hooks/useCancelListing";
+import { ConnectWalletButton } from "../../components/ConnectWalletButton";
 
 export default function SellingPage() {
   const { address } = useHashpackWallet();
@@ -208,7 +209,10 @@ export default function SellingPage() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         <h1 className="text-xl sm:text-2xl font-bold text-white">Selling</h1>
         {!address ? (
-          <p className="text-silver">Connect your wallet to view your listings.</p>
+          <div className="flex flex-col items-start gap-3">
+            <p className="text-silver">Connect your wallet to view your listings.</p>
+            <ConnectWalletButton className="btn-frost-cta disabled:opacity-50" />
+          </div>
         ) : loading ? (
           <p className="text-silver">Loading…</p>
         ) : (

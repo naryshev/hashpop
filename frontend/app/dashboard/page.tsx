@@ -9,6 +9,7 @@ import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { formatListingDate } from "../../lib/formatDate";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
 import { getApiUrl } from "../../lib/apiUrl";
+import { ConnectWalletButton } from "../../components/ConnectWalletButton";
 
 function formatListingId(id: string): string {
   if (!id || !id.startsWith("0x") || id.length !== 66) return id;
@@ -320,7 +321,10 @@ export default function DashboardPage() {
           {!mounted ? (
             <p className="text-silver">Loading…</p>
           ) : !address ? (
-            <p className="text-silver">Please connect your wallet to see your dashboard.</p>
+            <div className="flex flex-col items-start gap-3">
+              <p className="text-silver">Connect your wallet to see your dashboard.</p>
+              <ConnectWalletButton className="btn-frost-cta disabled:opacity-50" />
+            </div>
           ) : (
             <>
               {/* Stats */}
