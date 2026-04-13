@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useUnreadCount } from "../hooks/useUnreadCount";
 
 const links = [
   { href: "/messages", label: "Alerts", icon: "bell" },
@@ -97,6 +98,7 @@ export function BottomNav({
   const pathname = usePathname();
   const router = useRouter();
   const navLinks = signInMode ? signInLinks : links;
+  const unreadCount = useUnreadCount();
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -186,11 +188,18 @@ export function BottomNav({
             <Link
               key={href}
               href={href}
-              className={`flex flex-col items-center justify-center gap-0.5 py-2 px-1 transition-colors ${
+              className={`flex flex-col items-center justify-center gap-0.5 py-2 px-1 transition-colors relative ${
                 isActive ? "text-chrome" : "text-silver hover:text-white"
               }`}
             >
-              <Icon name={icon} />
+              <span className="relative inline-flex">
+                <Icon name={icon} />
+                {icon === "bell" && unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#00ffa3] text-black text-[9px] font-bold flex items-center justify-center">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
+              </span>
               <span className="text-[11px] font-medium">{label}</span>
             </Link>
           );

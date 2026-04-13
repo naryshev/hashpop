@@ -113,14 +113,22 @@ model Rating {
 }
 
 model Message {
-  id          String   @id @default(cuid())
-  fromAddress String
-  toAddress   String
-  body        String
-  listingId   String?
-  encrypted   Boolean  @default(false)
-  nonce       String?  // base64 nonce used in NaCl box
-  createdAt   DateTime @default(now())
+  id           String   @id @default(cuid())
+  fromAddress  String
+  toAddress    String
+  body         String
+  listingId    String?
+  encrypted    Boolean  @default(false)
+  nonce        String?  // base64 nonce used in NaCl box
+  type         String   @default("message") // "message" | "offer"
+  offerAmount  String?  // HBAR amount string for offer type
+  offerStatus  String?  // "pending" | "accepted" | "declined" | "countered"
+  read         Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  @@index([fromAddress])
+  @@index([toAddress])
+  @@index([listingId])
 }
 
 model WishlistItem {

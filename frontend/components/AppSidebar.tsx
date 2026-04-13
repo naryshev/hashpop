@@ -17,6 +17,7 @@ import {
 import { Sidebar, SidebarBody, SidebarLink } from "./ui/sidebar";
 import { cn } from "../lib/utils";
 import { useHashpackWallet } from "../lib/hashpackWallet";
+import { useUnreadCount } from "../hooks/useUnreadCount";
 
 type NavLink = {
   label: string;
@@ -33,6 +34,7 @@ export function AppSidebar({
 }) {
   const pathname = usePathname();
   const { isConnected, accountId, disconnect } = useHashpackWallet();
+  const unreadCount = useUnreadCount();
   const [openState, setOpenState] = useState(false);
   const open = openProp !== undefined ? openProp : openState;
   const setOpen = setOpenProp !== undefined ? setOpenProp : setOpenState;
@@ -61,7 +63,16 @@ export function AppSidebar({
       {
         label: "Messages",
         href: "/messages",
-        icon: <MessageSquare className="h-5 w-5 flex-shrink-0" />,
+        icon: (
+          <span className="relative inline-flex shrink-0">
+            <MessageSquare className="h-5 w-5 flex-shrink-0" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-[#00ffa3] text-black text-[9px] font-bold flex items-center justify-center">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </span>
+        ),
       },
       { label: "Support", href: "/support", icon: <LifeBuoy className="h-5 w-5 flex-shrink-0" /> },
     ],

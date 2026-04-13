@@ -1295,22 +1295,10 @@ export default function ListingPage() {
                       `/messages?openThread=${encodeURIComponent(item.seller)}&listingId=${encodeURIComponent(id)}`,
                     );
                   }}
-                  onMakeOffer={async () => {
+                  onMakeOffer={() => {
                     if (!walletConnected || !address || !item?.seller) return;
-                    try {
-                      await fetch(`${getApiUrl()}/api/messages`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          fromAddress: address,
-                          toAddress: item.seller,
-                          body: "I'd like to make an offer on this listing.",
-                          listingId: id,
-                        }),
-                      });
-                    } catch {}
                     router.push(
-                      `/messages?openThread=${encodeURIComponent(item.seller)}&listingId=${encodeURIComponent(id)}`,
+                      `/messages?openThread=${encodeURIComponent(item.seller)}&listingId=${encodeURIComponent(id)}&showOffer=1`,
                     );
                   }}
                 />

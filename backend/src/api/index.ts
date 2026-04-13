@@ -1732,13 +1732,15 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
 
   router.post("/messages", async (req, res) => {
     try {
-      const { fromAddress, toAddress, body, listingId, encrypted, nonce } = (req.body || {}) as {
+      const { fromAddress, toAddress, body, listingId, encrypted, nonce, type, offerAmount } = (req.body || {}) as {
         fromAddress?: string;
         toAddress?: string;
         body?: string;
         listingId?: string;
         encrypted?: boolean;
         nonce?: string;
+        type?: string;
+        offerAmount?: string;
       };
       const from = fromAddress?.trim().toLowerCase();
       const to = toAddress?.trim().toLowerCase();
@@ -1747,6 +1749,8 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         return res.status(400).json({ error: "fromAddress and toAddress required" });
       if (!text) return res.status(400).json({ error: "body required" });
       if (from === to) return res.status(400).json({ error: "Cannot message yourself" });
+
+      const msgType = type === "offer" ? "offer" : "message";
 
       const listingInput = typeof listingId === "string" ? listingId.trim() : "";
       let normalizedListingId: string | null = null;
@@ -1768,11 +1772,93 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           listingId: normalizedListingId,
           encrypted: encrypted === true,
           nonce: encrypted === true && nonce ? nonce : null,
+          type: msgType,
+          offerAmount: msgType === "offer" && offerAmount ? String(offerAmount) : null,
+          offerStatus: msgType === "offer" ? "pending" : null,
         },
       });
       res.status(201).json({ message: msg });
     } catch (err) {
       log.error({ err }, "Failed to create message");
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Mark messages in a thread as read
+  router.post("/messages/mark-read", async (req, res) => {
+    try {
+      const { address, other, listingId } = (req.body || {}) as {
+        address?: string;
+        other?: string;
+        listingId?: string;
+      };
+      const addr = address?.trim().toLowerCase();
+      const otherAddr = other?.trim().toLowerCase();
+      if (!addr || !otherAddr) return res.status(400).json({ error: "address and other required" });
+
+      const listingInput = typeof listingId === "string" ? listingId.trim() : "";
+      let normalizedListingId: string | null = null;
+      if (listingInput) {
+        normalizedListingId =
+          listingInput.startsWith("0x") && listingInput.length === 66
+            ? normalizeListingId(listingInput)
+            : listingIdToBytes32(listingInput);
+      }
+
+      await prisma.message.updateMany({
+        where: {
+          fromAddress: otherAddr,
+          toAddress: addr,
+          listingId: normalizedListingId,
+          read: false,
+        },
+        data: { read: true },
+      });
+      res.json({ ok: true });
+    } catch (err) {
+      log.error({ err }, "Failed to mark messages as read");
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Respond to an offer (accept or decline)
+  router.post("/messages/:id/offer-response", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { address, action } = (req.body || {}) as { address?: string; action?: string };
+      const addr = address?.trim().toLowerCase();
+      if (!addr) return res.status(400).json({ error: "address required" });
+      if (action !== "accepted" && action !== "declined")
+        return res.status(400).json({ error: "action must be accepted or declined" });
+
+      const msg = await prisma.message.findUnique({ where: { id } });
+      if (!msg) return res.status(404).json({ error: "Message not found" });
+      if (msg.type !== "offer") return res.status(400).json({ error: "Not an offer message" });
+      if (msg.toAddress !== addr) return res.status(403).json({ error: "Forbidden" });
+      if (msg.offerStatus !== "pending") return res.status(400).json({ error: "Offer already resolved" });
+
+      const updated = await prisma.message.update({
+        where: { id },
+        data: { offerStatus: action },
+      });
+      res.json({ message: updated });
+    } catch (err) {
+      log.error({ err }, "Failed to respond to offer");
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Unread message count
+  router.get("/messages/unread-count", async (req, res) => {
+    try {
+      const address = (req.query.address as string)?.trim()?.toLowerCase();
+      if (!address) return res.status(400).json({ error: "address required" });
+      const count = await prisma.message.count({
+        where: { toAddress: address, read: false },
+      });
+      res.json({ count });
+    } catch (err) {
+      log.error({ err }, "Failed to fetch unread count");
       res.status(500).json({ error: "Internal server error" });
     }
   });
@@ -1787,24 +1873,56 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         },
         orderBy: { createdAt: "desc" },
       });
-      const seen = new Map<string, { last: (typeof messages)[0]; preview: string }>();
+
+      // Collect unique listing IDs for metadata fetch
+      const listingIds = [...new Set(messages.map((m) => m.listingId).filter(Boolean) as string[])];
+      const listings = listingIds.length
+        ? await prisma.listing.findMany({
+            where: { id: { in: listingIds } },
+            select: { id: true, title: true, imageUrl: true, price: true, mediaUrls: true },
+          })
+        : [];
+      const listingMap = new Map(listings.map((l) => [l.id, l]));
+
+      const seen = new Map<string, { last: (typeof messages)[0]; preview: string; unreadCount: number }>();
       for (const m of messages) {
         const other = m.fromAddress === address ? m.toAddress : m.fromAddress;
         const key = `${other}-${m.listingId ?? ""}`;
         if (!seen.has(key)) {
-          const preview = m.encrypted ? "[Encrypted message]" : m.body.slice(0, 80);
-          seen.set(key, { last: m, preview });
+          let preview: string;
+          if (m.type === "offer") {
+            preview = `Offer: ${m.offerAmount} HBAR`;
+          } else if (m.encrypted) {
+            preview = "[Encrypted message]";
+          } else {
+            preview = m.body.slice(0, 80);
+          }
+          seen.set(key, { last: m, preview, unreadCount: 0 });
+        }
+        // Count unread messages sent to this user
+        if (m.toAddress === address && !m.read) {
+          const entry = seen.get(key)!;
+          entry.unreadCount += 1;
         }
       }
       const conversations = Array.from(seen.entries()).map(([key, v]) => {
         const dash = key.indexOf("-");
         const otherAddress = dash >= 0 ? key.slice(0, dash) : key;
         const listingId = dash >= 0 ? key.slice(dash + 1) || null : null;
+        const listing = listingId ? listingMap.get(listingId) : null;
         return {
           otherAddress,
           listingId,
           lastMessage: v.last,
           preview: v.preview,
+          unreadCount: v.unreadCount,
+          listing: listing
+            ? {
+                title: listing.title,
+                imageUrl: listing.imageUrl || (listing.mediaUrls?.[0] ?? null),
+                price: listing.price,
+              }
+            : null,
         };
       });
       const sorted = conversations.sort(
@@ -1845,11 +1963,19 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         where.listingId = null;
       }
 
+      // Fetch listing metadata if applicable
+      const listing = listingId
+        ? await prisma.listing.findUnique({
+            where: { id: listingId },
+            select: { id: true, title: true, imageUrl: true, price: true, mediaUrls: true, seller: true, status: true },
+          })
+        : null;
+
       const messages = await prisma.message.findMany({
         where,
         orderBy: { createdAt: "asc" },
       });
-      res.json({ messages });
+      res.json({ messages, listing });
     } catch (err) {
       log.error({ err }, "Failed to fetch thread");
       res.status(500).json({ error: "Internal server error" });
