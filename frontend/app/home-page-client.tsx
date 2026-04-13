@@ -8,6 +8,7 @@ import { formatHbarWithUsd } from "../lib/hbarUsd";
 import { useHbarUsd } from "../hooks/useHbarUsd";
 import { CardStack, type CardStackItem } from "../components/ui/card-stack";
 import { Sparkles } from "lucide-react";
+import { AddressDisplay } from "../components/AddressDisplay";
 
 function formatListingId(id: string): string {
   if (!id || !id.startsWith("0x") || id.length !== 66) return id;
@@ -88,29 +89,6 @@ type HomeStackItem = CardStackItem & {
   priceLabel?: string;
 };
 
-function formatSellerLabel(seller?: string): string {
-  if (!seller) return "by 0.0.xxxx";
-  const trimmed = seller.trim();
-  const accountMatch = /^(\d+)\.(\d+)\.(\d+)$/.exec(trimmed);
-  if (accountMatch) {
-    return `by ${accountMatch[1]}.${accountMatch[2]}.${accountMatch[3]}`;
-  }
-  if (/^0x[0-9a-fA-F]+$/.test(trimmed)) {
-    const hex = trimmed.slice(2);
-    if (hex.length === 40) {
-      const shard = BigInt(`0x${hex.slice(0, 8)}`);
-      const realm = BigInt(`0x${hex.slice(8, 24)}`);
-      const num = BigInt(`0x${hex.slice(24, 40)}`);
-      if (shard === 0n && realm === 0n) {
-        return `by ${shard.toString()}.${realm.toString()}.${num.toString()}`;
-      }
-      return `by ${trimmed.slice(0, 8)}…${trimmed.slice(-4)}`;
-    }
-    const accountNum = BigInt(`0x${hex}`);
-    return `by 0.0.${accountNum.toString()}`;
-  }
-  return `by ${trimmed}`;
-}
 
 export default function HomePageClient({
   initialListings,
@@ -163,7 +141,6 @@ export default function HomePageClient({
       return {
         id: item.id,
         title: item.title || formatListingId(item.id) || "Untitled",
-        description: formatSellerLabel(item.seller),
         href: `/listing/${encodeURIComponent(item.id)}`,
         listing: item,
         statusLabel: badge.label,
@@ -266,9 +243,11 @@ export default function HomePageClient({
                           <h2 className="line-clamp-2 text-base font-bold text-white sm:text-lg">
                             {item.title}
                           </h2>
-                          <p className="mt-1 line-clamp-2 text-xs text-white/85">
-                            {item.description}
-                          </p>
+                          {item.listing?.seller && (
+                            <p className="mt-1 text-xs text-white/75">
+                              by <AddressDisplay address={item.listing.seller} className="font-mono" />
+                            </p>
+                          )}
                           {item.priceLabel ? (
                             <p className="mt-2 inline-flex items-center gap-1 rounded-full border border-cyan-300/30 bg-cyan-400/10 px-2.5 py-1 text-xs font-semibold text-cyan-100">
                               <Sparkles className="h-3 w-3" />
@@ -293,9 +272,14 @@ export default function HomePageClient({
               {listingsError} Ensure backend and database are running.
             </p>
           ) : null}
-          <p className="mt-2 text-center text-[10px] text-white/30 select-none">
-            Hashpop &copy; {new Date().getFullYear()}
-          </p>
+          <div className="mt-2 space-y-1 text-center select-none">
+            <p className="text-[9px] text-white/25 leading-relaxed max-w-sm mx-auto px-2">
+              Hashpop is a peer-to-peer marketplace. Transactions are settled on the Hedera network and are irreversible. Hashpop does not hold funds, guarantee item authenticity, or mediate disputes. Use at your own risk.
+            </p>
+            <p className="text-[10px] text-white/30">
+              Hashpop &copy; {new Date().getFullYear()}
+            </p>
+          </div>
         </div>
       </section>
     </main>
