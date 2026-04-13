@@ -333,9 +333,12 @@ function MessagesPageContent() {
     ), [conversations]);
 
   // ── Render ──────────────────────────────────────────────────────────────────
+  // On mobile the BottomNav is fixed at top with pt-14 (3.5rem = 56px) offset applied
+  // to the content wrapper. Use 100dvh minus that offset so the chat panel fills
+  // exactly the visible viewport without relying on the broken flex-1 chain.
   return (
-    <main className="min-h-screen">
-      <div className="max-w-5xl mx-auto px-0 sm:px-4 sm:px-6 py-0 sm:py-6">
+    <main className="flex flex-col overflow-hidden h-[calc(100dvh-3.5rem)] md:h-auto md:flex-1">
+      <div className="flex-1 min-h-0 w-full max-w-5xl mx-auto sm:px-6 sm:py-6 flex flex-col">
 
         {!address ? (
           <div className="px-4 py-8 flex flex-col items-start gap-3">
@@ -343,7 +346,7 @@ function MessagesPageContent() {
             <ConnectWalletButton className="btn-frost-cta disabled:opacity-50" />
           </div>
         ) : (
-          <div className="glass-card overflow-hidden flex h-[calc(100vh-80px)] sm:h-[calc(100vh-120px)] sm:rounded-xl">
+          <div className="glass-card overflow-hidden flex flex-1 min-h-0 sm:rounded-xl">
 
             {/* ── Inbox sidebar ─────────────────────────────────────── */}
             <div className={`${mobileView === "thread" ? "hidden md:flex" : "flex"} md:flex flex-col w-full md:w-80 shrink-0 border-r border-white/10`}>
@@ -540,8 +543,8 @@ function MessagesPageContent() {
                   <div ref={messagesEndRef} />
                 </div>
 
-                {/* Input area */}
-                <div className="px-4 py-3 border-t border-white/10 space-y-2">
+                {/* Input area — pb accounts for iOS home-indicator safe area */}
+                <div className="px-4 py-3 border-t border-white/10 space-y-2" style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}>
                   {showOfferInput ? (
                     <div className="flex gap-2 items-center">
                       <div className="flex-1 flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-3 py-2">
