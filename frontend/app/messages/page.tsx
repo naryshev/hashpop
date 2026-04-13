@@ -9,6 +9,7 @@ import { useEncryptionKey } from "../../lib/useEncryptionKey";
 import { encryptMessage, decryptMessage } from "../../lib/chatEncryption";
 import { formatPriceForDisplay } from "../../lib/formatPrice";
 import { ConnectWalletButton } from "../../components/ConnectWalletButton";
+import { AddressDisplay } from "../../components/AddressDisplay";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -73,10 +74,6 @@ function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-function shortAddr(addr: string): string {
-  if (!addr) return "";
-  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
-}
 
 function LockIcon() {
   return (
@@ -381,14 +378,14 @@ function MessagesPageContent() {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between gap-1">
                                 <span className={`text-sm font-semibold truncate ${hasUnread ? "text-white" : "text-silver"}`}>
-                                  {c.listing?.title ?? shortAddr(c.otherAddress)}
+                                  {c.listing?.title ?? <AddressDisplay address={c.otherAddress} />}
                                 </span>
                                 <span className="text-[10px] text-silver/60 shrink-0">
                                   {relativeTime(c.lastMessage.createdAt)}
                                 </span>
                               </div>
                               {c.listing?.title && (
-                                <p className="text-[10px] text-silver/50 truncate">{shortAddr(c.otherAddress)}</p>
+                                <p className="text-[10px] text-silver/50 truncate"><AddressDisplay address={c.otherAddress} /></p>
                               )}
                               <div className="flex items-center justify-between gap-1 mt-0.5">
                                 <p className={`text-xs truncate ${hasUnread ? "text-white/80" : "text-silver/60"}`}>
@@ -436,10 +433,10 @@ function MessagesPageContent() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-white truncate">
-                          {threadListing.title ?? shortAddr(selectedThread.other)}
+                          {threadListing.title ?? <AddressDisplay address={selectedThread.other} />}
                         </p>
                         <p className="text-xs text-silver/60">
-                          {formatPriceForDisplay(threadListing.price)} HBAR · {shortAddr(selectedThread.other)}
+                          {formatPriceForDisplay(threadListing.price)} HBAR · <AddressDisplay address={selectedThread.other} />
                         </p>
                       </div>
                       <Link
@@ -450,7 +447,7 @@ function MessagesPageContent() {
                       </Link>
                     </>
                   ) : (
-                    <p className="text-sm font-semibold text-white">{shortAddr(selectedThread.other)}</p>
+                    <p className="text-sm font-semibold text-white"><AddressDisplay address={selectedThread.other} /></p>
                   )}
                 </div>
 

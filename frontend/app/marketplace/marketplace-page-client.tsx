@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { AddressDisplay } from "../../components/AddressDisplay";
 import Fuse from "fuse.js";
 import { ListingMedia } from "../../components/ListingMedia";
 import { WishlistButton } from "../../components/WishlistButton";
@@ -69,13 +70,6 @@ function getStatusBadge(
   };
 }
 
-function formatSellerDisplay(seller?: string): string {
-  if (!seller) return "";
-  if (/^\d+\.\d+\.\d+$/.test(seller)) return seller;
-  if (seller.startsWith("0x") && seller.length > 12)
-    return `${seller.slice(0, 6)}…${seller.slice(-4)}`;
-  return seller;
-}
 
 function parsePostedWithinDays(value: string): number | null {
   if (!value) return null;
@@ -474,7 +468,7 @@ export default function MarketplacePageClient({
                     </h2>
                     {item.seller && (
                       <p className="text-silver/50 text-[10px] mt-1 font-mono truncate">
-                        {formatSellerDisplay(item.seller)}
+                        <AddressDisplay address={item.seller} />
                       </p>
                     )}
                     <div className="flex items-center justify-between mt-1.5">
@@ -530,7 +524,7 @@ export default function MarketplacePageClient({
                     </h2>
                     {item.seller && (
                       <p className="text-silver/50 text-[11px] mt-1 font-mono truncate">
-                        {formatSellerDisplay(item.seller)}
+                        <AddressDisplay address={item.seller} />
                       </p>
                     )}
                     <div className="flex items-center justify-between mt-2">
