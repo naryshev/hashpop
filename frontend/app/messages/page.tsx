@@ -453,6 +453,33 @@ function MessagesPageContent() {
 
                 {/* Messages */}
                 <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+                  {/* Pinned listing card at top of thread */}
+                  {threadListing && (
+                    <Link
+                      href={`/listing/${encodeURIComponent(selectedThread.listingId)}`}
+                      className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 hover:bg-white/10 transition-colors mb-2"
+                    >
+                      {threadListing.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={threadListing.imageUrl}
+                          alt={threadListing.title ?? ""}
+                          className="h-14 w-14 shrink-0 rounded-xl object-cover"
+                        />
+                      ) : (
+                        <div className="h-14 w-14 shrink-0 rounded-xl bg-white/10 flex items-center justify-center">
+                          <svg className="w-6 h-6 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-white truncate">{threadListing.title ?? "Listing"}</p>
+                        <p className="text-xs text-[#00ffa3] font-medium mt-0.5">{formatPriceForDisplay(threadListing.price)} HBAR</p>
+                        <p className="text-[10px] text-silver/50 mt-0.5 uppercase tracking-wide">Tap to view listing</p>
+                      </div>
+                    </Link>
+                  )}
                   {threadLoading && threadMessages.length === 0 ? (
                     <p className="text-silver text-sm">Loading…</p>
                   ) : threadMessages.length === 0 ? (

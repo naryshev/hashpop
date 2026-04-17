@@ -245,7 +245,7 @@ export default function HomePageClient({
                           </h2>
                           {item.listing?.seller && (
                             <p className="mt-1 text-xs text-white/75">
-                              by <AddressDisplay address={item.listing.seller} className="font-mono" />
+                              by <AddressDisplay address={item.listing.seller} className="font-mono" showAvatar />
                             </p>
                           )}
                           {item.priceLabel ? (

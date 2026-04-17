@@ -21,10 +21,9 @@ import { ConnectWalletButton } from "../../components/ConnectWalletButton";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
 
 type Stats = {
-  totalSales?: number;
-  activeListings?: number;
   ratingAverage?: number;
   ratingCount?: number;
+  profileImageUrl?: string | null;
 };
 
 function NavRow({
@@ -75,7 +74,6 @@ export default function DashboardPage() {
   const { address, accountId, disconnect } = useHashpackWallet();
   const [mounted, setMounted] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
-  const [purchaseCount, setPurchaseCount] = useState(0);
   const unreadCount = useUnreadCount();
 
   useEffect(() => setMounted(true), []);
@@ -90,12 +88,6 @@ export default function DashboardPage() {
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => setStats(d))
       .catch(() => setStats(null));
-    fetch(`${getApiUrl()}/api/user/${address}/purchases`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: { purchases?: { role: string }[] } | null) => {
-        setPurchaseCount((d?.purchases ?? []).filter((p) => p.role === "buyer").length);
-      })
-      .catch(() => setPurchaseCount(0));
   }, [address]);
 
   const displayId = accountId || (address ? `${address.slice(0, 6)}…${address.slice(-4)}` : "");
@@ -115,8 +107,19 @@ export default function DashboardPage() {
           <>
             {/* Profile header */}
             <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#00ffa3] text-2xl font-black text-black select-none">
-                {avatarLetter}
+              <div className="relative shrink-0">
+                {stats?.profileImageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={stats.profileImageUrl}
+                    alt="Profile"
+                    className="h-14 w-14 rounded-full object-cover ring-2 ring-[#00ffa3]/30"
+                  />
+                ) : (
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#00ffa3] text-2xl font-black text-black select-none">
+                    {avatarLetter}
+                  </div>
+                )}
               </div>
               <div className="min-w-0">
                 <p className="text-base font-bold text-white truncate">{displayId}</p>
@@ -164,20 +167,6 @@ export default function DashboardPage() {
                   </span>
                   <span className="text-[11px] font-medium text-silver">{label}</span>
                 </Link>
-              ))}
-            </div>
-
-            {/* Stats strip */}
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { label: "Sales", value: stats?.totalSales ?? 0 },
-                { label: "Listings", value: stats?.activeListings ?? 0 },
-                { label: "Purchases", value: purchaseCount },
-              ].map(({ label, value }) => (
-                <div key={label} className="glass-card rounded-xl p-3 text-center">
-                  <p className="text-2xl font-bold text-white">{value}</p>
-                  <p className="text-xs text-silver mt-0.5">{label}</p>
-                </div>
               ))}
             </div>
 

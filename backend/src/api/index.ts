@@ -165,6 +165,12 @@ function imageFilename(originalname: string): string {
   return `listing-${Date.now()}-${Math.random().toString(36).slice(2, 10)}${safe}`;
 }
 
+function avatarFilename(originalname: string): string {
+  const ext = (path.extname(originalname) || ".jpg").toLowerCase().slice(0, 5);
+  const safe = /^\.(jpe?g|png|gif|webp)$/.test(ext) ? ext : ".jpg";
+  return `avatar-${Date.now()}-${Math.random().toString(36).slice(2, 10)}${safe}`;
+}
+
 function mediaFilename(originalname: string): string {
   const ext = (path.extname(originalname) || ".jpg").toLowerCase().slice(0, 8);
   const safe = /^\.(jpe?g|png|gif|webp|mp4|webm|mov)$/.test(ext) ? ext : ".bin";
@@ -2150,6 +2156,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           reputation: 0,
           ratingCount,
           ratingAverage,
+          profileImageUrl: null,
         });
       }
 
@@ -2161,12 +2168,38 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         successful: user.successfulCompletions,
         ratingCount,
         ratingAverage,
+        profileImageUrl: user.profileImageUrl ?? null,
       });
     } catch (err) {
       log.error({ err }, "Failed to fetch user");
       res.status(500).json({ error: "Internal server error" });
     }
   });
+
+  // Upload / update profile avatar
+  router.post(
+    "/user/upload-avatar",
+    multer({ storage: memoryStorage, limits: { fileSize: 2 * 1024 * 1024 } }).single("avatar"),
+    async (req, res) => {
+      try {
+        const address = (req.body?.address as string | undefined)?.trim().toLowerCase();
+        if (!address) return res.status(400).json({ error: "address required" });
+        if (!req.file) return res.status(400).json({ error: "avatar file required" });
+        const filename = avatarFilename(req.file.originalname);
+        const baseUrl = `${req.protocol}://${req.get("host")}`;
+        const url = await saveUpload(req.file.buffer, filename, req.file.mimetype, baseUrl, uploadsDir);
+        await prisma.user.upsert({
+          where: { address },
+          update: { profileImageUrl: url },
+          create: { id: address, address, profileImageUrl: url, reputationScore: 0 },
+        });
+        res.json({ profileImageUrl: url });
+      } catch (err) {
+        log.error({ err }, "Failed to upload avatar");
+        res.status(500).json({ error: "Internal server error" });
+      }
+    },
+  );
 
   router.get("/debug/mirror-logs", async (req, res) => {
     const marketplaceAddress = process.env.MARKETPLACE_ADDRESS;

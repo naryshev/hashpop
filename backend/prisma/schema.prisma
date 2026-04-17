@@ -87,6 +87,7 @@ model User {
   id                String   @id
   address           String   @unique
   publicKey         String?  // X25519 public key (base64), registered on first message send
+  profileImageUrl   String?  // User avatar/profile picture URL
   totalSales        Int      @default(0)
   successfulCompletions Int @default(0)
   refunds           Int      @default(0)

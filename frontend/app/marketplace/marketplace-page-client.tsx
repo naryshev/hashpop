@@ -468,7 +468,7 @@ export default function MarketplacePageClient({
                     </h2>
                     {item.seller && (
                       <p className="text-silver/50 text-[10px] mt-1 font-mono truncate">
-                        <AddressDisplay address={item.seller} />
+                        <AddressDisplay address={item.seller} showAvatar />
                       </p>
                     )}
                     <div className="flex items-center justify-between mt-1.5">
@@ -524,7 +524,7 @@ export default function MarketplacePageClient({
                     </h2>
                     {item.seller && (
                       <p className="text-silver/50 text-[11px] mt-1 font-mono truncate">
-                        <AddressDisplay address={item.seller} />
+                        <AddressDisplay address={item.seller} showAvatar />
                       </p>
                     )}
                     <div className="flex items-center justify-between mt-2">
