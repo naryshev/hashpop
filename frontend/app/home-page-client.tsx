@@ -190,7 +190,7 @@ export default function HomePageClient({
           <div className="mt-3 flex justify-center">
             <Link
               href="/marketplace"
-              className="btn-frost-cta inline-flex h-12 items-center border-emerald-200/70 px-6 text-sm font-extrabold uppercase tracking-[0.08em]"
+              className="btn-frost-cta inline-flex h-12 items-center border-emerald-200/70 px-6 text-sm font-extrabold uppercase tracking-[0.08em] text-white"
             >
               Browse Listings
             </Link>
