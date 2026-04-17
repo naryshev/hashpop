@@ -1988,6 +1988,39 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     }
   });
 
+  // All offer messages for a wallet (received + sent), with listing metadata
+  router.get("/messages/offers", async (req, res) => {
+    try {
+      const address = (req.query.address as string)?.trim().toLowerCase();
+      if (!address) return res.status(400).json({ error: "address required" });
+
+      const offers = await prisma.message.findMany({
+        where: { type: "offer", OR: [{ fromAddress: address }, { toAddress: address }] },
+        orderBy: { createdAt: "desc" },
+      });
+
+      const listingIds = [...new Set(offers.map((o) => o.listingId).filter(Boolean))] as string[];
+      const listings =
+        listingIds.length > 0
+          ? await prisma.listing.findMany({
+              where: { id: { in: listingIds } },
+              select: { id: true, title: true, imageUrl: true, price: true, seller: true, status: true },
+            })
+          : [];
+      const listingMap = Object.fromEntries(listings.map((l) => [l.id, l]));
+
+      res.json({
+        offers: offers.map((o) => ({
+          ...o,
+          listing: o.listingId ? (listingMap[o.listingId] ?? null) : null,
+        })),
+      });
+    } catch (err) {
+      log.error({ err }, "Failed to fetch offers");
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   router.post("/ratings", async (req, res) => {
     try {
       const {
