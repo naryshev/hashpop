@@ -2211,7 +2211,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
 
   // Upload / update profile avatar
   router.post("/user/upload-avatar", (req, res) => {
-    const avatarUpload = multer({ storage: memoryStorage, limits: { fileSize: 2 * 1024 * 1024 } }).single("avatar");
+    const avatarUpload = multer({ storage: memoryStorage, limits: { fileSize: 5 * 1024 * 1024 } }).single("avatar");
     avatarUpload(req, res, async (err: any) => {
       try {
         if (err) {

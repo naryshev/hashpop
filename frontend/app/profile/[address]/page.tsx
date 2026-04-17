@@ -9,7 +9,6 @@ import { getApiUrl } from "../../../lib/apiUrl";
 import { formatListingDate } from "../../../lib/formatDate";
 import { useHashpackWallet } from "../../../lib/hashpackWallet";
 import { invalidateProfileImage } from "../../../lib/profileImageCache";
-import { compressImage } from "../../../lib/compressImage";
 
 type Profile = {
   totalSales?: number;
@@ -85,27 +84,27 @@ export default function ProfilePage() {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !walletAddress) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError("Image must be under 5 MB.");
+      return;
+    }
     setUploading(true);
     setUploadError(null);
     try {
-      const compressed = await compressImage(file);
-      if (compressed.size > 2 * 1024 * 1024) {
-        setUploadError("Image is too large. Please choose a smaller photo.");
-        return;
-      }
       const form = new FormData();
-      form.append("avatar", compressed, file.name);
+      form.append("avatar", file);
       form.append("address", walletAddress.toLowerCase());
       const res = await fetch(`${getApiUrl()}/api/user/upload-avatar`, { method: "POST", body: form });
-      const data = await res.json() as { profileImageUrl?: string; error?: string };
-      if (!res.ok) { setUploadError(data.error ?? "Upload failed"); return; }
+      let data: { profileImageUrl?: string; error?: string } = {};
+      try { data = await res.json(); } catch { /* non-JSON response */ }
+      if (!res.ok) { setUploadError(data.error ?? `Upload failed (${res.status})`); return; }
       if (!data.profileImageUrl) { setUploadError("Upload failed — no URL returned."); return; }
       setLocalAvatarUrl(data.profileImageUrl);
       invalidateProfileImage(walletAddress);
       setEditOpen(false);
       fetchProfile();
-    } catch {
-      setUploadError("Upload failed. Please try again.");
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Upload failed. Please try again.");
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -224,14 +223,14 @@ export default function ProfilePage() {
       {editOpen && isOwnProfile && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-          onClick={() => setEditOpen(false)}
+          onClick={() => { if (!uploading) setEditOpen(false); }}
         >
           <div
             className="glass-card w-full max-w-sm rounded-2xl p-6 space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-base font-bold text-white">Update profile photo</h3>
-            <p className="text-sm text-silver/70">Choose a JPG, PNG, GIF, or WebP image (max 2 MB).</p>
+            <p className="text-sm text-silver/70">Choose a JPG, PNG, GIF, or WebP image (max 5 MB).</p>
 
             <label className="flex items-center justify-center w-full cursor-pointer rounded-xl border-2 border-dashed border-white/20 hover:border-[#00ffa3]/40 bg-white/5 py-8 transition-colors">
               <div className="text-center">
