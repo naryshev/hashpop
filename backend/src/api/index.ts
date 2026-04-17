@@ -7,67 +7,29 @@ import type { Logger } from "pino";
 import { ethers } from "ethers";
 import { fetchMirrorEvents } from "../mirror";
 import { decodeEvents, EXPECTED_TOPIC0_ITEM_LISTED } from "../indexer/decoder";
-import { saveUpload } from "../storage";
+import { saveUpload } from "../uploads";
 
-const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB
-const MAX_MEDIA_SIZE = 15 * 1024 * 1024; // 15MB
+const prisma = new PrismaClient();
+const memoryStorage = multer.memoryStorage();
 
-export function createRouter(
-  prisma: PrismaClient,
-  log: Logger,
-  uploadsDir: string
-): Router {
+export function createRouter({
+  log,
+  uploadsDir,
+}: {
+  log: Logger;
+  uploadsDir: string;
+}): Router {
   const router = Router();
-  const memoryStorage = multer.memoryStorage();
-  const upload = multer({
-    storage: memoryStorage,
-    limits: { fileSize: MAX_IMAGE_SIZE },
-  });
-  const uploadMedia = multer({
-    storage: memoryStorage,
-    limits: { fileSize: MAX_MEDIA_SIZE },
-  });
 
-  // ── Listings ──────────────────────────────────────────────────────────────
+  // ── listings ──────────────────────────────────────────────────────────────
 
-  router.get("/listings", async (req, res) => {
+  router.get("/listings", async (_req, res) => {
     try {
-      const page = Math.max(1, parseInt((req.query.page as string) || "1", 10));
-      const limit = Math.min(
-        50,
-        Math.max(1, parseInt((req.query.limit as string) || "20", 10))
-      );
-      const skip = (page - 1) * limit;
-
-      const statusFilter = req.query.status as string | undefined;
-      const whereClause =
-        statusFilter && statusFilter !== "all"
-          ? { status: statusFilter }
-          : undefined;
-
-      const [listings, total] = await Promise.all([
-        prisma.listing.findMany({
-          where: whereClause,
-          include: {
-            media: { orderBy: { order: "asc" } },
-            seller: true,
-          },
-          orderBy: { createdAt: "desc" },
-          skip,
-          take: limit,
-        }),
-        prisma.listing.count({ where: whereClause }),
-      ]);
-
-      res.json({
-        listings,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit),
-        },
+      const listings = await prisma.listing.findMany({
+        orderBy: { createdAt: "desc" },
+        include: { media: true },
       });
+      res.json(listings);
     } catch (e: any) {
       log.error({ err: e }, "Failed to fetch listings");
       res.status(500).json({ error: e?.message || "Internal server error" });
@@ -78,14 +40,9 @@ export function createRouter(
     try {
       const listing = await prisma.listing.findUnique({
         where: { id: req.params.id },
-        include: {
-          media: { orderBy: { order: "asc" } },
-          seller: true,
-        },
+        include: { media: true },
       });
-      if (!listing) {
-        return res.status(404).json({ error: "Listing not found" });
-      }
+      if (!listing) return res.status(404).json({ error: "Not found" });
       res.json(listing);
     } catch (e: any) {
       log.error({ err: e }, "Failed to fetch listing");
@@ -99,43 +56,29 @@ export function createRouter(
         title,
         description,
         price,
-        tokenId,
+        address,
+        chain,
         contractAddress,
-        sellerAddress,
+        tokenId,
+        txHash,
       } = req.body;
-
-      if (!title || !price || !sellerAddress) {
+      if (!title || price == null || !address) {
         return res
           .status(400)
-          .json({ error: "title, price, and sellerAddress are required" });
+          .json({ error: "title, price, and address are required" });
       }
-
-      const seller = await prisma.user.upsert({
-        where: { address: sellerAddress.toLowerCase() },
-        update: {},
-        create: {
-          id: sellerAddress.toLowerCase(),
-          address: sellerAddress.toLowerCase(),
-          reputationScore: 0,
-        },
-      });
-
       const listing = await prisma.listing.create({
         data: {
           title,
-          description,
-          price: parseFloat(price),
-          tokenId,
-          contractAddress,
-          sellerId: seller.id,
-          status: "active",
-        },
-        include: {
-          media: true,
-          seller: true,
+          description: description ?? null,
+          price: String(price),
+          sellerAddress: address,
+          chain: chain ?? null,
+          contractAddress: contractAddress ?? null,
+          tokenId: tokenId ?? null,
+          txHash: txHash ?? null,
         },
       });
-
       res.status(201).json(listing);
     } catch (e: any) {
       log.error({ err: e }, "Failed to create listing");
@@ -143,29 +86,208 @@ export function createRouter(
     }
   });
 
-  // ── Upload image (listing cover) ──────────────────────────────────────────
+  router.patch("/listings/:id", async (req, res) => {
+    try {
+      const { title, description, price } = req.body;
+      const listing = await prisma.listing.update({
+        where: { id: req.params.id },
+        data: {
+          ...(title !== undefined && { title }),
+          ...(description !== undefined && { description }),
+          ...(price !== undefined && { price: String(price) }),
+        },
+      });
+      res.json(listing);
+    } catch (e: any) {
+      log.error({ err: e }, "Failed to update listing");
+      res.status(500).json({ error: e?.message || "Internal server error" });
+    }
+  });
 
-  router.post("/upload-image", (req, res) => {
-    upload.single("image")(req, res, async (err: any) => {
+  // ── users ─────────────────────────────────────────────────────────────────
+
+  router.get("/users/:address", async (req, res) => {
+    try {
+      const address = req.params.address.toLowerCase();
+      const user = await prisma.user.findUnique({ where: { address } });
+      if (!user) return res.status(404).json({ error: "Not found" });
+      res.json(user);
+    } catch (e: any) {
+      log.error({ err: e }, "Failed to fetch user");
+      res.status(500).json({ error: e?.message || "Internal server error" });
+    }
+  });
+
+  router.post("/users", async (req, res) => {
+    try {
+      const { address, username, bio } = req.body;
+      if (!address)
+        return res.status(400).json({ error: "address is required" });
+      const normalised = address.toLowerCase();
+      const user = await prisma.user.upsert({
+        where: { address: normalised },
+        update: {
+          ...(username !== undefined && { username }),
+          ...(bio !== undefined && { bio }),
+        },
+        create: {
+          id: normalised,
+          address: normalised,
+          username: username ?? null,
+          bio: bio ?? null,
+          reputationScore: 0,
+        },
+      });
+      res.json(user);
+    } catch (e: any) {
+      log.error({ err: e }, "Failed to upsert user");
+      res.status(500).json({ error: e?.message || "Internal server error" });
+    }
+  });
+
+  // ── offers ────────────────────────────────────────────────────────────────
+
+  router.post("/offers", async (req, res) => {
+    try {
+      const { listingId, buyerAddress, offerPrice } = req.body;
+      if (!listingId || !buyerAddress || offerPrice == null) {
+        return res
+          .status(400)
+          .json({ error: "listingId, buyerAddress, offerPrice are required" });
+      }
+      const offer = await prisma.offer.create({
+        data: {
+          listingId,
+          buyerAddress: buyerAddress.toLowerCase(),
+          offerPrice: String(offerPrice),
+        },
+      });
+      res.status(201).json(offer);
+    } catch (e: any) {
+      log.error({ err: e }, "Failed to create offer");
+      res.status(500).json({ error: e?.message || "Internal server error" });
+    }
+  });
+
+  router.get("/offers", async (req, res) => {
+    try {
+      const { listingId } = req.query;
+      const offers = await prisma.offer.findMany({
+        where: listingId ? { listingId: String(listingId) } : undefined,
+        orderBy: { createdAt: "desc" },
+      });
+      res.json(offers);
+    } catch (e: any) {
+      log.error({ err: e }, "Failed to fetch offers");
+      res.status(500).json({ error: e?.message || "Internal server error" });
+    }
+  });
+
+  // ── swipes ────────────────────────────────────────────────────────────────
+
+  router.post("/swipes", async (req, res) => {
+    try {
+      const { listingId, swipedByAddress, direction } = req.body;
+      if (!listingId || !swipedByAddress || !direction) {
+        return res
+          .status(400)
+          .json({ error: "listingId, swipedByAddress, direction are required" });
+      }
+      if (direction !== "left" && direction !== "right") {
+        return res
+          .status(400)
+          .json({ error: 'direction must be "left" or "right"' });
+      }
+      const swipe = await prisma.swipe.create({
+        data: {
+          listingId,
+          swipedByAddress: swipedByAddress.toLowerCase(),
+          direction,
+        },
+      });
+      res.status(201).json(swipe);
+    } catch (e: any) {
+      log.error({ err: e }, "Failed to record swipe");
+      res.status(500).json({ error: e?.message || "Internal server error" });
+    }
+  });
+
+  // ── messages ──────────────────────────────────────────────────────────────
+
+  router.get("/messages", async (req, res) => {
+    try {
+      const { offerId } = req.query;
+      if (!offerId)
+        return res.status(400).json({ error: "offerId is required" });
+      const messages = await prisma.message.findMany({
+        where: { offerId: String(offerId) },
+        orderBy: { createdAt: "asc" },
+      });
+      res.json(messages);
+    } catch (e: any) {
+      log.error({ err: e }, "Failed to fetch messages");
+      res.status(500).json({ error: e?.message || "Internal server error" });
+    }
+  });
+
+  router.post("/messages", async (req, res) => {
+    try {
+      const { offerId, senderAddress, content } = req.body;
+      if (!offerId || !senderAddress || !content) {
+        return res
+          .status(400)
+          .json({ error: "offerId, senderAddress, content are required" });
+      }
+      const message = await prisma.message.create({
+        data: {
+          offerId,
+          senderAddress: senderAddress.toLowerCase(),
+          content,
+        },
+      });
+      res.status(201).json(message);
+    } catch (e: any) {
+      log.error({ err: e }, "Failed to create message");
+      res.status(500).json({ error: e?.message || "Internal server error" });
+    }
+  });
+
+  // ── profile image upload ──────────────────────────────────────────────────
+
+  const uploadProfile = multer({
+    storage: memoryStorage,
+    limits: { fileSize: 5 * 1024 * 1024 },
+  });
+
+  router.post("/upload-profile-image", (req, res) => {
+    uploadProfile.single("image")(req, res, async (err: any) => {
       try {
         if (err) {
           if (err.code === "LIMIT_FILE_SIZE")
             return res
               .status(400)
-              .json({ error: "Image must be 2 MB or smaller" });
+              .json({ error: "Image must be 5 MB or smaller" });
           return res
             .status(400)
             .json({ error: err.message || "Upload failed" });
         }
+        const address = (
+          req.body?.address as string | undefined
+        )
+          ?.trim()
+          .toLowerCase();
+        if (!address)
+          return res.status(400).json({ error: "address required" });
         if (!req.file)
-          return res.status(400).json({ error: "No file uploaded" });
+          return res.status(400).json({ error: "image file required" });
+
         const ext = (
           path.extname(req.file.originalname) || ".jpg"
         )
           .toLowerCase()
           .slice(0, 5);
         const safeExt = /^\.(jpe?g|png|gif|webp)$/.test(ext) ? ext : ".jpg";
-        const filename = `img-${Date.now()}-${Math.random()
+        const filename = `profile-${Date.now()}-${Math.random()
           .toString(36)
           .slice(2, 10)}${safeExt}`;
         const baseUrl = `${req.protocol}://${req.get("host")}`;
@@ -176,9 +298,21 @@ export function createRouter(
           baseUrl,
           uploadsDir
         );
-        res.json({ url });
+
+        await prisma.user.upsert({
+          where: { address },
+          update: { profileImageUrl: url },
+          create: {
+            id: address,
+            address,
+            profileImageUrl: url,
+            reputationScore: 0,
+          },
+        });
+
+        res.json({ profileImageUrl: url });
       } catch (e: any) {
-        log.error({ err: e }, "Failed to upload image");
+        log.error({ err: e }, "Upload handler error");
         res.status(500).json({ error: e?.message || "Internal server error" });
       }
     });
@@ -219,28 +353,26 @@ export function createRouter(
     uploadMedia.single("media")(req, res, async (err: any) => {
       try {
         if (err) {
-          log.warn({ err, code: err?.code }, "Upload middleware error");
+          log.warn({ err, code: err?.code }, "Upload media error");
           if (err.code === "LIMIT_FILE_SIZE")
             return res
               .status(400)
-              .json({ error: "File must be 15 MB or smaller" });
+              .json({ error: "File must be 20 MB or smaller" });
           return res
             .status(400)
             .json({ error: err.message || "Upload failed" });
         }
         if (!req.file)
           return res.status(400).json({ error: "No file uploaded" });
-
         const ext = (
           path.extname(req.file.originalname) || ".bin"
         )
           .toLowerCase()
           .slice(0, 5);
-        const safeExt =
-          /^\.(jpe?g|png|gif|webp|mp4|mov|avi|wmv|flv|mkv|webm)$/.test(ext)
-            ? ext
-            : ".bin";
-        const filename = `media-${Date.now()}-${Math.random()
+        const safeExt = /^\.(jpe?g|png|gif|webp|mp4|mov|avi|mkv)$/.test(ext)
+          ? ext
+          : ".bin";
+        const filename = `listing-${Date.now()}-${Math.random()
           .toString(36)
           .slice(2, 10)}${safeExt}`;
         const baseUrl = `${req.protocol}://${req.get("host")}`;
@@ -251,6 +383,15 @@ export function createRouter(
           baseUrl,
           uploadsDir
         );
+        const listingId = req.body?.listingId as string | undefined;
+        if (listingId) {
+          const mediaType = req.file.mimetype.startsWith("video/")
+            ? "video"
+            : "image";
+          await prisma.listingMedia.create({
+            data: { listingId, url, mediaType },
+          });
+        }
         res.json({ url });
       } catch (e: any) {
         log.error({ err: e }, "Failed to upload listing media");
@@ -259,288 +400,218 @@ export function createRouter(
     });
   });
 
-  // ── Users ─────────────────────────────────────────────────────────────────
+  // ── blockchain / indexer ──────────────────────────────────────────────────
 
-  router.get("/users/:address", async (req, res) => {
+  router.get("/events", async (req, res) => {
     try {
-      const address = req.params.address.toLowerCase();
-      const user = await prisma.user.findUnique({
-        where: { address },
-        include: {
-          listings: {
-            include: { media: { orderBy: { order: "asc" } } },
-            orderBy: { createdAt: "desc" },
-          },
-        },
+      const { contractAddress, fromBlock, toBlock } = req.query;
+      if (!contractAddress)
+        return res.status(400).json({ error: "contractAddress required" });
+
+      const events = await fetchMirrorEvents({
+        contractAddress: String(contractAddress),
+        fromBlock: fromBlock ? Number(fromBlock) : undefined,
+        toBlock: toBlock ? Number(toBlock) : undefined,
       });
-      if (!user) {
-        return res.status(404).json({ error: "User not found" });
-      }
-      res.json(user);
+      res.json(events);
     } catch (e: any) {
-      log.error({ err: e }, "Failed to fetch user");
+      log.error({ err: e }, "Failed to fetch events");
       res.status(500).json({ error: e?.message || "Internal server error" });
     }
   });
 
-  router.post("/users", async (req, res) => {
+  router.post("/index-listing", async (req, res) => {
     try {
-      const { address, username, bio } = req.body;
-      if (!address) {
-        return res.status(400).json({ error: "address is required" });
-      }
-      const user = await prisma.user.upsert({
-        where: { address: address.toLowerCase() },
-        update: { username, bio },
-        create: {
-          id: address.toLowerCase(),
-          address: address.toLowerCase(),
-          username,
-          bio,
-          reputationScore: 0,
-        },
-      });
-      res.json(user);
-    } catch (e: any) {
-      log.error({ err: e }, "Failed to create/update user");
-      res.status(500).json({ error: e?.message || "Internal server error" });
-    }
-  });
-
-  // ── On-chain sync ─────────────────────────────────────────────────────────
-
-  router.post("/sync-listings", async (req, res) => {
-    try {
-      const { rpcUrl, contractAddress, fromBlock, toBlock } = req.body;
-
-      if (!rpcUrl || !contractAddress) {
+      const { txHash, contractAddress } = req.body;
+      if (!txHash || !contractAddress) {
         return res
           .status(400)
-          .json({ error: "rpcUrl and contractAddress are required" });
+          .json({ error: "txHash and contractAddress required" });
       }
 
-      const provider = new ethers.JsonRpcProvider(rpcUrl);
-      const events = await fetchMirrorEvents(
-        provider,
-        contractAddress,
-        fromBlock || 0,
-        toBlock || "latest"
+      const provider = new ethers.JsonRpcProvider(
+        process.env.RPC_URL || "https://mainnet.base.org"
+      );
+      const receipt = await provider.getTransactionReceipt(txHash);
+      if (!receipt) {
+        return res.status(404).json({ error: "Transaction not found" });
+      }
+
+      const relevantLogs = receipt.logs.filter(
+        (l) =>
+          l.address.toLowerCase() === contractAddress.toLowerCase() &&
+          l.topics[0] === EXPECTED_TOPIC0_ITEM_LISTED
       );
 
-      const decoded = decodeEvents(events);
-      const created: any[] = [];
+      if (relevantLogs.length === 0) {
+        return res.status(404).json({ error: "No ItemListed events found" });
+      }
 
-      for (const item of decoded) {
-        if (item.topic0 !== EXPECTED_TOPIC0_ITEM_LISTED) continue;
-        const d = item.decoded as any;
-        if (!d) continue;
+      const decoded = decodeEvents(relevantLogs);
 
-        const sellerAddr = (d.seller as string).toLowerCase();
-        const seller = await prisma.user.upsert({
-          where: { address: sellerAddr },
-          update: {},
-          create: {
-            id: sellerAddr,
-            address: sellerAddr,
-            reputationScore: 0,
-          },
-        });
-
-        const existing = await prisma.listing.findFirst({
-          where: {
-            tokenId: String(d.tokenId),
-            contractAddress: (d.nftContract as string).toLowerCase(),
-          },
-        });
-
-        if (!existing) {
-          const listing = await prisma.listing.create({
-            data: {
-              title: `Token #${d.tokenId}`,
-              price: parseFloat(
-                ethers.formatEther(d.price as bigint)
-              ),
-              tokenId: String(d.tokenId),
-              contractAddress: (d.nftContract as string).toLowerCase(),
-              sellerId: seller.id,
-              status: "active",
+      const listings = await Promise.all(
+        decoded.map(async (item) => {
+          return prisma.listing.upsert({
+            where: { txHash_tokenId: { txHash, tokenId: String(item.tokenId) } },
+            create: {
+              title: item.metadata?.name || `NFT #${item.tokenId}`,
+              description: item.metadata?.description || null,
+              price: ethers.formatEther(item.price),
+              sellerAddress: item.seller.toLowerCase(),
+              chain: "base",
+              contractAddress: contractAddress.toLowerCase(),
+              tokenId: String(item.tokenId),
+              txHash,
+            },
+            update: {
+              price: ethers.formatEther(item.price),
             },
           });
-          created.push(listing);
-        }
-      }
-
-      res.json({ synced: created.length, listings: created });
-    } catch (e: any) {
-      log.error({ err: e }, "Failed to sync listings");
-      res.status(500).json({ error: e?.message || "Internal server error" });
-    }
-  });
-
-  // ── Offers ────────────────────────────────────────────────────────────────
-
-  router.get("/listings/:listingId/offers", async (req, res) => {
-    try {
-      const offers = await prisma.offer.findMany({
-        where: { listingId: req.params.listingId },
-        include: { buyer: true },
-        orderBy: { createdAt: "desc" },
-      });
-      res.json(offers);
-    } catch (e: any) {
-      log.error({ err: e }, "Failed to fetch offers");
-      res.status(500).json({ error: e?.message || "Internal server error" });
-    }
-  });
-
-  router.post("/listings/:listingId/offers", async (req, res) => {
-    try {
-      const { buyerAddress, amount, txHash } = req.body;
-      if (!buyerAddress || !amount) {
-        return res
-          .status(400)
-          .json({ error: "buyerAddress and amount are required" });
-      }
-
-      const buyer = await prisma.user.upsert({
-        where: { address: buyerAddress.toLowerCase() },
-        update: {},
-        create: {
-          id: buyerAddress.toLowerCase(),
-          address: buyerAddress.toLowerCase(),
-          reputationScore: 0,
-        },
-      });
-
-      const offer = await prisma.offer.create({
-        data: {
-          listingId: req.params.listingId,
-          buyerId: buyer.id,
-          amount: parseFloat(amount),
-          txHash,
-          status: "pending",
-        },
-        include: { buyer: true },
-      });
-
-      res.status(201).json(offer);
-    } catch (e: any) {
-      log.error({ err: e }, "Failed to create offer");
-      res.status(500).json({ error: e?.message || "Internal server error" });
-    }
-  });
-
-  // ── Listing-level media ───────────────────────────────────────────────────
-
-  router.post("/listings/:listingId/media", async (req, res) => {
-    try {
-      const { url, mediaType, order } = req.body;
-      if (!url || !mediaType) {
-        return res
-          .status(400)
-          .json({ error: "url and mediaType are required" });
-      }
-      const listing = await prisma.listing.findUnique({
-        where: { id: req.params.listingId },
-      });
-      if (!listing) {
-        return res.status(404).json({ error: "Listing not found" });
-      }
-      const media = await prisma.listingMedia.create({
-        data: {
-          listingId: req.params.listingId,
-          url,
-          mediaType,
-          order: order ?? 0,
-        },
-      });
-      res.status(201).json(media);
-    } catch (e: any) {
-      log.error({ err: e }, "Failed to add media to listing");
-      res.status(500).json({ error: e?.message || "Internal server error" });
-    }
-  });
-
-  router.delete("/listings/:listingId/media/:mediaId", async (req, res) => {
-    try {
-      const media = await prisma.listingMedia.findFirst({
-        where: {
-          id: req.params.mediaId,
-          listingId: req.params.listingId,
-        },
-      });
-      if (!media) {
-        return res.status(404).json({ error: "Media not found" });
-      }
-      await prisma.listingMedia.delete({ where: { id: req.params.mediaId } });
-      res.json({ success: true });
-    } catch (e: any) {
-      log.error({ err: e }, "Failed to delete media");
-      res.status(500).json({ error: e?.message || "Internal server error" });
-    }
-  });
-
-  router.put("/listings/:listingId/media/reorder", async (req, res) => {
-    try {
-      const { order } = req.body; // array of { id, order }
-      if (!Array.isArray(order)) {
-        return res.status(400).json({ error: "order must be an array" });
-      }
-      await Promise.all(
-        order.map((item: { id: string; order: number }) =>
-          prisma.listingMedia.update({
-            where: { id: item.id },
-            data: { order: item.order },
-          })
-        )
+        })
       );
-      res.json({ success: true });
+
+      res.json({ indexed: listings.length, listings });
     } catch (e: any) {
-      log.error({ err: e }, "Failed to reorder media");
+      log.error({ err: e }, "Failed to index listing");
       res.status(500).json({ error: e?.message || "Internal server error" });
     }
   });
 
-  // ── Listing PATCH/DELETE ──────────────────────────────────────────────────
+  // ── healthcheck ───────────────────────────────────────────────────────────
 
-  router.patch("/listings/:id", async (req, res) => {
+  router.get("/health", (_req, res) => {
+    res.json({ status: "ok" });
+  });
+
+  // ── on-chain listings from RPC ────────────────────────────────────────────
+
+  router.get("/onchain-listings", async (req, res) => {
     try {
-      const { title, description, price, status } = req.body;
-      const listing = await prisma.listing.update({
-        where: { id: req.params.id },
-        data: {
-          ...(title !== undefined && { title }),
-          ...(description !== undefined && { description }),
-          ...(price !== undefined && { price: parseFloat(price) }),
-          ...(status !== undefined && { status }),
-        },
-        include: {
-          media: { orderBy: { order: "asc" } },
-          seller: true,
-        },
+      const {
+        contractAddress,
+        fromBlock,
+        toBlock,
+        rpcUrl,
+      } = req.query as Record<string, string>;
+
+      if (!contractAddress)
+        return res.status(400).json({ error: "contractAddress required" });
+
+      const provider = new ethers.JsonRpcProvider(
+        rpcUrl || process.env.RPC_URL || "https://mainnet.base.org"
+      );
+
+      const latestBlock = await provider.getBlockNumber();
+      const from = fromBlock ? Number(fromBlock) : latestBlock - 10_000;
+      const to = toBlock ? Number(toBlock) : latestBlock;
+
+      const filter = {
+        address: contractAddress,
+        topics: [EXPECTED_TOPIC0_ITEM_LISTED],
+        fromBlock: from,
+        toBlock: to,
+      };
+
+      const logs = await provider.getLogs(filter);
+      const decoded = decodeEvents(logs);
+
+      res.json({ count: decoded.length, listings: decoded });
+    } catch (e: any) {
+      log.error({ err: e }, "Failed to fetch on-chain listings");
+      res.status(500).json({ error: e?.message || "Internal server error" });
+    }
+  });
+
+  // ── listing-swipes (next unseen listing per user) ─────────────────────────
+
+  router.get("/listing-swipes/next", async (req, res) => {
+    try {
+      const rawAddress = req.query.address as string | undefined;
+      if (!rawAddress)
+        return res.status(400).json({ error: "address required" });
+      const address = rawAddress.trim().toLowerCase();
+
+      // IDs already swiped by this user
+      const swiped = await prisma.swipe.findMany({
+        where: { swipedByAddress: address },
+        select: { listingId: true },
       });
+      const swipedIds = swiped.map((s) => s.listingId);
+
+      const listing = await prisma.listing.findFirst({
+        where: { id: { notIn: swipedIds } },
+        orderBy: { createdAt: "asc" },
+        include: { media: true },
+      });
+
+      if (!listing) return res.status(204).send();
       res.json(listing);
     } catch (e: any) {
-      if (e?.code === "P2025") {
-        return res.status(404).json({ error: "Listing not found" });
-      }
-      log.error({ err: e }, "Failed to update listing");
+      log.error({ err: e }, "Failed to fetch next listing for swipe");
       res.status(500).json({ error: e?.message || "Internal server error" });
     }
   });
 
-  router.delete("/listings/:id", async (req, res) => {
+  router.post("/listing-swipes", async (req, res) => {
     try {
-      await prisma.listing.delete({ where: { id: req.params.id } });
-      res.json({ success: true });
+      const { listingId, address, direction } = req.body as {
+        listingId?: string;
+        address?: string;
+        direction?: string;
+      };
+
+      if (!listingId || !address || !direction)
+        return res
+          .status(400)
+          .json({ error: "listingId, address, direction required" });
+
+      if (direction !== "left" && direction !== "right")
+        return res
+          .status(400)
+          .json({ error: 'direction must be "left" or "right"' });
+
+      const swipe = await prisma.swipe.create({
+        data: {
+          listingId,
+          swipedByAddress: address.trim().toLowerCase(),
+          direction,
+        },
+      });
+      res.status(201).json(swipe);
     } catch (e: any) {
-      if (e?.code === "P2025") {
-        return res.status(404).json({ error: "Listing not found" });
-      }
-      log.error({ err: e }, "Failed to delete listing");
+      log.error({ err: e }, "Failed to record listing swipe");
       res.status(500).json({ error: e?.message || "Internal server error" });
     }
   });
 
   return router;
+}
+
+// ── media upload (module-level, shared) ───────────────────────────────────────
+
+const uploadMedia = multer({
+  storage: memoryStorage,
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter(_req, file, cb) {
+    const allowed = [
+      "image/jpeg",
+      "image/png",
+      "image/gif",
+      "image/webp",
+      "video/mp4",
+      "video/quicktime",
+      "video/x-msvideo",
+      "video/x-matroska",
+    ];
+    if (allowed.includes(file.mimetype)) return cb(null, true);
+    cb(new Error("Unsupported file type"));
+  },
+});
+
+export async function handleError(err: any, res: any): Promise<void> {
+  if (err.code === "LIMIT_FILE_SIZE") {
+    res.status(400).json({ error: "File must be 20 MB or smaller" });
+  } else {
+    res.status(400).json({ error: err.message });
+  }
 }
