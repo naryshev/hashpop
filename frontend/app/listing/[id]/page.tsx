@@ -429,7 +429,7 @@ export default function ListingPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen">
+      <main className="min-h-screen slide-in-right">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
           <p className="text-silver">Loading…</p>
         </div>
@@ -439,7 +439,7 @@ export default function ListingPage() {
 
   if (!listing) {
     return (
-      <main className="min-h-screen">
+      <main className="min-h-screen slide-in-right">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
           <p className="text-silver">Listing not found.</p>
           <Link
@@ -642,7 +642,7 @@ export default function ListingPage() {
   };
 
   return (
-    <main className="min-h-screen overflow-x-hidden">
+    <main className="min-h-screen slide-in-right overflow-x-hidden">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 relative overflow-x-hidden">
         {cancelSuccess && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity duration-300 p-4">

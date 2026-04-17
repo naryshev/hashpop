@@ -52,7 +52,7 @@ export default function PurchaseSuccessPage() {
     : null;
 
   return (
-    <main className="min-h-screen flex items-start justify-center px-4 py-12">
+    <main className="min-h-screen slide-in-right flex items-start justify-center px-4 py-12">
       <div className="w-full max-w-lg">
 
         {/* Hero confirmation */}

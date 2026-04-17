@@ -201,7 +201,7 @@ export default function MarketplacePageClient({
   }, [items, query, categoryQuery, minPriceQuery, maxPriceQuery, postedWithinQuery, conditionQuery]);
 
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen slide-in-right">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
