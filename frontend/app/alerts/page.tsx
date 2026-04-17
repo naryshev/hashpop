@@ -5,18 +5,11 @@ import Link from "next/link";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
 import { getApiUrl } from "../../lib/apiUrl";
 import { formatPriceForDisplay } from "../../lib/formatPrice";
+import { formatHbarWithUsd } from "../../lib/hbarUsd";
+import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { ConnectWalletButton } from "../../components/ConnectWalletButton";
 import { BackToHashpop } from "../../components/BackToHashpop";
 import { AddressDisplay } from "../../components/AddressDisplay";
-
-type Conversation = {
-  otherAddress: string;
-  listingId: string | null;
-  preview: string;
-  unreadCount: number;
-  lastMessage: { createdAt: string; type?: string | null };
-  listing: { title: string | null; imageUrl: string | null; price: string } | null;
-};
 
 type Offer = {
   id: string;
@@ -26,7 +19,26 @@ type Offer = {
   offerStatus: string | null;
   createdAt: string;
   listingId: string | null;
-  listing: { id: string; title: string | null; imageUrl: string | null; price: string; seller: string; status: string } | null;
+  listing: {
+    id: string;
+    title: string | null;
+    imageUrl: string | null;
+    price: string;
+    seller: string;
+    status: string;
+  } | null;
+};
+
+type PurchaseRow = {
+  id: string;
+  listingId?: string | null;
+  buyer: string;
+  seller: string;
+  amount: string;
+  txHash?: string | null;
+  createdAt: string;
+  role: "buyer" | "seller";
+  listing?: { id: string; title?: string | null; status?: string; imageUrl?: string | null } | null;
 };
 
 function relativeTime(iso: string): string {
@@ -42,29 +54,25 @@ function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-function EmptySection({ message }: { message: string }) {
-  return (
-    <p className="text-silver/60 text-sm py-2">{message}</p>
-  );
+function listingStatus(status?: string): { label: string; color: string } {
+  const s = (status || "").toUpperCase();
+  if (s === "LOCKED") return { label: "In Escrow", color: "text-amber-300" };
+  if (s === "SHIPPED") return { label: "Shipped", color: "text-blue-300" };
+  if (s === "SOLD" || s === "COMPLETE") return { label: "Complete", color: "text-[#00ffa3]" };
+  return { label: "Active", color: "text-silver/60" };
 }
 
 export default function AlertsPage() {
   const { address } = useHashpackWallet();
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const usdRate = useHbarUsd();
   const [offers, setOffers] = useState<Offer[]>([]);
-  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [purchases, setPurchases] = useState<PurchaseRow[]>([]);
   const [loadingOffers, setLoadingOffers] = useState(false);
+  const [loadingPurchases, setLoadingPurchases] = useState(false);
   const [respondingId, setRespondingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!address) return;
-
-    setLoadingMessages(true);
-    fetch(`${getApiUrl()}/api/messages/inbox?address=${encodeURIComponent(address.toLowerCase())}`)
-      .then((r) => (r.ok ? r.json() : { conversations: [] }))
-      .then((d: { conversations?: Conversation[] }) => setConversations(d.conversations ?? []))
-      .catch(() => setConversations([]))
-      .finally(() => setLoadingMessages(false));
 
     setLoadingOffers(true);
     fetch(`${getApiUrl()}/api/messages/offers?address=${encodeURIComponent(address.toLowerCase())}`)
@@ -72,6 +80,13 @@ export default function AlertsPage() {
       .then((d: { offers?: Offer[] }) => setOffers(d.offers ?? []))
       .catch(() => setOffers([]))
       .finally(() => setLoadingOffers(false));
+
+    setLoadingPurchases(true);
+    fetch(`${getApiUrl()}/api/user/${encodeURIComponent(address)}/purchases`)
+      .then((r) => (r.ok ? r.json() : { purchases: [] }))
+      .then((d: { purchases?: PurchaseRow[] }) => setPurchases(d.purchases ?? []))
+      .catch(() => setPurchases([]))
+      .finally(() => setLoadingPurchases(false));
   }, [address]);
 
   const respondToOffer = async (offerId: string, action: "accepted" | "declined") => {
@@ -91,16 +106,25 @@ export default function AlertsPage() {
     }
   };
 
-  const unreadConvos = conversations.filter((c) => c.unreadCount > 0);
   const receivedOffers = offers.filter((o) => o.toAddress.toLowerCase() === address?.toLowerCase());
-  const pendingOffers = receivedOffers.filter((o) => o.offerStatus === "pending" || !o.offerStatus);
+  const pendingOffers = receivedOffers.filter((o) => !o.offerStatus || o.offerStatus === "pending");
+  const recentPurchases = purchases.slice(0, 6);
+
+  const totalAlerts = pendingOffers.length;
 
   return (
     <main className="min-h-screen slide-in-right">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-8">
         <div>
           <BackToHashpop />
-          <h1 className="text-xl font-bold text-white mt-1">Alerts</h1>
+          <div className="flex items-center gap-2 mt-1">
+            <h1 className="text-xl font-bold text-white">Alerts</h1>
+            {totalAlerts > 0 && (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#00ffa3] px-1.5 text-[11px] font-bold text-black">
+                {totalAlerts}
+              </span>
+            )}
+          </div>
         </div>
 
         {!address ? (
@@ -111,11 +135,11 @@ export default function AlertsPage() {
         ) : (
           <div className="space-y-8">
 
-            {/* Offers requiring action */}
+            {/* Received offers — actionable */}
             <section>
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-sm font-semibold text-silver uppercase tracking-wide">
-                  Offers
+                  Offers received
                   {pendingOffers.length > 0 && (
                     <span className="ml-2 inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-[#00ffa3] text-black text-[10px] font-bold">
                       {pendingOffers.length}
@@ -126,14 +150,15 @@ export default function AlertsPage() {
                   See all
                 </Link>
               </div>
+
               {loadingOffers ? (
                 <p className="text-silver/60 text-sm">Loading…</p>
               ) : receivedOffers.length === 0 ? (
-                <EmptySection message="No offers received yet." />
+                <p className="text-silver/60 text-sm py-1">No offers received yet.</p>
               ) : (
                 <div className="space-y-3">
                   {receivedOffers.slice(0, 5).map((offer) => {
-                    const isPending = offer.offerStatus === "pending" || !offer.offerStatus;
+                    const isPending = !offer.offerStatus || offer.offerStatus === "pending";
                     const threadUrl = offer.listingId
                       ? `/messages?openThread=${encodeURIComponent(offer.fromAddress)}&listingId=${encodeURIComponent(offer.listingId)}`
                       : `/messages?openThread=${encodeURIComponent(offer.fromAddress)}`;
@@ -171,11 +196,7 @@ export default function AlertsPage() {
                             </p>
                             <p className="text-xs text-silver/50 mt-0.5">
                               From{" "}
-                              <AddressDisplay
-                                address={offer.fromAddress}
-                                showAvatar
-                                className="inline-flex"
-                              />
+                              <AddressDisplay address={offer.fromAddress} showAvatar className="inline-flex" />
                               {" · "}{relativeTime(offer.createdAt)}
                             </p>
                           </div>
@@ -222,66 +243,59 @@ export default function AlertsPage() {
               )}
             </section>
 
-            {/* Unread messages */}
+            {/* Recent transaction activity */}
             <section>
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-sm font-semibold text-silver uppercase tracking-wide">
-                  Messages
-                  {unreadConvos.length > 0 && (
-                    <span className="ml-2 inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-[#00ffa3] text-black text-[10px] font-bold">
-                      {unreadConvos.length}
-                    </span>
-                  )}
+                  Recent activity
                 </h2>
-                <Link href="/messages" className="text-xs text-chrome hover:text-white">
+                <Link href="/purchases" className="text-xs text-chrome hover:text-white">
                   See all
                 </Link>
               </div>
-              {loadingMessages ? (
+
+              {loadingPurchases ? (
                 <p className="text-silver/60 text-sm">Loading…</p>
-              ) : unreadConvos.length === 0 ? (
-                <EmptySection message="No unread messages." />
+              ) : recentPurchases.length === 0 ? (
+                <p className="text-silver/60 text-sm py-1">No recent transactions.</p>
               ) : (
                 <div className="glass-card rounded-xl divide-y divide-white/5 overflow-hidden">
-                  {unreadConvos.slice(0, 8).map((convo) => {
-                    const threadUrl = `/messages?openThread=${encodeURIComponent(convo.otherAddress)}${convo.listingId ? `&listingId=${encodeURIComponent(convo.listingId)}` : ""}`;
+                  {recentPurchases.map((row) => {
+                    const targetId = row.listingId;
+                    const title = row.listing?.title || targetId || row.id;
+                    const { label, color } = listingStatus(row.listing?.status);
                     return (
                       <Link
-                        key={`${convo.otherAddress}-${convo.listingId ?? ""}`}
-                        href={threadUrl}
+                        key={row.id}
+                        href={targetId ? `/listing/${encodeURIComponent(targetId)}` : "/purchases"}
                         className="flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors"
                       >
-                        {convo.listing?.imageUrl ? (
+                        {row.listing?.imageUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
-                            src={convo.listing.imageUrl}
+                            src={row.listing.imageUrl}
                             alt=""
                             className="h-10 w-10 rounded-lg object-cover shrink-0"
                           />
                         ) : (
-                          <div className="h-10 w-10 rounded-full bg-white/[0.08] shrink-0 flex items-center justify-center">
-                            <svg className="w-4 h-4 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                          <div className="h-10 w-10 rounded-lg bg-white/[0.08] shrink-0 flex items-center justify-center">
+                            <svg className="w-4 h-4 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10" />
                             </svg>
                           </div>
                         )}
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <AddressDisplay
-                              address={convo.otherAddress}
-                              className="text-sm font-medium text-white truncate"
-                            />
-                            {convo.unreadCount > 0 && (
-                              <span className="shrink-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#00ffa3] px-1 text-[10px] font-bold text-black">
-                                {convo.unreadCount}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-silver/60 truncate mt-0.5">{convo.preview}</p>
+                          <p className="text-sm font-medium text-white truncate">{title}</p>
+                          <p className="text-xs text-silver/50 mt-0.5">
+                            {row.role === "buyer" ? "Bought" : "Sold"} · {relativeTime(row.createdAt)}
+                          </p>
                         </div>
-                        <p className="text-[10px] text-silver/40 shrink-0">
-                          {relativeTime(convo.lastMessage.createdAt)}
-                        </p>
+                        <div className="text-right shrink-0">
+                          <p className="text-sm font-semibold text-chrome">
+                            {formatHbarWithUsd(formatPriceForDisplay(row.amount || "0"), usdRate)}
+                          </p>
+                          <p className={`text-[10px] font-medium mt-0.5 ${color}`}>{label}</p>
+                        </div>
                       </Link>
                     );
                   })}

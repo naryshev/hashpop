@@ -335,7 +335,7 @@ function MessagesPageContent() {
   // to the content wrapper. Use 100dvh minus that offset so the chat panel fills
   // exactly the visible viewport without relying on the broken flex-1 chain.
   return (
-    <main className="flex flex-col overflow-hidden h-[calc(100dvh-3.5rem)] md:h-auto md:flex-1">
+    <main className="flex flex-col overflow-hidden h-[calc(100dvh-3.5rem)] md:h-auto md:flex-1 slide-in-right">
       <div className="flex-1 min-h-0 w-full max-w-5xl mx-auto sm:px-6 sm:py-6 flex flex-col">
 
         {!address ? (
