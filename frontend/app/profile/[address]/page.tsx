@@ -94,7 +94,7 @@ export default function ProfilePage() {
       const form = new FormData();
       form.append("avatar", file);
       form.append("address", walletAddress.toLowerCase());
-      const res = await fetch(`${getApiUrl()}/api/user/upload-avatar`, { method: "POST", body: form });
+      const res = await fetch(`${getApiUrl()}/api/upload-avatar`, { method: "POST", body: form });
       let data: { profileImageUrl?: string; error?: string } = {};
       try { data = await res.json(); } catch { /* non-JSON response */ }
       if (!res.ok) { setUploadError(data.error ?? `Upload failed (${res.status})`); return; }

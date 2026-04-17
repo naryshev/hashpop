@@ -269,6 +269,35 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     });
   });
 
+  // Top-level avatar upload route (mirrors /user/upload-avatar but avoids nested path routing issues)
+  router.post("/upload-avatar", (req, res) => {
+    const avatarUpload = multer({ storage: memoryStorage, limits: { fileSize: 5 * 1024 * 1024 } }).single("avatar");
+    avatarUpload(req, res, async (err: any) => {
+      try {
+        if (err) {
+          if (err.code === "LIMIT_FILE_SIZE")
+            return res.status(400).json({ error: "Image must be 5 MB or smaller" });
+          return res.status(400).json({ error: err.message || "Upload failed" });
+        }
+        const address = (req.body?.address as string | undefined)?.trim().toLowerCase();
+        if (!address) return res.status(400).json({ error: "address required" });
+        if (!req.file) return res.status(400).json({ error: "avatar file required" });
+        const filename = avatarFilename(req.file.originalname);
+        const baseUrl = `${req.protocol}://${req.get("host")}`;
+        const url = await saveUpload(req.file.buffer, filename, req.file.mimetype, baseUrl, uploadsDir);
+        await prisma.user.upsert({
+          where: { address },
+          update: { profileImageUrl: url },
+          create: { id: address, address, profileImageUrl: url, reputationScore: 0 },
+        });
+        res.json({ profileImageUrl: url });
+      } catch (e: any) {
+        log.error({ err: e }, "Failed to upload avatar");
+        res.status(500).json({ error: e?.message || "Internal server error" });
+      }
+    });
+  });
+
   router.post("/upload-listing-media", (req, res) => {
     uploadMedia.single("media")(req, res, async (err: any) => {
       try {
