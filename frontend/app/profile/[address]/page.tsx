@@ -9,6 +9,7 @@ import { getApiUrl } from "../../../lib/apiUrl";
 import { formatListingDate } from "../../../lib/formatDate";
 import { useHashpackWallet } from "../../../lib/hashpackWallet";
 import { invalidateProfileImage } from "../../../lib/profileImageCache";
+import { compressImage } from "../../../lib/compressImage";
 
 type Profile = {
   totalSales?: number;
@@ -87,13 +88,19 @@ export default function ProfilePage() {
     setUploading(true);
     setUploadError(null);
     try {
+      const compressed = await compressImage(file);
+      if (compressed.size > 2 * 1024 * 1024) {
+        setUploadError("Image is too large. Please choose a smaller photo.");
+        return;
+      }
       const form = new FormData();
-      form.append("avatar", file);
+      form.append("avatar", compressed, file.name);
       form.append("address", walletAddress.toLowerCase());
       const res = await fetch(`${getApiUrl()}/api/user/upload-avatar`, { method: "POST", body: form });
       const data = await res.json() as { profileImageUrl?: string; error?: string };
       if (!res.ok) { setUploadError(data.error ?? "Upload failed"); return; }
-      setLocalAvatarUrl(data.profileImageUrl ?? null);
+      if (!data.profileImageUrl) { setUploadError("Upload failed — no URL returned."); return; }
+      setLocalAvatarUrl(data.profileImageUrl);
       invalidateProfileImage(walletAddress);
       setEditOpen(false);
       fetchProfile();

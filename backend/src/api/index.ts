@@ -2210,11 +2210,16 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
   });
 
   // Upload / update profile avatar
-  router.post(
-    "/user/upload-avatar",
-    multer({ storage: memoryStorage, limits: { fileSize: 2 * 1024 * 1024 } }).single("avatar"),
-    async (req, res) => {
+  router.post("/user/upload-avatar", (req, res) => {
+    const avatarUpload = multer({ storage: memoryStorage, limits: { fileSize: 2 * 1024 * 1024 } }).single("avatar");
+    avatarUpload(req, res, async (err: any) => {
       try {
+        if (err) {
+          log.warn({ err, code: err?.code }, "Avatar upload error");
+          if (err.code === "LIMIT_FILE_SIZE")
+            return res.status(400).json({ error: "Image must be 2 MB or smaller" });
+          return res.status(400).json({ error: err.message || "Upload failed" });
+        }
         const address = (req.body?.address as string | undefined)?.trim().toLowerCase();
         if (!address) return res.status(400).json({ error: "address required" });
         if (!req.file) return res.status(400).json({ error: "avatar file required" });
@@ -2227,12 +2232,12 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           create: { id: address, address, profileImageUrl: url, reputationScore: 0 },
         });
         res.json({ profileImageUrl: url });
-      } catch (err) {
-        log.error({ err }, "Failed to upload avatar");
-        res.status(500).json({ error: "Internal server error" });
+      } catch (e: any) {
+        log.error({ err: e }, "Failed to upload avatar");
+        res.status(500).json({ error: e?.message || "Internal server error" });
       }
-    },
-  );
+    });
+  });
 
   router.get("/debug/mirror-logs", async (req, res) => {
     const marketplaceAddress = process.env.MARKETPLACE_ADDRESS;
