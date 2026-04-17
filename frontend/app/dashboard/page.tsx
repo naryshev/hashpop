@@ -147,7 +147,7 @@ export default function DashboardPage() {
               {(
                 [
                   { href: "/marketplace", icon: Home, label: "Home" },
-                  { href: "/messages", icon: Bell, label: "Alerts", badge: unreadCount },
+                  { href: "/alerts", icon: Bell, label: "Alerts", badge: unreadCount },
                   { href: "/messages", icon: MessageSquare, label: "Messages" },
                 ] as { href: string; icon: React.ElementType; label: string; badge?: number }[]
               ).map(({ href, icon: Icon, label, badge }) => (
