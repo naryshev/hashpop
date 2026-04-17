@@ -90,7 +90,7 @@ export default function DashboardPage() {
   }, [address]);
 
   const displayId = accountId || (address ? `${address.slice(0, 6)}…${address.slice(-4)}` : "");
-  const avatarLetter = displayId ? (displayId[0]?.toUpperCase() ?? "?") : "?";
+  const avatarLetter = address ? (address[2]?.toUpperCase() ?? "?") : "?";
 
   return (
     <main className="min-h-screen slide-in-right">

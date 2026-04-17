@@ -10,6 +10,7 @@ import { encryptMessage, decryptMessage } from "../../lib/chatEncryption";
 import { formatPriceForDisplay } from "../../lib/formatPrice";
 import { ConnectWalletButton } from "../../components/ConnectWalletButton";
 import { AddressDisplay } from "../../components/AddressDisplay";
+import { BackToHashpop } from "../../components/BackToHashpop";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -347,7 +348,8 @@ function MessagesPageContent() {
 
             {/* ── Inbox sidebar ─────────────────────────────────────── */}
             <div className={`${mobileView === "thread" ? "hidden md:flex" : "flex"} md:flex flex-col w-full md:w-80 shrink-0 border-r border-white/10`}>
-              <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
+              <div className="px-4 py-3 border-b border-white/10 space-y-1">
+                <BackToHashpop label="My Hashpop" href="/dashboard" />
                 <h1 className="text-base font-bold text-white">Inbox</h1>
               </div>
 
