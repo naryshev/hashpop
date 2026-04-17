@@ -13,6 +13,7 @@ import { getApiUrl } from "../../lib/apiUrl";
 import { AddressDisplay } from "../../components/AddressDisplay";
 import { getTransactionExplorerUrl } from "../../lib/explorer";
 import { activeHederaChain } from "../../lib/hederaChains";
+import { BackToHashpop } from "../../components/BackToHashpop";
 
 type PurchaseRow = {
   id: string;
@@ -133,8 +134,9 @@ export default function PurchasesPage() {
   }
 
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen slide-in-right">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        <BackToHashpop />
         <div className="flex items-center justify-between">
           <h1 className="text-xl sm:text-2xl font-bold text-white">Transaction History</h1>
           <Link href="/dashboard" className="text-sm text-chrome hover:text-white font-medium">

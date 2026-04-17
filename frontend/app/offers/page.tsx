@@ -2,13 +2,15 @@
 
 import { useHashpackWallet } from "../../lib/hashpackWallet";
 import { ConnectWalletButton } from "../../components/ConnectWalletButton";
+import { BackToHashpop } from "../../components/BackToHashpop";
 
 export default function OffersPage() {
   const { address } = useHashpackWallet();
 
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen slide-in-right">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        <BackToHashpop />
         <h1 className="text-xl sm:text-2xl font-bold text-white">Bids & Offers</h1>
         {!address ? (
           <div className="flex flex-col items-start gap-3">

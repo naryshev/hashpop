@@ -10,6 +10,7 @@ import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { formatListingDate } from "../../lib/formatDate";
 import { useCancelListing } from "../../hooks/useCancelListing";
 import { ConnectWalletButton } from "../../components/ConnectWalletButton";
+import { BackToHashpop } from "../../components/BackToHashpop";
 
 export default function SellingPage() {
   const { address } = useHashpackWallet();
@@ -103,7 +104,7 @@ export default function SellingPage() {
   }, [deleteTarget, forceDeleting, address, fetchListings]);
 
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen slide-in-right">
       {/* Delete confirmation modal */}
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
@@ -207,6 +208,7 @@ export default function SellingPage() {
       )}
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        <BackToHashpop />
         <h1 className="text-xl sm:text-2xl font-bold text-white">Selling</h1>
         {!address ? (
           <div className="flex flex-col items-start gap-3">

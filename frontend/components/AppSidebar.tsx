@@ -25,19 +25,11 @@ type NavLink = {
   icon: JSX.Element;
 };
 
-export function AppSidebar({
-  open: openProp,
-  setOpen: setOpenProp,
-}: {
-  open?: boolean;
-  setOpen?: React.Dispatch<React.SetStateAction<boolean>>;
-}) {
+export function AppSidebar() {
   const pathname = usePathname();
   const { isConnected, accountId, disconnect } = useHashpackWallet();
   const unreadCount = useUnreadCount();
-  const [openState, setOpenState] = useState(false);
-  const open = openProp !== undefined ? openProp : openState;
-  const setOpen = setOpenProp !== undefined ? setOpenProp : setOpenState;
+  const [open, setOpen] = useState(false);
   const appVersion = process.env.NEXT_PUBLIC_APP_VERSION?.trim() || "v1.0.0";
 
   const links = useMemo<NavLink[]>(
