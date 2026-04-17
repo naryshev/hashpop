@@ -10,6 +10,7 @@ import { formatPriceForDisplay } from "../../lib/formatPrice";
 import { getTransactionErrorMessage } from "../../lib/transactionError";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
 import { ConnectWalletButton } from "../../components/ConnectWalletButton";
+import { BackToHashpop } from "../../components/BackToHashpop";
 import { activeHederaChain } from "../../lib/hederaChains";
 import { getTransactionExplorerUrl } from "../../lib/explorer";
 
@@ -301,8 +302,9 @@ function CreatePageContent() {
   const additionalItems = mediaItems.slice(1);
 
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen slide-in-right">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-6 relative">
+        <BackToHashpop />
         {listingSuccess && (createdListingIdRef.current ?? createdListingId) && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
             <div className="glass-card p-8 max-w-sm text-center space-y-6">

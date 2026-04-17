@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useUnreadCount } from "../hooks/useUnreadCount";
 
 const links = [
-  { href: "/", label: "Home", icon: "home" },
+  { href: "/marketplace", label: "Home", icon: "home" },
   { href: "/messages", label: "Alerts", icon: "bell" },
   { href: "/marketplace", label: "Search", icon: "search" },
   { href: "/dashboard", label: "My Hashpop", icon: "dashboard" },
@@ -130,8 +130,7 @@ export function BottomNav({ signInMode = false }: { signInMode?: boolean }) {
         style={{ gridTemplateColumns: `repeat(${navLinks.length}, minmax(0, 1fr))` }}
       >
         {navLinks.map(({ href, label, icon }) => {
-          const isActive =
-            href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href);
+          const isActive = pathname === href || pathname.startsWith(href);
 
           if (icon === "search") {
             return (

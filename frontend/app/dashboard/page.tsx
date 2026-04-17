@@ -144,7 +144,7 @@ export default function DashboardPage() {
             <div className="grid grid-cols-3 gap-3">
               {(
                 [
-                  { href: "/", icon: Home, label: "Home" },
+                  { href: "/marketplace", icon: Home, label: "Home" },
                   { href: "/messages", icon: Bell, label: "Alerts", badge: unreadCount },
                   { href: "/messages", icon: MessageSquare, label: "Messages" },
                 ] as { href: string; icon: React.ElementType; label: string; badge?: number }[]
