@@ -81,7 +81,6 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!address) {
       setStats(null);
-      setPurchaseCount(0);
       return;
     }
     fetch(`${getApiUrl()}/api/user/${address}`)
