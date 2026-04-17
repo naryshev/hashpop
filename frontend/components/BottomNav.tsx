@@ -7,7 +7,7 @@ import { useUnreadCount } from "../hooks/useUnreadCount";
 
 const links = [
   { href: "/marketplace", label: "Home", icon: "home" },
-  { href: "/messages", label: "Alerts", icon: "bell" },
+  { href: "/alerts", label: "Alerts", icon: "bell" },
   { href: "/marketplace", label: "Search", icon: "search" },
   { href: "/dashboard", label: "My Hashpop", icon: "dashboard" },
   { href: "/selling", label: "Selling", icon: "sell" },
@@ -15,7 +15,7 @@ const links = [
 
 const signInLinks = [
   { href: "/dashboard", label: "My Hashpop", icon: "dashboard" },
-  { href: "/messages", label: "Alerts", icon: "bell" },
+  { href: "/alerts", label: "Alerts", icon: "bell" },
 ];
 
 function Icon({ name }: { name: string }) {
