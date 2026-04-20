@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { MapPin, Clock } from "lucide-react";
 import { BuyButton } from "../../../components/BuyButton";
 import { EscrowPanel } from "../../../components/EscrowPanel";
 import { AddressDisplay } from "../../../components/AddressDisplay";
@@ -67,6 +68,7 @@ type Listing = {
   txHash?: string | null;
   createdAt?: string;
   onChainConfirmed?: boolean;
+  location?: string | null;
 };
 
 export default function ListingPage() {
@@ -981,6 +983,20 @@ export default function ListingPage() {
                   : attributesLine}
               </p>
             )}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5">
+              {listing?.location && (
+                <span className="inline-flex items-center gap-1 text-xs text-silver/70">
+                  <MapPin className="h-3 w-3 shrink-0" />
+                  {listing.location}
+                </span>
+              )}
+              {listing?.createdAt && (
+                <span className="inline-flex items-center gap-1 text-xs text-silver/50">
+                  <Clock className="h-3 w-3 shrink-0" />
+                  {formatListingDate(listing.createdAt)}
+                </span>
+              )}
+            </div>
           </div>
           {/* right side empty — right panel starts at image level below */}
         </div>
@@ -1109,9 +1125,6 @@ export default function ListingPage() {
               <div className="border border-[#4a5e83]/40 bg-gradient-to-b from-[#121a29]/80 to-[#0f1522]/80 p-5">
                 <h3 className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-3">Description</h3>
                 <p className="text-silver text-sm whitespace-pre-wrap leading-relaxed">{listing.description}</p>
-                <p className="text-white/30 text-xs mt-4 pt-3 border-t border-white/5">
-                  Listed: {formatListingDate(listing.createdAt)} · {listing.status}
-                </p>
               </div>
             )}
             {isSeller && isSellerActiveListing && editing && (
