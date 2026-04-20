@@ -983,20 +983,6 @@ export default function ListingPage() {
                   : attributesLine}
               </p>
             )}
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5">
-              {listing?.location && (
-                <span className="inline-flex items-center gap-1 text-xs text-silver/70">
-                  <MapPin className="h-3 w-3 shrink-0" />
-                  {listing.location}
-                </span>
-              )}
-              {listing?.createdAt && (
-                <span className="inline-flex items-center gap-1 text-xs text-silver/50">
-                  <Clock className="h-3 w-3 shrink-0" />
-                  {formatListingDate(listing.createdAt)}
-                </span>
-              )}
-            </div>
           </div>
           {/* right side empty — right panel starts at image level below */}
         </div>
@@ -1396,14 +1382,25 @@ export default function ListingPage() {
                 </div>
               )}
 
-            {listing?.txHash && (
-              <div className="glass-card p-4 rounded-[2px] border border-white/10">
-                <h3 className="text-white font-medium mb-2">Transaction</h3>
-                <div className="text-sm text-silver space-y-1">
-                  <p className="font-mono text-xs text-silver/80 break-all">{listing.txHash}</p>
-                  {(() => {
-                    const url = getTransactionExplorerUrl(listing.txHash, chainId);
-                    return url ? (
+            <div className="glass-card p-4 rounded-[2px] border border-white/10">
+              <h3 className="text-white font-medium mb-2">Listing info</h3>
+              <div className="text-sm text-silver space-y-1.5">
+                {listing?.createdAt && (
+                  <p className="inline-flex items-center gap-1.5 text-xs text-silver/80">
+                    <Clock className="h-3.5 w-3.5 shrink-0" />
+                    {formatListingDate(listing.createdAt)}
+                  </p>
+                )}
+                {listing?.location && (
+                  <p className="inline-flex items-center gap-1.5 text-xs text-silver/80">
+                    <MapPin className="h-3.5 w-3.5 shrink-0" />
+                    {listing.location}
+                  </p>
+                )}
+                {listing?.txHash && (() => {
+                  const url = getTransactionExplorerUrl(listing.txHash, chainId);
+                  return url ? (
+                    <p>
                       <a
                         href={url}
                         target="_blank"
@@ -1412,11 +1409,11 @@ export default function ListingPage() {
                       >
                         View on HashScan
                       </a>
-                    ) : null;
-                  })()}
-                </div>
+                    </p>
+                  ) : null;
+                })()}
               </div>
-            )}
+            </div>
 
             <div className="glass-card p-4 rounded-[2px] border border-white/10">
               <h3 className="text-white font-medium mb-2">Security</h3>
