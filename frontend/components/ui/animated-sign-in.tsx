@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Wallet, Copy, Check, QrCode, ChevronUp } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
@@ -9,20 +9,25 @@ import { buildHashPackDeepLink } from "../../lib/hashpackWallet";
 
 export default function AnimatedSignIn() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { connect, isConnecting, isReady, error, isConnected, pairingUri } = useHashpackWallet();
   const lastPressAtRef = useRef(0);
   const [deepLinkFired, setDeepLinkFired] = useState(false);
   const [showQr, setShowQr] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    if (!isConnected) return;
-    router.replace("/dashboard");
-  }, [isConnected, router]);
+  const returnTo = searchParams.get("returnTo");
 
   useEffect(() => {
-    router.prefetch("/dashboard");
-  }, [router]);
+    if (!isConnected) return;
+    const dest = returnTo && returnTo.startsWith("/") ? returnTo : "/dashboard";
+    router.replace(dest);
+  }, [isConnected, router, returnTo]);
+
+  useEffect(() => {
+    const dest = returnTo && returnTo.startsWith("/") ? returnTo : "/dashboard";
+    router.prefetch(dest);
+  }, [router, returnTo]);
 
   const handleConnectPress = useCallback(() => {
     const now = Date.now();

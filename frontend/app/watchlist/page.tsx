@@ -3,12 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
+import { ConnectWalletButton } from "../../components/ConnectWalletButton";
 import { getApiUrl } from "../../lib/apiUrl";
 import { formatPriceForDisplay } from "../../lib/formatPrice";
 import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { ListingMedia } from "../../components/ListingMedia";
 import { WishlistButton } from "../../components/WishlistButton";
+import { BackToHashpop } from "../../components/BackToHashpop";
 
 type WatchItem = {
   itemId: string;
@@ -84,11 +86,15 @@ export default function WatchlistPage() {
   }, [address]);
 
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen slide-in-right">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+        <BackToHashpop />
         <h1 className="text-xl sm:text-2xl font-bold text-white mb-6">Watchlist</h1>
         {!address ? (
-          <p className="text-silver">Connect your wallet to view your watchlist.</p>
+          <div className="flex flex-col items-start gap-3">
+            <p className="text-silver">Connect your wallet to view your watchlist.</p>
+            <ConnectWalletButton className="btn-frost-cta disabled:opacity-50" />
+          </div>
         ) : loading ? (
           <p className="text-silver">Loading…</p>
         ) : items.length === 0 ? (

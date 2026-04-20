@@ -17,6 +17,7 @@ import {
 import { Sidebar, SidebarBody, SidebarLink } from "./ui/sidebar";
 import { cn } from "../lib/utils";
 import { useHashpackWallet } from "../lib/hashpackWallet";
+import { useUnreadCount } from "../hooks/useUnreadCount";
 
 type NavLink = {
   label: string;
@@ -24,18 +25,11 @@ type NavLink = {
   icon: JSX.Element;
 };
 
-export function AppSidebar({
-  open: openProp,
-  setOpen: setOpenProp,
-}: {
-  open?: boolean;
-  setOpen?: React.Dispatch<React.SetStateAction<boolean>>;
-}) {
+export function AppSidebar() {
   const pathname = usePathname();
   const { isConnected, accountId, disconnect } = useHashpackWallet();
-  const [openState, setOpenState] = useState(false);
-  const open = openProp !== undefined ? openProp : openState;
-  const setOpen = setOpenProp !== undefined ? setOpenProp : setOpenState;
+  const unreadCount = useUnreadCount();
+  const [open, setOpen] = useState(false);
   const appVersion = process.env.NEXT_PUBLIC_APP_VERSION?.trim() || "v1.0.0";
 
   const links = useMemo<NavLink[]>(
@@ -61,7 +55,16 @@ export function AppSidebar({
       {
         label: "Messages",
         href: "/messages",
-        icon: <MessageSquare className="h-5 w-5 flex-shrink-0" />,
+        icon: (
+          <span className="relative inline-flex shrink-0">
+            <MessageSquare className="h-5 w-5 flex-shrink-0" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-[#00ffa3] text-black text-[9px] font-bold flex items-center justify-center">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </span>
+        ),
       },
       { label: "Support", href: "/support", icon: <LifeBuoy className="h-5 w-5 flex-shrink-0" /> },
     ],

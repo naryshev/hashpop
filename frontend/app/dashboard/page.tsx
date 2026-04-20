@@ -1,210 +1,71 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { MessageSquare, ChevronDown, ChevronUp } from "lucide-react";
-import { formatPriceForDisplay } from "../../lib/formatPrice";
-import { formatHbarWithUsd } from "../../lib/hbarUsd";
-import { useHbarUsd } from "../../hooks/useHbarUsd";
-import { formatListingDate } from "../../lib/formatDate";
+import {
+  Heart,
+  Package,
+  Tag,
+  PlusCircle,
+  LifeBuoy,
+  LogOut,
+  ChevronRight,
+  Home,
+  Bell,
+  MessageSquare,
+  Star,
+} from "lucide-react";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
 import { getApiUrl } from "../../lib/apiUrl";
+import { ConnectWalletButton } from "../../components/ConnectWalletButton";
+import { useUnreadCount } from "../../hooks/useUnreadCount";
 
-function formatListingId(id: string): string {
-  if (!id || !id.startsWith("0x") || id.length !== 66) return id;
-  try {
-    const hex = id.slice(2).replace(/0+$/, "");
-    if (hex.length % 2) return id;
-    const bytes = new Uint8Array(hex.length / 2);
-    for (let i = 0; i < hex.length; i += 2) bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
-    const str = new TextDecoder().decode(bytes);
-    return /^[\x20-\x7e]+$/.test(str) ? str : `${id.slice(0, 10)}…`;
-  } catch {
-    return `${id.slice(0, 10)}…`;
-  }
-}
-
-function shortAddr(addr: string): string {
-  if (!addr) return "";
-  if (/^\d+\.\d+\.\d+$/.test(addr)) return addr;
-  if (addr.startsWith("0x") && addr.length > 12) return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
-  return addr;
-}
-
-type SaleItem = {
-  id: string;
-  listingId: string | null;
-  buyer: string;
-  seller: string;
-  amount: string;
-  txHash: string | null;
-  createdAt: string;
-  role: "buyer" | "seller";
-  listing: { id: string; title: string | null; status: string; imageUrl: string | null } | null;
+type Stats = {
+  ratingAverage?: number;
+  ratingCount?: number;
+  profileImageUrl?: string | null;
 };
 
-type ChatMsg = {
-  id: string;
-  fromAddress: string;
-  toAddress: string;
-  body: string;
-  createdAt: string;
-};
-
-function SoldItemCard({
-  sale,
-  myAddress,
-  usdRate,
+function NavRow({
+  href,
+  icon: Icon,
+  label,
+  desc,
+  badge,
 }: {
-  sale: SaleItem;
-  myAddress: string;
-  usdRate: number | null;
+  href: string;
+  icon: React.ElementType;
+  label: string;
+  desc?: string;
+  badge?: number;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const [msgs, setMsgs] = useState<ChatMsg[]>([]);
-  const [msgsLoading, setMsgsLoading] = useState(false);
-  const [reply, setReply] = useState("");
-  const [sending, setSending] = useState(false);
-
-  const targetId = sale.listingId ?? sale.listing?.id ?? "";
-  const listingTitle =
-    sale.listing?.title || (targetId ? formatListingId(targetId) : "Untitled sale");
-
-  const fetchMsgs = useCallback(async () => {
-    if (!sale.buyer || !targetId) return;
-    setMsgsLoading(true);
-    try {
-      const q = new URLSearchParams({ address: myAddress, other: sale.buyer, listingId: targetId });
-      const res = await fetch(`${getApiUrl()}/api/messages/thread?${q}`);
-      const data = (await res.json()) as { messages?: ChatMsg[] };
-      setMsgs(data.messages ?? []);
-    } catch {
-      setMsgs([]);
-    } finally {
-      setMsgsLoading(false);
-    }
-  }, [sale.buyer, targetId, myAddress]);
-
-  useEffect(() => {
-    if (expanded) void fetchMsgs();
-  }, [expanded, fetchMsgs]);
-
-  const sendReply = async () => {
-    if (!reply.trim() || sending || !sale.buyer || !targetId) return;
-    setSending(true);
-    try {
-      await fetch(`${getApiUrl()}/api/messages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fromAddress: myAddress,
-          toAddress: sale.buyer,
-          body: reply.trim(),
-          listingId: targetId,
-        }),
-      });
-      setReply("");
-      await fetchMsgs();
-    } finally {
-      setSending(false);
-    }
-  };
-
   return (
-    <div className="glass-card rounded-xl overflow-hidden">
-      {/* Summary row */}
-      <div className="p-4 flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          {targetId ? (
-            <Link
-              href={`/listing/${encodeURIComponent(targetId)}`}
-              className="text-white font-semibold hover:text-chrome truncate block"
-            >
-              {listingTitle}
-            </Link>
-          ) : (
-            <p className="text-white font-semibold truncate">{listingTitle}</p>
-          )}
-          <p className="text-silver/70 text-xs mt-0.5 font-mono">
-            Buyer: {shortAddr(sale.buyer)}
-          </p>
-          <p className="text-chrome font-semibold text-sm mt-1">
-            {formatHbarWithUsd(sale.amount, usdRate)}
-          </p>
-          <p className="text-silver/50 text-xs mt-0.5">{formatListingDate(sale.createdAt)}</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setExpanded((e) => !e)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/20 text-silver hover:text-white hover:border-white/30 text-xs font-medium transition-colors shrink-0"
-        >
-          <MessageSquare className="h-3.5 w-3.5" />
-          <span>Messages</span>
-          {expanded ? (
-            <ChevronUp className="h-3 w-3" />
-          ) : (
-            <ChevronDown className="h-3 w-3" />
-          )}
-        </button>
-      </div>
-
-      {/* Expandable chat */}
-      {expanded && (
-        <div className="border-t border-white/10 p-4 space-y-3">
-          {msgsLoading ? (
-            <p className="text-silver text-sm">Loading…</p>
-          ) : msgs.length === 0 ? (
-            <p className="text-silver/60 text-sm">
-              No messages yet. Use the box below to coordinate shipping or meetup with the buyer.
-            </p>
-          ) : (
-            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-              {msgs.map((m) => {
-                const isMe = m.fromAddress.toLowerCase() === myAddress.toLowerCase();
-                return (
-                  <div key={m.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
-                    <div
-                      className={`max-w-xs lg:max-w-sm rounded-lg px-3 py-2 text-sm ${
-                        isMe
-                          ? "bg-white/15 text-white"
-                          : "bg-white/5 text-silver border border-white/10"
-                      }`}
-                    >
-                      <p className="break-words">{m.body}</p>
-                      <p className="text-[10px] text-white/40 mt-1">
-                        {new Date(m.createdAt).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={reply}
-              onChange={(e) => setReply(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  void sendReply();
-                }
-              }}
-              placeholder="Message buyer about shipping / meetup…"
-              className="flex-1 bg-white/5 border border-white/20 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#00ffa3]/50 transition-colors"
-            />
-            <button
-              type="button"
-              onClick={() => void sendReply()}
-              disabled={sending || !reply.trim()}
-              className="px-4 py-2 bg-white/10 border border-white/20 text-white text-sm font-medium rounded-lg hover:bg-white/20 transition-colors disabled:opacity-40"
-            >
-              {sending ? "…" : "Send"}
-            </button>
-          </div>
-        </div>
+    <Link
+      href={href}
+      className="flex items-center gap-4 px-4 py-3.5 hover:bg-white/5 transition-colors active:bg-white/10"
+    >
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-white/80">
+        <Icon className="h-5 w-5" />
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className="block text-sm font-medium text-white leading-snug">{label}</span>
+        {desc && <span className="block text-xs text-silver/70 mt-0.5">{desc}</span>}
+      </span>
+      {badge != null && badge > 0 && (
+        <span className="mr-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#00ffa3] px-1 text-[10px] font-bold text-black">
+          {badge > 9 ? "9+" : badge}
+        </span>
       )}
+      <ChevronRight className="h-4 w-4 shrink-0 text-white/30" />
+    </Link>
+  );
+}
+
+function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="glass-card overflow-hidden rounded-2xl">
+      <h2 className="px-4 pt-4 pb-2 text-base font-bold text-white">{title}</h2>
+      <div className="divide-y divide-white/5">{children}</div>
     </div>
   );
 }
@@ -212,293 +73,134 @@ function SoldItemCard({
 export default function DashboardPage() {
   const { address, accountId, disconnect } = useHashpackWallet();
   const [mounted, setMounted] = useState(false);
-  const [stats, setStats] = useState<any>(null);
-  const [activeListings, setActiveListings] = useState<any[]>([]);
-  const [soldItems, setSoldItems] = useState<SaleItem[]>([]);
-  const [wishlistItems, setWishlistItems] = useState<
-    { itemId: string; itemType: string; title?: string; price?: string; reservePrice?: string }[]
-  >([]);
-  const [purchaseCount, setPurchaseCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const usdRate = useHbarUsd();
+  const [stats, setStats] = useState<Stats | null>(null);
+  const unreadCount = useUnreadCount();
 
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
-    let cancelled = false;
-    setStats(null);
-    setActiveListings([]);
-    setSoldItems([]);
-    setWishlistItems([]);
-    setPurchaseCount(0);
     if (!address) {
-      setLoading(false);
+      setStats(null);
       return;
     }
-    setLoading(true);
-    Promise.all([
-      fetch(`${getApiUrl()}/api/user/${address}`)
-        .then((res) => res.json())
-        .then((d) => {
-          if (!cancelled) setStats(d);
-        })
-        .catch(() => {
-          if (!cancelled) setStats(null);
-        }),
-      fetch(`${getApiUrl()}/api/user/${address}/listings`)
-        .then((res) => res.json())
-        .then((data: { active?: any[] }) => {
-          if (cancelled) return;
-          setActiveListings(data.active ?? []);
-        })
-        .catch(() => {
-          if (cancelled) return;
-          setActiveListings([]);
-        }),
-      fetch(`${getApiUrl()}/api/wishlist?address=${encodeURIComponent(address)}`)
-        .then((res) => (res.ok ? res.json() : Promise.reject()))
-        .then((data: { items?: { itemId: string; itemType: string }[] }) => {
-          const items = data.items ?? [];
-          Promise.all(
-            items
-              .filter((w) => w.itemType === "listing")
-              .map((w) =>
-                fetch(`${getApiUrl()}/api/listing/${encodeURIComponent(w.itemId)}`)
-                  .then((r) => (r.ok ? r.json() : null))
-                  .then((d) => ({
-                    itemId: w.itemId,
-                    itemType: "listing" as const,
-                    ...(d?.listing ?? {}),
-                  })),
-              ),
-          ).then((rows) => {
-            if (!cancelled) setWishlistItems(rows);
-          });
-        })
-        .catch(() => {
-          if (!cancelled) setWishlistItems([]);
-        }),
-      fetch(`${getApiUrl()}/api/user/${address}/purchases`)
-        .then((res) => (res.ok ? res.json() : Promise.reject(res)))
-        .then((data: { purchases?: SaleItem[] }) => {
-          if (!cancelled) {
-            const all = data.purchases ?? [];
-            setPurchaseCount(all.filter((s) => s.role === "buyer").length);
-            setSoldItems(all.filter((s) => s.role === "seller"));
-          }
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setPurchaseCount(0);
-            setSoldItems([]);
-          }
-        }),
-    ]).finally(() => {
-      if (!cancelled) setLoading(false);
-    });
-    return () => {
-      cancelled = true;
-    };
+    fetch(`${getApiUrl()}/api/user/${address}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setStats(d))
+      .catch(() => setStats(null));
   }, [address]);
 
+  const displayId = accountId || (address ? `${address.slice(0, 6)}…${address.slice(-4)}` : "");
+  const avatarLetter = address ? (address[2]?.toUpperCase() ?? "?") : "?";
+
   return (
-    <main className="min-h-screen">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-8">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl sm:text-2xl font-bold text-white">{accountId || "My Hashpop"}</h1>
-          {address && (
-            <Link
-              href={`/profile/${encodeURIComponent(address)}`}
-              className="text-sm text-chrome hover:text-white font-medium"
-            >
-              ★ {Number(stats?.ratingAverage ?? 0).toFixed(1)}
-            </Link>
-          )}
-        </div>
-
-        <div className="space-y-8" suppressHydrationWarning>
-          {!mounted ? (
-            <p className="text-silver">Loading…</p>
-          ) : !address ? (
-            <p className="text-silver">Please connect your wallet to see your dashboard.</p>
-          ) : (
-            <>
-              {/* Stats */}
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="glass-card p-4 rounded-xl">
-                  <p className="text-sm text-silver">Sales</p>
-                  <p className="text-2xl font-semibold text-white mt-1">{stats?.totalSales ?? 0}</p>
-                </div>
-                <div className="glass-card p-4 rounded-xl">
-                  <p className="text-sm text-silver">Listings</p>
-                  <p className="text-2xl font-semibold text-white mt-1">
-                    {stats?.activeListings ?? 0}
-                  </p>
-                </div>
-                <div className="glass-card p-4 rounded-xl">
-                  <p className="text-sm text-silver">Purchases</p>
-                  <p className="text-2xl font-semibold text-white mt-1">{purchaseCount}</p>
-                  <Link
-                    href="/purchases"
-                    className="text-xs text-chrome hover:text-white mt-1 inline-block"
-                  >
-                    View history
-                  </Link>
-                </div>
+    <main className="min-h-screen slide-in-right">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+        {!mounted ? (
+          <p className="text-silver text-sm">Loading…</p>
+        ) : !address ? (
+          <div className="flex flex-col items-start gap-3">
+            <p className="text-silver">Connect your wallet to see your dashboard.</p>
+            <ConnectWalletButton className="btn-frost-cta text-white disabled:opacity-50" />
+          </div>
+        ) : (
+          <>
+            {/* Profile header */}
+            <div className="flex items-center gap-4">
+              <div className="relative shrink-0">
+                {stats?.profileImageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={stats.profileImageUrl}
+                    alt="Profile"
+                    className="h-14 w-14 rounded-full object-cover ring-2 ring-[#00ffa3]/30"
+                  />
+                ) : (
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#00ffa3] text-2xl font-black text-black select-none">
+                    {avatarLetter}
+                  </div>
+                )}
               </div>
-
-              {/* Active Listings */}
-              <section>
-                <h2 className="text-lg font-semibold text-white mb-3">Current Listings</h2>
-                {loading ? (
-                  <p className="text-silver">Loading…</p>
-                ) : activeListings.length === 0 ? (
-                  <p className="text-silver">
-                    No active listings.{" "}
-                    <Link href="/create" className="text-chrome hover:text-white underline">
-                      Create one
-                    </Link>
-                    .
-                  </p>
+              <div className="min-w-0">
+                <p className="text-base font-bold text-white truncate">{displayId}</p>
+                {stats?.ratingCount ? (
+                  <Link
+                    href={`/profile/${encodeURIComponent(address)}`}
+                    className="inline-flex items-center gap-1 text-sm text-[#00ffa3]"
+                  >
+                    <Star className="h-3.5 w-3.5 fill-current" />
+                    {Number(stats.ratingAverage ?? 0).toFixed(1)}
+                    <span className="text-silver/60 text-xs">({stats.ratingCount})</span>
+                  </Link>
                 ) : (
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {activeListings.map((row) => {
-                      const thumb = row.imageUrl || (Array.isArray(row.mediaUrls) && row.mediaUrls[0]) || null;
-                      const statusColor =
-                        row.status === "LOCKED"
-                          ? "text-amber-400 border-amber-500/40 bg-amber-500/10"
-                          : row.status === "SOLD"
-                          ? "text-rose-400 border-rose-500/40 bg-rose-500/10"
-                          : "text-[#00ffa3] border-[#00ffa3]/30 bg-[#00ffa3]/5";
-                      return (
-                        <Link
-                          key={`${row.itemType || "listing"}-${row.id}`}
-                          href={`/listing/${encodeURIComponent(row.id)}`}
-                          className="glass-card group flex flex-col overflow-hidden hover:border-white/20 transition-colors"
-                        >
-                          {/* Thumbnail */}
-                          <div className="relative aspect-[4/3] w-full bg-white/5 overflow-hidden">
-                            {thumb ? (
-                              <img
-                                src={thumb}
-                                alt={row.title || ""}
-                                className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <span className="text-white/20 text-4xl select-none">□</span>
-                              </div>
-                            )}
-                            {/* Status badge */}
-                            <span
-                              className={`absolute top-2 right-2 text-[10px] font-semibold uppercase tracking-widest px-2 py-0.5 border ${statusColor}`}
-                            >
-                              {row.status === "ACTIVE"
-                                ? "Active"
-                                : row.status === "LOCKED"
-                                ? "In Escrow"
-                                : row.status || "Active"}
-                            </span>
-                          </div>
-
-                          {/* Info */}
-                          <div className="flex flex-col flex-1 p-4 gap-1">
-                            <p className="text-white font-semibold text-sm leading-snug line-clamp-2 group-hover:text-chrome transition-colors">
-                              {row.title || formatListingId(row.id) || row.id.slice(0, 10) + "…"}
-                            </p>
-                            <p className="text-chrome font-semibold text-sm mt-auto pt-2">
-                              {formatHbarWithUsd(
-                                formatPriceForDisplay(row.price || row.reservePrice || "0"),
-                                usdRate,
-                              )}
-                            </p>
-                            <p className="text-silver/50 text-xs">{formatListingDate(row.createdAt)}</p>
-                          </div>
-                        </Link>
-                      );
-                    })}
-                  </div>
+                  <Link
+                    href={`/profile/${encodeURIComponent(address)}`}
+                    className="text-xs text-silver/60 hover:text-white"
+                  >
+                    View profile
+                  </Link>
                 )}
-              </section>
+              </div>
+            </div>
 
-              {/* Sold Items */}
-              <section>
-                <h2 className="text-lg font-semibold text-white mb-3">Sold Items</h2>
-                {loading ? (
-                  <p className="text-silver">Loading…</p>
-                ) : soldItems.length === 0 ? (
-                  <p className="text-silver">No sold items yet.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {soldItems.map((sale) => (
-                      <SoldItemCard
-                        key={sale.id}
-                        sale={sale}
-                        myAddress={address}
-                        usdRate={usdRate}
-                      />
-                    ))}
-                  </div>
-                )}
-              </section>
+            {/* Quick-action row */}
+            <div className="grid grid-cols-3 gap-3">
+              {(
+                [
+                  { href: "/marketplace", icon: Home, label: "Home" },
+                  { href: "/alerts", icon: Bell, label: "Alerts", badge: unreadCount },
+                  { href: "/messages", icon: MessageSquare, label: "Messages" },
+                ] as { href: string; icon: React.ElementType; label: string; badge?: number }[]
+              ).map(({ href, icon: Icon, label, badge }) => (
+                <Link
+                  key={label}
+                  href={href}
+                  className="relative flex flex-col items-center gap-2 rounded-2xl border border-white/10 bg-white/5 py-4 hover:bg-white/10 transition-colors active:bg-white/15"
+                >
+                  <span className="relative">
+                    <Icon className="h-6 w-6 text-white/80" />
+                    {badge != null && badge > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#00ffa3] px-1 text-[9px] font-bold text-black">
+                        {badge > 9 ? "9+" : badge}
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-[11px] font-medium text-silver">{label}</span>
+                </Link>
+              ))}
+            </div>
 
-              {/* Watchlist */}
-              <section>
-                <h2 className="text-lg font-semibold text-white mb-3">Watchlist</h2>
-                {loading ? (
-                  <p className="text-silver">Loading…</p>
-                ) : wishlistItems.length === 0 ? (
-                  <p className="text-silver">
-                    No watchlist items. Add listings from the marketplace with the ♡ or + Add to
-                    wishlist button.
-                  </p>
-                ) : (
-                  <div className="glass-card overflow-hidden rounded-xl">
-                    <ul className="divide-y divide-white/5">
-                      {wishlistItems.map((w) => (
-                        <li
-                          key={w.itemId}
-                          className="flex items-center justify-between p-3 hover:bg-white/5"
-                        >
-                          <Link
-                            href={`/listing/${encodeURIComponent(w.itemId)}`}
-                            className="text-white hover:text-chrome font-medium flex-1 min-w-0 truncate"
-                          >
-                            {w.title || formatListingId(w.itemId) || w.itemId.slice(0, 10) + "…"}
-                          </Link>
-                          <span className="text-chrome text-sm shrink-0 ml-2">
-                            {formatHbarWithUsd(
-                              formatPriceForDisplay(w.price || w.reservePrice || "0"),
-                              usdRate,
-                            )}
-                          </span>
-                          <Link
-                            href={`/listing/${encodeURIComponent(w.itemId)}`}
-                            className="text-chrome hover:text-white text-sm shrink-0 ml-2"
-                          >
-                            View
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </section>
+            {/* Shopping */}
+            <SectionCard title="Shopping">
+              <NavRow href="/watchlist" icon={Heart} label="Watchlist" desc="Keep tabs on watched items" />
+              <NavRow href="/purchases" icon={Package} label="Purchases" desc="Your order history" />
+              <NavRow href="/offers" icon={Tag} label="Bids & Offers" desc="Active auctions and seller offers" />
+            </SectionCard>
 
-              <div className="pt-2">
+            {/* Selling */}
+            <SectionCard title="Selling">
+              <NavRow href="/create" icon={PlusCircle} label="List an Item" />
+              <NavRow href="/selling" icon={Tag} label="Selling Overview" desc="Manage your listings and sales" />
+            </SectionCard>
+
+            {/* Account */}
+            <div className="glass-card overflow-hidden rounded-2xl">
+              <h2 className="px-4 pt-4 pb-2 text-base font-bold text-white">Account</h2>
+              <div className="divide-y divide-white/5">
+                <NavRow href="/support" icon={LifeBuoy} label="Support" />
                 <button
                   type="button"
-                  onClick={() => {
-                    void disconnect();
-                  }}
-                  className="inline-flex items-center rounded-lg border border-white/20 px-4 py-2 text-sm font-medium text-silver transition hover:border-white/30 hover:text-white"
+                  onClick={() => void disconnect()}
+                  className="flex w-full items-center gap-4 px-4 py-3.5 hover:bg-white/5 transition-colors active:bg-white/10"
                 >
-                  Sign out
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-white/80">
+                    <LogOut className="h-5 w-5" />
+                  </span>
+                  <span className="text-sm font-medium text-white">Sign out</span>
                 </button>
               </div>
-            </>
-          )}
-        </div>
+            </div>
+          </>
+        )}
       </div>
     </main>
   );
