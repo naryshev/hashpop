@@ -1671,64 +1671,15 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     }
   });
 
-  router.post("/user/public-key", async (req, res) => {
-    try {
-      const {
-        address: rawAddr,
-        publicKey,
-        signature,
-      } = (req.body || {}) as {
-        address?: string;
-        publicKey?: string;
-        signature?: string;
-      };
-      if (!rawAddr || !publicKey || !signature) {
-        return res.status(400).json({ error: "address, publicKey, and signature required" });
-      }
-      const addr = rawAddr.trim().toLowerCase();
-      const expectedMessage = `hashpop.pubkey:${publicKey}`;
-      let recoveredAddress: string;
-      try {
-        recoveredAddress = ethers.verifyMessage(expectedMessage, signature).toLowerCase();
-      } catch {
-        return res.status(400).json({ error: "Invalid signature" });
-      }
-      if (recoveredAddress !== addr) {
-        return res.status(403).json({ error: "Signature does not match address" });
-      }
-      await prisma.user.upsert({
-        where: { id: addr },
-        update: { publicKey },
-        create: { id: addr, address: addr, publicKey, reputationScore: 0 },
-      });
-      res.json({ success: true });
-    } catch (err) {
-      log.error({ err }, "Failed to register public key");
-      res.status(500).json({ error: "Internal server error" });
-    }
-  });
-
-  router.get("/user/:address/public-key", async (req, res) => {
-    try {
-      const addr = req.params.address?.trim().toLowerCase();
-      if (!addr) return res.status(400).json({ error: "address required" });
-      const user = await prisma.user.findFirst({ where: { address: addr } });
-      res.json({ publicKey: user?.publicKey ?? null });
-    } catch (err) {
-      log.error({ err }, "Failed to fetch public key");
-      res.status(500).json({ error: "Internal server error" });
-    }
-  });
-
   router.post("/messages", async (req, res) => {
     try {
-      const { fromAddress, toAddress, body, listingId, encrypted, nonce } = (req.body || {}) as {
+      const { fromAddress, toAddress, body, listingId, type, imageUrl } = (req.body || {}) as {
         fromAddress?: string;
         toAddress?: string;
         body?: string;
         listingId?: string;
-        encrypted?: boolean;
-        nonce?: string;
+        type?: string;
+        imageUrl?: string;
       };
       const from = fromAddress?.trim().toLowerCase();
       const to = toAddress?.trim().toLowerCase();
@@ -1740,6 +1691,8 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
 
       const listingInput = typeof listingId === "string" ? listingId.trim() : "";
       let normalizedListingId: string | null = null;
+      let resolvedImageUrl: string | null =
+        typeof imageUrl === "string" && imageUrl.trim() ? imageUrl.trim() : null;
 
       if (listingInput) {
         normalizedListingId =
@@ -1748,7 +1701,14 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
             : listingIdToBytes32(listingInput);
         const listing = await prisma.listing.findUnique({ where: { id: normalizedListingId } });
         if (!listing) return res.status(404).json({ error: "Listing not found" });
+
+        // For offer messages, snapshot the listing's primary image so it renders in chat history.
+        if (type === "offer" && !resolvedImageUrl) {
+          resolvedImageUrl = listing.imageUrl || listing.mediaUrls?.[0] || null;
+        }
       }
+
+      const msgType = type === "offer" ? "offer" : "text";
 
       const msg = await prisma.message.create({
         data: {
@@ -1756,8 +1716,8 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           toAddress: to,
           body: text,
           listingId: normalizedListingId,
-          encrypted: encrypted === true,
-          nonce: encrypted === true && nonce ? nonce : null,
+          type: msgType,
+          imageUrl: resolvedImageUrl,
         },
       });
       res.status(201).json({ message: msg });
@@ -1782,7 +1742,10 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         const other = m.fromAddress === address ? m.toAddress : m.fromAddress;
         const key = `${other}-${m.listingId ?? ""}`;
         if (!seen.has(key)) {
-          const preview = m.encrypted ? "[Encrypted message]" : m.body.slice(0, 80);
+          let preview: string;
+          if (m.encrypted) preview = "[Encrypted message]";
+          else if (m.type === "offer") preview = `Offer: ${m.body.slice(0, 72)}`;
+          else preview = m.body.slice(0, 80);
           seen.set(key, { last: m, preview });
         }
       }
