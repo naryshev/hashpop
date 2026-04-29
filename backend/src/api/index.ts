@@ -236,6 +236,34 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     },
   });
 
+  router.post("/upload-avatar", (req, res) => {
+    upload.single("avatar")(req, res, async (err: any) => {
+      try {
+        if (err) {
+          if (err.code === "LIMIT_FILE_SIZE") return res.status(400).json({ error: "Image must be 2MB or smaller" });
+          return res.status(400).json({ error: err.message || "Upload failed" });
+        }
+        const address = (req.body?.address as string)?.trim()?.toLowerCase();
+        if (!address) return res.status(400).json({ error: "address required" });
+        if (!req.file?.buffer) return res.status(400).json({ error: "No image file" });
+        const baseUrl = `${req.protocol}://${req.get("host")}`;
+        const ext = (path.extname(req.file.originalname) || ".jpg").toLowerCase();
+        const safe = /^\.(jpe?g|png|gif|webp)$/.test(ext) ? ext : ".jpg";
+        const filename = `avatar-${Date.now()}-${Math.random().toString(36).slice(2, 10)}${safe}`;
+        const profileImageUrl = await saveUpload(req.file.buffer, filename, req.file.mimetype, baseUrl, uploadsDir);
+        await prisma.user.upsert({
+          where: { address },
+          create: { id: address, address, profileImageUrl },
+          update: { profileImageUrl },
+        });
+        res.json({ profileImageUrl });
+      } catch (e: any) {
+        log.error({ err: e }, "Avatar upload error");
+        res.status(500).json({ error: e?.message || "Internal server error" });
+      }
+    });
+  });
+
   router.post("/upload-listing-image", (req, res) => {
     upload.single("image")(req, res, async (err: any) => {
       try {
@@ -1722,13 +1750,15 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
 
   router.post("/messages", async (req, res) => {
     try {
-      const { fromAddress, toAddress, body, listingId, encrypted, nonce } = (req.body || {}) as {
+      const { fromAddress, toAddress, body, listingId, encrypted, nonce, type, offerAmount } = (req.body || {}) as {
         fromAddress?: string;
         toAddress?: string;
         body?: string;
         listingId?: string;
         encrypted?: boolean;
         nonce?: string;
+        type?: string;
+        offerAmount?: string;
       };
       const from = fromAddress?.trim().toLowerCase();
       const to = toAddress?.trim().toLowerCase();
@@ -1750,6 +1780,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         if (!listing) return res.status(404).json({ error: "Listing not found" });
       }
 
+      const isOffer = type === "offer" && offerAmount;
       const msg = await prisma.message.create({
         data: {
           fromAddress: from,
@@ -1758,6 +1789,9 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           listingId: normalizedListingId,
           encrypted: encrypted === true,
           nonce: encrypted === true && nonce ? nonce : null,
+          type: isOffer ? "offer" : "message",
+          offerAmount: isOffer ? String(offerAmount) : null,
+          offerStatus: isOffer ? "pending" : null,
         },
       });
       res.status(201).json({ message: msg });
@@ -1772,38 +1806,110 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       const address = (req.query.address as string)?.trim()?.toLowerCase();
       if (!address) return res.status(400).json({ error: "address required" });
       const messages = await prisma.message.findMany({
-        where: {
-          OR: [{ fromAddress: address }, { toAddress: address }],
-        },
+        where: { OR: [{ fromAddress: address }, { toAddress: address }] },
         orderBy: { createdAt: "desc" },
       });
-      const seen = new Map<string, { last: (typeof messages)[0]; preview: string }>();
+
+      // Build conversation map keyed by "otherAddress-listingId"
+      type ConvEntry = { last: (typeof messages)[0]; msgs: (typeof messages)[0][] };
+      const seen = new Map<string, ConvEntry>();
       for (const m of messages) {
         const other = m.fromAddress === address ? m.toAddress : m.fromAddress;
-        const key = `${other}-${m.listingId ?? ""}`;
-        if (!seen.has(key)) {
-          const preview = m.encrypted ? "[Encrypted message]" : m.body.slice(0, 80);
-          seen.set(key, { last: m, preview });
+        const key = `${other}||${m.listingId ?? ""}`;
+        const entry = seen.get(key);
+        if (!entry) {
+          seen.set(key, { last: m, msgs: [m] });
+        } else {
+          entry.msgs.push(m);
         }
       }
-      const conversations = Array.from(seen.entries()).map(([key, v]) => {
-        const dash = key.indexOf("-");
-        const otherAddress = dash >= 0 ? key.slice(0, dash) : key;
-        const listingId = dash >= 0 ? key.slice(dash + 1) || null : null;
+
+      // Fetch read receipts for this address
+      const readReceipts = await (prisma as any).conversationRead.findMany({
+        where: { address },
+      }).catch(() => [] as any[]);
+      const readMap = new Map<string, Date>();
+      for (const r of readReceipts) {
+        readMap.set(`${r.otherAddress}||${r.listingId ?? ""}`, new Date(r.lastReadAt));
+      }
+
+      // Collect listing IDs to batch-fetch metadata
+      const listingIds = new Set<string>();
+      for (const [key] of seen) {
+        const listingId = key.split("||")[1];
+        if (listingId) listingIds.add(listingId);
+      }
+      const listings = listingIds.size > 0
+        ? await prisma.listing.findMany({ where: { id: { in: Array.from(listingIds) } }, select: { id: true, title: true, imageUrl: true, price: true } })
+        : [];
+      const listingMeta = new Map(listings.map((l) => [l.id, l]));
+
+      const conversations = Array.from(seen.entries()).map(([key, entry]) => {
+        const [otherAddress, listingId] = key.split("||");
+        const lastReadAt = readMap.get(key);
+        const unreadCount = entry.msgs.filter(
+          (m) => m.fromAddress !== address && (!lastReadAt || new Date(m.createdAt) > lastReadAt),
+        ).length;
+        const last = entry.last;
+        const preview = last.type === "offer"
+          ? `Offer: ${last.offerAmount} HBAR`
+          : last.encrypted
+            ? "[Encrypted message]"
+            : last.body.slice(0, 80);
+        const meta = listingId ? listingMeta.get(listingId) ?? null : null;
         return {
           otherAddress,
-          listingId,
-          lastMessage: v.last,
-          preview: v.preview,
+          listingId: listingId || null,
+          lastMessage: last,
+          preview,
+          unreadCount,
+          listing: meta ? { title: meta.title, imageUrl: rewriteMediaUrlForClient(meta.imageUrl), price: toHbarForClient(meta.price) } : null,
         };
       });
+
       const sorted = conversations.sort(
-        (a, b) =>
-          new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime(),
+        (a, b) => new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime(),
       );
       res.json({ conversations: sorted });
     } catch (err) {
       log.error({ err }, "Failed to fetch inbox");
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  router.post("/messages/mark-read", async (req, res) => {
+    try {
+      const { address, other, listingId } = req.body as { address?: string; other?: string; listingId?: string };
+      if (!address || !other) return res.status(400).json({ error: "address and other required" });
+      const addr = address.toLowerCase();
+      const otherAddr = other.toLowerCase();
+      const lid = listingId ?? "";
+      await (prisma as any).conversationRead.upsert({
+        where: { address_otherAddress_listingId: { address: addr, otherAddress: otherAddr, listingId: lid } },
+        create: { address: addr, otherAddress: otherAddr, listingId: lid, lastReadAt: new Date() },
+        update: { lastReadAt: new Date() },
+      }).catch(() => {});
+      res.json({ ok: true });
+    } catch (err) {
+      log.error({ err }, "Failed to mark read");
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  router.post("/messages/:id/offer-response", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { address, action } = req.body as { address?: string; action?: string };
+      if (!address || !["accepted", "declined"].includes(action ?? "")) {
+        return res.status(400).json({ error: "address and action (accepted|declined) required" });
+      }
+      const msg = await prisma.message.findUnique({ where: { id } });
+      if (!msg) return res.status(404).json({ error: "Message not found" });
+      if (msg.toAddress !== address.toLowerCase()) return res.status(403).json({ error: "Forbidden" });
+      await prisma.message.update({ where: { id }, data: { offerStatus: action } });
+      res.json({ ok: true });
+    } catch (err) {
+      log.error({ err }, "Failed to respond to offer");
       res.status(500).json({ error: "Internal server error" });
     }
   });
@@ -1864,7 +1970,27 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         where,
         orderBy: { createdAt: "asc" },
       });
-      res.json({ messages });
+
+      // Fetch listing metadata for the thread header
+      let listing = null;
+      if (listingId) {
+        const l = await prisma.listing.findUnique({
+          where: { id: listingId },
+          select: { id: true, title: true, imageUrl: true, price: true, seller: true, status: true },
+        }).catch(() => null);
+        if (l) {
+          listing = {
+            id: l.id,
+            title: l.title,
+            imageUrl: rewriteMediaUrlForClient(l.imageUrl),
+            price: toHbarForClient(l.price),
+            seller: l.seller,
+            status: l.status,
+          };
+        }
+      }
+
+      res.json({ messages, listing });
     } catch (err) {
       log.error({ err }, "Failed to fetch thread");
       res.status(500).json({ error: "Internal server error" });
@@ -2039,6 +2165,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           reputation: 0,
           ratingCount,
           ratingAverage,
+          profileImageUrl: null,
         });
       }
 
@@ -2050,6 +2177,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         successful: user.successfulCompletions,
         ratingCount,
         ratingAverage,
+        profileImageUrl: user.profileImageUrl ? rewriteMediaUrlForClient(user.profileImageUrl) : null,
       });
     } catch (err) {
       log.error({ err }, "Failed to fetch user");
