@@ -83,16 +83,17 @@ model Sale {
 }
 
 model User {
-  id                String   @id
-  address           String   @unique
-  publicKey         String?  // X25519 public key (base64), registered on first message send
-  totalSales        Int      @default(0)
-  successfulCompletions Int @default(0)
-  refunds           Int      @default(0)
-  timeouts          Int      @default(0)
-  reputationScore   Int      @default(0)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id                    String   @id
+  address               String   @unique
+  publicKey             String?
+  profileImageUrl       String?
+  totalSales            Int      @default(0)
+  successfulCompletions Int      @default(0)
+  refunds               Int      @default(0)
+  timeouts              Int      @default(0)
+  reputationScore       Int      @default(0)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 }
 
 model Rating {
@@ -118,16 +119,29 @@ model Message {
   body        String
   listingId   String?
   encrypted   Boolean  @default(false)
-  nonce       String?  // base64 nonce used in NaCl box
+  nonce       String?
+  type        String   @default("message") // "message" | "offer"
+  offerAmount String?
+  offerStatus String?  // "pending" | "accepted" | "declined"
   createdAt   DateTime @default(now())
 }
 
+model ConversationRead {
+  id           String   @id @default(cuid())
+  address      String
+  otherAddress String
+  listingId    String   @default("")
+  lastReadAt   DateTime @default(now())
+  @@unique([address, otherAddress, listingId])
+  @@index([address])
+}
+
 model WishlistItem {
-  id         String   @id @default(cuid())
+  id          String   @id @default(cuid())
   userAddress String
-  itemId     String
-  itemType   String   // "listing" | "auction"
-  createdAt  DateTime @default(now())
+  itemId      String
+  itemType    String   // "listing" | "auction"
+  createdAt   DateTime @default(now())
   @@unique([userAddress, itemId])
   @@index([userAddress])
 }

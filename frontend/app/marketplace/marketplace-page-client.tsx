@@ -12,6 +12,7 @@ import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { canonicalizeCategory } from "../../lib/categories";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
+import { AddressDisplay } from "../../components/AddressDisplay";
 
 function formatListingId(id: string): string {
   if (!id || !id.startsWith("0x") || id.length !== 66) return id;
@@ -69,14 +70,6 @@ function getStatusBadge(
   };
 }
 
-function formatSellerDisplay(seller?: string): string {
-  if (!seller) return "";
-  if (/^\d+\.\d+\.\d+$/.test(seller)) return seller;
-  if (seller.startsWith("0x") && seller.length > 12)
-    return `${seller.slice(0, 6)}…${seller.slice(-4)}`;
-  return seller;
-}
-
 function parsePostedWithinDays(value: string): number | null {
   if (!value) return null;
   const daysMap: Record<string, number> = {
@@ -116,7 +109,7 @@ export default function MarketplacePageClient({
   initialItems: ListingItem[];
   initialError: string | null;
 }) {
-  const { isConnected } = useHashpackWallet();
+  const { isConnected, address } = useHashpackWallet();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [searchInput, setSearchInput] = useState("");
@@ -443,7 +436,9 @@ export default function MarketplacePageClient({
         ) : (
           <>
             <div className="sm:hidden space-y-3">
-              {filteredItems.map((item) => (
+              {filteredItems.map((item) => {
+                const isOwn = address && item.seller?.toLowerCase() === address.toLowerCase();
+                return (
                 <Link
                   key={`${item.itemType}-${item.id}`}
                   href={`/listing/${encodeURIComponent(item.id)}`}
@@ -473,11 +468,11 @@ export default function MarketplacePageClient({
                     </h2>
                     {item.seller && (
                       <p className="text-silver/50 text-[10px] mt-1 font-mono truncate">
-                        {formatSellerDisplay(item.seller)}
+                        <AddressDisplay address={item.seller} showAvatar />
                       </p>
                     )}
                     <div className="flex items-center justify-between mt-1.5">
-                      <p className="text-chrome font-semibold">
+                      <p className={`font-semibold ${isOwn ? "text-amber-400" : "text-chrome"}`}>
                         {formatHbarWithUsd(formatPriceForDisplay(item.price || "0"), usdRate)}
                       </p>
                       {(item.watchlistCount ?? 0) > 0 && (
@@ -488,14 +483,17 @@ export default function MarketplacePageClient({
                     </div>
                   </div>
                 </Link>
-              ))}
+                );
+              })}
             </div>
             <div className="hidden sm:grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {filteredItems.map((item) => (
+              {filteredItems.map((item) => {
+                const isOwn = address && item.seller?.toLowerCase() === address.toLowerCase();
+                return (
                 <Link
                   key={`${item.itemType}-${item.id}`}
                   href={`/listing/${encodeURIComponent(item.id)}`}
-                  className="glass-card overflow-hidden transition-all duration-200 hover:border-white/20 hover:shadow-glow"
+                  className={`glass-card overflow-hidden transition-all duration-200 ${isOwn ? "hover:border-amber-400/50 hover:shadow-[0_0_22px_rgba(251,191,36,0.35)]" : "hover:border-white/20 hover:shadow-glow"}`}
                 >
                   <div className="relative bg-white/5">
                     <ListingMedia
@@ -524,7 +522,7 @@ export default function MarketplacePageClient({
                     </h2>
                     {item.seller && (
                       <p className="text-silver/50 text-[11px] mt-1 font-mono truncate">
-                        {formatSellerDisplay(item.seller)}
+                        <AddressDisplay address={item.seller} showAvatar />
                       </p>
                     )}
                     <div className="flex items-center justify-between mt-2">
@@ -539,7 +537,8 @@ export default function MarketplacePageClient({
                     </div>
                   </div>
                 </Link>
-              ))}
+                );
+              })}
             </div>
           </>
         )}

@@ -19,10 +19,10 @@ const signInLinks = [
 function Icon({ name }: { name: string }) {
   const c = "w-5 h-5";
   switch (name) {
-    case "menu":
+    case "home":
       return (
         <svg className={c} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
         </svg>
       );
     case "browse":
@@ -87,8 +87,8 @@ function Icon({ name }: { name: string }) {
 
 export function BottomNav({
   signInMode = false,
-  showMenu = false,
-  onMenuClick,
+  showMenu: _showMenu = false,
+  onMenuClick: _onMenuClick,
 }: {
   signInMode?: boolean;
   showMenu?: boolean;
@@ -98,10 +98,17 @@ export function BottomNav({
   const router = useRouter();
   const navLinks = signInMode ? signInLinks : links;
   const [searchOpen, setSearchOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [filterMinPrice, setFilterMinPrice] = useState("");
+  const [filterMaxPrice, setFilterMaxPrice] = useState("");
+  const [filterPostedWithin, setFilterPostedWithin] = useState("");
+  const [filterCondition, setFilterCondition] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const navRef = useRef<HTMLElement>(null);
 
-  const totalCols = (showMenu ? 1 : 0) + navLinks.length;
+  const totalCols = (!signInMode ? 1 : 0) + navLinks.length;
+  const hasActiveFilters = !!(filterMinPrice || filterMaxPrice || filterPostedWithin || filterCondition);
 
   useEffect(() => {
     if (searchOpen) {
@@ -110,8 +117,9 @@ export function BottomNav({
     }
   }, [searchOpen]);
 
-  const closeSearch = () => {
+  const closeAll = () => {
     setSearchOpen(false);
+    setFilterOpen(false);
     setSearchQuery("");
     searchInputRef.current?.blur();
   };
@@ -119,22 +127,61 @@ export function BottomNav({
   useEffect(() => {
     if (!searchOpen) return;
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeSearch();
+      if (e.key === "Escape") closeAll();
+    };
+    const handleOutside = (e: MouseEvent | TouchEvent) => {
+      if (navRef.current && !navRef.current.contains(e.target as Node)) closeAll();
     };
     document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
+    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("touchstart", handleOutside);
+    return () => {
+      document.removeEventListener("keydown", handleKey);
+      document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("touchstart", handleOutside);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchOpen]);
 
+  const buildParams = (q: string) => {
+    const p = new URLSearchParams();
+    if (q) p.set("q", q);
+    if (filterMinPrice) p.set("minPrice", filterMinPrice);
+    if (filterMaxPrice) p.set("maxPrice", filterMaxPrice);
+    if (filterPostedWithin) p.set("postedWithin", filterPostedWithin);
+    if (filterCondition) p.set("condition", filterCondition);
+    return p.toString();
+  };
+
+  const submitSearch = () => {
+    const q = searchQuery.trim();
+    const params = buildParams(q);
+    closeAll();
+    router.push(params ? `/marketplace?${params}` : "/marketplace");
+  };
+
+  const applyFilters = () => {
+    const q = searchQuery.trim();
+    const params = buildParams(q);
+    closeAll();
+    router.push(params ? `/marketplace?${params}` : "/marketplace");
+  };
+
+  const clearFilters = () => {
+    setFilterMinPrice("");
+    setFilterMaxPrice("");
+    setFilterPostedWithin("");
+    setFilterCondition("");
+  };
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    closeSearch();
-    const q = searchQuery.trim();
-    router.push(q ? `/marketplace?q=${encodeURIComponent(q)}` : "/marketplace");
+    submitSearch();
   };
 
   return (
     <nav
+      ref={navRef}
       className={`fixed top-0 left-0 right-0 z-30 bg-black/90 backdrop-blur-[20px] shadow-[0_4px_16px_rgba(0,0,0,0.4)] ${signInMode ? "" : "md:hidden"}`}
       style={{ paddingTop: "env(safe-area-inset-top, 0)" }}
     >
@@ -142,17 +189,17 @@ export function BottomNav({
         className="grid items-center border-b border-white/10"
         style={{ gridTemplateColumns: `repeat(${totalCols}, minmax(0, 1fr))` }}
       >
-        {/* Hamburger — leftmost, only when sidebar is present */}
-        {showMenu && (
-          <button
-            type="button"
-            onClick={onMenuClick}
-            className="flex flex-col items-center justify-center gap-0.5 py-2 px-1 text-silver hover:text-white transition-colors"
-            aria-label="Open menu"
+        {/* Home — always first on non-sign-in nav */}
+        {!signInMode && (
+          <Link
+            href="/marketplace"
+            className={`flex flex-col items-center justify-center gap-0.5 py-2 px-1 transition-colors ${
+              pathname === "/marketplace" ? "text-chrome" : "text-silver hover:text-white"
+            }`}
           >
-            <Icon name="menu" />
-            <span className="text-[11px] font-medium">Menu</span>
-          </button>
+            <Icon name="home" />
+            <span className="text-[11px] font-medium">Home</span>
+          </Link>
         )}
 
         {navLinks.map(({ href, label, icon }) => {
@@ -164,7 +211,7 @@ export function BottomNav({
               <button
                 key="search"
                 type="button"
-                onClick={() => (searchOpen ? closeSearch() : setSearchOpen(true))}
+                onClick={() => (searchOpen ? closeAll() : setSearchOpen(true))}
                 className="flex flex-col items-center justify-center py-2 px-1"
                 aria-label={searchOpen ? "Close search" : "Open search"}
                 aria-expanded={searchOpen}
@@ -197,7 +244,7 @@ export function BottomNav({
         })}
       </div>
 
-      {/* Sliding green search panel */}
+      {/* Sliding search bar */}
       <div
         className={`overflow-hidden transition-all duration-300 ease-out ${
           searchOpen ? "max-h-20 opacity-100" : "max-h-0 opacity-0"
@@ -228,23 +275,111 @@ export function BottomNav({
               className="flex-1 bg-transparent text-sm text-white placeholder:text-[#00ffa3]/40 focus:outline-none"
               aria-label="Search query"
             />
+            {/* Filter icon — toggles filter panel */}
             <button
               type="button"
-              onClick={closeSearch}
-              className="shrink-0 text-[#00ffa3]/50 hover:text-[#00ffa3] transition-colors"
-              aria-label="Close search"
+              onClick={() => setFilterOpen((o) => !o)}
+              className={`shrink-0 transition-colors ${filterOpen || hasActiveFilters ? "text-[#00ffa3]" : "text-[#00ffa3]/60 hover:text-[#00ffa3]"}`}
+              aria-label="Toggle filters"
+              aria-expanded={filterOpen}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
+                  d="M3 4h18M7 12h10M11 20h2"
                 />
               </svg>
             </button>
           </div>
         </form>
+      </div>
+
+      {/* Sliding filter panel */}
+      <div
+        className={`overflow-hidden transition-all duration-300 ease-out ${
+          searchOpen && filterOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
+        }`}
+      >
+        <div className="px-3 pb-3 space-y-3 border-t border-white/10 pt-2.5">
+          <p className="text-[10px] font-semibold tracking-widest text-silver/60 uppercase">Filters</p>
+
+          {/* Price range */}
+          <div>
+            <span className="text-xs text-silver/70 mb-1.5 block">Price (HBAR)</span>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="0"
+                step="any"
+                value={filterMinPrice}
+                onChange={(e) => setFilterMinPrice(e.target.value)}
+                placeholder="Min"
+                className="flex-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-sm text-white placeholder:text-white/30 focus:border-[#00ffa3]/50 focus:outline-none"
+              />
+              <span className="text-silver/40 text-xs shrink-0">–</span>
+              <input
+                type="number"
+                min="0"
+                step="any"
+                value={filterMaxPrice}
+                onChange={(e) => setFilterMaxPrice(e.target.value)}
+                placeholder="Max"
+                className="flex-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-sm text-white placeholder:text-white/30 focus:border-[#00ffa3]/50 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          {/* Date + Condition row */}
+          <div className="flex gap-2">
+            <select
+              value={filterPostedWithin}
+              onChange={(e) => setFilterPostedWithin(e.target.value)}
+              className="flex-1 rounded-lg border border-white/10 bg-[#0b111b] px-2 py-1.5 text-sm text-white focus:border-[#00ffa3]/50 focus:outline-none"
+            >
+              <option value="">Any time</option>
+              <option value="1d">Last 24h</option>
+              <option value="1w">Last week</option>
+              <option value="1m">Last month</option>
+              <option value="3m">Last 3 months</option>
+              <option value="6m">Last 6 months</option>
+              <option value="1y">Last year</option>
+            </select>
+            <select
+              value={filterCondition}
+              onChange={(e) => setFilterCondition(e.target.value)}
+              className="flex-1 rounded-lg border border-white/10 bg-[#0b111b] px-2 py-1.5 text-sm text-white focus:border-[#00ffa3]/50 focus:outline-none"
+            >
+              <option value="">Any condition</option>
+              <option value="new">New</option>
+              <option value="like new">Like New</option>
+              <option value="good">Good</option>
+              <option value="fair">Fair</option>
+              <option value="poor">Poor</option>
+            </select>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex gap-2 pt-0.5">
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="flex-1 rounded-lg border border-white/10 py-2 text-xs text-silver/70 hover:text-white transition-colors"
+              >
+                Clear
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={applyFilters}
+              className="flex-1 rounded-lg bg-[#00ffa3]/15 border border-[#00ffa3]/50 py-2 text-xs font-semibold text-[#00ffa3] hover:bg-[#00ffa3]/25 transition-colors"
+            >
+              Apply
+            </button>
+          </div>
+        </div>
       </div>
     </nav>
   );
