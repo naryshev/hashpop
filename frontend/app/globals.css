@@ -42,6 +42,14 @@ body {
   }
 }
 
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(22px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.slide-in-right {
+  animation: slideInRight 0.26s ease-out both;
+}
+
 /* Remove tap highlight flash on mobile for a native app feel */
 * {
   -webkit-tap-highlight-color: transparent;
