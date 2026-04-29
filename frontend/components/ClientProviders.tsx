@@ -4,6 +4,7 @@ import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { usePathname } from "next/navigation";
 import { HashpackWalletProvider } from "../lib/hashpackWallet";
+import { HashPackConfirmProvider } from "../lib/hashpackConfirm";
 import { Footer } from "./Footer";
 import { BottomNav } from "./BottomNav";
 import { WalletAccountSync } from "./WalletAccountSync";
@@ -23,6 +24,7 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
   return (
     <HashpackWalletProvider>
       <QueryClientProvider client={qc}>
+        <HashPackConfirmProvider>
         <WalletAccountSync />
         {useSidebarNav ? (
           <div className="min-h-screen pt-14 md:pt-0 flex flex-col md:flex-row">
@@ -51,6 +53,7 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
             onMenuClick={() => setSidebarOpen(true)}
           />
         )}
+        </HashPackConfirmProvider>
       </QueryClientProvider>
     </HashpackWalletProvider>
   );
