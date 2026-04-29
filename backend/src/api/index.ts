@@ -1808,6 +1808,31 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     }
   });
 
+  router.get("/messages/unread-count", async (req, res) => {
+    try {
+      const address = (req.query.address as string)?.trim()?.toLowerCase();
+      if (!address) return res.status(400).json({ error: "address required" });
+      const messages = await prisma.message.findMany({
+        where: { OR: [{ fromAddress: address }, { toAddress: address }] },
+        orderBy: { createdAt: "desc" },
+      });
+      const seen = new Map<string, (typeof messages)[0]>();
+      for (const m of messages) {
+        const other = m.fromAddress === address ? m.toAddress : m.fromAddress;
+        const key = `${other}-${m.listingId ?? ""}`;
+        if (!seen.has(key)) seen.set(key, m);
+      }
+      let count = 0;
+      for (const m of seen.values()) {
+        if (m.fromAddress !== address) count++;
+      }
+      res.json({ count });
+    } catch (err) {
+      log.error({ err }, "Failed to fetch unread count");
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   router.get("/messages/thread", async (req, res) => {
     try {
       const address = (req.query.address as string)?.trim()?.toLowerCase();

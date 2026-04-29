@@ -116,7 +116,7 @@ export default function MarketplacePageClient({
   initialItems: ListingItem[];
   initialError: string | null;
 }) {
-  const { isConnected } = useHashpackWallet();
+  const { isConnected, address } = useHashpackWallet();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [searchInput, setSearchInput] = useState("");
@@ -443,7 +443,9 @@ export default function MarketplacePageClient({
         ) : (
           <>
             <div className="sm:hidden space-y-3">
-              {filteredItems.map((item) => (
+              {filteredItems.map((item) => {
+                const isOwn = address && item.seller?.toLowerCase() === address.toLowerCase();
+                return (
                 <Link
                   key={`${item.itemType}-${item.id}`}
                   href={`/listing/${encodeURIComponent(item.id)}`}
@@ -477,7 +479,7 @@ export default function MarketplacePageClient({
                       </p>
                     )}
                     <div className="flex items-center justify-between mt-1.5">
-                      <p className="text-chrome font-semibold">
+                      <p className={`font-semibold ${isOwn ? "text-amber-400" : "text-chrome"}`}>
                         {formatHbarWithUsd(formatPriceForDisplay(item.price || "0"), usdRate)}
                       </p>
                       {(item.watchlistCount ?? 0) > 0 && (
@@ -488,14 +490,17 @@ export default function MarketplacePageClient({
                     </div>
                   </div>
                 </Link>
-              ))}
+                );
+              })}
             </div>
             <div className="hidden sm:grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {filteredItems.map((item) => (
+              {filteredItems.map((item) => {
+                const isOwn = address && item.seller?.toLowerCase() === address.toLowerCase();
+                return (
                 <Link
                   key={`${item.itemType}-${item.id}`}
                   href={`/listing/${encodeURIComponent(item.id)}`}
-                  className="glass-card overflow-hidden transition-all duration-200 hover:border-white/20 hover:shadow-glow"
+                  className={`glass-card overflow-hidden transition-all duration-200 ${isOwn ? "hover:border-amber-400/50 hover:shadow-[0_0_22px_rgba(251,191,36,0.35)]" : "hover:border-white/20 hover:shadow-glow"}`}
                 >
                   <div className="relative bg-white/5">
                     <ListingMedia
@@ -539,7 +544,8 @@ export default function MarketplacePageClient({
                     </div>
                   </div>
                 </Link>
-              ))}
+                );
+              })}
             </div>
           </>
         )}
