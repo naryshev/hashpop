@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Interface } from "ethers";
 import { useHashpackWallet } from "../lib/hashpackWallet";
+import { useHashPackConfirm } from "../lib/hashpackConfirm";
 
 type WriteRequest = {
   address: `0x${string}`;
@@ -119,6 +120,7 @@ class TransactionRevertError extends Error {
 
 export function useHashpackContractWrite() {
   const { hashconnect, accountId, isConnected, refreshAccountData, network } = useHashpackWallet();
+  const { show: showConfirmPrompt, hide: hideConfirmPrompt } = useHashPackConfirm();
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [lastHash, setLastHash] = useState<string | null>(null);
@@ -232,6 +234,7 @@ export function useHashpackContractWrite() {
               if (typeof (tx as any).isFrozen === "function" && !(tx as any).isFrozen()) {
                 tx.freezeWith(freezeClient);
               }
+              showConfirmPrompt();
               walletPrompted = true;
               const signedTx = await signer.signTransaction(tx as any);
               const txResponse = await (signedTx as any).execute(freezeClient);
@@ -259,6 +262,7 @@ export function useHashpackContractWrite() {
               if (typeof (tx as any).isFrozen === "function" && !(tx as any).isFrozen()) {
                 tx.freezeWith(freezeClient);
               }
+              showConfirmPrompt();
               walletPrompted = true;
               const signedTx = await signer.signTransaction(tx as any);
               const txResponse = await (signedTx as any).execute(freezeClient);
@@ -272,6 +276,7 @@ export function useHashpackContractWrite() {
               });
             } else {
               // Fallback for older HashConnect behavior
+              showConfirmPrompt();
               walletPrompted = true;
               receipt = await (hashconnect as any).sendTransaction(accountObj as any, tx as any);
               txId = tx.transactionId?.toString?.() ?? receipt?.transactionId?.toString?.() ?? txId;
@@ -369,6 +374,7 @@ export function useHashpackContractWrite() {
       } finally {
         inFlightRef.current = false;
         safeSetPending(false);
+        hideConfirmPrompt();
       }
     },
     [accountId, hashconnect, isConnected, network, refreshAccountData],

@@ -31,6 +31,17 @@ body {
   padding-right: env(safe-area-inset-right);
 }
 
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Remove tap highlight flash on mobile for a native app feel */
 * {
   -webkit-tap-highlight-color: transparent;
