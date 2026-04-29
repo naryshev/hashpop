@@ -1437,7 +1437,7 @@ export default function ListingPage() {
             <div>
               <h3 className="text-white font-medium mb-2">Seller</h3>
               <p className="text-silver text-sm flex items-center gap-2">
-                <AddressDisplay address={item!.seller} className="text-chrome font-mono text-xs" />
+                <AddressDisplay address={item!.seller} className="text-chrome font-mono text-xs" showAvatar />
               </p>
               {isSeller && isSellerActiveListing && !isLockedOnChain && !editing && (
                 <div className="flex gap-2 mt-2">

@@ -7,6 +7,7 @@ import { useHashpackWallet } from "../../lib/hashpackWallet";
 import { getApiUrl } from "../../lib/apiUrl";
 import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
+import { UserAvatar } from "../../components/UserAvatar";
 
 type SaleItem = {
   id: string;
@@ -98,9 +99,7 @@ function OfferRow({ conv, myAddress }: { conv: Conversation; myAddress: string }
   const href = `/messages?openThread=${encodeURIComponent(conv.otherAddress)}${conv.listingId ? `&listingId=${encodeURIComponent(conv.listingId)}` : ""}`;
   return (
     <Link href={href} className="flex items-center gap-3 p-3 hover:bg-white/5 transition-colors active:bg-white/10">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-white/70 text-sm font-bold select-none">
-        {conv.otherAddress[2]?.toUpperCase() ?? "?"}
-      </div>
+      <UserAvatar address={conv.otherAddress} size="md" />
       <div className="flex-1 min-w-0">
         <p className="text-white text-sm font-medium truncate">{shortAddr(conv.otherAddress)}</p>
         <p className="text-silver/60 text-xs mt-0.5 truncate">
@@ -118,10 +117,7 @@ function UnreadRow({ conv, myAddress }: { conv: Conversation; myAddress: string 
   const href = `/messages?openThread=${encodeURIComponent(conv.otherAddress)}${conv.listingId ? `&listingId=${encodeURIComponent(conv.listingId)}` : ""}`;
   return (
     <Link href={href} className="flex items-center gap-3 p-3 hover:bg-white/5 transition-colors active:bg-white/10">
-      <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-white/70 text-sm font-bold select-none">
-        {conv.otherAddress[2]?.toUpperCase() ?? "?"}
-        <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-[#00ffa3] border-2 border-[#0b111b]" />
-      </div>
+      <UserAvatar address={conv.otherAddress} size="md" withDot />
       <div className="flex-1 min-w-0">
         <p className="text-white text-sm font-semibold truncate">{shortAddr(conv.otherAddress)}</p>
         <p className="text-silver/60 text-xs mt-0.5 truncate">

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
 import { getApiUrl } from "../../lib/apiUrl";
+import { UserAvatar } from "../../components/UserAvatar";
 
 type Conversation = {
   otherAddress: string;
@@ -46,12 +47,7 @@ function OfferCard({ conv, myAddress }: { conv: Conversation; myAddress: string 
       href={href}
       className="flex items-center gap-4 p-4 hover:bg-white/5 transition-colors active:bg-white/10"
     >
-      <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-white/80 text-base font-bold select-none">
-        {conv.otherAddress[2]?.toUpperCase() ?? "?"}
-        {isUnread && (
-          <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-[#00ffa3] border-2 border-[#0b111b]" />
-        )}
-      </div>
+      <UserAvatar address={conv.otherAddress} size="md" withDot={isUnread} />
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
           <p className={`text-sm truncate ${isUnread ? "text-white font-semibold" : "text-white font-medium"}`}>

@@ -100,6 +100,7 @@ export function BottomNav({
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const navRef = useRef<HTMLElement>(null);
 
   const totalCols = (!signInMode ? 1 : 0) + navLinks.length;
 
@@ -121,20 +122,36 @@ export function BottomNav({
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") closeSearch();
     };
+    const handleOutside = (e: MouseEvent | TouchEvent) => {
+      if (navRef.current && !navRef.current.contains(e.target as Node)) closeSearch();
+    };
     document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
+    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("touchstart", handleOutside);
+    return () => {
+      document.removeEventListener("keydown", handleKey);
+      document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("touchstart", handleOutside);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchOpen]);
 
+  const submitSearch = () => {
+    const q = searchQuery.trim();
+    setSearchOpen(false);
+    setSearchQuery("");
+    searchInputRef.current?.blur();
+    router.push(q ? `/marketplace?q=${encodeURIComponent(q)}` : "/marketplace");
+  };
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    closeSearch();
-    const q = searchQuery.trim();
-    router.push(q ? `/marketplace?q=${encodeURIComponent(q)}` : "/marketplace");
+    submitSearch();
   };
 
   return (
     <nav
+      ref={navRef}
       className={`fixed top-0 left-0 right-0 z-30 bg-black/90 backdrop-blur-[20px] shadow-[0_4px_16px_rgba(0,0,0,0.4)] ${signInMode ? "" : "md:hidden"}`}
       style={{ paddingTop: "env(safe-area-inset-top, 0)" }}
     >
@@ -230,16 +247,17 @@ export function BottomNav({
             />
             <button
               type="button"
-              onClick={closeSearch}
-              className="shrink-0 text-[#00ffa3]/50 hover:text-[#00ffa3] transition-colors"
-              aria-label="Close search"
+              onClick={submitSearch}
+              className="shrink-0 text-[#00ffa3]/70 hover:text-[#00ffa3] transition-colors"
+              aria-label="Filter searches"
             >
+              {/* sliders / filter (inverted hamburger) */}
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
+                  d="M3 4h18M7 12h10M11 20h2"
                 />
               </svg>
             </button>

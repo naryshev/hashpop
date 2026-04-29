@@ -210,7 +210,7 @@ export default function ProfilePage() {
                     <p className="text-sm text-white/90 leading-relaxed">{r.comment}</p>
                   ) : null}
                   <p className="text-xs text-silver/50">
-                    by <AddressDisplay address={r.reviewerAddress} className="font-mono" />
+                    by <AddressDisplay address={r.reviewerAddress} className="font-mono" showAvatar />
                   </p>
                 </div>
               ))}

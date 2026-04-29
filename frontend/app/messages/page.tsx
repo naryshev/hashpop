@@ -11,6 +11,7 @@ import { formatPriceForDisplay } from "../../lib/formatPrice";
 import { ConnectWalletButton } from "../../components/ConnectWalletButton";
 import { AddressDisplay } from "../../components/AddressDisplay";
 import { BackToHashpop } from "../../components/BackToHashpop";
+import { UserAvatar } from "../../components/UserAvatar";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -82,22 +83,6 @@ function LockIcon() {
       <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
       <path d="M7 11V7a5 5 0 0 1 10 0v4" />
     </svg>
-  );
-}
-
-function Avatar({ imageUrl, title }: { imageUrl?: string | null; title?: string | null }) {
-  if (imageUrl) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={imageUrl} alt={title || ""} className="w-full h-full object-cover" />
-    );
-  }
-  return (
-    <div className="w-full h-full flex items-center justify-center bg-white/10">
-      <svg className="w-5 h-5 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2zM16 3H8l-2 4h12l-2-4z" />
-      </svg>
-    </div>
   );
 }
 
@@ -371,9 +356,17 @@ function MessagesPageContent() {
                             onClick={() => selectThread(c.otherAddress, listingKey)}
                             className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-colors ${isSelected ? "bg-white/10" : "hover:bg-white/5"}`}
                           >
-                            {/* Thumbnail */}
-                            <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-white/5">
-                              <Avatar imageUrl={c.listing?.imageUrl} title={c.listing?.title} />
+                            {/* User avatar (with optional listing thumbnail overlay) */}
+                            <div className="relative shrink-0">
+                              <UserAvatar address={c.otherAddress} size="md" />
+                              {c.listing?.imageUrl && (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={c.listing.imageUrl}
+                                  alt={c.listing.title ?? ""}
+                                  className="absolute -bottom-0.5 -right-0.5 h-5 w-5 rounded-md object-cover ring-2 ring-[#0b111b]"
+                                />
+                              )}
                             </div>
 
                             {/* Text */}
@@ -430,9 +423,7 @@ function MessagesPageContent() {
 
                   {threadListing ? (
                     <>
-                      <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-white/5">
-                        <Avatar imageUrl={threadListing.imageUrl} title={threadListing.title} />
-                      </div>
+                      <UserAvatar address={selectedThread.other} size="md" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-white truncate">
                           {threadListing.title ?? <AddressDisplay address={selectedThread.other} />}
@@ -449,7 +440,10 @@ function MessagesPageContent() {
                       </Link>
                     </>
                   ) : (
-                    <p className="text-sm font-semibold text-white"><AddressDisplay address={selectedThread.other} /></p>
+                    <>
+                      <UserAvatar address={selectedThread.other} size="md" />
+                      <p className="text-sm font-semibold text-white"><AddressDisplay address={selectedThread.other} /></p>
+                    </>
                   )}
                 </div>
 

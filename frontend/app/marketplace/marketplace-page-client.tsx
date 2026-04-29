@@ -12,6 +12,7 @@ import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { canonicalizeCategory } from "../../lib/categories";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
+import { AddressDisplay } from "../../components/AddressDisplay";
 
 function formatListingId(id: string): string {
   if (!id || !id.startsWith("0x") || id.length !== 66) return id;
@@ -67,14 +68,6 @@ function getStatusBadge(
     label: "SOLD",
     className: "bg-rose-500 border-rose-400 text-white",
   };
-}
-
-function formatSellerDisplay(seller?: string): string {
-  if (!seller) return "";
-  if (/^\d+\.\d+\.\d+$/.test(seller)) return seller;
-  if (seller.startsWith("0x") && seller.length > 12)
-    return `${seller.slice(0, 6)}…${seller.slice(-4)}`;
-  return seller;
 }
 
 function parsePostedWithinDays(value: string): number | null {
@@ -475,7 +468,7 @@ export default function MarketplacePageClient({
                     </h2>
                     {item.seller && (
                       <p className="text-silver/50 text-[10px] mt-1 font-mono truncate">
-                        {formatSellerDisplay(item.seller)}
+                        <AddressDisplay address={item.seller} showAvatar />
                       </p>
                     )}
                     <div className="flex items-center justify-between mt-1.5">
@@ -529,7 +522,7 @@ export default function MarketplacePageClient({
                     </h2>
                     {item.seller && (
                       <p className="text-silver/50 text-[11px] mt-1 font-mono truncate">
-                        {formatSellerDisplay(item.seller)}
+                        <AddressDisplay address={item.seller} showAvatar />
                       </p>
                     )}
                     <div className="flex items-center justify-between mt-2">

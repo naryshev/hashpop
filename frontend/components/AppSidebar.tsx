@@ -17,6 +17,7 @@ import {
 import { Sidebar, SidebarBody, SidebarLink } from "./ui/sidebar";
 import { cn } from "../lib/utils";
 import { useHashpackWallet } from "../lib/hashpackWallet";
+import { UserAvatar } from "./UserAvatar";
 
 type NavLink = {
   label: string;
@@ -32,7 +33,7 @@ export function AppSidebar({
   setOpen?: React.Dispatch<React.SetStateAction<boolean>>;
 }) {
   const pathname = usePathname();
-  const { isConnected, accountId, disconnect } = useHashpackWallet();
+  const { isConnected, accountId, address, disconnect } = useHashpackWallet();
   const [openState, setOpenState] = useState(false);
   const open = openProp !== undefined ? openProp : openState;
   const setOpen = setOpenProp !== undefined ? setOpenProp : setOpenState;
@@ -100,12 +101,19 @@ export function AppSidebar({
         </div>
         <div className="space-y-1">
           {isConnected && accountId ? (
-            <div className="flex items-center gap-2 px-2 py-1">
-              <UserCircle className="h-5 w-5 flex-shrink-0 text-neutral-500 dark:text-neutral-400" />
+            <Link
+              href={address ? `/profile/${address}` : "/dashboard"}
+              className="flex items-center gap-2 px-2 py-1 hover:bg-neutral-200/50 dark:hover:bg-white/5 rounded-lg transition-colors"
+            >
+              {address ? (
+                <UserAvatar address={address} size="sm" />
+              ) : (
+                <UserCircle className="h-5 w-5 flex-shrink-0 text-neutral-500 dark:text-neutral-400" />
+              )}
               {open && (
                 <p className="text-xs text-neutral-600 dark:text-neutral-300 truncate">{accountId}</p>
               )}
-            </div>
+            </Link>
           ) : null}
           {isConnected && (
             <button
