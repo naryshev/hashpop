@@ -19,10 +19,10 @@ const signInLinks = [
 function Icon({ name }: { name: string }) {
   const c = "w-5 h-5";
   switch (name) {
-    case "menu":
+    case "home":
       return (
         <svg className={c} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
         </svg>
       );
     case "browse":
@@ -87,8 +87,8 @@ function Icon({ name }: { name: string }) {
 
 export function BottomNav({
   signInMode = false,
-  showMenu = false,
-  onMenuClick,
+  showMenu: _showMenu = false,
+  onMenuClick: _onMenuClick,
 }: {
   signInMode?: boolean;
   showMenu?: boolean;
@@ -101,7 +101,7 @@ export function BottomNav({
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const totalCols = (showMenu ? 1 : 0) + navLinks.length;
+  const totalCols = (!signInMode ? 1 : 0) + navLinks.length;
 
   useEffect(() => {
     if (searchOpen) {
@@ -142,17 +142,17 @@ export function BottomNav({
         className="grid items-center border-b border-white/10"
         style={{ gridTemplateColumns: `repeat(${totalCols}, minmax(0, 1fr))` }}
       >
-        {/* Hamburger — leftmost, only when sidebar is present */}
-        {showMenu && (
-          <button
-            type="button"
-            onClick={onMenuClick}
-            className="flex flex-col items-center justify-center gap-0.5 py-2 px-1 text-silver hover:text-white transition-colors"
-            aria-label="Open menu"
+        {/* Home — always first on non-sign-in nav */}
+        {!signInMode && (
+          <Link
+            href="/marketplace"
+            className={`flex flex-col items-center justify-center gap-0.5 py-2 px-1 transition-colors ${
+              pathname === "/marketplace" ? "text-chrome" : "text-silver hover:text-white"
+            }`}
           >
-            <Icon name="menu" />
-            <span className="text-[11px] font-medium">Menu</span>
-          </button>
+            <Icon name="home" />
+            <span className="text-[11px] font-medium">Home</span>
+          </Link>
         )}
 
         {navLinks.map(({ href, label, icon }) => {
