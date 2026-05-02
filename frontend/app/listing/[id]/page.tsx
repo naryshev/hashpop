@@ -1306,6 +1306,7 @@ export default function ListingPage() {
                           toAddress: item.seller,
                           body: "I'd like to make an offer on this listing.",
                           listingId: id,
+                          type: "offer",
                         }),
                       });
                     } catch {}

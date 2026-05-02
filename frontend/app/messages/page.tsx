@@ -1,13 +1,12 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AddressDisplay } from "../../components/AddressDisplay";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
 import { getApiUrl } from "../../lib/apiUrl";
-import { useEncryptionKey } from "../../lib/useEncryptionKey";
-import { encryptMessage, decryptMessage } from "../../lib/chatEncryption";
+import { resolveListingImageUrl } from "../../lib/listingImageUrl";
 
 type InboxConversation = {
   otherAddress: string;
@@ -17,7 +16,7 @@ type InboxConversation = {
     toAddress: string;
     body: string;
     createdAt: string;
-    encrypted?: boolean;
+    type?: string;
   };
   preview: string;
 };
@@ -28,29 +27,10 @@ type Message = {
   toAddress: string;
   body: string;
   listingId: string | null;
-  encrypted?: boolean;
-  nonce?: string | null;
+  type?: string;
+  imageUrl?: string | null;
   createdAt: string;
 };
-
-function LockIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="12"
-      height="12"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-    </svg>
-  );
-}
 
 function MessagesPageContent() {
   const { address } = useHashpackWallet();
@@ -61,7 +41,6 @@ function MessagesPageContent() {
     null,
   );
   const [threadMessages, setThreadMessages] = useState<Message[]>([]);
-  const [decryptedBodies, setDecryptedBodies] = useState<Record<string, string>>({});
   const [threadLoading, setThreadLoading] = useState(false);
   const [replyBody, setReplyBody] = useState("");
   const [sending, setSending] = useState(false);
@@ -69,23 +48,6 @@ function MessagesPageContent() {
   const [composeAddress, setComposeAddress] = useState("");
   const [composeBody, setComposeBody] = useState("");
   const [composeSending, setComposeSending] = useState(false);
-  const { keypair, ensureKeypair } = useEncryptionKey();
-
-  // Cache of fetched public keys by address
-  const publicKeyCache = useRef<Record<string, string | null>>({});
-
-  const fetchPublicKey = useCallback(async (addr: string): Promise<string | null> => {
-    const key = addr.toLowerCase();
-    if (key in publicKeyCache.current) return publicKeyCache.current[key];
-    try {
-      const res = await fetch(`${getApiUrl()}/api/user/${encodeURIComponent(key)}/public-key`);
-      const data = await res.json();
-      publicKeyCache.current[key] = data.publicKey ?? null;
-      return data.publicKey ?? null;
-    } catch {
-      return null;
-    }
-  }, []);
 
   const listingSortedConversations = useMemo(() => {
     return [...conversations].sort((a, b) => {
@@ -125,41 +87,9 @@ function MessagesPageContent() {
     fetchInbox();
   }, [fetchInbox]);
 
-  // Decrypt encrypted messages when thread loads or keypair becomes available
-  useEffect(() => {
-    if (!threadMessages.length || !address) return;
-    const encryptedMsgs = threadMessages.filter((m) => m.encrypted && m.nonce);
-    if (!encryptedMsgs.length) return;
-
-    const doDecrypt = async () => {
-      const kp = keypair ?? (await ensureKeypair());
-      if (!kp) return;
-
-      const newDecrypted: Record<string, string> = {};
-      for (const m of encryptedMsgs) {
-        if (decryptedBodies[m.id]) continue;
-        // Determine the other party's public key for decryption
-        const isMe = m.fromAddress.toLowerCase() === address.toLowerCase();
-        const otherAddr = isMe ? m.toAddress : m.fromAddress;
-        const otherPubKey = await fetchPublicKey(otherAddr);
-        if (!otherPubKey || !m.nonce) {
-          newDecrypted[m.id] = "[Unable to decrypt]";
-          continue;
-        }
-        const plaintext = decryptMessage(m.body, m.nonce, otherPubKey, kp.secretKey);
-        newDecrypted[m.id] = plaintext ?? "[Unable to decrypt]";
-      }
-      if (Object.keys(newDecrypted).length > 0) {
-        setDecryptedBodies((prev) => ({ ...prev, ...newDecrypted }));
-      }
-    };
-    doDecrypt();
-  }, [threadMessages, keypair, address, ensureKeypair, fetchPublicKey, decryptedBodies]);
-
   useEffect(() => {
     if (!address || !selectedThread) {
       setThreadMessages([]);
-      setDecryptedBodies({});
       return;
     }
     setThreadLoading(true);
@@ -171,7 +101,6 @@ function MessagesPageContent() {
       .then((res) => res.json())
       .then((data: { messages?: Message[] }) => {
         setThreadMessages(data.messages ?? []);
-        setDecryptedBodies({});
       })
       .catch(() => {
         setThreadMessages([]);
@@ -183,30 +112,14 @@ function MessagesPageContent() {
     if (!address || !selectedThread || !replyBody.trim() || sending) return;
     setSending(true);
     try {
-      const kp = await ensureKeypair();
-      const recipientPubKey = await fetchPublicKey(selectedThread.other);
-
-      let msgBody = replyBody.trim();
-      let encrypted = false;
-      let nonce: string | undefined;
-
-      if (kp && recipientPubKey) {
-        const result = encryptMessage(msgBody, recipientPubKey, kp.secretKey);
-        msgBody = result.ciphertext;
-        nonce = result.nonce;
-        encrypted = true;
-      }
-
       await fetch(`${getApiUrl()}/api/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fromAddress: address,
           toAddress: selectedThread.other,
-          body: msgBody,
+          body: replyBody.trim(),
           listingId: selectedThread.listingId || undefined,
-          encrypted,
-          nonce,
         }),
       });
       setReplyBody("");
@@ -217,12 +130,11 @@ function MessagesPageContent() {
       const res = await fetch(`${getApiUrl()}/api/messages/thread?${q}`);
       const data = await res.json();
       setThreadMessages(data.messages ?? []);
-      setDecryptedBodies({});
       fetchInbox();
     } finally {
       setSending(false);
     }
-  }, [address, selectedThread, replyBody, sending, fetchInbox, ensureKeypair, fetchPublicKey]);
+  }, [address, selectedThread, replyBody, sending, fetchInbox]);
 
   const sendCompose = useCallback(async () => {
     if (!address || !composeAddress.trim() || !composeBody.trim() || composeSending) return;
@@ -230,29 +142,13 @@ function MessagesPageContent() {
     if (toAddr === address.toLowerCase()) return;
     setComposeSending(true);
     try {
-      const kp = await ensureKeypair();
-      const recipientPubKey = await fetchPublicKey(toAddr);
-
-      let msgBody = composeBody.trim();
-      let encrypted = false;
-      let nonce: string | undefined;
-
-      if (kp && recipientPubKey) {
-        const result = encryptMessage(msgBody, recipientPubKey, kp.secretKey);
-        msgBody = result.ciphertext;
-        nonce = result.nonce;
-        encrypted = true;
-      }
-
       await fetch(`${getApiUrl()}/api/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fromAddress: address,
           toAddress: toAddr,
-          body: msgBody,
-          encrypted,
-          nonce,
+          body: composeBody.trim(),
         }),
       });
       setShowCompose(false);
@@ -263,22 +159,7 @@ function MessagesPageContent() {
     } finally {
       setComposeSending(false);
     }
-  }, [
-    address,
-    composeAddress,
-    composeBody,
-    composeSending,
-    ensureKeypair,
-    fetchPublicKey,
-    fetchInbox,
-  ]);
-
-  const getDisplayBody = (m: Message): string => {
-    if (m.encrypted) {
-      return decryptedBodies[m.id] ?? "[Decrypting...]";
-    }
-    return m.body;
-  };
+  }, [address, composeAddress, composeBody, composeSending, fetchInbox]);
 
   return (
     <main className="min-h-screen">
@@ -383,12 +264,7 @@ function MessagesPageContent() {
                                 : c.listingId}
                             </p>
                           )}
-                          <p className="text-silver text-xs mt-1 truncate">
-                            {c.lastMessage.encrypted && (
-                              <LockIcon className="inline-block mr-1 opacity-60" />
-                            )}
-                            {c.preview}
-                          </p>
+                          <p className="text-silver text-xs mt-1 truncate">{c.preview}</p>
                           <p className="text-silver text-xs mt-0.5">
                             {c.lastMessage.createdAt
                               ? new Date(c.lastMessage.createdAt).toLocaleString()
@@ -427,6 +303,8 @@ function MessagesPageContent() {
                   ) : (
                     threadMessages.map((m) => {
                       const isMe = m.fromAddress.toLowerCase() === address.toLowerCase();
+                      const isOffer = m.type === "offer";
+                      const resolvedImg = resolveListingImageUrl(m.imageUrl);
                       return (
                         <div
                           key={m.id}
@@ -437,11 +315,30 @@ function MessagesPageContent() {
                           >
                             <p className="text-xs opacity-80 mb-0.5">
                               <AddressDisplay address={m.fromAddress} className="font-mono" />
-                              {m.encrypted && (
-                                <LockIcon className="inline-block ml-1.5 opacity-60" />
+                              {isOffer && (
+                                <span className="ml-1.5 inline-block rounded bg-chrome/30 text-white px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                                  Offer
+                                </span>
                               )}
                             </p>
-                            <p className="whitespace-pre-wrap">{getDisplayBody(m)}</p>
+                            {isOffer && resolvedImg && (
+                              <Link
+                                href={
+                                  m.listingId
+                                    ? `/listing/${encodeURIComponent(m.listingId)}`
+                                    : "#"
+                                }
+                                className="block mb-2"
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={resolvedImg}
+                                  alt="Listing preview"
+                                  className="w-full max-w-[240px] rounded-md border border-white/10 object-cover"
+                                />
+                              </Link>
+                            )}
+                            <p className="whitespace-pre-wrap">{m.body}</p>
                             <p className="text-xs opacity-70 mt-1">
                               {new Date(m.createdAt).toLocaleString()}
                             </p>
@@ -455,7 +352,7 @@ function MessagesPageContent() {
                   <textarea
                     value={replyBody}
                     onChange={(e) => setReplyBody(e.target.value)}
-                    placeholder="Type a private message..."
+                    placeholder="Type a message..."
                     className="input-frost w-full text-sm min-h-[72px] resize-y mb-2"
                     rows={2}
                   />
