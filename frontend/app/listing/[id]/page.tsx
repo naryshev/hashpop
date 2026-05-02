@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { MapPin, Clock } from "lucide-react";
 import { BuyButton } from "../../../components/BuyButton";
 import { EscrowPanel } from "../../../components/EscrowPanel";
 import { AddressDisplay } from "../../../components/AddressDisplay";
@@ -67,6 +68,7 @@ type Listing = {
   txHash?: string | null;
   createdAt?: string;
   onChainConfirmed?: boolean;
+  location?: string | null;
 };
 
 export default function ListingPage() {
@@ -429,7 +431,7 @@ export default function ListingPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen">
+      <main className="min-h-screen slide-in-right">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
           <p className="text-silver">Loading…</p>
         </div>
@@ -439,7 +441,7 @@ export default function ListingPage() {
 
   if (!listing) {
     return (
-      <main className="min-h-screen">
+      <main className="min-h-screen slide-in-right">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
           <p className="text-silver">Listing not found.</p>
           <Link
@@ -642,7 +644,7 @@ export default function ListingPage() {
   };
 
   return (
-    <main className="min-h-screen overflow-x-hidden">
+    <main className="min-h-screen slide-in-right overflow-x-hidden">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 relative overflow-x-hidden">
         {cancelSuccess && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity duration-300 p-4">
@@ -1109,9 +1111,6 @@ export default function ListingPage() {
               <div className="border border-[#4a5e83]/40 bg-gradient-to-b from-[#121a29]/80 to-[#0f1522]/80 p-5">
                 <h3 className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-3">Description</h3>
                 <p className="text-silver text-sm whitespace-pre-wrap leading-relaxed">{listing.description}</p>
-                <p className="text-white/30 text-xs mt-4 pt-3 border-t border-white/5">
-                  Listed: {formatListingDate(listing.createdAt)} · {listing.status}
-                </p>
               </div>
             )}
             {isSeller && isSellerActiveListing && editing && (
@@ -1295,22 +1294,10 @@ export default function ListingPage() {
                       `/messages?openThread=${encodeURIComponent(item.seller)}&listingId=${encodeURIComponent(id)}`,
                     );
                   }}
-                  onMakeOffer={async () => {
+                  onMakeOffer={() => {
                     if (!walletConnected || !address || !item?.seller) return;
-                    try {
-                      await fetch(`${getApiUrl()}/api/messages`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          fromAddress: address,
-                          toAddress: item.seller,
-                          body: "I'd like to make an offer on this listing.",
-                          listingId: id,
-                        }),
-                      });
-                    } catch {}
                     router.push(
-                      `/messages?openThread=${encodeURIComponent(item.seller)}&listingId=${encodeURIComponent(id)}`,
+                      `/messages?openThread=${encodeURIComponent(item.seller)}&listingId=${encodeURIComponent(id)}&showOffer=1`,
                     );
                   }}
                 />
@@ -1395,14 +1382,25 @@ export default function ListingPage() {
                 </div>
               )}
 
-            {listing?.txHash && (
-              <div className="glass-card p-4 rounded-[2px] border border-white/10">
-                <h3 className="text-white font-medium mb-2">Transaction</h3>
-                <div className="text-sm text-silver space-y-1">
-                  <p className="font-mono text-xs text-silver/80 break-all">{listing.txHash}</p>
-                  {(() => {
-                    const url = getTransactionExplorerUrl(listing.txHash, chainId);
-                    return url ? (
+            <div className="glass-card p-4 rounded-[2px] border border-white/10">
+              <h3 className="text-white font-medium mb-2">Listing info</h3>
+              <div className="text-sm text-silver space-y-1.5">
+                {listing?.createdAt && (
+                  <p className="inline-flex items-center gap-1.5 text-xs text-silver/80">
+                    <Clock className="h-3.5 w-3.5 shrink-0" />
+                    {formatListingDate(listing.createdAt)}
+                  </p>
+                )}
+                {listing?.location && (
+                  <p className="inline-flex items-center gap-1.5 text-xs text-silver/80">
+                    <MapPin className="h-3.5 w-3.5 shrink-0" />
+                    {listing.location}
+                  </p>
+                )}
+                {listing?.txHash && (() => {
+                  const url = getTransactionExplorerUrl(listing.txHash, chainId);
+                  return url ? (
+                    <p>
                       <a
                         href={url}
                         target="_blank"
@@ -1411,11 +1409,11 @@ export default function ListingPage() {
                       >
                         View on HashScan
                       </a>
-                    ) : null;
-                  })()}
-                </div>
+                    </p>
+                  ) : null;
+                })()}
               </div>
-            )}
+            </div>
 
             <div className="glass-card p-4 rounded-[2px] border border-white/10">
               <h3 className="text-white font-medium mb-2">Security</h3>
@@ -1437,7 +1435,7 @@ export default function ListingPage() {
             <div>
               <h3 className="text-white font-medium mb-2">Seller</h3>
               <p className="text-silver text-sm flex items-center gap-2">
-                <AddressDisplay address={item!.seller} className="text-chrome font-mono text-xs" />
+                <AddressDisplay address={item!.seller} className="text-chrome font-mono text-xs" showAvatar />
               </p>
               {isSeller && isSellerActiveListing && !isLockedOnChain && !editing && (
                 <div className="flex gap-2 mt-2">

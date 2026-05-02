@@ -10,6 +10,7 @@ import { formatPriceForDisplay } from "../../lib/formatPrice";
 import { getTransactionErrorMessage } from "../../lib/transactionError";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
 import { ConnectWalletButton } from "../../components/ConnectWalletButton";
+import { BackToHashpop } from "../../components/BackToHashpop";
 import { activeHederaChain } from "../../lib/hederaChains";
 import { getTransactionExplorerUrl } from "../../lib/explorer";
 
@@ -41,6 +42,7 @@ function CreatePageContent() {
   const [category, setCategory] = useState("");
   const [condition, setCondition] = useState("");
   const [yearOfProduction, setYearOfProduction] = useState("");
+  const [location, setLocation] = useState("");
   const [requireEscrow, setRequireEscrow] = useState(false);
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [mediaError, setMediaError] = useState<string | null>(null);
@@ -63,6 +65,7 @@ function CreatePageContent() {
   const categoryRef = useRef<string | null>(null);
   const conditionRef = useRef<string | null>(null);
   const yearOfProductionRef = useRef<string | null>(null);
+  const locationRef = useRef<string | null>(null);
 
   const {
     create,
@@ -80,6 +83,7 @@ function CreatePageContent() {
     categoryRef,
     conditionRef,
     yearOfProductionRef,
+    locationRef,
   });
   const isPending = listingPending;
   const isSuccess = listingSuccess;
@@ -114,6 +118,7 @@ function CreatePageContent() {
         setCategory(item.category ?? "");
         setCondition(item.condition ?? "");
         setYearOfProduction(item.yearOfProduction ?? "");
+        setLocation(item.location ?? "");
         setPrice(formatPriceForDisplay(item.price ?? "0"));
         const urls = item.mediaUrls?.length ? item.mediaUrls : item.imageUrl ? [item.imageUrl] : [];
         duplicateMediaUrlsRef.current = urls;
@@ -246,6 +251,7 @@ function CreatePageContent() {
     categoryRef.current = category.trim() || null;
     conditionRef.current = condition.trim() || null;
     yearOfProductionRef.current = yearOfProduction.trim() || null;
+    locationRef.current = location.trim() || null;
     requireEscrowRef.current = requireEscrow;
 
     if (!price || Number(price) <= 0) {
@@ -255,6 +261,11 @@ function CreatePageContent() {
 
     if (!category.trim()) {
       setSubmitError("Select a category.");
+      return;
+    }
+
+    if (!location.trim()) {
+      setSubmitError("Enter a location.");
       return;
     }
 
@@ -291,8 +302,9 @@ function CreatePageContent() {
   const additionalItems = mediaItems.slice(1);
 
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen slide-in-right">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-6 relative">
+        <BackToHashpop />
         {listingSuccess && (createdListingIdRef.current ?? createdListingId) && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
             <div className="glass-card p-8 max-w-sm text-center space-y-6">
@@ -555,6 +567,19 @@ function CreatePageContent() {
               onChange={(e) => setYearOfProduction(e.target.value)}
               className="input-frost mt-1 w-full"
               placeholder="—"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-sm text-silver">
+              Location <span className="text-rose-400">*</span>
+            </span>
+            <input
+              type="text"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              className="input-frost mt-1 w-full"
+              placeholder="City, Country"
             />
           </label>
 

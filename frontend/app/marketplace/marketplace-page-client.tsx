@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { AddressDisplay } from "../../components/AddressDisplay";
 import Fuse from "fuse.js";
 import { ListingMedia } from "../../components/ListingMedia";
 import { WishlistButton } from "../../components/WishlistButton";
@@ -69,13 +70,6 @@ function getStatusBadge(
   };
 }
 
-function formatSellerDisplay(seller?: string): string {
-  if (!seller) return "";
-  if (/^\d+\.\d+\.\d+$/.test(seller)) return seller;
-  if (seller.startsWith("0x") && seller.length > 12)
-    return `${seller.slice(0, 6)}…${seller.slice(-4)}`;
-  return seller;
-}
 
 function parsePostedWithinDays(value: string): number | null {
   if (!value) return null;
@@ -99,6 +93,7 @@ export type ListingItem = {
   description?: string | null;
   category?: string | null;
   condition?: string | null;
+  location?: string | null;
   watchlistCount?: number;
   seller?: string;
   imageUrl?: string | null;
@@ -206,7 +201,7 @@ export default function MarketplacePageClient({
   }, [items, query, categoryQuery, minPriceQuery, maxPriceQuery, postedWithinQuery, conditionQuery]);
 
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen slide-in-right">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
@@ -473,7 +468,7 @@ export default function MarketplacePageClient({
                     </h2>
                     {item.seller && (
                       <p className="text-silver/50 text-[10px] mt-1 font-mono truncate">
-                        {formatSellerDisplay(item.seller)}
+                        <AddressDisplay address={item.seller} showAvatar />
                       </p>
                     )}
                     <div className="flex items-center justify-between mt-1.5">
@@ -486,6 +481,11 @@ export default function MarketplacePageClient({
                         </span>
                       )}
                     </div>
+                    {item.location && (
+                      <p className="text-[10px] text-silver/50 mt-1 truncate">
+                        📍 {item.location}
+                      </p>
+                    )}
                   </div>
                 </Link>
               ))}
@@ -524,7 +524,7 @@ export default function MarketplacePageClient({
                     </h2>
                     {item.seller && (
                       <p className="text-silver/50 text-[11px] mt-1 font-mono truncate">
-                        {formatSellerDisplay(item.seller)}
+                        <AddressDisplay address={item.seller} showAvatar />
                       </p>
                     )}
                     <div className="flex items-center justify-between mt-2">
@@ -537,6 +537,11 @@ export default function MarketplacePageClient({
                         </span>
                       )}
                     </div>
+                    {item.location && (
+                      <p className="text-xs text-silver/50 mt-1 truncate">
+                        📍 {item.location}
+                      </p>
+                    )}
                   </div>
                 </Link>
               ))}

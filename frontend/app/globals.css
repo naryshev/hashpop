@@ -54,6 +54,14 @@ a,
   touch-action: manipulation;
 }
 
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(22px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.slide-in-right {
+  animation: slideInRight 0.26s ease-out both;
+}
+
 @layer components {
   .glass {
     @apply rounded-glass border border-white/10 bg-white/5 backdrop-blur-glass;

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
+import { ConnectWalletButton } from "../../components/ConnectWalletButton";
 import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { formatPriceForDisplay } from "../../lib/formatPrice";
@@ -12,6 +13,7 @@ import { getApiUrl } from "../../lib/apiUrl";
 import { AddressDisplay } from "../../components/AddressDisplay";
 import { getTransactionExplorerUrl } from "../../lib/explorer";
 import { activeHederaChain } from "../../lib/hederaChains";
+import { BackToHashpop } from "../../components/BackToHashpop";
 
 type PurchaseRow = {
   id: string;
@@ -132,8 +134,9 @@ export default function PurchasesPage() {
   }
 
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen slide-in-right">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        <BackToHashpop />
         <div className="flex items-center justify-between">
           <h1 className="text-xl sm:text-2xl font-bold text-white">Transaction History</h1>
           <Link href="/dashboard" className="text-sm text-chrome hover:text-white font-medium">
@@ -143,7 +146,10 @@ export default function PurchasesPage() {
 
         <div className="space-y-6">
           {!address ? (
-            <p className="text-silver">Connect your wallet to view transaction history.</p>
+            <div className="flex flex-col items-start gap-3">
+              <p className="text-silver">Connect your wallet to view transaction history.</p>
+              <ConnectWalletButton className="btn-frost-cta disabled:opacity-50" />
+            </div>
           ) : loading ? (
             <p className="text-silver">Loading…</p>
           ) : (
