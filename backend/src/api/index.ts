@@ -417,6 +417,9 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       category,
       condition,
       yearOfProduction,
+      city,
+      locationLat,
+      locationLng,
     } = (req.body || {}) as {
       txHash?: string;
       listingId?: string;
@@ -431,6 +434,9 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       category?: string;
       condition?: string;
       yearOfProduction?: string;
+      city?: string;
+      locationLat?: number;
+      locationLng?: number;
     };
     const fallbackListingId =
       typeof listingId === "string" && listingId.trim()
@@ -461,6 +467,25 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       typeof yearOfProduction === "string" && yearOfProduction.trim()
         ? yearOfProduction.trim()
         : null;
+    const cityStr = typeof city === "string" && city.trim() ? city.trim().slice(0, 120) : null;
+    // Round to 2 decimal places (~1km precision) so the stored value already obscures
+    // the seller's exact address — the API can return it directly without leaking detail.
+    const roundCoord = (n: number) => Math.round(n * 100) / 100;
+    const latNum =
+      typeof locationLat === "number" &&
+      Number.isFinite(locationLat) &&
+      locationLat >= -90 &&
+      locationLat <= 90
+        ? roundCoord(locationLat)
+        : null;
+    const lngNum =
+      typeof locationLng === "number" &&
+      Number.isFinite(locationLng) &&
+      locationLng >= -180 &&
+      locationLng <= 180
+        ? roundCoord(locationLng)
+        : null;
+    const hasCoords = latNum !== null && lngNum !== null;
     const requireEscrowBool = !!requireEscrow;
 
     const upsertFallbackListing = async () => {
@@ -484,6 +509,8 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         ...(categoryStr != null && { category: categoryStr }),
         ...(conditionStr != null && { condition: conditionStr }),
         ...(yearStr != null && { yearOfProduction: yearStr }),
+        ...(cityStr != null && { city: cityStr }),
+        ...(hasCoords && { locationLat: latNum, locationLng: lngNum }),
       };
       const fallbackCreateData: any = {
         id: fallbackListingId!,
@@ -501,6 +528,8 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         ...(categoryStr != null && { category: categoryStr }),
         ...(conditionStr != null && { condition: conditionStr }),
         ...(yearStr != null && { yearOfProduction: yearStr }),
+        ...(cityStr != null && { city: cityStr }),
+        ...(hasCoords && { locationLat: latNum, locationLng: lngNum }),
       };
       await prisma.listing.upsert({
         where: { id: fallbackListingId! },
@@ -611,6 +640,8 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           ...(categoryStr != null && { category: categoryStr }),
           ...(conditionStr != null && { condition: conditionStr }),
           ...(yearStr != null && { yearOfProduction: yearStr }),
+          ...(cityStr != null && { city: cityStr }),
+          ...(hasCoords && { locationLat: latNum, locationLng: lngNum }),
         };
         const createData: any = {
           id: listingId,
@@ -628,6 +659,8 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           ...(categoryStr != null && { category: categoryStr }),
           ...(conditionStr != null && { condition: conditionStr }),
           ...(yearStr != null && { yearOfProduction: yearStr }),
+          ...(cityStr != null && { city: cityStr }),
+          ...(hasCoords && { locationLat: latNum, locationLng: lngNum }),
         };
         await prisma.listing.upsert({
           where: { id: listingId },
@@ -1280,6 +1313,9 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         trackingNumber,
         trackingCarrier,
         requireEscrow,
+        city,
+        locationLat,
+        locationLng,
       } = (req.body || {}) as {
         title?: string;
         subtitle?: string;
@@ -1293,6 +1329,9 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         trackingNumber?: string;
         trackingCarrier?: string;
         requireEscrow?: boolean;
+        city?: string | null;
+        locationLat?: number | null;
+        locationLng?: number | null;
       };
       const listing = await prisma.listing.findUnique({ where: { id } });
       if (!listing) return res.status(404).json({ error: "Listing not found" });
@@ -1315,6 +1354,9 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         trackingCarrier?: string | null;
         shippedAt?: Date | null;
         requireEscrow?: boolean;
+        city?: string | null;
+        locationLat?: number | null;
+        locationLng?: number | null;
       } = {};
       if (title !== undefined) update.title = title === "" ? null : title;
       if (subtitle !== undefined) update.subtitle = subtitle === "" ? null : subtitle;
@@ -1350,6 +1392,34 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       }
       if (requireEscrow !== undefined) {
         update.requireEscrow = !!requireEscrow;
+      }
+      if (city !== undefined) {
+        const trimmed = typeof city === "string" ? city.trim().slice(0, 120) : "";
+        update.city = trimmed === "" ? null : trimmed;
+      }
+      if (locationLat !== undefined) {
+        if (
+          typeof locationLat === "number" &&
+          Number.isFinite(locationLat) &&
+          locationLat >= -90 &&
+          locationLat <= 90
+        ) {
+          update.locationLat = Math.round(locationLat * 100) / 100;
+        } else if (locationLat === null) {
+          update.locationLat = null;
+        }
+      }
+      if (locationLng !== undefined) {
+        if (
+          typeof locationLng === "number" &&
+          Number.isFinite(locationLng) &&
+          locationLng >= -180 &&
+          locationLng <= 180
+        ) {
+          update.locationLng = Math.round(locationLng * 100) / 100;
+        } else if (locationLng === null) {
+          update.locationLng = null;
+        }
       }
       const updated = await prisma.listing.update({
         where: { id },

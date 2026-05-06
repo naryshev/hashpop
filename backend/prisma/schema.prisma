@@ -30,6 +30,9 @@ model Listing {
   originalPapers     String?
   imageUrl           String?
   mediaUrls          String[] @default([])
+  city               String?
+  locationLat        Float?
+  locationLng        Float?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
   sales              Sale[]

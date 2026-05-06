@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCreateListing } from "../../hooks/useCreateListing";
 import { CategorySearch } from "../../components/CategorySearch";
+import { LocationPicker, type LocationValue } from "../../components/LocationPicker";
 import { compressImage } from "../../lib/compressImage";
 import { formatPriceForDisplay } from "../../lib/formatPrice";
 import { getTransactionErrorMessage } from "../../lib/transactionError";
@@ -41,6 +42,7 @@ function CreatePageContent() {
   const [category, setCategory] = useState("");
   const [condition, setCondition] = useState("");
   const [yearOfProduction, setYearOfProduction] = useState("");
+  const [location, setLocation] = useState<LocationValue>({ city: null, lat: null, lng: null });
   const [requireEscrow, setRequireEscrow] = useState(false);
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [mediaError, setMediaError] = useState<string | null>(null);
@@ -63,6 +65,9 @@ function CreatePageContent() {
   const categoryRef = useRef<string | null>(null);
   const conditionRef = useRef<string | null>(null);
   const yearOfProductionRef = useRef<string | null>(null);
+  const cityRef = useRef<string | null>(null);
+  const locationLatRef = useRef<number | null>(null);
+  const locationLngRef = useRef<number | null>(null);
 
   const {
     create,
@@ -80,6 +85,9 @@ function CreatePageContent() {
     categoryRef,
     conditionRef,
     yearOfProductionRef,
+    cityRef,
+    locationLatRef,
+    locationLngRef,
   });
   const isPending = listingPending;
   const isSuccess = listingSuccess;
@@ -114,6 +122,16 @@ function CreatePageContent() {
         setCategory(item.category ?? "");
         setCondition(item.condition ?? "");
         setYearOfProduction(item.yearOfProduction ?? "");
+        if (
+          item.city ||
+          (typeof item.locationLat === "number" && typeof item.locationLng === "number")
+        ) {
+          setLocation({
+            city: item.city ?? null,
+            lat: typeof item.locationLat === "number" ? item.locationLat : null,
+            lng: typeof item.locationLng === "number" ? item.locationLng : null,
+          });
+        }
         setPrice(formatPriceForDisplay(item.price ?? "0"));
         const urls = item.mediaUrls?.length ? item.mediaUrls : item.imageUrl ? [item.imageUrl] : [];
         duplicateMediaUrlsRef.current = urls;
@@ -246,6 +264,9 @@ function CreatePageContent() {
     categoryRef.current = category.trim() || null;
     conditionRef.current = condition.trim() || null;
     yearOfProductionRef.current = yearOfProduction.trim() || null;
+    cityRef.current = location.city?.trim() || null;
+    locationLatRef.current = typeof location.lat === "number" ? location.lat : null;
+    locationLngRef.current = typeof location.lng === "number" ? location.lng : null;
     requireEscrowRef.current = requireEscrow;
 
     if (!price || Number(price) <= 0) {
@@ -557,6 +578,16 @@ function CreatePageContent() {
               placeholder="—"
             />
           </label>
+
+          <div className="block">
+            <span className="text-sm text-silver">Location (optional)</span>
+            <p className="text-xs text-silver/70 mt-0.5">
+              Show buyers roughly where the item is. Search a city or click the map to drop a pin.
+            </p>
+            <div className="mt-2">
+              <LocationPicker value={location} onChange={setLocation} />
+            </div>
+          </div>
 
           <label className="flex items-start gap-3 rounded-lg border border-white/10 bg-white/5 p-3">
             <input
