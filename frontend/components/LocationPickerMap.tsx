@@ -7,6 +7,8 @@ type Props = {
   lat: number | null;
   lng: number | null;
   onPick: (lat: number, lng: number) => void;
+  previewLat?: number | null;
+  previewLng?: number | null;
 };
 
 const DEFAULT_CENTER: [number, number] = [34.05, -118.24];
@@ -21,19 +23,42 @@ function ClickHandler({ onPick }: { onPick: (lat: number, lng: number) => void }
   return null;
 }
 
-function Recenter({ lat, lng }: { lat: number | null; lng: number | null }) {
+function Recenter({
+  lat,
+  lng,
+  previewLat,
+  previewLng,
+}: {
+  lat: number | null;
+  lng: number | null;
+  previewLat: number | null;
+  previewLng: number | null;
+}) {
   const map = useMap();
+  // Committed value takes priority over preview so dropping a pin or picking a
+  // suggestion doesn't get overridden by a stale preview.
+  const targetLat = lat ?? previewLat;
+  const targetLng = lng ?? previewLng;
   useEffect(() => {
-    if (lat != null && lng != null) {
-      map.flyTo([lat, lng], Math.max(map.getZoom(), 11), { duration: 0.6 });
+    if (targetLat != null && targetLng != null) {
+      map.flyTo([targetLat, targetLng], Math.max(map.getZoom(), 11), { duration: 0.6 });
     }
-  }, [lat, lng, map]);
+  }, [targetLat, targetLng, map]);
   return null;
 }
 
-export default function LocationPickerMap({ lat, lng, onPick }: Props) {
-  const center: [number, number] = lat != null && lng != null ? [lat, lng] : DEFAULT_CENTER;
-  const zoom = lat != null && lng != null ? 12 : DEFAULT_ZOOM;
+export default function LocationPickerMap({
+  lat,
+  lng,
+  onPick,
+  previewLat = null,
+  previewLng = null,
+}: Props) {
+  const initialLat = lat ?? previewLat;
+  const initialLng = lng ?? previewLng;
+  const center: [number, number] =
+    initialLat != null && initialLng != null ? [initialLat, initialLng] : DEFAULT_CENTER;
+  const zoom = initialLat != null && initialLng != null ? 12 : DEFAULT_ZOOM;
   return (
     <div className="relative w-full overflow-hidden rounded-glass border border-white/10">
       <MapContainer
@@ -47,7 +72,7 @@ export default function LocationPickerMap({ lat, lng, onPick }: Props) {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         />
         <ClickHandler onPick={onPick} />
-        <Recenter lat={lat} lng={lng} />
+        <Recenter lat={lat} lng={lng} previewLat={previewLat} previewLng={previewLng} />
         {lat != null && lng != null && (
           <Circle
             center={[lat, lng]}
