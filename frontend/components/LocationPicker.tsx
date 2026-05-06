@@ -177,7 +177,21 @@ export function LocationPicker({ value, onChange }: Props) {
         Pick a city above, or click the map to drop a pin. Coordinates are rounded to ~1km for
         privacy.
       </p>
-      <LocationPickerMap lat={value.lat} lng={value.lng} onPick={handleMapPick} />
+      <LocationPickerMap
+        lat={value.lat}
+        lng={value.lng}
+        onPick={handleMapPick}
+        previewLat={
+          suggestions[0] && Number.isFinite(parseFloat(suggestions[0].lat))
+            ? parseFloat(suggestions[0].lat)
+            : null
+        }
+        previewLng={
+          suggestions[0] && Number.isFinite(parseFloat(suggestions[0].lon))
+            ? parseFloat(suggestions[0].lon)
+            : null
+        }
+      />
       {value.lat != null && value.lng != null && (
         <p className="text-xs text-silver">
           Approximate location set
