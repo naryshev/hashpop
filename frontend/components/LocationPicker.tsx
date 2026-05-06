@@ -97,7 +97,13 @@ export function LocationPicker({ value, onChange }: Props) {
       if (res.ok) {
         const data = (await res.json()) as {
           display_name?: string;
-          address?: { city?: string; town?: string; village?: string; state?: string; country?: string };
+          address?: {
+            city?: string;
+            town?: string;
+            village?: string;
+            state?: string;
+            country?: string;
+          };
         };
         const a = data.address || {};
         const place = a.city || a.town || a.village;
