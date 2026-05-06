@@ -20,6 +20,8 @@ import { ConnectWalletButton } from "../../../components/ConnectWalletButton";
 import { activeHederaChain } from "../../../lib/hederaChains";
 import { readListingCompat } from "../../../lib/marketplaceRead";
 import { getTransactionExplorerUrl } from "../../../lib/explorer";
+import { LocationMap } from "../../../components/LocationMap";
+import { LocationPicker, type LocationValue } from "../../../components/LocationPicker";
 
 import { getApiUrl } from "../../../lib/apiUrl";
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024;
@@ -64,6 +66,9 @@ type Listing = {
   originalPapers?: string | null;
   imageUrl?: string | null;
   mediaUrls?: string[];
+  city?: string | null;
+  locationLat?: number | null;
+  locationLng?: number | null;
   txHash?: string | null;
   createdAt?: string;
   onChainConfirmed?: boolean;
@@ -93,6 +98,11 @@ export default function ListingPage() {
   const [editPrice, setEditPrice] = useState("");
   const [editCondition, setEditCondition] = useState("");
   const [editYearOfProduction, setEditYearOfProduction] = useState("");
+  const [editLocation, setEditLocation] = useState<LocationValue>({
+    city: null,
+    lat: null,
+    lng: null,
+  });
   const [editImageFiles, setEditImageFiles] = useState<File[]>([]);
   const [editRemovedMediaUrls, setEditRemovedMediaUrls] = useState<string[]>([]);
   const [editSaving, setEditSaving] = useState(false);
@@ -229,6 +239,11 @@ export default function ListingPage() {
     setEditPrice(formatPriceForDisplay(listing.price));
     setEditCondition(listing.condition ?? "");
     setEditYearOfProduction(listing.yearOfProduction ?? "");
+    setEditLocation({
+      city: listing.city ?? null,
+      lat: typeof listing.locationLat === "number" ? listing.locationLat : null,
+      lng: typeof listing.locationLng === "number" ? listing.locationLng : null,
+    });
   }, [listing]);
 
   useEffect(() => {
@@ -572,6 +587,9 @@ export default function ListingPage() {
         description: editDescription.trim() || undefined,
         condition: editCondition.trim() || undefined,
         yearOfProduction: editYearOfProduction.trim() || undefined,
+        city: editLocation.city ?? null,
+        locationLat: editLocation.lat,
+        locationLng: editLocation.lng,
         ...(mediaUrls !== undefined && { mediaUrls }),
       };
       // Price is now synced only from on-chain events/tx sync endpoint to avoid DB-on-chain divergence.
@@ -1114,6 +1132,21 @@ export default function ListingPage() {
                 </p>
               </div>
             )}
+            {!editing &&
+              listing &&
+              typeof listing.locationLat === "number" &&
+              typeof listing.locationLng === "number" && (
+                <div className="border border-[#4a5e83]/40 bg-gradient-to-b from-[#121a29]/80 to-[#0f1522]/80 p-5">
+                  <h3 className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-3">
+                    Location
+                  </h3>
+                  <LocationMap
+                    lat={listing.locationLat}
+                    lng={listing.locationLng}
+                    city={listing.city}
+                  />
+                </div>
+              )}
             {isSeller && isSellerActiveListing && editing && (
               <div className="glass-card p-4 space-y-3">
                 <h3 className="text-white font-medium">Configure</h3>
@@ -1160,6 +1193,12 @@ export default function ListingPage() {
                     placeholder="e.g. 2023"
                   />
                 </label>
+                <div className="block">
+                  <span className="text-xs text-silver">Location (optional)</span>
+                  <div className="mt-1">
+                    <LocationPicker value={editLocation} onChange={setEditLocation} />
+                  </div>
+                </div>
                 <label className="block">
                   <span className="text-xs text-silver">Price (HBAR)</span>
                   <input
