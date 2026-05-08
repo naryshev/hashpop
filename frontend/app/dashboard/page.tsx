@@ -125,9 +125,7 @@ function SoldItemCard({
           ) : (
             <p className="text-white font-semibold truncate">{listingTitle}</p>
           )}
-          <p className="text-silver/70 text-xs mt-0.5 font-mono">
-            Buyer: {shortAddr(sale.buyer)}
-          </p>
+          <p className="text-silver/70 text-xs mt-0.5 font-mono">Buyer: {shortAddr(sale.buyer)}</p>
           <p className="text-chrome font-semibold text-sm mt-1">
             {formatHbarWithUsd(sale.amount, usdRate)}
           </p>
@@ -140,11 +138,7 @@ function SoldItemCard({
         >
           <MessageSquare className="h-3.5 w-3.5" />
           <span>Messages</span>
-          {expanded ? (
-            <ChevronUp className="h-3 w-3" />
-          ) : (
-            <ChevronDown className="h-3 w-3" />
-          )}
+          {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
         </button>
       </div>
 
@@ -219,6 +213,10 @@ export default function DashboardPage() {
     { itemId: string; itemType: string; title?: string; price?: string; reservePrice?: string }[]
   >([]);
   const [purchaseCount, setPurchaseCount] = useState(0);
+  const [offerCounts, setOfferCounts] = useState<{ received: number; sent: number }>({
+    received: 0,
+    sent: 0,
+  });
   const [loading, setLoading] = useState(true);
   const usdRate = useHbarUsd();
 
@@ -231,6 +229,7 @@ export default function DashboardPage() {
     setSoldItems([]);
     setWishlistItems([]);
     setPurchaseCount(0);
+    setOfferCounts({ received: 0, sent: 0 });
     if (!address) {
       setLoading(false);
       return;
@@ -293,6 +292,19 @@ export default function DashboardPage() {
             setSoldItems([]);
           }
         }),
+      fetch(`${getApiUrl()}/api/user/${address}/offers`)
+        .then((res) => (res.ok ? res.json() : Promise.reject(res)))
+        .then((data: { received?: { status: string }[]; sent?: { status: string }[] }) => {
+          if (cancelled) return;
+          const isActive = (o: { status: string }) => o.status === "ACTIVE";
+          setOfferCounts({
+            received: (data.received ?? []).filter(isActive).length,
+            sent: (data.sent ?? []).filter(isActive).length,
+          });
+        })
+        .catch(() => {
+          if (!cancelled) setOfferCounts({ received: 0, sent: 0 });
+        }),
     ]).finally(() => {
       if (!cancelled) setLoading(false);
     });
@@ -324,7 +336,7 @@ export default function DashboardPage() {
           ) : (
             <>
               {/* Stats */}
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-4">
                 <div className="glass-card p-4 rounded-xl">
                   <p className="text-sm text-silver">Sales</p>
                   <p className="text-2xl font-semibold text-white mt-1">{stats?.totalSales ?? 0}</p>
@@ -342,7 +354,22 @@ export default function DashboardPage() {
                     href="/purchases"
                     className="text-xs text-chrome hover:text-white mt-1 inline-block"
                   >
-                    View history
+                    View purchases
+                  </Link>
+                </div>
+                <div className="glass-card p-4 rounded-xl">
+                  <p className="text-sm text-silver">Offers</p>
+                  <p className="text-2xl font-semibold text-white mt-1">
+                    {offerCounts.received + offerCounts.sent}
+                  </p>
+                  <p className="text-xs text-silver/70 mt-0.5">
+                    {offerCounts.received} received · {offerCounts.sent} sent
+                  </p>
+                  <Link
+                    href="/offers"
+                    className="text-xs text-chrome hover:text-white mt-1 inline-block"
+                  >
+                    View offers
                   </Link>
                 </div>
               </div>
@@ -363,13 +390,14 @@ export default function DashboardPage() {
                 ) : (
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {activeListings.map((row) => {
-                      const thumb = row.imageUrl || (Array.isArray(row.mediaUrls) && row.mediaUrls[0]) || null;
+                      const thumb =
+                        row.imageUrl || (Array.isArray(row.mediaUrls) && row.mediaUrls[0]) || null;
                       const statusColor =
                         row.status === "LOCKED"
                           ? "text-amber-400 border-amber-500/40 bg-amber-500/10"
                           : row.status === "SOLD"
-                          ? "text-rose-400 border-rose-500/40 bg-rose-500/10"
-                          : "text-[#00ffa3] border-[#00ffa3]/30 bg-[#00ffa3]/5";
+                            ? "text-rose-400 border-rose-500/40 bg-rose-500/10"
+                            : "text-[#00ffa3] border-[#00ffa3]/30 bg-[#00ffa3]/5";
                       return (
                         <Link
                           key={`${row.itemType || "listing"}-${row.id}`}
@@ -396,8 +424,8 @@ export default function DashboardPage() {
                               {row.status === "ACTIVE"
                                 ? "Active"
                                 : row.status === "LOCKED"
-                                ? "In Escrow"
-                                : row.status || "Active"}
+                                  ? "In Escrow"
+                                  : row.status || "Active"}
                             </span>
                           </div>
 
@@ -412,7 +440,9 @@ export default function DashboardPage() {
                                 usdRate,
                               )}
                             </p>
-                            <p className="text-silver/50 text-xs">{formatListingDate(row.createdAt)}</p>
+                            <p className="text-silver/50 text-xs">
+                              {formatListingDate(row.createdAt)}
+                            </p>
                           </div>
                         </Link>
                       );
