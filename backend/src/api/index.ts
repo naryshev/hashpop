@@ -1029,6 +1029,149 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
   });
 
   /**
+   * Mirror an OfferMade event into the DB so the seller's listing page can show
+   * pending offers without waiting for the indexer. Verifies the tx receipt
+   * when an RPC URL is available; falls back to a direct upsert otherwise.
+   */
+  router.post("/sync-offer", async (req, res) => {
+    const { txHash, listingId, buyer, amount } = (req.body || {}) as {
+      txHash?: string;
+      listingId?: string;
+      buyer?: string;
+      amount?: string;
+    };
+    const normalizedId =
+      typeof listingId === "string" && listingId.trim()
+        ? normalizeListingId(listingId.trim())
+        : null;
+    const buyerAddr =
+      typeof buyer === "string" && /^0x[0-9a-fA-F]{40}$/.test(buyer.trim())
+        ? buyer.trim().toLowerCase()
+        : null;
+    const amountStr = typeof amount === "string" && amount.trim() ? amount.trim() : null;
+    if (!normalizedId || !buyerAddr || !amountStr) {
+      return res.status(400).json({ error: "listingId, buyer, amount required" });
+    }
+    const txHashStr = typeof txHash === "string" && txHash.trim() ? txHash.trim() : null;
+
+    const upsertOffer = async (storedAmount: string) => {
+      try {
+        await prisma.offer.upsert({
+          where: { listingId_buyer: { listingId: normalizedId, buyer: buyerAddr } },
+          update: {
+            amount: storedAmount,
+            status: "ACTIVE",
+            ...(txHashStr && { txHash: txHashStr }),
+          },
+          create: {
+            listingId: normalizedId,
+            buyer: buyerAddr,
+            amount: storedAmount,
+            status: "ACTIVE",
+            ...(txHashStr && { txHash: txHashStr }),
+          },
+        });
+      } catch (e) {
+        log.warn({ err: e, listingId: normalizedId }, "Offer table missing or upsert failed");
+        throw e;
+      }
+    };
+
+    const rpcUrl = process.env.HEDERA_RPC_URL;
+    if (txHashStr && rpcUrl) {
+      try {
+        const provider = new ethers.JsonRpcProvider(rpcUrl);
+        const receipt = await provider.getTransactionReceipt(txHashStr);
+        if (receipt?.logs?.length) {
+          for (const logEntry of receipt.logs) {
+            const decoded = decodeEvents(logEntry);
+            if (decoded?.type !== "OfferMade") continue;
+            const evtListing = normalizeListingId(decoded.listingId);
+            const evtBuyer = normalizeWalletAddress(decoded.buyer);
+            const evtAmount = chainAmountToHbar(String(decoded.amount ?? "0"));
+            if (evtListing === normalizedId && evtBuyer === buyerAddr && evtAmount) {
+              await upsertOffer(evtAmount);
+              return res.json({ ok: true, listingId: normalizedId, buyer: buyerAddr });
+            }
+          }
+        }
+      } catch (e) {
+        log.warn({ err: e, txHash: txHashStr }, "sync-offer chain verification failed; falling back");
+      }
+    }
+    try {
+      await upsertOffer(amountStr);
+      return res.json({ ok: true, listingId: normalizedId, buyer: buyerAddr, source: "fallback" });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message || "Sync failed" });
+    }
+  });
+
+  /**
+   * Mirror OfferAccepted / OfferRejected / OfferCancelled events. The seller
+   * (accept/reject) or buyer (cancel) calls this after their own tx confirms.
+   */
+  router.post("/sync-offer-action", async (req, res) => {
+    const { txHash, listingId, buyer, action } = (req.body || {}) as {
+      txHash?: string;
+      listingId?: string;
+      buyer?: string;
+      action?: "accept" | "reject" | "cancel";
+    };
+    const normalizedId =
+      typeof listingId === "string" && listingId.trim()
+        ? normalizeListingId(listingId.trim())
+        : null;
+    const buyerAddr =
+      typeof buyer === "string" && /^0x[0-9a-fA-F]{40}$/.test(buyer.trim())
+        ? buyer.trim().toLowerCase()
+        : null;
+    if (!normalizedId || !buyerAddr || !action) {
+      return res.status(400).json({ error: "listingId, buyer, action required" });
+    }
+    const nextStatus =
+      action === "accept" ? "ACCEPTED" : action === "reject" ? "REJECTED" : "CANCELLED";
+    try {
+      const updated = await prisma.offer.updateMany({
+        where: { listingId: normalizedId, buyer: buyerAddr, status: "ACTIVE" },
+        data: { status: nextStatus, ...(txHash && { txHash }) },
+      });
+      // If the seller accepted, the marketplace contract has already moved the
+      // listing to LOCKED (escrow) or COMPLETED (direct sale). Mirror that here
+      // so the listing page reflects the state without a refresh.
+      if (action === "accept") {
+        await prisma.listing.updateMany({
+          where: { id: normalizedId, status: "LISTED" },
+          data: { status: "LOCKED", buyer: buyerAddr },
+        });
+      }
+      return res.json({ ok: true, updated: updated.count, status: nextStatus });
+    } catch (err: any) {
+      log.error({ err, listingId: normalizedId }, "sync-offer-action failed");
+      return res.status(500).json({ error: err.message || "Sync failed" });
+    }
+  });
+
+  /**
+   * Active and historical offers for a listing. The seller view uses this to
+   * render Accept / Reject buttons; the buyer view uses it to display their
+   * own pending offer.
+   */
+  router.get("/listing/:id/offers", async (req, res) => {
+    try {
+      const id = normalizeListingId(req.params.id ?? "");
+      const offers = await prisma.offer.findMany({
+        where: { listingId: id },
+        orderBy: { createdAt: "desc" },
+      });
+      return res.json({ offers });
+    } catch (err) {
+      log.error({ err }, "Failed to fetch offers");
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  /**
    * Sync an auction from createAuction transaction so it shows immediately.
    */
   router.post("/sync-auction", async (req, res) => {

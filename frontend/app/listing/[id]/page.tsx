@@ -22,6 +22,7 @@ import { readListingCompat } from "../../../lib/marketplaceRead";
 import { getTransactionExplorerUrl } from "../../../lib/explorer";
 import { LocationMap } from "../../../components/LocationMap";
 import { LocationPicker, type LocationValue } from "../../../components/LocationPicker";
+import { OffersPanel } from "../../../components/OffersPanel";
 
 import { getApiUrl } from "../../../lib/apiUrl";
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024;
@@ -1299,68 +1300,52 @@ export default function ListingPage() {
                   onEscrowUpdated={() => fetchListing(0, false)}
                 />
               )}
-            {listing &&
-              isListed &&
-              !isSeller &&
-              (walletConnected ? (
-                <BuyButton
-                  listingId={listing.id}
-                  price={listing.price}
-                  inWishlist={inWishlist}
-                  onToggleWishlist={() => {
-                    void toggleWishlist();
-                  }}
-                  wishlistDisabled={!address || wishlistLoading}
-                  onPurchaseComplete={(txHash) => {
-                    router.push(
-                      `/purchase-success/${encodeURIComponent(id)}${txHash ? `?tx=${encodeURIComponent(txHash)}` : ""}`,
-                    );
-                  }}
-                  onMessage={async () => {
-                    if (!walletConnected || !address || !item?.seller) return;
-                    try {
-                      await fetch(`${getApiUrl()}/api/messages`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          fromAddress: address,
-                          toAddress: item.seller,
-                          body: "Hi, I'm interested in this listing.",
-                          listingId: id,
-                        }),
-                      });
-                    } catch {}
-                    router.push(
-                      `/messages?openThread=${encodeURIComponent(item.seller)}&listingId=${encodeURIComponent(id)}`,
-                    );
-                  }}
-                  onMakeOffer={async () => {
-                    if (!walletConnected || !address || !item?.seller) return;
-                    try {
-                      await fetch(`${getApiUrl()}/api/messages`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          fromAddress: address,
-                          toAddress: item.seller,
-                          body: "I'd like to make an offer on this listing.",
-                          listingId: id,
-                        }),
-                      });
-                    } catch {}
-                    router.push(
-                      `/messages?openThread=${encodeURIComponent(item.seller)}&listingId=${encodeURIComponent(id)}`,
-                    );
-                  }}
-                />
-              ) : (
-                <div className="glass-card p-4 rounded-[2px] border border-white/10">
-                  <p className="text-silver text-sm mb-3">
-                    Connect your wallet to buy this listing.
-                  </p>
-                  <ConnectWalletButton className="btn-frost-cta w-full disabled:opacity-50" />
-                </div>
-              ))}
+            {listing && isListed && (
+              <OffersPanel
+                listingId={listing.id}
+                sellerAddress={listing.seller}
+                onChanged={() => fetchListing(0, false)}
+              />
+            )}
+            {listing && isListed && !isSeller && (
+              <BuyButton
+                listingId={listing.id}
+                price={listing.price}
+                inWishlist={inWishlist}
+                onToggleWishlist={() => {
+                  void toggleWishlist();
+                }}
+                wishlistDisabled={!address || wishlistLoading}
+                onPurchaseComplete={(txHash) => {
+                  router.push(
+                    `/purchase-success/${encodeURIComponent(id)}${txHash ? `?tx=${encodeURIComponent(txHash)}` : ""}`,
+                  );
+                }}
+                onMessage={async () => {
+                  if (!walletConnected || !address || !item?.seller) return;
+                  try {
+                    await fetch(`${getApiUrl()}/api/messages`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        fromAddress: address,
+                        toAddress: item.seller,
+                        body: "Hi, I'm interested in this listing.",
+                        listingId: id,
+                      }),
+                    });
+                  } catch {}
+                  router.push(
+                    `/messages?openThread=${encodeURIComponent(item.seller)}&listingId=${encodeURIComponent(id)}`,
+                  );
+                }}
+                onOfferSubmitted={() => {
+                  // Refresh listing so the buyer's banner updates and the
+                  // seller (if same browser session) sees the new offer.
+                  fetchListing(0, false);
+                }}
+              />
+            )}
             {listing &&
               listing.status === "SOLD" &&
               !listing.requireEscrow &&
