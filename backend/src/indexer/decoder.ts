@@ -11,6 +11,10 @@ const AUCTION_CREATED = ethers
 const BID_PLACED = ethers.id("BidPlaced(bytes32,address,uint256)").toLowerCase();
 const AUCTION_EXTENDED = ethers.id("AuctionExtended(bytes32,uint256)").toLowerCase();
 const AUCTION_SETTLED = ethers.id("AuctionSettled(bytes32,address,uint256)").toLowerCase();
+const OFFER_MADE = ethers.id("OfferMade(bytes32,address,uint256)").toLowerCase();
+const OFFER_ACCEPTED = ethers.id("OfferAccepted(bytes32,address,uint256)").toLowerCase();
+const OFFER_REJECTED = ethers.id("OfferRejected(bytes32,address,uint256)").toLowerCase();
+const OFFER_CANCELLED = ethers.id("OfferCancelled(bytes32,address,uint256)").toLowerCase();
 
 export const EXPECTED_TOPIC0_ITEM_LISTED = ITEM_LISTED;
 
@@ -141,6 +145,42 @@ export function decodeEvents(event: any): any | null {
       winner: addressFromTopic(topicAt(event, 2)),
       amount: uint256FromData(data),
       seller: "", // not in event; could be looked up from auction if needed
+    };
+  }
+
+  if (t0 === OFFER_MADE) {
+    return {
+      type: "OfferMade",
+      listingId: topicAt(event, 1),
+      buyer: addressFromTopic(topicAt(event, 2)),
+      amount: uint256FromData(data),
+    };
+  }
+
+  if (t0 === OFFER_ACCEPTED) {
+    return {
+      type: "OfferAccepted",
+      listingId: topicAt(event, 1),
+      buyer: addressFromTopic(topicAt(event, 2)),
+      amount: uint256FromData(data),
+    };
+  }
+
+  if (t0 === OFFER_REJECTED) {
+    return {
+      type: "OfferRejected",
+      listingId: topicAt(event, 1),
+      buyer: addressFromTopic(topicAt(event, 2)),
+      amount: uint256FromData(data),
+    };
+  }
+
+  if (t0 === OFFER_CANCELLED) {
+    return {
+      type: "OfferCancelled",
+      listingId: topicAt(event, 1),
+      buyer: addressFromTopic(topicAt(event, 2)),
+      amount: uint256FromData(data),
     };
   }
 

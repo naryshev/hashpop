@@ -134,3 +134,17 @@ model WishlistItem {
   @@unique([userAddress, itemId])
   @@index([userAddress])
 }
+
+model Offer {
+  id        String   @id @default(cuid())
+  listingId String
+  buyer     String
+  amount    String
+  status    String   // "ACTIVE" | "ACCEPTED" | "REJECTED" | "CANCELLED"
+  txHash    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([listingId, status])
+  @@index([buyer])
+  @@unique([listingId, buyer])
+}
