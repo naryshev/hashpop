@@ -1172,6 +1172,94 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
   });
 
   /**
+   * All offers tied to a wallet — received (user is seller) and sent (user is
+   * buyer). Each row inlines a small listing snippet so the My Hashpop pages
+   * can render thumbnails / titles without an extra round-trip per row.
+   */
+  router.get("/user/:address/offers", async (req, res) => {
+    try {
+      const addrLower = (req.params.address ?? "").toLowerCase();
+      if (!/^0x[0-9a-f]{40}$/.test(addrLower)) {
+        return res.status(400).json({ error: "Invalid wallet address" });
+      }
+      // Sent: offers where the user is the buyer.
+      const sent = await prisma.offer.findMany({
+        where: { buyer: addrLower },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+      });
+      // Received: offers on listings where the user is the seller. We resolve
+      // the seller via the Listing table since offers don't store seller.
+      const myListings = await prisma.listing.findMany({
+        where: { seller: addrLower },
+        select: { id: true },
+      });
+      const myListingIds = myListings.map((l) => l.id);
+      const received = myListingIds.length
+        ? await prisma.offer.findMany({
+            where: { listingId: { in: myListingIds } },
+            orderBy: { createdAt: "desc" },
+            take: 100,
+          })
+        : [];
+
+      const allListingIds = Array.from(
+        new Set([...sent.map((o) => o.listingId), ...received.map((o) => o.listingId)]),
+      );
+      const listings = allListingIds.length
+        ? await prisma.listing.findMany({
+            where: { id: { in: allListingIds } },
+            select: {
+              id: true,
+              title: true,
+              price: true,
+              status: true,
+              seller: true,
+              imageUrl: true,
+              mediaUrls: true,
+            },
+          })
+        : [];
+      const listingById = new Map(
+        listings.map((l) => [
+          l.id,
+          {
+            id: l.id,
+            title: l.title,
+            price: toHbarForClient(l.price),
+            status: l.status,
+            seller: l.seller,
+            imageUrl: rewriteMediaUrlForClient(l.imageUrl),
+            mediaUrls:
+              rewriteMediaUrlsForClient(l.mediaUrls as unknown as string[]) ??
+              (l.mediaUrls as unknown as string[]),
+          },
+        ]),
+      );
+
+      const decorate = (o: (typeof sent)[number]) => ({
+        id: o.id,
+        listingId: o.listingId,
+        buyer: o.buyer,
+        amount: o.amount,
+        status: o.status,
+        txHash: o.txHash ?? null,
+        createdAt: o.createdAt,
+        updatedAt: o.updatedAt,
+        listing: listingById.get(o.listingId) ?? null,
+      });
+
+      return res.json({
+        received: received.map(decorate),
+        sent: sent.map(decorate),
+      });
+    } catch (err) {
+      log.error({ err }, "Failed to fetch user offers");
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  /**
    * Sync an auction from createAuction transaction so it shows immediately.
    */
   router.post("/sync-auction", async (req, res) => {
@@ -1771,6 +1859,11 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
                 title: s.listing.title,
                 status: s.listing.status,
                 imageUrl: rewriteMediaUrlForClient(s.listing.imageUrl),
+                requireEscrow: (s.listing as any).requireEscrow ?? false,
+                trackingNumber: (s.listing as any).trackingNumber ?? null,
+                trackingCarrier: (s.listing as any).trackingCarrier ?? null,
+                shippedAt: (s.listing as any).shippedAt ?? null,
+                exchangeConfirmedAt: (s.listing as any).exchangeConfirmedAt ?? null,
               }
             : null,
           auction: s.auction

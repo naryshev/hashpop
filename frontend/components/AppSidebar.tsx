@@ -13,6 +13,8 @@ import {
   LogIn,
   LogOut,
   UserCircle,
+  Tag,
+  Receipt,
 } from "lucide-react";
 import { Sidebar, SidebarBody, SidebarLink } from "./ui/sidebar";
 import { cn } from "../lib/utils";
@@ -57,6 +59,16 @@ export function AppSidebar({
         href: "/create",
         icon: <PlusSquare className="h-5 w-5 flex-shrink-0" />,
       },
+      ...(isConnected
+        ? [
+            { label: "Offers", href: "/offers", icon: <Tag className="h-5 w-5 flex-shrink-0" /> },
+            {
+              label: "Purchases",
+              href: "/purchases",
+              icon: <Receipt className="h-5 w-5 flex-shrink-0" />,
+            },
+          ]
+        : []),
       { label: "Watchlist", href: "/watchlist", icon: <Heart className="h-5 w-5 flex-shrink-0" /> },
       {
         label: "Messages",
@@ -103,7 +115,9 @@ export function AppSidebar({
             <div className="flex items-center gap-2 px-2 py-1">
               <UserCircle className="h-5 w-5 flex-shrink-0 text-neutral-500 dark:text-neutral-400" />
               {open && (
-                <p className="text-xs text-neutral-600 dark:text-neutral-300 truncate">{accountId}</p>
+                <p className="text-xs text-neutral-600 dark:text-neutral-300 truncate">
+                  {accountId}
+                </p>
               )}
             </div>
           ) : null}
