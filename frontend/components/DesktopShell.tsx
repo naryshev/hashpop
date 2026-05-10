@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -109,6 +109,16 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
   const { isConnected, accountId, address, disconnect } = useHashpackWallet();
   const { openSignIn } = useSignInModal();
 
+  // Defer wallet-dependent UI until after hydration. Without this the rail
+  // and top bar render with isConnected=false on the server, then the client
+  // swaps in extra nav entries and the wallet chip, which breaks hydration
+  // (React errors #418 / #422). After mount we use the real wallet state.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  const effectiveConnected = mounted && isConnected;
+
   const titleSlotRef = useTopBarSlotRef("title");
   const centerSlotRef = useTopBarSlotRef("center");
   const actionsSlotRef = useTopBarSlotRef("actions");
@@ -116,7 +126,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
   const items = useMemo<RailItem[]>(() => {
     return [
       { label: "Marketplace", href: "/marketplace", icon: <Store className="h-5 w-5" /> },
-      ...(isConnected
+      ...(effectiveConnected
         ? [
             {
               label: "My Hashpop",
@@ -126,7 +136,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
           ]
         : []),
       { label: "Create Listing", href: "/create", icon: <PlusSquare className="h-5 w-5" /> },
-      ...(isConnected
+      ...(effectiveConnected
         ? [
             { label: "Offers", href: "/offers", icon: <Tag className="h-5 w-5" /> },
             { label: "Purchases", href: "/purchases", icon: <Receipt className="h-5 w-5" /> },
@@ -136,7 +146,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
       { label: "Messages", href: "/messages", icon: <MessageSquare className="h-5 w-5" /> },
       { label: "Support", href: "/support", icon: <LifeBuoy className="h-5 w-5" /> },
     ];
-  }, [isConnected]);
+  }, [effectiveConnected]);
 
   const fallbackTitle = pathnameTitle(pathname);
 
@@ -175,7 +185,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
           })}
         </div>
         <div className="flex flex-col items-center gap-1">
-          {isConnected ? (
+          {effectiveConnected ? (
             <RailButton label="Sign out" onClick={() => void disconnect()}>
               <LogOut className="h-5 w-5" />
             </RailButton>
@@ -221,7 +231,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
             >
               <Bell className="h-4 w-4" />
             </Link>
-            {isConnected ? (
+            {effectiveConnected ? (
               <div className="flex items-center gap-2 rounded-glass border border-white/10 bg-white/5 px-3 py-1.5 text-xs">
                 <Wallet className="h-3.5 w-3.5 text-chrome" />
                 <span className="font-mono text-white/80">

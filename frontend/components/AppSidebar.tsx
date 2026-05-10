@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -48,6 +48,14 @@ export function AppSidebar({
   const setOpen = setOpenProp !== undefined ? setOpenProp : setOpenState;
   const appVersion = process.env.NEXT_PUBLIC_APP_VERSION?.trim() || "v1.0.0";
 
+  // Defer wallet-dependent items until after hydration so SSR (always
+  // logged-out) and client (real wallet state) agree on the DOM structure.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  const effectiveConnected = mounted && isConnected;
+
   const links = useMemo<NavLink[]>(
     () => [
       {
@@ -55,7 +63,7 @@ export function AppSidebar({
         href: "/marketplace",
         icon: <Store className="h-5 w-5 flex-shrink-0" />,
       },
-      ...(isConnected
+      ...(effectiveConnected
         ? [
             {
               label: "My Hashpop",
@@ -69,7 +77,7 @@ export function AppSidebar({
         href: "/create",
         icon: <PlusSquare className="h-5 w-5 flex-shrink-0" />,
       },
-      ...(isConnected
+      ...(effectiveConnected
         ? [
             { label: "Offers", href: "/offers", icon: <Tag className="h-5 w-5 flex-shrink-0" /> },
             {
@@ -87,12 +95,12 @@ export function AppSidebar({
       },
       { label: "Support", href: "/support", icon: <LifeBuoy className="h-5 w-5 flex-shrink-0" /> },
     ],
-    [isConnected],
+    [effectiveConnected],
   );
 
   // "Sign in" is rendered as a button (not a link) so it opens the modal in
   // place instead of navigating away.
-  const signInAction: NavAction | null = isConnected
+  const signInAction: NavAction | null = effectiveConnected
     ? null
     : {
         label: "Sign In",
@@ -141,7 +149,7 @@ export function AppSidebar({
           </div>
         </div>
         <div className="space-y-1">
-          {isConnected && accountId ? (
+          {effectiveConnected && accountId ? (
             <div className="flex items-center gap-2 px-2 py-1">
               <UserCircle className="h-5 w-5 flex-shrink-0 text-neutral-500 dark:text-neutral-400" />
               {open && (
@@ -151,7 +159,7 @@ export function AppSidebar({
               )}
             </div>
           ) : null}
-          {isConnected && (
+          {effectiveConnected && (
             <button
               type="button"
               onClick={() => void disconnect()}
