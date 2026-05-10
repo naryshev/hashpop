@@ -1,4 +1,5 @@
 "use client";
+import { listingHref } from "../../lib/listingUrl";
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -12,6 +13,7 @@ import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { canonicalizeCategory } from "../../lib/categories";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
+import { TopBarSlot } from "../../lib/topBar";
 
 function formatListingId(id: string): string {
   if (!id || !id.startsWith("0x") || id.length !== 66) return id;
@@ -160,8 +162,9 @@ export default function MarketplacePageClient({
       const q = query.toLowerCase();
       // Substring match first — exact word/phrase hits in any field
       const substringHits = categoryMatched.filter((item) =>
-        [item.title, item.subtitle, item.description, item.category]
-          .some((f) => f?.toLowerCase().includes(q)),
+        [item.title, item.subtitle, item.description, item.category].some((f) =>
+          f?.toLowerCase().includes(q),
+        ),
       );
       if (substringHits.length > 0) {
         queryMatched = substringHits;
@@ -200,171 +203,217 @@ export default function MarketplacePageClient({
         if (!createdMs || Number.isNaN(createdMs)) return false;
         if (now - createdMs > maxAgeMs) return false;
       }
-      if (conditionQuery && item.condition?.toLowerCase() !== conditionQuery.toLowerCase()) return false;
+      if (conditionQuery && item.condition?.toLowerCase() !== conditionQuery.toLowerCase())
+        return false;
       return true;
     });
-  }, [items, query, categoryQuery, minPriceQuery, maxPriceQuery, postedWithinQuery, conditionQuery]);
+  }, [
+    items,
+    query,
+    categoryQuery,
+    minPriceQuery,
+    maxPriceQuery,
+    postedWithinQuery,
+    conditionQuery,
+  ]);
+
+  // Header chrome is hoisted into the global top bar via portals so the page
+  // body holds only content. Title, search-with-filters, and the Create
+  // Listing CTA each live in their own named slot. On mobile the slots
+  // aren't rendered (no DesktopShell), so the search-with-filter block is
+  // duplicated below as a fallback header inside the page body.
+  const headerCluster = (
+    <div className="flex items-center gap-2">
+      <span className="text-base font-semibold tracking-tight text-white">Marketplace</span>
+      {isConnected ? (
+        <span className="inline-flex items-center gap-1 h-5 px-2 text-[10px] font-medium border border-[#00ffa3]/40 bg-[#00ffa3]/10 text-[#00ffa3] shadow-[0_0_8px_rgba(0,255,163,0.2)]">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#00ffa3] shadow-[0_0_4px_rgba(0,255,163,0.8)]" />
+          Authenticated
+        </span>
+      ) : (
+        <StatusBadge status="error" className="h-5 px-2 text-[10px]">
+          Connect
+        </StatusBadge>
+      )}
+    </div>
+  );
+
+  const searchCluster = (
+    <div className="relative flex w-full max-w-md justify-center">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          const q = searchInput.trim();
+          const p = new URLSearchParams(searchParams.toString());
+          if (q) p.set("q", q);
+          else p.delete("q");
+          router.push(p.toString() ? `/marketplace?${p.toString()}` : "/marketplace");
+          setSearchInput("");
+          setFilterOpen(false);
+        }}
+      >
+        <div className="flex items-center gap-1.5 rounded-full border border-[#00ffa3]/50 bg-[#00ffa3]/[0.08] px-3 py-1.5 shadow-[0_0_14px_rgba(0,255,163,0.12),inset_0_0_8px_rgba(0,255,163,0.04)]">
+          <svg
+            className="h-3.5 w-3.5 shrink-0 text-[#00ffa3]"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-4.35-4.35M16 10.5A5.5 5.5 0 115 10.5a5.5 5.5 0 0111 0z"
+            />
+          </svg>
+          <input
+            type="text"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search listings…"
+            className="w-36 bg-transparent text-sm text-white placeholder:text-[#00ffa3]/40 focus:outline-none"
+          />
+          {/* Filter toggle — replaces the second X */}
+          <button
+            type="button"
+            onClick={() => {
+              setFilterOpen((o) => !o);
+              setFilterMinPrice(minPriceQuery);
+              setFilterMaxPrice(maxPriceQuery);
+              setFilterPostedWithin(postedWithinQuery);
+              setFilterCondition(conditionQuery);
+            }}
+            aria-label="Filters"
+            className={`shrink-0 transition-colors ${filterOpen || minPriceQuery || maxPriceQuery || postedWithinQuery || conditionQuery ? "text-[#00ffa3]" : "text-[#00ffa3]/50 hover:text-[#00ffa3]"}`}
+          >
+            {/* sliders / funnel icon */}
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 4h18M7 12h10M11 20h2"
+              />
+            </svg>
+          </button>
+        </div>
+      </form>
+      {/* Filter dropdown */}
+      {filterOpen && (
+        <div className="absolute right-0 top-full mt-2 w-72 rounded-xl border border-white/10 bg-[#0a0a0a] shadow-2xl p-4 z-50">
+          <p className="text-xs font-semibold tracking-widest text-silver uppercase mb-3">
+            Filters
+          </p>
+          <div className="space-y-3">
+            <div>
+              <span className="text-xs text-silver/70 mb-1 block">Price (HBAR)</span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={filterMinPrice}
+                  onChange={(e) => setFilterMinPrice(e.target.value)}
+                  placeholder="Min"
+                  className="input-frost w-full text-sm py-1.5"
+                />
+                <span className="text-silver/40 text-xs shrink-0">to</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={filterMaxPrice}
+                  onChange={(e) => setFilterMaxPrice(e.target.value)}
+                  placeholder="Max"
+                  className="input-frost w-full text-sm py-1.5"
+                />
+              </div>
+            </div>
+            <div>
+              <span className="text-xs text-silver/70 mb-1 block">Date listed</span>
+              <select
+                value={filterPostedWithin}
+                onChange={(e) => setFilterPostedWithin(e.target.value)}
+                className="input-frost w-full text-sm py-1.5"
+              >
+                <option value="">Any time</option>
+                <option value="1d">Last 24 hours</option>
+                <option value="1w">Last week</option>
+                <option value="1m">Last month</option>
+                <option value="3m">Last 3 months</option>
+                <option value="6m">Last 6 months</option>
+                <option value="1y">Last year</option>
+              </select>
+            </div>
+            <div>
+              <span className="text-xs text-silver/70 mb-1 block">Condition</span>
+              <select
+                value={filterCondition}
+                onChange={(e) => setFilterCondition(e.target.value)}
+                className="input-frost w-full text-sm py-1.5"
+              >
+                <option value="">Any condition</option>
+                <option value="Like new">Like new</option>
+                <option value="Used">Used</option>
+                <option value="Refurbished">Refurbished</option>
+                <option value="For parts or repair">For parts or repair</option>
+              </select>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  const p = new URLSearchParams(searchParams.toString());
+                  p.delete("minPrice");
+                  p.delete("maxPrice");
+                  p.delete("postedWithin");
+                  p.delete("condition");
+                  setFilterOpen(false);
+                  router.push(p.toString() ? `/marketplace?${p.toString()}` : "/marketplace");
+                }}
+                className="flex-1 text-xs text-silver hover:text-white border border-white/15 rounded-lg py-1.5 transition-colors"
+              >
+                Reset
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const p = new URLSearchParams(searchParams.toString());
+                  if (filterMinPrice) p.set("minPrice", filterMinPrice);
+                  else p.delete("minPrice");
+                  if (filterMaxPrice) p.set("maxPrice", filterMaxPrice);
+                  else p.delete("maxPrice");
+                  if (filterPostedWithin) p.set("postedWithin", filterPostedWithin);
+                  else p.delete("postedWithin");
+                  if (filterCondition) p.set("condition", filterCondition);
+                  else p.delete("condition");
+                  setFilterOpen(false);
+                  router.push(p.toString() ? `/marketplace?${p.toString()}` : "/marketplace");
+                }}
+                className="flex-1 text-xs btn-frost-cta py-1.5"
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const actionsCluster = (
+    <Link href="/create" className="text-sm text-chrome hover:text-white font-medium">
+      Create Listing
+    </Link>
+  );
 
   return (
     <main className="min-h-screen">
+      <TopBarSlot name="title">{headerCluster}</TopBarSlot>
+      <TopBarSlot name="center">{searchCluster}</TopBarSlot>
+      <TopBarSlot name="actions">{actionsCluster}</TopBarSlot>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-bold text-white">Marketplace</h1>
-            {isConnected ? (
-              <span className="inline-flex items-center gap-1 h-6 px-2.5 text-[11px] font-medium border border-[#00ffa3]/40 bg-[#00ffa3]/10 text-[#00ffa3] shadow-[0_0_8px_rgba(0,255,163,0.2)]">
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#00ffa3] shadow-[0_0_4px_rgba(0,255,163,0.8)]" />
-                Authenticated
-              </span>
-            ) : (
-              <StatusBadge status="error" className="h-6 px-2.5 text-[11px]">
-                Connect
-              </StatusBadge>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            {/* Desktop: always-visible inline search + filter dropdown */}
-            <div className="hidden md:flex relative">
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const q = searchInput.trim();
-                  const p = new URLSearchParams(searchParams.toString());
-                  if (q) p.set("q", q); else p.delete("q");
-                  router.push(p.toString() ? `/marketplace?${p.toString()}` : "/marketplace");
-                  setSearchInput("");
-                  setFilterOpen(false);
-                }}
-              >
-                <div className="flex items-center gap-1.5 rounded-full border border-[#00ffa3]/50 bg-[#00ffa3]/[0.08] px-3 py-1.5 shadow-[0_0_14px_rgba(0,255,163,0.12),inset_0_0_8px_rgba(0,255,163,0.04)]">
-                  <svg className="h-3.5 w-3.5 shrink-0 text-[#00ffa3]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M16 10.5A5.5 5.5 0 115 10.5a5.5 5.5 0 0111 0z" />
-                  </svg>
-                  <input
-                    type="text"
-                    value={searchInput}
-                    onChange={(e) => setSearchInput(e.target.value)}
-                    placeholder="Search listings…"
-                    className="w-36 bg-transparent text-sm text-white placeholder:text-[#00ffa3]/40 focus:outline-none"
-                  />
-                  {/* Filter toggle — replaces the second X */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFilterOpen((o) => !o);
-                      setFilterMinPrice(minPriceQuery);
-                      setFilterMaxPrice(maxPriceQuery);
-                      setFilterPostedWithin(postedWithinQuery);
-                      setFilterCondition(conditionQuery);
-                    }}
-                    aria-label="Filters"
-                    className={`shrink-0 transition-colors ${filterOpen || minPriceQuery || maxPriceQuery || postedWithinQuery || conditionQuery ? "text-[#00ffa3]" : "text-[#00ffa3]/50 hover:text-[#00ffa3]"}`}
-                  >
-                    {/* sliders / funnel icon */}
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h18M7 12h10M11 20h2" />
-                    </svg>
-                  </button>
-                </div>
-              </form>
-              {/* Filter dropdown */}
-              {filterOpen && (
-                <div className="absolute right-0 top-full mt-2 w-72 rounded-xl border border-white/10 bg-[#0a0a0a] shadow-2xl p-4 z-50">
-                  <p className="text-xs font-semibold tracking-widest text-silver uppercase mb-3">Filters</p>
-                  <div className="space-y-3">
-                    <div>
-                      <span className="text-xs text-silver/70 mb-1 block">Price (HBAR)</span>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={filterMinPrice}
-                          onChange={(e) => setFilterMinPrice(e.target.value)}
-                          placeholder="Min"
-                          className="input-frost w-full text-sm py-1.5"
-                        />
-                        <span className="text-silver/40 text-xs shrink-0">to</span>
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={filterMaxPrice}
-                          onChange={(e) => setFilterMaxPrice(e.target.value)}
-                          placeholder="Max"
-                          className="input-frost w-full text-sm py-1.5"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-xs text-silver/70 mb-1 block">Date listed</span>
-                      <select
-                        value={filterPostedWithin}
-                        onChange={(e) => setFilterPostedWithin(e.target.value)}
-                        className="input-frost w-full text-sm py-1.5"
-                      >
-                        <option value="">Any time</option>
-                        <option value="1d">Last 24 hours</option>
-                        <option value="1w">Last week</option>
-                        <option value="1m">Last month</option>
-                        <option value="3m">Last 3 months</option>
-                        <option value="6m">Last 6 months</option>
-                        <option value="1y">Last year</option>
-                      </select>
-                    </div>
-                    <div>
-                      <span className="text-xs text-silver/70 mb-1 block">Condition</span>
-                      <select
-                        value={filterCondition}
-                        onChange={(e) => setFilterCondition(e.target.value)}
-                        className="input-frost w-full text-sm py-1.5"
-                      >
-                        <option value="">Any condition</option>
-                        <option value="Like new">Like new</option>
-                        <option value="Used">Used</option>
-                        <option value="Refurbished">Refurbished</option>
-                        <option value="For parts or repair">For parts or repair</option>
-                      </select>
-                    </div>
-                    <div className="flex gap-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const p = new URLSearchParams(searchParams.toString());
-                          p.delete("minPrice"); p.delete("maxPrice");
-                          p.delete("postedWithin"); p.delete("condition");
-                          setFilterOpen(false);
-                          router.push(p.toString() ? `/marketplace?${p.toString()}` : "/marketplace");
-                        }}
-                        className="flex-1 text-xs text-silver hover:text-white border border-white/15 rounded-lg py-1.5 transition-colors"
-                      >
-                        Reset
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const p = new URLSearchParams(searchParams.toString());
-                          if (filterMinPrice) p.set("minPrice", filterMinPrice); else p.delete("minPrice");
-                          if (filterMaxPrice) p.set("maxPrice", filterMaxPrice); else p.delete("maxPrice");
-                          if (filterPostedWithin) p.set("postedWithin", filterPostedWithin); else p.delete("postedWithin");
-                          if (filterCondition) p.set("condition", filterCondition); else p.delete("condition");
-                          setFilterOpen(false);
-                          router.push(p.toString() ? `/marketplace?${p.toString()}` : "/marketplace");
-                        }}
-                        className="flex-1 text-xs btn-frost-cta py-1.5"
-                      >
-                        Apply
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-            <Link href="/create" className="text-sm text-chrome hover:text-white font-medium">
-              Create Listing
-            </Link>
-          </div>
-        </div>
         {(() => {
           const removeFilter = (keys: string[]) => {
             const p = new URLSearchParams(searchParams.toString());
@@ -377,17 +426,28 @@ export default function MarketplacePageClient({
           if (query) pills.push({ label: `"${query}"`, keys: ["q"] });
           if (categoryQuery) pills.push({ label: categoryQuery, keys: ["category"] });
           if (minPriceQuery && maxPriceQuery)
-            pills.push({ label: `${minPriceQuery}–${maxPriceQuery} HBAR`, keys: ["minPrice", "maxPrice"] });
+            pills.push({
+              label: `${minPriceQuery}–${maxPriceQuery} HBAR`,
+              keys: ["minPrice", "maxPrice"],
+            });
           else if (minPriceQuery)
             pills.push({ label: `\u2265 ${minPriceQuery} HBAR`, keys: ["minPrice"] });
           else if (maxPriceQuery)
             pills.push({ label: `\u2264 ${maxPriceQuery} HBAR`, keys: ["maxPrice"] });
           if (postedWithinQuery) {
             const labelMap: Record<string, string> = {
-              "1d": "Last day", "1w": "Last week", "1m": "Last month",
-              "3m": "Last 3 months", "6m": "Last 6 months", "1y": "Last year", "2y": "Last 2 years",
+              "1d": "Last day",
+              "1w": "Last week",
+              "1m": "Last month",
+              "3m": "Last 3 months",
+              "6m": "Last 6 months",
+              "1y": "Last year",
+              "2y": "Last 2 years",
             };
-            pills.push({ label: labelMap[postedWithinQuery] ?? postedWithinQuery, keys: ["postedWithin"] });
+            pills.push({
+              label: labelMap[postedWithinQuery] ?? postedWithinQuery,
+              keys: ["postedWithin"],
+            });
           }
           if (conditionQuery) pills.push({ label: conditionQuery, keys: ["condition"] });
 
@@ -397,7 +457,9 @@ export default function MarketplacePageClient({
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-semibold tracking-widest text-silver uppercase">
                   Active Filters{" "}
-                  <span className="text-[#00ffa3]">· {filteredItems.length} Result{filteredItems.length !== 1 ? "s" : ""}</span>
+                  <span className="text-[#00ffa3]">
+                    · {filteredItems.length} Result{filteredItems.length !== 1 ? "s" : ""}
+                  </span>
                 </span>
                 <button
                   type="button"
@@ -416,7 +478,9 @@ export default function MarketplacePageClient({
                     className="inline-flex items-center gap-1.5 rounded-full border border-[#00ffa3]/60 bg-[#00ffa3]/10 px-3 py-1 text-sm text-[#00ffa3] hover:bg-[#00ffa3]/20 transition-colors"
                   >
                     {label}
-                    <span aria-hidden className="text-[#00ffa3]/70 text-base leading-none">×</span>
+                    <span aria-hidden className="text-[#00ffa3]/70 text-base leading-none">
+                      ×
+                    </span>
                   </button>
                 ))}
               </div>
@@ -446,7 +510,7 @@ export default function MarketplacePageClient({
               {filteredItems.map((item) => (
                 <Link
                   key={`${item.itemType}-${item.id}`}
-                  href={`/listing/${encodeURIComponent(item.id)}`}
+                  href={listingHref(item.id)}
                   className="block glass-card overflow-hidden transition-all duration-200 active:border-white/20"
                 >
                   <div className="relative bg-white/5">
@@ -494,7 +558,7 @@ export default function MarketplacePageClient({
               {filteredItems.map((item) => (
                 <Link
                   key={`${item.itemType}-${item.id}`}
-                  href={`/listing/${encodeURIComponent(item.id)}`}
+                  href={listingHref(item.id)}
                   className="glass-card overflow-hidden transition-all duration-200 hover:border-white/20 hover:shadow-glow"
                 >
                   <div className="relative bg-white/5">

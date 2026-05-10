@@ -1,4 +1,5 @@
 "use client";
+import { listingHref } from "../../lib/listingUrl";
 
 import { useRef, useState, useMemo, useCallback, useEffect, Suspense } from "react";
 import Link from "next/link";
@@ -98,7 +99,7 @@ function CreatePageContent() {
   useEffect(() => {
     const listingId = createdListingIdRef.current ?? createdListingId;
     if (!listingId || !listingSuccess) return;
-    const t = setTimeout(() => router.push(`/listing/${encodeURIComponent(listingId)}`), 2200);
+    const t = setTimeout(() => router.push(listingHref(listingId)), 2200);
     return () => clearTimeout(t);
   }, [listingSuccess, createdListingId, router]);
 
@@ -332,7 +333,7 @@ function CreatePageContent() {
               )}
               <div className="flex flex-col sm:flex-row gap-2 justify-center pt-2">
                 <Link
-                  href={`/listing/${encodeURIComponent(createdListingIdRef.current ?? createdListingId ?? "")}`}
+                  href={listingHref(createdListingIdRef.current ?? createdListingId ?? "")}
                   className="btn-frost-cta text-center"
                 >
                   View listing
@@ -544,7 +545,9 @@ function CreatePageContent() {
           </label>
 
           <label className="block">
-            <span className="text-sm text-silver">Category <span className="text-rose-400">*</span></span>
+            <span className="text-sm text-silver">
+              Category <span className="text-rose-400">*</span>
+            </span>
             <CategorySearch
               value={category}
               onChange={setCategory}
@@ -585,7 +588,16 @@ function CreatePageContent() {
               Show buyers roughly where the item is. Search a city or click the map to drop a pin.
             </p>
             <div className="mt-2">
-              <LocationPicker value={location} onChange={setLocation} />
+              {/* Only mount the leaflet map once the wallet is connected so
+                  the (disabled) form for unauthenticated visitors doesn't
+                  spin up tile fetches that race React unmounts on nav. */}
+              {walletConnected ? (
+                <LocationPicker value={location} onChange={setLocation} />
+              ) : (
+                <div className="aspect-[16/7] w-full rounded-glass border border-white/10 bg-white/5 flex items-center justify-center text-silver text-sm">
+                  Connect your wallet to add a location.
+                </div>
+              )}
             </div>
           </div>
 

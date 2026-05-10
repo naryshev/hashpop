@@ -1,4 +1,5 @@
 "use client";
+import { listingHref } from "../../lib/listingUrl";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -150,13 +151,6 @@ export default function OffersPage() {
   return (
     <main className="min-h-screen">
       <div className="mx-auto max-w-4xl space-y-6 px-4 py-6 sm:px-6">
-        <div className="flex items-center justify-between gap-3">
-          <h1 className="text-xl font-bold text-white sm:text-2xl">Offers</h1>
-          <Link href="/dashboard" className="text-sm font-medium text-chrome hover:text-white">
-            My Hashpop
-          </Link>
-        </div>
-
         {!address ? (
           <div className="glass-card rounded-xl p-6">
             <p className="mb-3 font-medium text-white">Connect your wallet to view offers.</p>
@@ -257,7 +251,7 @@ export default function OffersPage() {
                     <li key={row.id} className="glass-card rounded-xl border border-white/10 p-4">
                       <div className="flex gap-4">
                         <Link
-                          href={`/listing/${encodeURIComponent(row.listingId)}`}
+                          href={listingHref(row.listingId)}
                           className="relative aspect-square w-20 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-white/5"
                         >
                           {thumb ? (
@@ -272,7 +266,7 @@ export default function OffersPage() {
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-start justify-between gap-2">
                             <Link
-                              href={`/listing/${encodeURIComponent(row.listingId)}`}
+                              href={listingHref(row.listingId)}
                               className="block truncate text-base font-semibold text-white hover:text-chrome"
                             >
                               {title}
@@ -345,7 +339,7 @@ export default function OffersPage() {
                                 {rowBusy ? "Confirm in wallet…" : "Cancel offer"}
                               </button>
                               <Link
-                                href={`/listing/${encodeURIComponent(row.listingId)}`}
+                                href={listingHref(row.listingId)}
                                 className="rounded-glass border border-white/15 px-3 py-1.5 text-sm text-silver hover:text-white"
                               >
                                 View listing

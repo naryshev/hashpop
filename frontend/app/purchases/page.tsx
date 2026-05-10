@@ -1,4 +1,5 @@
 "use client";
+import { listingHref } from "../../lib/listingUrl";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -63,9 +64,7 @@ type Step = {
 function describeStep(row: PurchaseRow, state: EscrowState): Step {
   const isBuyer = row.role === "buyer";
   const isEscrow = !!row.listing?.requireEscrow;
-  const listingHref = row.listingId
-    ? `/listing/${encodeURIComponent(row.listingId)}`
-    : "/marketplace";
+  const ctaHref = row.listingId ? listingHref(row.listingId) : "/marketplace";
   const tracking = row.listing?.trackingNumber
     ? `${row.listing.trackingCarrier ?? "Carrier"} ${row.listing.trackingNumber}`
     : null;
@@ -103,7 +102,7 @@ function describeStep(row: PurchaseRow, state: EscrowState): Step {
       detail: isBuyer
         ? "Your payment is locked in escrow. The seller has 7 days from purchase to ship and add tracking, or escrow auto-refunds."
         : "Buyer paid into escrow. Add a tracking number on the listing and confirm shipment to keep the timer from running out.",
-      cta: isBuyer ? undefined : { label: "Add tracking", href: listingHref },
+      cta: isBuyer ? undefined : { label: "Add tracking", href: ctaHref },
       tone: isBuyer ? "waiting" : "active",
     };
   }
@@ -116,7 +115,7 @@ function describeStep(row: PurchaseRow, state: EscrowState): Step {
       detail: isBuyer
         ? `Seller confirmed shipment${tracking ? ` (${tracking})` : ""}. Once the item arrives, click "Confirm receipt" on the listing to release payment. Escrow auto-releases after the timeout if you take no action.`
         : `You marked the item as shipped${tracking ? ` (${tracking})` : ""}. Funds release once the buyer confirms — or automatically after the escrow timeout.`,
-      cta: isBuyer ? { label: "Confirm receipt", href: listingHref } : undefined,
+      cta: isBuyer ? { label: "Confirm receipt", href: ctaHref } : undefined,
       tone: isBuyer ? "active" : "waiting",
     };
   }
@@ -206,17 +205,9 @@ export default function PurchasesPage() {
   return (
     <main className="min-h-screen">
       <div className="mx-auto max-w-4xl space-y-6 px-4 py-6 sm:px-6">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-bold text-white sm:text-2xl">Purchases</h1>
-            <p className="mt-1 text-xs text-silver/70">
-              Track your buys and sales through every escrow step.
-            </p>
-          </div>
-          <Link href="/dashboard" className="text-sm font-medium text-chrome hover:text-white">
-            My Hashpop
-          </Link>
-        </div>
+        <p className="text-xs text-silver/70">
+          Track your buys and sales through every escrow step.
+        </p>
 
         {!address ? (
           <div className="glass-card rounded-xl p-6">
@@ -301,9 +292,7 @@ export default function PurchasesPage() {
                     <li key={row.id} className="glass-card rounded-xl border border-white/10 p-4">
                       <div className="flex gap-4">
                         <Link
-                          href={
-                            targetId ? `/listing/${encodeURIComponent(targetId)}` : "/marketplace"
-                          }
+                          href={targetId ? listingHref(targetId) : "/marketplace"}
                           className="relative aspect-square w-20 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-white/5"
                         >
                           {thumb ? (
@@ -323,11 +312,7 @@ export default function PurchasesPage() {
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-start justify-between gap-2">
                             <Link
-                              href={
-                                targetId
-                                  ? `/listing/${encodeURIComponent(targetId)}`
-                                  : "/marketplace"
-                              }
+                              href={targetId ? listingHref(targetId) : "/marketplace"}
                               className="block truncate text-base font-semibold text-white hover:text-chrome"
                             >
                               {title}

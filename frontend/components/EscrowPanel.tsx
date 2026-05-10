@@ -241,7 +241,7 @@ export function EscrowPanel({
 
       {/* Transaction Details */}
       <div className="px-5 pb-4">
-        <div className="rounded-[2px] bg-white/[0.03] border border-white/[0.06] p-3 space-y-2">
+        <div className="rounded-glass bg-white/[0.03] border border-white/[0.06] p-3 space-y-2">
           <div className="grid grid-cols-3 gap-3 text-sm">
             <div>
               <p className="text-[10px] uppercase tracking-wider text-white/40 mb-0.5">Buyer</p>
@@ -325,7 +325,7 @@ export function EscrowPanel({
               released from escrow to the seller&apos;s wallet.
             </p>
             {trackingNumber && (
-              <div className="rounded-[2px] bg-white/5 border border-white/10 px-3 py-2">
+              <div className="rounded-glass bg-white/5 border border-white/10 px-3 py-2">
                 <p className="text-xs text-chrome">
                   Tracking: {trackingNumber}
                   {trackingCarrier ? ` (${trackingCarrier})` : ""}
@@ -394,7 +394,7 @@ export function EscrowPanel({
         )}
 
         {errorMessage && (
-          <div className="rounded-[2px] bg-red-500/10 border border-red-500/30 px-3 py-2 mt-3">
+          <div className="rounded-glass bg-red-500/10 border border-red-500/30 px-3 py-2 mt-3">
             <p className="text-sm text-red-400">{errorMessage}</p>
           </div>
         )}

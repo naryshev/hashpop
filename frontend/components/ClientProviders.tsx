@@ -5,19 +5,20 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { usePathname } from "next/navigation";
 import { HashpackWalletProvider } from "../lib/hashpackWallet";
 import { HashPackConfirmProvider } from "../lib/hashpackConfirm";
+import { SignInModalProvider } from "../lib/signInModal";
+import { TopBarProvider } from "../lib/topBar";
 import { Footer } from "./Footer";
 import { BottomNav } from "./BottomNav";
 import { WalletAccountSync } from "./WalletAccountSync";
 import { AppSidebar } from "./AppSidebar";
+import { DesktopShell } from "./DesktopShell";
 
 const qc = new QueryClient();
 
 export function ClientProviders({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isHome = pathname === "/";
-  const isSignIn = pathname === "/signin";
   const isFullscreenRoute = isHome;
-  const useSidebarNav = !isHome && !isSignIn;
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -25,34 +26,28 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
     <HashpackWalletProvider>
       <QueryClientProvider client={qc}>
         <HashPackConfirmProvider>
-        <WalletAccountSync />
-        {useSidebarNav ? (
-          <div className="min-h-screen pt-14 md:pt-0 flex flex-col md:flex-row">
-            <AppSidebar open={sidebarOpen} setOpen={setSidebarOpen} />
-            <div className="min-w-0 flex-1 flex flex-col">
-              {children}
-              <Footer />
-            </div>
-          </div>
-        ) : (
-          <div
-            className={
-              isFullscreenRoute
-                ? "h-screen overflow-hidden flex flex-col"
-                : "min-h-screen pt-14 md:pt-0 flex flex-col"
-            }
-          >
-            {children}
-            {!isFullscreenRoute && !isSignIn && <Footer />}
-          </div>
-        )}
-        {!isFullscreenRoute && !isSignIn && (
-          <BottomNav
-            signInMode={isSignIn}
-            showMenu={useSidebarNav}
-            onMenuClick={() => setSidebarOpen(true)}
-          />
-        )}
+          <SignInModalProvider>
+            <TopBarProvider>
+              <WalletAccountSync />
+              {isFullscreenRoute ? (
+                <div className="flex h-screen flex-col overflow-hidden">{children}</div>
+              ) : (
+                <>
+                  <DesktopShell>
+                    {children}
+                    <Footer />
+                  </DesktopShell>
+                  {/* Mobile-only nav chrome. AppSidebar provides the slide-out
+                      drawer; BottomNav renders the floating top bar with a
+                      hamburger. Both are no-ops on desktop via md:hidden. */}
+                  <div className="md:hidden">
+                    <AppSidebar open={sidebarOpen} setOpen={setSidebarOpen} />
+                    <BottomNav showMenu onMenuClick={() => setSidebarOpen(true)} />
+                  </div>
+                </>
+              )}
+            </TopBarProvider>
+          </SignInModalProvider>
         </HashPackConfirmProvider>
       </QueryClientProvider>
     </HashpackWalletProvider>

@@ -1,4 +1,5 @@
 "use client";
+import { listingHref } from "../../lib/listingUrl";
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -117,7 +118,7 @@ function SoldItemCard({
         <div className="flex-1 min-w-0">
           {targetId ? (
             <Link
-              href={`/listing/${encodeURIComponent(targetId)}`}
+              href={listingHref(targetId)}
               className="text-white font-semibold hover:text-chrome truncate block"
             >
               {listingTitle}
@@ -316,17 +317,16 @@ export default function DashboardPage() {
   return (
     <main className="min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-8">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl sm:text-2xl font-bold text-white">{accountId || "My Hashpop"}</h1>
-          {address && (
+        {address && (
+          <div className="flex items-center justify-end">
             <Link
               href={`/profile/${encodeURIComponent(address)}`}
               className="text-sm text-chrome hover:text-white font-medium"
             >
               ★ {Number(stats?.ratingAverage ?? 0).toFixed(1)}
             </Link>
-          )}
-        </div>
+          </div>
+        )}
 
         <div className="space-y-8" suppressHydrationWarning>
           {!mounted ? (
@@ -401,7 +401,7 @@ export default function DashboardPage() {
                       return (
                         <Link
                           key={`${row.itemType || "listing"}-${row.id}`}
-                          href={`/listing/${encodeURIComponent(row.id)}`}
+                          href={listingHref(row.id)}
                           className="glass-card group flex flex-col overflow-hidden hover:border-white/20 transition-colors"
                         >
                           {/* Thumbnail */}
@@ -491,7 +491,7 @@ export default function DashboardPage() {
                           className="flex items-center justify-between p-3 hover:bg-white/5"
                         >
                           <Link
-                            href={`/listing/${encodeURIComponent(w.itemId)}`}
+                            href={listingHref(w.itemId)}
                             className="text-white hover:text-chrome font-medium flex-1 min-w-0 truncate"
                           >
                             {w.title || formatListingId(w.itemId) || w.itemId.slice(0, 10) + "…"}
@@ -503,7 +503,7 @@ export default function DashboardPage() {
                             )}
                           </span>
                           <Link
-                            href={`/listing/${encodeURIComponent(w.itemId)}`}
+                            href={listingHref(w.itemId)}
                             className="text-chrome hover:text-white text-sm shrink-0 ml-2"
                           >
                             View
