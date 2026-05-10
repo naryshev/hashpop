@@ -253,7 +253,11 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
         {/* Inner content card. The only bordered element in the chrome.
             Mobile gets full-bleed content with top padding for BottomNav. */}
         <main className="flex-1 pt-14 md:p-3 md:pt-1">
-          <div className="md:min-h-[calc(100vh-3.5rem-1.5rem)] md:overflow-hidden md:rounded-glass-lg md:border md:border-white/10 md:bg-[#0e1422]/60 md:backdrop-blur-glass">
+          {/* Note: no overflow-hidden here. Combining overflow-hidden with
+              backdrop-blur creates a stacking context that destabilises
+              direct-DOM children like leaflet maps. Children that overflow
+              the rounded edge stay readable; the corners just don't clip. */}
+          <div className="md:min-h-[calc(100vh-3.5rem-1.5rem)] md:rounded-glass-lg md:border md:border-white/10 md:bg-[#0e1422]/60 md:backdrop-blur-glass">
             {children}
           </div>
         </main>

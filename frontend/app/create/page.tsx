@@ -588,7 +588,16 @@ function CreatePageContent() {
               Show buyers roughly where the item is. Search a city or click the map to drop a pin.
             </p>
             <div className="mt-2">
-              <LocationPicker value={location} onChange={setLocation} />
+              {/* Only mount the leaflet map once the wallet is connected so
+                  the (disabled) form for unauthenticated visitors doesn't
+                  spin up tile fetches that race React unmounts on nav. */}
+              {walletConnected ? (
+                <LocationPicker value={location} onChange={setLocation} />
+              ) : (
+                <div className="aspect-[16/7] w-full rounded-glass border border-white/10 bg-white/5 flex items-center justify-center text-silver text-sm">
+                  Connect your wallet to add a location.
+                </div>
+              )}
             </div>
           </div>
 
