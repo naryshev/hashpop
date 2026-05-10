@@ -1,4 +1,5 @@
 "use client";
+import { listingHref } from "../../lib/listingUrl";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -33,11 +34,15 @@ function formatSellerDisplay(seller?: string): string {
 }
 
 function getStatusStyle(status?: string): { label: string; className: string; pulse?: boolean } {
-  const s = String(status || "").trim().toUpperCase();
+  const s = String(status || "")
+    .trim()
+    .toUpperCase();
   if (s === "LISTED")
     return { label: "ACTIVE", className: "bg-[#00ffa3] border-[#00ffa3] text-black", pulse: true };
-  if (s === "LOCKED") return { label: "LOCKED", className: "bg-orange-400 border-orange-300 text-black" };
-  if (s === "CANCELLED") return { label: "CANCELLED", className: "bg-zinc-600 border-zinc-500 text-white" };
+  if (s === "LOCKED")
+    return { label: "LOCKED", className: "bg-orange-400 border-orange-300 text-black" };
+  if (s === "CANCELLED")
+    return { label: "CANCELLED", className: "bg-zinc-600 border-zinc-500 text-white" };
   return { label: "SOLD", className: "bg-rose-500 border-rose-400 text-white" };
 }
 
@@ -102,20 +107,27 @@ export default function WatchlistPage() {
                 return (
                   <Link
                     key={item.itemId}
-                    href={`/listing/${encodeURIComponent(item.itemId)}`}
+                    href={listingHref(item.itemId)}
                     className="block glass-card overflow-hidden transition-all duration-200 active:border-white/20"
                   >
                     <div className="relative bg-white/5">
                       <ListingMedia
-                        listing={{ imageUrl: item.imageUrl, mediaUrls: item.mediaUrls ?? undefined }}
+                        listing={{
+                          imageUrl: item.imageUrl,
+                          mediaUrls: item.mediaUrls ?? undefined,
+                        }}
                         className="w-full"
                         aspectRatio="square"
                         navigation="arrows"
                         cardSize
                         compactHeight="160px"
                       />
-                      <span className={`absolute top-2 left-2 rounded-full inline-flex items-center gap-1.5 border px-2 py-0.5 text-[10px] font-semibold ${badge.className}`}>
-                        {badge.pulse && <span className="inline-flex h-2 w-2 rounded-full bg-green-400 animate-pulse" />}
+                      <span
+                        className={`absolute top-2 left-2 rounded-full inline-flex items-center gap-1.5 border px-2 py-0.5 text-[10px] font-semibold ${badge.className}`}
+                      >
+                        {badge.pulse && (
+                          <span className="inline-flex h-2 w-2 rounded-full bg-green-400 animate-pulse" />
+                        )}
                         {badge.label}
                       </span>
                     </div>
@@ -130,10 +142,15 @@ export default function WatchlistPage() {
                       )}
                       <div className="flex items-center justify-between mt-1.5">
                         <p className="text-chrome font-semibold">
-                          {formatHbarWithUsd(formatPriceForDisplay(item.price || item.reservePrice || "0"), usdRate)}
+                          {formatHbarWithUsd(
+                            formatPriceForDisplay(item.price || item.reservePrice || "0"),
+                            usdRate,
+                          )}
                         </p>
                         {(item.watchlistCount ?? 0) > 0 && (
-                          <span className="text-[10px] text-silver/50 flex items-center gap-0.5">♡ {item.watchlistCount}</span>
+                          <span className="text-[10px] text-silver/50 flex items-center gap-0.5">
+                            ♡ {item.watchlistCount}
+                          </span>
                         )}
                       </div>
                     </div>
@@ -149,12 +166,15 @@ export default function WatchlistPage() {
                 return (
                   <Link
                     key={item.itemId}
-                    href={`/listing/${encodeURIComponent(item.itemId)}`}
+                    href={listingHref(item.itemId)}
                     className="glass-card overflow-hidden transition-all duration-200 hover:border-white/20 hover:shadow-glow"
                   >
                     <div className="relative bg-white/5">
                       <ListingMedia
-                        listing={{ imageUrl: item.imageUrl, mediaUrls: item.mediaUrls ?? undefined }}
+                        listing={{
+                          imageUrl: item.imageUrl,
+                          mediaUrls: item.mediaUrls ?? undefined,
+                        }}
                         className="w-full"
                         aspectRatio="square"
                         navigation="arrows"
@@ -164,8 +184,12 @@ export default function WatchlistPage() {
                       <div className="absolute top-2 right-2">
                         <WishlistButton itemId={item.itemId} itemType="listing" compact />
                       </div>
-                      <span className={`absolute top-2 left-2 rounded-full inline-flex items-center gap-1.5 border px-2 py-0.5 text-[10px] font-semibold ${badge.className}`}>
-                        {badge.pulse && <span className="inline-flex h-2 w-2 rounded-full bg-green-400 animate-pulse" />}
+                      <span
+                        className={`absolute top-2 left-2 rounded-full inline-flex items-center gap-1.5 border px-2 py-0.5 text-[10px] font-semibold ${badge.className}`}
+                      >
+                        {badge.pulse && (
+                          <span className="inline-flex h-2 w-2 rounded-full bg-green-400 animate-pulse" />
+                        )}
                         {badge.label}
                       </span>
                     </div>
@@ -180,10 +204,15 @@ export default function WatchlistPage() {
                       )}
                       <div className="flex items-center justify-between mt-2">
                         <p className="text-chrome font-semibold text-lg">
-                          {formatHbarWithUsd(formatPriceForDisplay(item.price || item.reservePrice || "0"), usdRate)}
+                          {formatHbarWithUsd(
+                            formatPriceForDisplay(item.price || item.reservePrice || "0"),
+                            usdRate,
+                          )}
                         </p>
                         {(item.watchlistCount ?? 0) > 0 && (
-                          <span className="text-xs text-silver/50 flex items-center gap-1">♡ {item.watchlistCount}</span>
+                          <span className="text-xs text-silver/50 flex items-center gap-1">
+                            ♡ {item.watchlistCount}
+                          </span>
                         )}
                       </div>
                     </div>

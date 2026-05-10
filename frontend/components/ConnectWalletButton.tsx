@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useHashpackWallet } from "../lib/hashpackWallet";
+import { useSignInModal } from "../lib/signInModal";
 
 type ConnectWalletButtonProps = {
   className?: string;
@@ -11,8 +11,9 @@ type ConnectWalletButtonProps = {
 };
 
 /**
- * Single source of truth for "Connect wallet" actions.
- * Use this component anywhere you need a button that opens the HashConnect pairing flow.
+ * Single source of truth for "Connect wallet" actions. Opens the site-wide
+ * HashPack sign-in modal so the gated action can resume in place rather than
+ * navigating to a separate page.
  */
 export function ConnectWalletButton({
   className = "btn-frost-cta disabled:opacity-50 disabled:cursor-not-allowed",
@@ -20,16 +21,15 @@ export function ConnectWalletButton({
   "data-testid": dataTestId = "connect-wallet-button",
   onPress,
 }: ConnectWalletButtonProps) {
-  const router = useRouter();
   const { isConnecting, isReady } = useHashpackWallet();
+  const { openSignIn } = useSignInModal();
 
   const handleClick = () => {
-    // Keep a tiny runtime breadcrumb for debugging click wiring in devtools.
     if (process.env.NODE_ENV !== "production") {
       console.debug("[wallet] connect button clicked");
     }
     onPress?.();
-    router.push("/signin");
+    openSignIn();
   };
 
   return (

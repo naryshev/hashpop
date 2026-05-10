@@ -19,11 +19,18 @@ import {
 import { Sidebar, SidebarBody, SidebarLink } from "./ui/sidebar";
 import { cn } from "../lib/utils";
 import { useHashpackWallet } from "../lib/hashpackWallet";
+import { useSignInModal } from "../lib/signInModal";
 
 type NavLink = {
   label: string;
   href: string;
   icon: JSX.Element;
+};
+
+type NavAction = {
+  label: string;
+  icon: JSX.Element;
+  onClick: () => void;
 };
 
 export function AppSidebar({
@@ -35,6 +42,7 @@ export function AppSidebar({
 }) {
   const pathname = usePathname();
   const { isConnected, accountId, disconnect } = useHashpackWallet();
+  const { openSignIn } = useSignInModal();
   const [openState, setOpenState] = useState(false);
   const open = openProp !== undefined ? openProp : openState;
   const setOpen = setOpenProp !== undefined ? setOpenProp : setOpenState;
@@ -47,13 +55,15 @@ export function AppSidebar({
         href: "/marketplace",
         icon: <Store className="h-5 w-5 flex-shrink-0" />,
       },
-      isConnected
-        ? {
-            label: "My Hashpop",
-            href: "/dashboard",
-            icon: <LayoutDashboard className="h-5 w-5 flex-shrink-0" />,
-          }
-        : { label: "Sign In", href: "/signin", icon: <LogIn className="h-5 w-5 flex-shrink-0" /> },
+      ...(isConnected
+        ? [
+            {
+              label: "My Hashpop",
+              href: "/dashboard",
+              icon: <LayoutDashboard className="h-5 w-5 flex-shrink-0" />,
+            },
+          ]
+        : []),
       {
         label: "Create Listing",
         href: "/create",
@@ -79,6 +89,16 @@ export function AppSidebar({
     ],
     [isConnected],
   );
+
+  // "Sign in" is rendered as a button (not a link) so it opens the modal in
+  // place instead of navigating away.
+  const signInAction: NavAction | null = isConnected
+    ? null
+    : {
+        label: "Sign In",
+        icon: <LogIn className="h-5 w-5 flex-shrink-0" />,
+        onClick: () => openSignIn(),
+      };
 
   return (
     <Sidebar open={open} setOpen={setOpen}>
@@ -108,6 +128,16 @@ export function AppSidebar({
                 />
               );
             })}
+            {signInAction && (
+              <button
+                type="button"
+                onClick={signInAction.onClick}
+                className="flex items-center justify-start gap-2 rounded-lg px-2 py-2 text-neutral-700 transition-colors hover:bg-neutral-200/50 dark:text-neutral-200 dark:hover:bg-white/5"
+              >
+                {signInAction.icon}
+                <span className="whitespace-pre text-sm">{signInAction.label}</span>
+              </button>
+            )}
           </div>
         </div>
         <div className="space-y-1">

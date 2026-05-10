@@ -1,4 +1,5 @@
 "use client";
+import { listingHref } from "../../lib/listingUrl";
 
 import { useRef, useState, useMemo, useCallback, useEffect, Suspense } from "react";
 import Link from "next/link";
@@ -98,7 +99,7 @@ function CreatePageContent() {
   useEffect(() => {
     const listingId = createdListingIdRef.current ?? createdListingId;
     if (!listingId || !listingSuccess) return;
-    const t = setTimeout(() => router.push(`/listing/${encodeURIComponent(listingId)}`), 2200);
+    const t = setTimeout(() => router.push(listingHref(listingId)), 2200);
     return () => clearTimeout(t);
   }, [listingSuccess, createdListingId, router]);
 
@@ -332,7 +333,7 @@ function CreatePageContent() {
               )}
               <div className="flex flex-col sm:flex-row gap-2 justify-center pt-2">
                 <Link
-                  href={`/listing/${encodeURIComponent(createdListingIdRef.current ?? createdListingId ?? "")}`}
+                  href={listingHref(createdListingIdRef.current ?? createdListingId ?? "")}
                   className="btn-frost-cta text-center"
                 >
                   View listing
@@ -544,7 +545,9 @@ function CreatePageContent() {
           </label>
 
           <label className="block">
-            <span className="text-sm text-silver">Category <span className="text-rose-400">*</span></span>
+            <span className="text-sm text-silver">
+              Category <span className="text-rose-400">*</span>
+            </span>
             <CategorySearch
               value={category}
               onChange={setCategory}

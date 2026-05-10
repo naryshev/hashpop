@@ -103,7 +103,7 @@ export function OffersPanel({ listingId, sellerAddress, onChanged }: Props) {
   if (activeOffers.length === 0) return null;
 
   return (
-    <div className="glass-card rounded-[2px] border border-white/10 p-4">
+    <div className="glass-card rounded-glass border border-white/10 p-4">
       <h3 className="mb-2 font-medium text-white">{isSeller ? "Pending offers" : "Your offer"}</h3>
       {!isSeller && (
         <p className="mb-2 text-xs text-silver/70">
@@ -120,7 +120,7 @@ export function OffersPanel({ listingId, sellerAddress, onChanged }: Props) {
             return (
               <li
                 key={offer.id}
-                className="space-y-2 rounded-[2px] border border-white/10 bg-white/5 px-3 py-3"
+                className="space-y-2 rounded-glass border border-white/10 bg-white/5 px-3 py-3"
               >
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-base font-semibold text-white">
@@ -168,7 +168,7 @@ export function OffersPanel({ listingId, sellerAddress, onChanged }: Props) {
           })}
       </ul>
       {error && (
-        <p className="mt-3 rounded-[2px] border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300/90">
+        <p className="mt-3 rounded-glass border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300/90">
           {error}
         </p>
       )}

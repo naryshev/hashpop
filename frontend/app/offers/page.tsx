@@ -1,4 +1,5 @@
 "use client";
+import { listingHref } from "../../lib/listingUrl";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -257,7 +258,7 @@ export default function OffersPage() {
                     <li key={row.id} className="glass-card rounded-xl border border-white/10 p-4">
                       <div className="flex gap-4">
                         <Link
-                          href={`/listing/${encodeURIComponent(row.listingId)}`}
+                          href={listingHref(row.listingId)}
                           className="relative aspect-square w-20 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-white/5"
                         >
                           {thumb ? (
@@ -272,7 +273,7 @@ export default function OffersPage() {
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-start justify-between gap-2">
                             <Link
-                              href={`/listing/${encodeURIComponent(row.listingId)}`}
+                              href={listingHref(row.listingId)}
                               className="block truncate text-base font-semibold text-white hover:text-chrome"
                             >
                               {title}
@@ -345,7 +346,7 @@ export default function OffersPage() {
                                 {rowBusy ? "Confirm in wallet…" : "Cancel offer"}
                               </button>
                               <Link
-                                href={`/listing/${encodeURIComponent(row.listingId)}`}
+                                href={listingHref(row.listingId)}
                                 className="rounded-glass border border-white/15 px-3 py-1.5 text-sm text-silver hover:text-white"
                               >
                                 View listing

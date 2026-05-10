@@ -1,4 +1,5 @@
 "use client";
+import { listingHref } from "../../lib/listingUrl";
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -412,7 +413,7 @@ function MessagesPageContent() {
                   </span>
                   {selectedThread.listingId && (
                     <Link
-                      href={`/listing/${encodeURIComponent(selectedThread.listingId)}`}
+                      href={listingHref(selectedThread.listingId)}
                       className="text-chrome text-xs hover:text-white"
                     >
                       View listing

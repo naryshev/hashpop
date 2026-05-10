@@ -26,8 +26,12 @@ const config: Config = {
         inner: "inset 0 1px 0 rgba(255,255,255,0.06)",
       },
       borderRadius: {
-        glass: "2px",
-        "glass-lg": "2px",
+        // Site-wide corner constitution. `glass` is the default radius for
+        // buttons / inputs / small panels; `glass-lg` is for cards and
+        // top-level surfaces. Keep changes here so the whole UI rounds
+        // together.
+        glass: "0.5rem", // 8px — matches tailwind's rounded-lg
+        "glass-lg": "0.75rem", // 12px — matches tailwind's rounded-xl
       },
       backdropBlur: {
         glass: "12px",

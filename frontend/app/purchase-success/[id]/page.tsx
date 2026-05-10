@@ -1,4 +1,5 @@
 "use client";
+import { listingHref } from "../../../lib/listingUrl";
 
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
@@ -54,10 +55,10 @@ export default function PurchaseSuccessPage() {
   return (
     <main className="min-h-screen flex items-start justify-center px-4 py-12">
       <div className="w-full max-w-lg">
-
         {/* Hero confirmation */}
         <div className="flex flex-col items-center text-center mb-8">
-          <div className="w-16 h-16 flex items-center justify-center bg-[#00ffa3]/10 border border-[#00ffa3]/40 mb-5"
+          <div
+            className="w-16 h-16 flex items-center justify-center bg-[#00ffa3]/10 border border-[#00ffa3]/40 mb-5"
             style={{ boxShadow: "0 0 32px rgba(0,255,163,0.2)" }}
           >
             <svg
@@ -181,17 +182,11 @@ export default function PurchaseSuccessPage() {
 
         {/* CTA buttons */}
         <div className="flex gap-3">
-          <Link
-            href="/marketplace"
-            className="btn-frost flex-1 text-center text-sm"
-          >
+          <Link href="/marketplace" className="btn-frost flex-1 text-center text-sm">
             Marketplace
           </Link>
           {id && (
-            <Link
-              href={`/listing/${encodeURIComponent(id)}`}
-              className="btn-frost-cta flex-1 text-center text-sm"
-            >
+            <Link href={listingHref(id)} className="btn-frost-cta flex-1 text-center text-sm">
               View Listing & Escrow
             </Link>
           )}

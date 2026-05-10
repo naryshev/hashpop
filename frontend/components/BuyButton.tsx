@@ -14,8 +14,8 @@ import { parseUnits } from "viem";
 import { readListingCompat } from "../lib/marketplaceRead";
 import { getApiUrl } from "../lib/apiUrl";
 import { getTransactionExplorerUrl } from "../lib/explorer";
-import { RequireWalletModal } from "./RequireWalletModal";
 import { OfferModal } from "./OfferModal";
+import { useSignInModal } from "../lib/signInModal";
 
 export function BuyButton({
   listingId,
@@ -102,16 +102,8 @@ export function BuyButton({
   const errorMessage = actionError ?? getTransactionErrorMessage(displayError, { chainId });
   const explorerUrl = getTransactionExplorerUrl(lastTxId, chainId);
 
-  // Auth-gate state. `pendingAction` tracks which flow to resume after the
-  // user finishes signing in inside the modal.
-  const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [pendingAction, setPendingAction] = useState<"buy" | "offer" | null>(null);
   const [offerModalOpen, setOfferModalOpen] = useState(false);
-
-  const requestAuth = (next: "buy" | "offer") => {
-    setPendingAction(next);
-    setAuthModalOpen(true);
-  };
+  const { openSignIn } = useSignInModal();
 
   useEffect(() => {
     if (!errorMessage && !isSuccess) return;
@@ -201,7 +193,7 @@ export function BuyButton({
       <button
         onClick={() => {
           if (!address) {
-            requestAuth("buy");
+            openSignIn({ title: "Sign in to buy" });
             return;
           }
           if (canBuy) void buy();
@@ -217,7 +209,10 @@ export function BuyButton({
         type="button"
         onClick={() => {
           if (!address) {
-            requestAuth("offer");
+            openSignIn({
+              title: "Sign in to make an offer",
+              onConnected: () => setOfferModalOpen(true),
+            });
             return;
           }
           setOfferModalOpen(true);
@@ -270,25 +265,6 @@ export function BuyButton({
           </a>
         </div>
       )}
-
-      <RequireWalletModal
-        open={authModalOpen}
-        onClose={() => {
-          setAuthModalOpen(false);
-          setPendingAction(null);
-        }}
-        title={pendingAction === "offer" ? "Sign in to make an offer" : "Sign in to buy"}
-        onConnected={() => {
-          // Resume the gated flow once the user finishes connecting.
-          if (pendingAction === "offer") {
-            setOfferModalOpen(true);
-          }
-          // Buy is intentionally not auto-triggered: surface the on-chain
-          // confirmation explicitly so the user clicks Purchase again now
-          // that their wallet is connected. Avoids accidental tx prompts.
-          setPendingAction(null);
-        }}
-      />
 
       <OfferModal
         open={offerModalOpen}

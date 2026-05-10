@@ -1,4 +1,5 @@
 "use client";
+import { listingHref } from "../lib/listingUrl";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -164,7 +165,7 @@ export default function HomePageClient({
         id: item.id,
         title: item.title || formatListingId(item.id) || "Untitled",
         description: formatSellerLabel(item.seller),
-        href: `/listing/${encodeURIComponent(item.id)}`,
+        href: listingHref(item.id),
         listing: item,
         statusLabel: badge.label,
         statusClass: `${badge.className} ${badge.glowClass}`,
