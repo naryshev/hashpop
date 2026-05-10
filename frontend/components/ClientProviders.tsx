@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { HashpackWalletProvider } from "../lib/hashpackWallet";
 import { HashPackConfirmProvider } from "../lib/hashpackConfirm";
 import { SignInModalProvider } from "../lib/signInModal";
+import { TopBarProvider } from "../lib/topBar";
 import { Footer } from "./Footer";
 import { BottomNav } from "./BottomNav";
 import { WalletAccountSync } from "./WalletAccountSync";
@@ -26,24 +27,26 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
       <QueryClientProvider client={qc}>
         <HashPackConfirmProvider>
           <SignInModalProvider>
-            <WalletAccountSync />
-            {isFullscreenRoute ? (
-              <div className="flex h-screen flex-col overflow-hidden">{children}</div>
-            ) : (
-              <>
-                <DesktopShell>
-                  {children}
-                  <Footer />
-                </DesktopShell>
-                {/* Mobile-only nav chrome. AppSidebar provides the slide-out
-                    drawer; BottomNav renders the floating top bar with a
-                    hamburger. Both are no-ops on desktop via md:hidden. */}
-                <div className="md:hidden">
-                  <AppSidebar open={sidebarOpen} setOpen={setSidebarOpen} />
-                  <BottomNav showMenu onMenuClick={() => setSidebarOpen(true)} />
-                </div>
-              </>
-            )}
+            <TopBarProvider>
+              <WalletAccountSync />
+              {isFullscreenRoute ? (
+                <div className="flex h-screen flex-col overflow-hidden">{children}</div>
+              ) : (
+                <>
+                  <DesktopShell>
+                    {children}
+                    <Footer />
+                  </DesktopShell>
+                  {/* Mobile-only nav chrome. AppSidebar provides the slide-out
+                      drawer; BottomNav renders the floating top bar with a
+                      hamburger. Both are no-ops on desktop via md:hidden. */}
+                  <div className="md:hidden">
+                    <AppSidebar open={sidebarOpen} setOpen={setSidebarOpen} />
+                    <BottomNav showMenu onMenuClick={() => setSidebarOpen(true)} />
+                  </div>
+                </>
+              )}
+            </TopBarProvider>
           </SignInModalProvider>
         </HashPackConfirmProvider>
       </QueryClientProvider>

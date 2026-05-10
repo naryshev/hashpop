@@ -205,17 +205,9 @@ export default function PurchasesPage() {
   return (
     <main className="min-h-screen">
       <div className="mx-auto max-w-4xl space-y-6 px-4 py-6 sm:px-6">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-bold text-white sm:text-2xl">Purchases</h1>
-            <p className="mt-1 text-xs text-silver/70">
-              Track your buys and sales through every escrow step.
-            </p>
-          </div>
-          <Link href="/dashboard" className="text-sm font-medium text-chrome hover:text-white">
-            My Hashpop
-          </Link>
-        </div>
+        <p className="text-xs text-silver/70">
+          Track your buys and sales through every escrow step.
+        </p>
 
         {!address ? (
           <div className="glass-card rounded-xl p-6">

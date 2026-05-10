@@ -91,7 +91,6 @@ export default function WatchlistPage() {
   return (
     <main className="min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-white mb-6">Watchlist</h1>
         {!address ? (
           <p className="text-silver">Connect your wallet to view your watchlist.</p>
         ) : loading ? (

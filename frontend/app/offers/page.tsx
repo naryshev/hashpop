@@ -151,13 +151,6 @@ export default function OffersPage() {
   return (
     <main className="min-h-screen">
       <div className="mx-auto max-w-4xl space-y-6 px-4 py-6 sm:px-6">
-        <div className="flex items-center justify-between gap-3">
-          <h1 className="text-xl font-bold text-white sm:text-2xl">Offers</h1>
-          <Link href="/dashboard" className="text-sm font-medium text-chrome hover:text-white">
-            My Hashpop
-          </Link>
-        </div>
-
         {!address ? (
           <div className="glass-card rounded-xl p-6">
             <p className="mb-3 font-medium text-white">Connect your wallet to view offers.</p>

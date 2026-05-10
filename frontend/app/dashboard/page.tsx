@@ -317,17 +317,16 @@ export default function DashboardPage() {
   return (
     <main className="min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-8">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl sm:text-2xl font-bold text-white">{accountId || "My Hashpop"}</h1>
-          {address && (
+        {address && (
+          <div className="flex items-center justify-end">
             <Link
               href={`/profile/${encodeURIComponent(address)}`}
               className="text-sm text-chrome hover:text-white font-medium"
             >
               ★ {Number(stats?.ratingAverage ?? 0).toFixed(1)}
             </Link>
-          )}
-        </div>
+          </div>
+        )}
 
         <div className="space-y-8" suppressHydrationWarning>
           {!mounted ? (

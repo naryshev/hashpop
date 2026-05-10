@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useHashpackWallet } from "../lib/hashpackWallet";
 import { useSignInModal } from "../lib/signInModal";
+import { useTopBarSlotRef } from "../lib/topBar";
 import { cn } from "../lib/utils";
 
 type RailItem = {
@@ -35,6 +36,24 @@ function shortAccount(value: string | null | undefined): string | null {
     return `${value.slice(0, 6)}…${value.slice(-4)}`;
   }
   return value;
+}
+
+/** Map a pathname to a human title. Used when a page doesn't supply its own. */
+function pathnameTitle(pathname: string): string {
+  if (pathname === "/" || pathname.startsWith("/marketplace")) return "Marketplace";
+  if (pathname.startsWith("/dashboard")) return "My Hashpop";
+  if (pathname.startsWith("/create")) return "Create Listing";
+  if (pathname.startsWith("/offers")) return "Offers";
+  if (pathname.startsWith("/purchases")) return "Purchases";
+  if (pathname.startsWith("/selling")) return "Selling";
+  if (pathname.startsWith("/watchlist")) return "Watchlist";
+  if (pathname.startsWith("/messages")) return "Messages";
+  if (pathname.startsWith("/support")) return "Support";
+  if (pathname.startsWith("/profile")) return "Profile";
+  if (pathname.startsWith("/listing")) return "Listing";
+  if (pathname.startsWith("/purchase-success")) return "Purchase";
+  if (pathname.startsWith("/admin")) return "Admin";
+  return "";
 }
 
 function RailButton({
@@ -56,7 +75,7 @@ function RailButton({
   );
   const tooltip = (
     <span
-      className="pointer-events-none absolute left-12 top-1/2 -translate-y-1/2 z-50 whitespace-nowrap rounded-glass border border-white/10 bg-[#15181f] px-2 py-1 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100"
+      className="pointer-events-none absolute left-12 top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-glass border border-white/10 bg-[#15181f] px-2 py-1 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100"
       role="tooltip"
     >
       {label}
@@ -79,17 +98,20 @@ function RailButton({
 }
 
 /**
- * Desktop chrome (icon rail + top bar). Hidden on mobile via `md:flex`.
- * Renders `children` inside a rounded card that mimics Railway's project
- * canvas. The same children should NOT be rendered elsewhere — this is the
- * single layout host. On mobile, the chrome collapses and content goes
- * full-bleed with the existing top BottomNav.
+ * Desktop chrome: borderless icon rail on the left + borderless top bar on
+ * top, both floating on the dark canvas. Page content lives in a single
+ * rounded, bordered card in the centre — the only visible border in the
+ * chrome. Title / centre (search) / actions slots are mounted here and pages
+ * portal into them via <TopBarSlot>.
  */
 export function DesktopShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { isConnected, accountId, address, disconnect } = useHashpackWallet();
   const { openSignIn } = useSignInModal();
-  const appVersion = process.env.NEXT_PUBLIC_APP_VERSION?.trim() || "v1.0.0";
+
+  const titleSlotRef = useTopBarSlotRef("title");
+  const centerSlotRef = useTopBarSlotRef("center");
+  const actionsSlotRef = useTopBarSlotRef("actions");
 
   const items = useMemo<RailItem[]>(() => {
     return [
@@ -116,17 +138,19 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
     ];
   }, [isConnected]);
 
+  const fallbackTitle = pathnameTitle(pathname);
+
   return (
     <div className="flex min-h-screen">
-      {/* Left icon rail — desktop only */}
+      {/* Left icon rail — desktop only, no border, floats on the canvas. */}
       <aside
-        className="sticky top-0 z-30 hidden h-screen w-16 shrink-0 flex-col items-center justify-between border-r border-white/10 bg-[#0a101c]/95 py-4 md:flex"
+        className="sticky top-0 z-30 hidden h-screen w-16 shrink-0 flex-col items-center justify-between bg-transparent py-3 md:flex"
         aria-label="Primary navigation"
       >
         <div className="flex flex-col items-center gap-1">
           <Link
             href="/marketplace"
-            className="mb-3 flex h-10 w-10 items-center justify-center"
+            className="mb-2 flex h-10 w-10 items-center justify-center"
             aria-label="Hashpop home"
             title="Hashpop"
           >
@@ -160,25 +184,36 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
               <LogIn className="h-5 w-5" />
             </RailButton>
           )}
-          <p className="text-[10px] font-medium text-neutral-500" title={`App ${appVersion}`}>
-            {appVersion}
-          </p>
         </div>
       </aside>
 
       {/* Main column */}
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Top bar — desktop only */}
-        <header className="sticky top-0 z-20 hidden h-14 items-center justify-between border-b border-white/10 bg-[#0a101c]/90 px-4 backdrop-blur-md md:flex">
-          <Link
-            href="/marketplace"
-            className="flex items-center gap-2 rounded-glass px-2 py-1 hover:bg-white/5"
-          >
-            <span className="bg-[linear-gradient(100deg,#ff2f3d_0%,#ff8f00_32%,#13a0ff_62%,#6ddf85_100%)] bg-clip-text text-base font-extrabold tracking-tight text-transparent">
-              hashpop
-            </span>
-          </Link>
+        {/* Top bar — desktop only. Borderless; floats on canvas. */}
+        <header className="sticky top-0 z-20 hidden h-14 items-center gap-4 bg-transparent px-2 md:flex">
+          {/* Title slot (page-provided or pathname fallback). Mirrors the
+              space the wordmark used to occupy in the top-left. */}
+          <div className="flex min-w-0 items-center gap-3">
+            <div
+              ref={titleSlotRef}
+              className="flex min-w-0 items-center text-base font-semibold tracking-tight text-white"
+            >
+              {fallbackTitle}
+            </div>
+          </div>
+          {/* Center slot — typically a search input + filter dropdown. */}
+          <div
+            ref={centerSlotRef}
+            className="flex flex-1 items-center justify-center"
+            data-topbar-slot="center"
+          />
+          {/* Right cluster: page actions slot, alerts, account chip. */}
           <div className="flex items-center gap-2">
+            <div
+              ref={actionsSlotRef}
+              className="flex items-center gap-2"
+              data-topbar-slot="actions"
+            />
             <Link
               href="/messages"
               className="flex h-9 w-9 items-center justify-center rounded-glass text-neutral-300 hover:bg-white/5 hover:text-white"
@@ -205,11 +240,10 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        {/* Content area: rounded canvas on desktop, full-bleed on mobile.
-            Mobile gets top padding to clear the fixed BottomNav (which
-            renders as a top bar on small screens). */}
-        <main className="flex-1 pt-14 md:p-4 md:pt-4">
-          <div className="md:min-h-[calc(100vh-3.5rem-2rem)] md:rounded-glass-lg md:border md:border-white/10 md:bg-[#0e1422]/60 md:backdrop-blur-glass">
+        {/* Inner content card. The only bordered element in the chrome.
+            Mobile gets full-bleed content with top padding for BottomNav. */}
+        <main className="flex-1 pt-14 md:p-3 md:pt-1">
+          <div className="md:min-h-[calc(100vh-3.5rem-1.5rem)] md:overflow-hidden md:rounded-glass-lg md:border md:border-white/10 md:bg-[#0e1422]/60 md:backdrop-blur-glass">
             {children}
           </div>
         </main>
