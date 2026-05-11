@@ -8,10 +8,11 @@ import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { formatPriceForDisplay } from "../../lib/formatPrice";
 import { formatListingDate } from "../../lib/formatDate";
-import { TransactionProgress } from "../../components/TransactionProgress";
 import { getApiUrl } from "../../lib/apiUrl";
 import { AddressDisplay } from "../../components/AddressDisplay";
 import { ConnectWalletButton } from "../../components/ConnectWalletButton";
+import { Stepper } from "../../components/order/Stepper";
+import type { OrderState } from "../../components/order/tokens";
 
 type PurchaseRow = {
   id: string;
@@ -46,6 +47,22 @@ function escrowFromListingStatus(status?: string): EscrowState {
   if (s === "LOCKED") return "AWAITING_SHIPMENT";
   if (s === "SHIPPED") return "AWAITING_CONFIRMATION";
   return "COMPLETE";
+}
+
+// Map the contract's 3 escrow states onto the design's stepper states.
+// "delivered" is where the buyer's release CTA appears, matching the design.
+function escrowToOrderState(s: EscrowState): OrderState {
+  if (s === "COMPLETE") return "released";
+  if (s === "AWAITING_CONFIRMATION") return "delivered";
+  return "paid";
+}
+
+function nextStepCopy(role: "buyer" | "seller", s: EscrowState): string {
+  if (s === "COMPLETE") return "Trade closed";
+  if (s === "AWAITING_SHIPMENT") return role === "seller" ? "Ship the item" : "Seller to ship";
+  if (s === "AWAITING_CONFIRMATION")
+    return role === "buyer" ? "Tap release" : "Buyer to release";
+  return "—";
 }
 
 type Step = {
@@ -204,12 +221,32 @@ export default function PurchasesPage() {
     return describeStep(row, state);
   };
 
+  const activeOrders = items.filter((r) => {
+    const onChain = r.listingId ? escrowStates[r.listingId] : undefined;
+    const state = onChain ?? escrowFromListingStatus(r.listing?.status);
+    return state !== "COMPLETE";
+  });
+  const needsAttention = activeOrders.filter((r) => {
+    const onChain = r.listingId ? escrowStates[r.listingId] : undefined;
+    const state = onChain ?? escrowFromListingStatus(r.listing?.status);
+    return (
+      (r.role === "buyer" && state === "AWAITING_CONFIRMATION") ||
+      (r.role === "seller" && state === "AWAITING_SHIPMENT")
+    );
+  }).length;
+
   return (
     <main className="min-h-screen">
       <div className="mx-auto max-w-4xl space-y-6 px-4 py-6 sm:px-6">
-        <p className="text-xs text-silver/70">
-          Track your buys and sales through every escrow step.
-        </p>
+        <div>
+          <h1 className="text-2xl font-extrabold tracking-[-0.01em] text-white">
+            {activeOrders.length} active order{activeOrders.length === 1 ? "" : "s"}
+          </h1>
+          <p className="mt-1 text-xs text-silver">
+            {items.length} total · {needsAttention} need{needsAttention === 1 ? "s" : ""} your
+            attention
+          </p>
+        </div>
 
         {!address ? (
           <div className="glass-card rounded-xl p-6">
@@ -290,18 +327,32 @@ export default function PurchasesPage() {
                   const thumb = row.listing?.imageUrl || row.auction?.imageUrl || null;
                   const step = stepFor(row);
                   const counterpartyAddr = row.role === "buyer" ? row.seller : row.buyer;
-                  // Per-order detail screen (matches Mobile Order & Escrow design handoff).
                   const detailHref = row.listingId
                     ? `/purchases/${encodeListingIdForUrl(row.listingId)}`
                     : targetId
                       ? listingHref(targetId)
                       : "/marketplace";
+                  const orderState: OrderState = escrowToOrderState(step.state);
+                  const next = nextStepCopy(row.role, step.state);
+                  const showReleaseCta =
+                    step.isEscrow &&
+                    row.role === "buyer" &&
+                    step.state === "AWAITING_CONFIRMATION";
+                  const showShipCta =
+                    step.isEscrow &&
+                    row.role === "seller" &&
+                    step.state === "AWAITING_SHIPMENT";
+
                   return (
-                    <li key={row.id} className="glass-card rounded-xl border border-white/10 p-4">
-                      <div className="flex gap-4">
+                    <li
+                      key={row.id}
+                      className="rounded-glass-lg border border-white/10 bg-[#0e1422] p-[18px]"
+                    >
+                      {/* Header row: thumb + title + price + status pill */}
+                      <div className="flex items-center gap-3.5">
                         <Link
                           href={detailHref}
-                          className="relative aspect-square w-20 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-white/5"
+                          className="relative h-[52px] w-[52px] shrink-0 overflow-hidden rounded-[10px] border border-white/10 bg-white/5"
                         >
                           {thumb ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -311,93 +362,98 @@ export default function PurchasesPage() {
                               className="h-full w-full object-cover"
                             />
                           ) : (
-                            <div className="flex h-full w-full items-center justify-center text-2xl text-white/20">
+                            <div className="flex h-full w-full items-center justify-center text-xl text-white/20">
                               □
                             </div>
                           )}
                         </Link>
-
                         <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-start justify-between gap-2">
-                            <Link
-                              href={detailHref}
-                              className="block truncate text-base font-semibold text-white hover:text-chrome"
-                            >
-                              {title}
-                            </Link>
+                          <Link
+                            href={detailHref}
+                            className="block truncate text-sm font-bold text-white hover:text-chrome"
+                          >
+                            {title}
+                          </Link>
+                          <p className="mt-1 flex flex-wrap items-center gap-2 font-mono text-[11px] text-silver">
+                            <span>{row.role === "buyer" ? "from" : "to"}&nbsp;</span>
+                            <AddressDisplay
+                              address={counterpartyAddr}
+                              className="text-silver"
+                            />
+                            {row.listingId && (
+                              <>
+                                <span className="text-white/30">·</span>
+                                <span>
+                                  #
+                                  {row.listingId.length > 20
+                                    ? `${row.listingId.slice(0, 10)}…`
+                                    : row.listingId}
+                                </span>
+                              </>
+                            )}
+                            <span className="text-white/30">·</span>
+                            <span>{formatListingDate(row.createdAt)}</span>
+                          </p>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <div className="text-lg font-extrabold text-chrome">
+                            {formatHbarWithUsd(
+                              formatPriceForDisplay(row.amount || "0"),
+                              usdRate,
+                            )}
+                          </div>
+                          <div className="mt-1">
                             <StepBadge tone={step.tone}>
                               {step.state === "COMPLETE"
                                 ? step.isEscrow
-                                  ? "Complete"
+                                  ? "Released"
                                   : "Direct sale"
                                 : step.state === "AWAITING_SHIPMENT"
-                                  ? "Awaiting shipment"
+                                  ? "Paid"
                                   : step.state === "AWAITING_CONFIRMATION"
-                                    ? "Awaiting confirmation"
+                                    ? "Delivered"
                                     : "In progress"}
                             </StepBadge>
                           </div>
-                          <p className="mt-0.5 text-xs text-silver/70">
-                            {row.role === "buyer" ? "Seller " : "Buyer "}
-                            <AddressDisplay
-                              address={counterpartyAddr}
-                              className="font-mono text-chrome"
-                            />
-                            <span className="mx-1.5 text-white/30">·</span>
-                            {formatListingDate(row.createdAt)}
-                          </p>
-                          <p className="mt-1 text-sm font-semibold text-white">
-                            {formatHbarWithUsd(formatPriceForDisplay(row.amount || "0"), usdRate)}
-                          </p>
                         </div>
                       </div>
 
-                      {/* Step description + CTA */}
-                      <div
-                        className={`mt-3 rounded-lg border px-3 py-2 ${
-                          step.tone === "active"
-                            ? "border-blue-400/40 bg-blue-400/5"
-                            : step.tone === "waiting"
-                              ? "border-amber-400/30 bg-amber-400/5"
-                              : step.tone === "complete"
-                                ? "border-emerald-400/30 bg-emerald-400/5"
-                                : "border-white/10 bg-white/5"
-                        }`}
-                      >
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="min-w-0 flex-1">
-                            <p
-                              className={`text-sm font-semibold ${
-                                step.tone === "active"
-                                  ? "text-blue-200"
-                                  : step.tone === "waiting"
-                                    ? "text-amber-200"
-                                    : step.tone === "complete"
-                                      ? "text-emerald-200"
-                                      : "text-white"
-                              }`}
-                            >
-                              {step.headline}
-                            </p>
-                            <p className="mt-0.5 text-xs text-silver/80">{step.detail}</p>
-                          </div>
-                          {step.cta && (
-                            <Link
-                              href={step.cta.href}
-                              className="shrink-0 rounded-glass border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/15"
-                            >
-                              {step.cta.label}
-                            </Link>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Progress stepper — only for escrow-backed transactions. */}
+                      {/* 4-step stepper (only when escrow-backed) */}
                       {step.isEscrow && (
-                        <div className="mt-2">
-                          <TransactionProgress escrowState={step.state} compact />
+                        <div className="mt-4">
+                          <Stepper state={orderState} />
                         </div>
                       )}
+
+                      {/* Footer: next-step copy + role/state CTAs + Details */}
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-[11px] text-silver">
+                          Next: {next}
+                        </span>
+                        <span className="flex-1" />
+                        {showReleaseCta && (
+                          <Link
+                            href={detailHref}
+                            className="rounded-glass bg-[linear-gradient(110deg,#00b37a_0%,#00ffa3_50%,#00e5ff_100%)] px-4 py-2 text-xs font-bold text-black shadow-glow"
+                          >
+                            Release {formatPriceForDisplay(row.amount || "0")} ℏ
+                          </Link>
+                        )}
+                        {showShipCta && (
+                          <Link
+                            href={detailHref}
+                            className="rounded-glass bg-[linear-gradient(110deg,#00b37a_0%,#00ffa3_50%,#00e5ff_100%)] px-4 py-2 text-xs font-bold text-black"
+                          >
+                            Mark shipped
+                          </Link>
+                        )}
+                        <Link
+                          href={detailHref}
+                          className="rounded-glass border border-white/10 px-3.5 py-2 text-xs text-silver hover:bg-white/5"
+                        >
+                          Details
+                        </Link>
+                      </div>
                     </li>
                   );
                 })}
