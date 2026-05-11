@@ -16,10 +16,6 @@ import { DesktopShell } from "./DesktopShell";
 const qc = new QueryClient();
 
 export function ClientProviders({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const isHome = pathname === "/";
-  const isFullscreenRoute = isHome;
-
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
@@ -29,23 +25,17 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
           <SignInModalProvider>
             <TopBarProvider>
               <WalletAccountSync />
-              {isFullscreenRoute ? (
-                <div className="flex h-screen flex-col overflow-hidden">{children}</div>
-              ) : (
-                <>
-                  <DesktopShell>
-                    {children}
-                    <Footer />
-                  </DesktopShell>
-                  {/* Mobile-only nav chrome. AppSidebar provides the slide-out
-                      drawer; BottomNav renders the floating top bar with a
-                      hamburger. Both are no-ops on desktop via md:hidden. */}
-                  <div className="md:hidden">
-                    <AppSidebar open={sidebarOpen} setOpen={setSidebarOpen} />
-                    <BottomNav showMenu onMenuClick={() => setSidebarOpen(true)} />
-                  </div>
-                </>
-              )}
+              <DesktopShell>
+                {children}
+                <Footer />
+              </DesktopShell>
+              {/* Mobile-only nav chrome. AppSidebar provides the slide-out
+                  drawer; BottomNav renders the floating top bar with a
+                  hamburger. Both are no-ops on desktop via md:hidden. */}
+              <div className="md:hidden">
+                <AppSidebar open={sidebarOpen} setOpen={setSidebarOpen} />
+                <BottomNav showMenu onMenuClick={() => setSidebarOpen(true)} />
+              </div>
             </TopBarProvider>
           </SignInModalProvider>
         </HashPackConfirmProvider>
