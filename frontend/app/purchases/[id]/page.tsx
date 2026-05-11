@@ -21,6 +21,7 @@ import { ItemRow } from "@/components/order/ItemRow";
 import { Pill } from "@/components/order/Pill";
 import { ReleaseConfirmModal } from "@/components/order/ReleaseConfirmModal";
 import { Stepper } from "@/components/order/Stepper";
+import { TxDetailSheet } from "@/components/order/TxDetailSheet";
 import { TxPill } from "@/components/order/TxPill";
 import { HP, OrderRole, OrderState, STATE_BADGE, STATE_LABEL } from "@/components/order/tokens";
 
@@ -87,6 +88,7 @@ export default function PurchaseDetailPage() {
   const [escrow, setEscrow] = useState<Escrow | null>(null);
   const [loading, setLoading] = useState(true);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [txSheetId, setTxSheetId] = useState<string | null>(null);
 
   const idBytes = useMemo(() => toBytes32(id), [id]);
 
@@ -264,6 +266,7 @@ export default function PurchaseDetailPage() {
               href={stepTxHref}
               pulsing={shipPending || releasePending}
               label={shipPending || releasePending ? "Submitting" : "On-chain"}
+              onSelect={stepTxHash ? () => setTxSheetId(stepTxHash) : undefined}
             />
           </div>
 
@@ -352,6 +355,13 @@ export default function PurchaseDetailPage() {
         submitting={releasePending}
         onConfirm={onConfirmRelease}
         onCancel={() => setConfirmOpen(false)}
+      />
+
+      <TxDetailSheet
+        open={!!txSheetId}
+        txId={txSheetId}
+        hashscanHref={getTransactionExplorerUrl(txSheetId, chainId)}
+        onClose={() => setTxSheetId(null)}
       />
     </main>
   );

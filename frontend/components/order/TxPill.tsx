@@ -10,13 +10,19 @@ export function TxPill({
   label = "On-chain",
   href,
   pulsing = false,
+  onSelect,
 }: {
   hash: string | null | undefined;
   label?: string;
   href?: string | null;
   pulsing?: boolean;
+  /** If provided, the pill becomes a button and click is delegated here
+   *  instead of navigating to `href`. The href can still be passed for
+   *  consumers (like the in-app sheet) that show a fallback HashScan link. */
+  onSelect?: () => void;
 }) {
   if (!hash) return null;
+  const interactive = !!(onSelect || href);
   const body = (
     <>
       <span
@@ -41,7 +47,7 @@ export function TxPill({
         {label}
       </span>
       {shorten(hash)}
-      {href ? <span style={{ opacity: 0.5 }}>↗</span> : null}
+      {interactive ? <span style={{ opacity: 0.5 }}>›</span> : null}
     </>
   );
 
@@ -58,6 +64,18 @@ export function TxPill({
     color: HP.chrome,
     textDecoration: "none",
   } as const;
+
+  if (onSelect) {
+    return (
+      <button
+        type="button"
+        onClick={onSelect}
+        style={{ ...shared, cursor: "pointer", font: "inherit", fontFamily: shared.fontFamily }}
+      >
+        {body}
+      </button>
+    );
+  }
 
   if (href) {
     return (
