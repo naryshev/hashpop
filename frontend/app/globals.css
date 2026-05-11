@@ -58,6 +58,15 @@ a,
   .glass {
     @apply rounded-glass border border-white/10 bg-white/5 backdrop-blur-glass;
   }
+  /* Hide scrollbars visually while keeping scroll behavior. Used on the
+     desktop content card so the chrome stays minimal. */
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
   .glass-card {
     @apply rounded-glass-lg border border-[#4a5e83]/40 bg-gradient-to-b from-[#121a29]/90 to-[#0f1522]/90 backdrop-blur-glass;
   }

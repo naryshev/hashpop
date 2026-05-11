@@ -258,7 +258,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
             the bottom edge) is always visible while the page content
             scrolls inside it instead of sliding under the chrome. */}
         <main className="flex-1 pt-14 md:flex md:min-h-0 md:flex-1 md:p-3 md:pt-1">
-          <div className="md:h-full md:min-h-0 md:flex-1 md:overflow-y-auto md:rounded-glass-lg md:border md:border-white/10 md:bg-[#0e1422]/60">
+          <div className="scrollbar-none md:h-full md:min-h-0 md:flex-1 md:overflow-y-auto md:rounded-glass-lg md:border md:border-white/10 md:bg-[#0e1422]/60">
             {children}
           </div>
         </main>
