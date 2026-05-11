@@ -42,6 +42,17 @@ body {
   }
 }
 
+/* Used by the order/escrow detail screen for pending tx pills. */
+@keyframes hp-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
 /* Remove tap highlight flash on mobile for a native app feel */
 * {
   -webkit-tap-highlight-color: transparent;

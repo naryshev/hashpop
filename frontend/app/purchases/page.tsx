@@ -1,5 +1,5 @@
 "use client";
-import { listingHref } from "../../lib/listingUrl";
+import { encodeListingIdForUrl, listingHref } from "../../lib/listingUrl";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -64,7 +64,9 @@ type Step = {
 function describeStep(row: PurchaseRow, state: EscrowState): Step {
   const isBuyer = row.role === "buyer";
   const isEscrow = !!row.listing?.requireEscrow;
-  const ctaHref = row.listingId ? listingHref(row.listingId) : "/marketplace";
+  const ctaHref = row.listingId
+    ? `/purchases/${encodeListingIdForUrl(row.listingId)}`
+    : "/marketplace";
   const tracking = row.listing?.trackingNumber
     ? `${row.listing.trackingCarrier ?? "Carrier"} ${row.listing.trackingNumber}`
     : null;
@@ -288,11 +290,17 @@ export default function PurchasesPage() {
                   const thumb = row.listing?.imageUrl || row.auction?.imageUrl || null;
                   const step = stepFor(row);
                   const counterpartyAddr = row.role === "buyer" ? row.seller : row.buyer;
+                  // Per-order detail screen (matches Mobile Order & Escrow design handoff).
+                  const detailHref = row.listingId
+                    ? `/purchases/${encodeListingIdForUrl(row.listingId)}`
+                    : targetId
+                      ? listingHref(targetId)
+                      : "/marketplace";
                   return (
                     <li key={row.id} className="glass-card rounded-xl border border-white/10 p-4">
                       <div className="flex gap-4">
                         <Link
-                          href={targetId ? listingHref(targetId) : "/marketplace"}
+                          href={detailHref}
                           className="relative aspect-square w-20 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-white/5"
                         >
                           {thumb ? (
@@ -312,7 +320,7 @@ export default function PurchasesPage() {
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-start justify-between gap-2">
                             <Link
-                              href={targetId ? listingHref(targetId) : "/marketplace"}
+                              href={detailHref}
                               className="block truncate text-base font-semibold text-white hover:text-chrome"
                             >
                               {title}
