@@ -41,22 +41,55 @@ type ListingPreview = {
   status: string | null;
   imageUrl: string | null;
   seller: string;
-  requireEscrow?: boolean;
+  buyer: string | null;
+  requireEscrow: boolean;
+  shippedAt: string | null;
+  exchangeConfirmedAt: string | null;
+  trackingNumber: string | null;
+  trackingCarrier: string | null;
+  createdAt: string | null;
 };
 
-type StatusKey = "LISTED" | "LOCKED" | "SOLD" | "CANCELLED";
+// Escrow stepper states for the right-rail controller. Map the on-chain
+// listing status + delivery timestamps down to one of these positions so the
+// stepper reflects reality without the page having to consult the contract.
+type StepKey = "funded" | "shipped" | "delivered" | "released";
+const STEPS: { key: StepKey; label: string }[] = [
+  { key: "funded", label: "Funded" },
+  { key: "shipped", label: "Shipped" },
+  { key: "delivered", label: "Delivered" },
+  { key: "released", label: "Released" },
+];
 
-const STATUS_STYLE: Record<StatusKey, { bg: string; text: string; label: string }> = {
-  LISTED: { bg: "bg-chrome", text: "text-black", label: "ACTIVE" },
-  LOCKED: { bg: "bg-amber-400", text: "text-black", label: "LOCKED" },
-  SOLD: { bg: "bg-rose-500", text: "text-white", label: "SOLD" },
-  CANCELLED: { bg: "bg-zinc-600", text: "text-white", label: "CANCELLED" },
+function deriveStepIndex(listing: ListingPreview | undefined): number {
+  if (!listing) return -1;
+  const status = (listing.status ?? "").toUpperCase();
+  if (status === "SOLD") return 3; // released
+  if (listing.exchangeConfirmedAt) return 2; // delivered
+  if (listing.shippedAt || listing.trackingNumber) return 1; // shipped
+  if (status === "LOCKED") return 0; // funded
+  return -1;
+}
+
+type StateKey = "PAID" | "SHIPPED" | "DELIVERED" | "RELEASED" | "DISPUTED" | "AWAITING";
+const STATE_STYLE: Record<StateKey, { bg: string; text: string; label: string }> = {
+  PAID: { bg: "bg-chrome", text: "text-black", label: "PAID" },
+  SHIPPED: { bg: "bg-amber-400", text: "text-black", label: "SHIPPED" },
+  DELIVERED: { bg: "bg-[#00e5ff]", text: "text-black", label: "DELIVERED" },
+  RELEASED: { bg: "bg-[#00b37a]", text: "text-white", label: "RELEASED" },
+  DISPUTED: { bg: "bg-rose-500", text: "text-white", label: "DISPUTED" },
+  AWAITING: { bg: "bg-white/10", text: "text-silver", label: "AWAITING" },
 };
 
-function statusStyleFor(status: string | null) {
-  if (!status) return null;
-  const key = status.toUpperCase() as StatusKey;
-  return STATUS_STYLE[key] ?? null;
+function stateKeyFor(listing: ListingPreview | undefined): StateKey {
+  if (!listing) return "AWAITING";
+  const status = (listing.status ?? "").toUpperCase();
+  if (status === "SOLD") return "RELEASED";
+  if (status === "CANCELLED") return "DISPUTED";
+  if (listing.exchangeConfirmedAt) return "DELIVERED";
+  if (listing.shippedAt || listing.trackingNumber) return "SHIPPED";
+  if (status === "LOCKED") return "PAID";
+  return "AWAITING";
 }
 
 function LockIcon({ className }: { className?: string }) {
@@ -107,9 +140,9 @@ function SendArrow() {
   );
 }
 
-// Stable colour pair derived from an address — used for the avatar gradient
-// so the conversation list reads as a cast of recognisable people without
-// having to ship avatar images.
+// Stable colour pair derived from an address — used for avatars and the
+// thumbnail swatch when no listing image is available, so each correspondent
+// reads as a recognisable person/item without shipping artwork.
 const AVATAR_PALETTES: ReadonlyArray<readonly [string, string]> = [
   ["#f97316", "#7c2d12"],
   ["#a78bfa", "#5b21b6"],
@@ -121,9 +154,9 @@ const AVATAR_PALETTES: ReadonlyArray<readonly [string, string]> = [
   ["#60a5fa", "#1e3a8a"],
 ];
 
-function paletteFor(address: string): readonly [string, string] {
+function paletteFor(seed: string): readonly [string, string] {
   let hash = 0;
-  for (let i = 0; i < address.length; i++) hash = (hash * 31 + address.charCodeAt(i)) | 0;
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) | 0;
   return AVATAR_PALETTES[Math.abs(hash) % AVATAR_PALETTES.length];
 }
 
@@ -169,17 +202,14 @@ function Avatar({
   );
 }
 
-// Item thumbnail used in the order-context strip above a thread. Falls back
-// to a category-coloured swatch when the listing has no image, matching the
-// glyph-on-gradient pattern from the Chat Explorations design.
-function ItemThumb({ listing, size = 40 }: { listing: ListingPreview; size?: number }) {
+function ItemThumb({ listing, size = 42 }: { listing: ListingPreview; size?: number }) {
   if (listing.imageUrl) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={listing.imageUrl}
         alt=""
-        className="shrink-0 rounded-glass object-cover"
+        className="shrink-0 rounded-glass-lg object-cover"
         style={{ width: size, height: size }}
       />
     );
@@ -187,16 +217,41 @@ function ItemThumb({ listing, size = 40 }: { listing: ListingPreview; size?: num
   const [a, b] = paletteFor(listing.id);
   return (
     <span
-      className="flex shrink-0 items-center justify-center rounded-glass text-lg"
+      className="flex shrink-0 items-center justify-center rounded-glass-lg text-lg text-white/90"
       style={{
         width: size,
         height: size,
         background: `linear-gradient(135deg, ${a}, ${b})`,
       }}
     >
-      <span className="text-white/90">◇</span>
+      ◇
     </span>
   );
+}
+
+function StatePill({ stateKey, size = "sm" }: { stateKey: StateKey; size?: "sm" | "md" }) {
+  const s = STATE_STYLE[stateKey];
+  const pad = size === "sm" ? "px-2 py-0.5 text-[9px]" : "px-2.5 py-1 text-[10px]";
+  return (
+    <span className={`inline-flex items-center rounded-full font-bold tracking-wider ${pad} ${s.bg} ${s.text}`}>
+      {s.label}
+    </span>
+  );
+}
+
+type TabKey = "active" | "awaiting" | "disputed" | "closed";
+const TABS: { key: TabKey; label: string }[] = [
+  { key: "active", label: "Active" },
+  { key: "awaiting", label: "Awaiting" },
+  { key: "disputed", label: "Disputed" },
+  { key: "closed", label: "Closed" },
+];
+
+function tabFor(stateKey: StateKey): TabKey {
+  if (stateKey === "DISPUTED") return "disputed";
+  if (stateKey === "RELEASED") return "closed";
+  if (stateKey === "AWAITING") return "awaiting";
+  return "active"; // PAID, SHIPPED, DELIVERED
 }
 
 function MessagesPageContent() {
@@ -217,7 +272,7 @@ function MessagesPageContent() {
   const [composeBody, setComposeBody] = useState("");
   const [composeSending, setComposeSending] = useState(false);
   const [listingPreviews, setListingPreviews] = useState<Record<string, ListingPreview>>({});
-  const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState<TabKey>("active");
   const { keypair, ensureKeypair } = useEncryptionKey();
 
   const publicKeyCache = useRef<Record<string, string | null>>({});
@@ -259,35 +314,23 @@ function MessagesPageContent() {
             status: l.status ?? null,
             imageUrl: l.imageUrl ?? null,
             seller: l.seller ?? "",
+            buyer: l.buyer ?? null,
             requireEscrow: !!l.requireEscrow,
+            shippedAt: l.shippedAt ?? null,
+            exchangeConfirmedAt: l.exchangeConfirmedAt ?? null,
+            trackingNumber: l.trackingNumber ?? null,
+            trackingCarrier: l.trackingCarrier ?? null,
+            createdAt: l.createdAt ?? null,
           },
         }));
       } catch {
-        // ignore — preview is best-effort
+        // best-effort
       } finally {
         listingFetchInFlight.current.delete(listingId);
       }
     },
     [listingPreviews],
   );
-
-  const listingSortedConversations = useMemo(() => {
-    const filtered = search.trim()
-      ? conversations.filter(
-          (c) =>
-            c.otherAddress.toLowerCase().includes(search.toLowerCase()) ||
-            (c.listingId ?? "").toLowerCase().includes(search.toLowerCase()) ||
-            c.preview.toLowerCase().includes(search.toLowerCase()),
-        )
-      : conversations;
-    return [...filtered].sort((a, b) => {
-      if (a.listingId && !b.listingId) return -1;
-      if (!a.listingId && b.listingId) return 1;
-      return (
-        new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime()
-      );
-    });
-  }, [conversations, search]);
 
   useEffect(() => {
     if (!address) return;
@@ -317,9 +360,6 @@ function MessagesPageContent() {
     fetchInbox();
   }, [fetchInbox]);
 
-  // Hydrate listing previews for every conversation that references one. The
-  // strip above each thread depends on this data, and the conversation rows
-  // surface the item title when available.
   useEffect(() => {
     const ids = new Set<string>();
     for (const c of conversations) if (c.listingId) ids.add(c.listingId);
@@ -482,31 +522,66 @@ function MessagesPageContent() {
     return m.body;
   };
 
+  // Bucket conversations by tab. Listing-bound chats route into the tab that
+  // matches their derived escrow state; inquiries with no order land in
+  // "Awaiting" so the sidebar always has a place for them.
+  const conversationsByTab = useMemo(() => {
+    const buckets: Record<TabKey, InboxConversation[]> = {
+      active: [],
+      awaiting: [],
+      disputed: [],
+      closed: [],
+    };
+    for (const c of conversations) {
+      if (!c.listingId) {
+        buckets.awaiting.push(c);
+        continue;
+      }
+      const listing = listingPreviews[c.listingId];
+      const key = tabFor(stateKeyFor(listing));
+      buckets[key].push(c);
+    }
+    return buckets;
+  }, [conversations, listingPreviews]);
+
+  const visibleConversations = useMemo(() => {
+    const list = [...conversationsByTab[activeTab]];
+    list.sort(
+      (a, b) =>
+        new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime(),
+    );
+    return list;
+  }, [conversationsByTab, activeTab]);
+
+  // Keep the active tab in sync with whatever the user selected — if they
+  // open a disputed conversation we shouldn't leave the sidebar showing
+  // Active and the focused row hidden.
+  useEffect(() => {
+    if (!selectedThread?.listingId) return;
+    const listing = listingPreviews[selectedThread.listingId];
+    if (!listing) return;
+    const tab = tabFor(stateKeyFor(listing));
+    setActiveTab(tab);
+  }, [selectedThread, listingPreviews]);
+
   const selectedListing = selectedThread?.listingId
     ? listingPreviews[selectedThread.listingId]
     : undefined;
-  const selectedStatusStyle = selectedListing ? statusStyleFor(selectedListing.status) : null;
-
-  // The thread opens with a synthesised "Escrow funded" system bubble when the
-  // listing has an active escrow contract — this is how the Chat Explorations
-  // design surfaces the order moment in-line with the conversation. Real
-  // escrow events will replace this once the indexer emits them as messages.
-  const escrowSystemBubble = useMemo(() => {
-    if (!selectedListing) return null;
-    if (!selectedListing.requireEscrow) return null;
-    const price = selectedListing.price;
-    return {
-      title: `Escrow funded · ${price ?? "—"} ℏ locked`,
-      sub: `Listing ${formatListingId(selectedListing.id)} · Buyer must release within 14d of delivery`,
-    };
-  }, [selectedListing]);
+  const selectedState = stateKeyFor(selectedListing);
+  const stepIdx = deriveStepIndex(selectedListing);
+  const swatch = selectedListing ? paletteFor(selectedListing.id) : null;
+  const isBuyer =
+    !!address && !!selectedListing?.buyer &&
+    selectedListing.buyer.toLowerCase() === address.toLowerCase();
+  const canRelease = isBuyer && stepIdx >= 1 && selectedState !== "RELEASED";
+  const isClosed = selectedState === "RELEASED";
 
   return (
     <main className="min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3">
-            <h1 className="text-xl sm:text-2xl font-bold text-white">Messages</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-white">Conversations</h1>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-chrome/10 border border-chrome/30 px-2.5 py-1 text-[11px] font-semibold text-chrome">
               <LockIcon className="h-3 w-3" />
               End-to-end encrypted
@@ -574,37 +649,61 @@ function MessagesPageContent() {
         {!address ? (
           <p className="text-silver">Connect your wallet to view messages.</p>
         ) : (
-          <div className="glass-card overflow-hidden flex flex-col md:flex-row min-h-[560px] rounded-glass-lg">
-            {/* Conversation list */}
+          <div className="glass-card overflow-hidden flex flex-col lg:flex-row min-h-[640px] rounded-glass-lg">
+            {/* Order-grouped sidebar */}
             <aside
-              className={`flex flex-col border-b md:border-b-0 md:border-r border-white/10 ${
-                selectedThread ? "md:w-80 shrink-0" : "w-full"
+              className={`flex flex-col border-b lg:border-b-0 lg:border-r border-white/10 ${
+                selectedThread ? "lg:w-[320px] shrink-0" : "w-full"
               }`}
             >
-              <div className="p-3 border-b border-white/10">
-                <div className="flex h-9 items-center gap-2 rounded-full border border-white/10 bg-[#0f1726]/90 px-3">
-                  <span className="text-silver text-xs">⌕</span>
-                  <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search conversations…"
-                    className="flex-1 bg-transparent text-sm text-white placeholder:text-silver focus:outline-none"
-                  />
-                </div>
+              <div className="flex flex-wrap items-center gap-1.5 border-b border-white/10 p-3">
+                {TABS.map((t) => {
+                  const isActive = t.key === activeTab;
+                  const count = conversationsByTab[t.key].length;
+                  return (
+                    <button
+                      key={t.key}
+                      type="button"
+                      onClick={() => setActiveTab(t.key)}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold transition-colors ${
+                        isActive
+                          ? "border border-chrome/40 bg-chrome/[0.08] text-chrome"
+                          : "border border-white/10 text-silver hover:bg-white/5"
+                      }`}
+                    >
+                      {t.label}
+                      <span
+                        className={`font-mono text-[10px] ${isActive ? "text-chrome" : "text-silver"}`}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
-              <div className="flex-1 overflow-y-auto">
+
+              <div className="flex-1 overflow-y-auto py-2">
                 {inboxLoading ? (
-                  <p className="p-4 text-silver text-sm">Loading…</p>
-                ) : listingSortedConversations.length === 0 ? (
-                  <p className="p-4 text-silver text-sm">No messages yet.</p>
+                  <p className="px-4 py-3 text-silver text-sm">Loading…</p>
+                ) : visibleConversations.length === 0 ? (
+                  <p className="px-4 py-3 text-silver text-sm">
+                    {activeTab === "active"
+                      ? "No active escrows."
+                      : activeTab === "awaiting"
+                        ? "No inquiries waiting."
+                        : activeTab === "disputed"
+                          ? "No disputes — nice."
+                          : "Nothing closed yet."}
+                  </p>
                 ) : (
-                  <ul className="divide-y divide-white/5">
-                    {listingSortedConversations.map((c) => {
+                  <ul className="space-y-1.5 px-2">
+                    {visibleConversations.map((c) => {
                       const listingKey = c.listingId ?? "";
                       const isSelected =
                         selectedThread?.other === c.otherAddress &&
                         selectedThread?.listingId === listingKey;
                       const listing = c.listingId ? listingPreviews[c.listingId] : undefined;
+                      const stateKey = stateKeyFor(listing);
                       return (
                         <li key={`${c.otherAddress}-${listingKey}`}>
                           <button
@@ -615,48 +714,53 @@ function MessagesPageContent() {
                                 listingId: listingKey,
                               });
                             }}
-                            className={`flex w-full gap-3 px-3 py-3 text-left transition-colors hover:bg-white/5 ${
+                            className={`block w-full rounded-glass-lg border p-3 text-left transition-colors ${
                               isSelected
-                                ? "bg-chrome/[0.04] border-l-[3px] border-chrome"
-                                : "border-l-[3px] border-transparent"
+                                ? "border-chrome/40 bg-[#0e1422]/85"
+                                : "border-transparent hover:bg-white/[0.03]"
                             }`}
                           >
-                            <Avatar address={c.otherAddress} size={40} />
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="truncate text-sm font-semibold text-white">
-                                  <AddressDisplay
-                                    address={c.otherAddress}
-                                    className="text-white font-mono text-xs"
-                                  />
-                                </span>
-                                <span className="font-mono text-[10px] text-silver">
-                                  {c.lastMessage.createdAt
-                                    ? new Date(c.lastMessage.createdAt).toLocaleDateString([], {
-                                        month: "short",
-                                        day: "numeric",
-                                      })
-                                    : ""}
-                                </span>
-                              </div>
-                              {c.listingId && (
-                                <div className="mt-0.5 flex items-center gap-1.5 text-[10px]">
-                                  <span className="truncate font-mono text-chrome">
-                                    #{formatListingId(c.listingId).slice(0, 12)}
-                                  </span>
-                                  {listing?.title && (
-                                    <span className="truncate text-silver">· {listing.title}</span>
+                            <div className="flex items-center gap-2.5">
+                              {listing ? (
+                                <ItemThumb listing={listing} size={42} />
+                              ) : (
+                                <Avatar address={c.otherAddress} size={42} />
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate text-[13px] font-bold text-white">
+                                  {listing?.title ?? (
+                                    <AddressDisplay
+                                      address={c.otherAddress}
+                                      className="text-white font-mono text-xs"
+                                    />
                                   )}
                                 </div>
-                              )}
-                              <div className="mt-1 flex items-center gap-2">
-                                <span className="truncate text-xs text-silver">
-                                  {c.lastMessage.encrypted && (
-                                    <LockIcon className="mr-1 inline-block h-3 w-3 opacity-60" />
+                                <div className="mt-1 flex items-center gap-1.5">
+                                  {listing?.price && (
+                                    <span className="text-[11px] font-semibold text-chrome">
+                                      {listing.price} ℏ
+                                    </span>
                                   )}
-                                  {c.preview}
-                                </span>
+                                  <StatePill stateKey={stateKey} />
+                                </div>
                               </div>
+                            </div>
+                            <div className="mt-2 flex items-center gap-2 border-t border-white/[0.06] pt-2">
+                              <Avatar address={c.otherAddress} size={20} />
+                              <span className="min-w-0 flex-1 truncate text-[11px] text-silver">
+                                {c.lastMessage.encrypted && (
+                                  <LockIcon className="mr-1 inline-block h-2.5 w-2.5 opacity-60" />
+                                )}
+                                {c.preview}
+                              </span>
+                              <span className="font-mono text-[10px] text-silver">
+                                {c.lastMessage.createdAt
+                                  ? new Date(c.lastMessage.createdAt).toLocaleDateString([], {
+                                      month: "short",
+                                      day: "numeric",
+                                    })
+                                  : ""}
+                              </span>
                             </div>
                           </button>
                         </li>
@@ -667,155 +771,226 @@ function MessagesPageContent() {
               </div>
             </aside>
 
-            {/* Thread */}
+            {/* Thread + right rail */}
             {selectedThread ? (
               <div className="flex min-h-0 flex-1 flex-col">
-                {/* Thread header */}
-                <div className="flex items-center gap-3 border-b border-white/10 px-5 py-3">
-                  <Avatar address={selectedThread.other} size={38} />
+                {/* Large order header */}
+                <div
+                  className="flex items-center gap-4 border-b border-white/10 px-5 py-4"
+                  style={{
+                    background: swatch
+                      ? `linear-gradient(135deg, ${swatch[0]}33, transparent)`
+                      : undefined,
+                  }}
+                >
+                  {selectedListing ? (
+                    <ItemThumb listing={selectedListing} size={56} />
+                  ) : (
+                    <Avatar address={selectedThread.other} size={56} />
+                  )}
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-sm font-bold text-white">
+                    <div className="truncate text-base font-bold text-white">
+                      {selectedListing?.title ?? "Direct conversation"}
+                    </div>
+                    <div className="mt-1 flex items-center gap-2">
+                      <Avatar address={selectedThread.other} size={18} />
+                      <span className="font-mono text-[11px] text-white/80">
                         <AddressDisplay
                           address={selectedThread.other}
-                          className="text-white font-mono text-xs"
+                          className="text-white/80 font-mono text-[11px]"
                         />
                       </span>
-                    </div>
-                    <div className="mt-0.5 flex items-center gap-2 font-mono text-[10px] text-silver">
-                      <span>{selectedThread.other.slice(0, 10)}…</span>
                       <E2EBadge />
                     </div>
                   </div>
-                </div>
-
-                {/* Order / listing context strip */}
-                {selectedListing && (
-                  <div className="flex items-center gap-3 border-b border-white/10 bg-[#0e1422]/80 px-5 py-2.5">
-                    <ItemThumb listing={selectedListing} size={36} />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-xs font-semibold text-white">
-                        {selectedListing.title ?? "Listing"}
+                  {selectedListing?.price && (
+                    <div className="text-right">
+                      <div className="text-lg font-extrabold text-chrome">
+                        {selectedListing.price} ℏ
                       </div>
-                      <div className="mt-0.5 flex items-center gap-2 font-mono text-[10px] text-silver">
-                        <span>#{formatListingId(selectedListing.id).slice(0, 16)}</span>
-                        {selectedListing.price && (
-                          <span>· {selectedListing.price} ℏ in escrow</span>
-                        )}
-                      </div>
+                      <div className="font-mono text-[10px] text-silver">locked in escrow</div>
                     </div>
-                    {selectedStatusStyle && (
-                      <span
-                        className={`rounded-full px-2.5 py-0.5 text-[9px] font-bold tracking-wider ${selectedStatusStyle.bg} ${selectedStatusStyle.text}`}
-                      >
-                        {selectedStatusStyle.label}
-                      </span>
-                    )}
-                    <Link
-                      href={listingHref(selectedListing.id)}
-                      className="rounded-glass border border-white/10 px-3 py-1 text-[11px] text-silver hover:border-chrome/50 hover:text-chrome transition-colors"
-                    >
-                      View order →
-                    </Link>
-                  </div>
-                )}
-
-                {/* Messages */}
-                <div className="flex-1 overflow-y-auto px-5 py-4 space-y-2 min-h-[260px]">
-                  {threadLoading ? (
-                    <p className="text-silver text-sm">Loading thread…</p>
-                  ) : threadMessages.length === 0 ? (
-                    <p className="text-silver text-sm">No messages yet. Send a message below.</p>
-                  ) : (
-                    <>
-                      {escrowSystemBubble && (
-                        <div className="my-3 flex justify-center">
-                          <div className="max-w-md rounded-glass-lg border border-chrome/30 bg-chrome/[0.06] px-3.5 py-2.5 text-center">
-                            <div className="text-[11px] font-bold text-chrome">
-                              ⚡ {escrowSystemBubble.title}
-                            </div>
-                            <div className="mt-0.5 font-mono text-[10px] text-silver">
-                              {escrowSystemBubble.sub}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      {threadMessages.map((m) => {
-                        const isMe = m.fromAddress.toLowerCase() === address.toLowerCase();
-                        return (
-                          <div
-                            key={m.id}
-                            className={`flex ${isMe ? "justify-end" : "justify-start"}`}
-                          >
-                            <div
-                              className={`max-w-[70%] rounded-glass-lg px-3.5 py-2 text-sm shadow-inner ${
-                                isMe
-                                  ? "bg-chrome text-black"
-                                  : "border border-white/10 bg-[#0e1422]/85 text-white"
-                              }`}
-                            >
-                              <p className="whitespace-pre-wrap leading-relaxed">
-                                {getDisplayBody(m)}
-                              </p>
-                              <div
-                                className={`mt-1 flex items-center justify-end gap-1.5 text-[10px] ${
-                                  isMe ? "text-black/55" : "text-silver"
-                                }`}
-                              >
-                                <span>
-                                  {new Date(m.createdAt).toLocaleTimeString([], {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })}
-                                </span>
-                                {m.encrypted && <LockIcon className="h-2.5 w-2.5 opacity-70" />}
-                                {isMe && <span>✓✓</span>}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </>
                   )}
                 </div>
 
-                {/* Composer */}
-                <div className="border-t border-white/10 bg-[#0b111b] px-4 py-3">
-                  <div className="flex items-end gap-2">
-                    <div className="flex flex-1 items-end gap-2 rounded-glass-lg border border-white/10 bg-[#0f1726]/90 px-3 py-2 focus-within:border-chrome/50">
-                      <E2EBadge />
-                      <textarea
-                        value={replyBody}
-                        onChange={(e) => setReplyBody(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            void sendReply();
-                          }
-                        }}
-                        placeholder={`Encrypted message to ${selectedThread.other.slice(0, 10)}…`}
-                        rows={1}
-                        className="flex-1 resize-none bg-transparent text-sm text-white placeholder:text-silver focus:outline-none min-h-[24px] max-h-32"
-                      />
+                <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+                  {/* Messages column */}
+                  <div className="flex min-h-0 flex-1 flex-col">
+                    <div className="flex-1 space-y-2 overflow-y-auto px-5 py-4">
+                      {threadLoading ? (
+                        <p className="text-silver text-sm">Loading thread…</p>
+                      ) : threadMessages.length === 0 ? (
+                        <p className="text-silver text-sm">No messages yet. Send a message below.</p>
+                      ) : (
+                        <>
+                          <div className="my-2 text-center font-mono text-[10px] text-silver">
+                            —{" "}
+                            {selectedListing?.createdAt
+                              ? `Order opened · ${new Date(
+                                  selectedListing.createdAt,
+                                ).toLocaleDateString()}`
+                              : "Conversation"}
+                            {" "}—
+                          </div>
+                          {threadMessages.map((m) => {
+                            const isMe = m.fromAddress.toLowerCase() === address.toLowerCase();
+                            return (
+                              <div
+                                key={m.id}
+                                className={`flex ${isMe ? "justify-end" : "justify-start"}`}
+                              >
+                                <div
+                                  className={`max-w-[70%] rounded-glass-lg px-3.5 py-2 text-sm shadow-inner ${
+                                    isMe
+                                      ? "bg-chrome text-black"
+                                      : "border border-white/10 bg-[#0e1422]/85 text-white"
+                                  }`}
+                                >
+                                  <p className="whitespace-pre-wrap leading-relaxed">
+                                    {getDisplayBody(m)}
+                                  </p>
+                                  <div
+                                    className={`mt-1 flex items-center justify-end gap-1.5 text-[10px] ${
+                                      isMe ? "text-black/55" : "text-silver"
+                                    }`}
+                                  >
+                                    <span>
+                                      {new Date(m.createdAt).toLocaleTimeString([], {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      })}
+                                    </span>
+                                    {m.encrypted && <LockIcon className="h-2.5 w-2.5 opacity-70" />}
+                                    {isMe && <span>✓✓</span>}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </>
+                      )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={sendReply}
-                      disabled={!replyBody.trim() || sending}
-                      className="btn-frost-cta inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm disabled:opacity-50"
-                    >
-                      {sending ? "Sending…" : "Send"}
-                      {!sending && <SendArrow />}
-                    </button>
+
+                    {/* Composer */}
+                    <div className="border-t border-white/10 bg-[#0b111b] px-4 py-3">
+                      <div className="flex items-end gap-2">
+                        <div className="flex flex-1 items-end gap-2 rounded-glass-lg border border-white/10 bg-[#0f1726]/90 px-3 py-2 focus-within:border-chrome/50">
+                          <E2EBadge />
+                          <textarea
+                            value={replyBody}
+                            onChange={(e) => setReplyBody(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && !e.shiftKey) {
+                                e.preventDefault();
+                                void sendReply();
+                              }
+                            }}
+                            placeholder={`Encrypted message to ${selectedThread.other.slice(0, 10)}…`}
+                            rows={1}
+                            className="flex-1 resize-none bg-transparent text-sm text-white placeholder:text-silver focus:outline-none min-h-[24px] max-h-32"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={sendReply}
+                          disabled={!replyBody.trim() || sending}
+                          className="btn-frost-cta inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm disabled:opacity-50"
+                        >
+                          {sending ? "Sending…" : "Send"}
+                          {!sending && <SendArrow />}
+                        </button>
+                      </div>
+                    </div>
                   </div>
+
+                  {/* Right rail: escrow controller */}
+                  {selectedListing && (
+                    <aside className="w-full border-t border-white/10 px-4 py-4 lg:w-[260px] lg:border-l lg:border-t-0 lg:overflow-y-auto">
+                      <div className="mb-2.5 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-silver">
+                        Escrow
+                      </div>
+                      <div className="mb-4 rounded-glass-lg border border-chrome/25 bg-chrome/[0.04] px-3 py-2.5">
+                        <div className="font-mono text-[10px] text-chrome">Listing</div>
+                        <div className="mt-1 break-all font-mono text-[11px] text-white">
+                          {formatListingId(selectedListing.id)}
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        {STEPS.map((s, i) => {
+                          const done = stepIdx >= i;
+                          const current = stepIdx === i;
+                          return (
+                            <div
+                              key={s.key}
+                              className={`flex items-center gap-2.5 py-1 text-[12px] ${
+                                done ? "text-white" : "text-silver"
+                              }`}
+                            >
+                              <span
+                                className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[10px] font-extrabold ${
+                                  done ? "bg-chrome text-black" : "bg-white/[0.05] text-silver"
+                                } ${current ? "ring-1 ring-chrome/60" : ""}`}
+                              >
+                                {done && !current ? "✓" : i + 1}
+                              </span>
+                              {s.label}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <div className="mt-4 flex flex-col gap-2">
+                        {canRelease ? (
+                          <Link
+                            href={listingHref(selectedListing.id)}
+                            className="btn-frost-cta inline-flex items-center justify-center rounded-glass px-3 py-2 text-[12px] font-semibold"
+                          >
+                            Release {selectedListing.price} ℏ
+                          </Link>
+                        ) : (
+                          <Link
+                            href={listingHref(selectedListing.id)}
+                            className="inline-flex items-center justify-center rounded-glass border border-white/10 px-3 py-2 text-[12px] text-silver transition-colors hover:border-chrome/40 hover:text-chrome"
+                          >
+                            View order →
+                          </Link>
+                        )}
+                        {!isClosed && (
+                          <button
+                            type="button"
+                            className="inline-flex items-center justify-center rounded-glass border border-rose-500/30 px-3 py-2 text-[12px] text-rose-400 transition-colors hover:bg-rose-500/[0.08]"
+                          >
+                            Open dispute
+                          </button>
+                        )}
+                      </div>
+
+                      {(selectedListing.trackingNumber || selectedListing.trackingCarrier) && (
+                        <>
+                          <div className="mb-2 mt-5 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-silver">
+                            Shipping
+                          </div>
+                          <div className="rounded-glass border border-white/10 bg-white/[0.02] px-3 py-2 text-[11px] text-white">
+                            <div className="text-silver">
+                              {selectedListing.trackingCarrier ?? "Carrier"}
+                            </div>
+                            <div className="break-all font-mono">
+                              {selectedListing.trackingNumber ?? "—"}
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </aside>
+                  )}
                 </div>
               </div>
             ) : (
-              <div className="hidden flex-1 items-center justify-center p-8 text-center text-silver md:flex">
+              <div className="hidden flex-1 items-center justify-center p-8 text-center text-silver lg:flex">
                 <div>
                   <div className="text-sm">Select a conversation to read messages.</div>
                   <div className="mt-1 font-mono text-[11px]">
-                    All messages are end-to-end encrypted wallet-to-wallet.
+                    Chats are grouped by order · all messages are end-to-end encrypted.
                   </div>
                 </div>
               </div>
