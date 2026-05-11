@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { useHashpackWallet } from "./hashpackWallet";
 import { SignInCard } from "../components/ui/SignInCard";
 
@@ -93,31 +94,46 @@ export function SignInModalProvider({ children }: { children: React.ReactNode })
     [openSignIn, closeSignIn, open],
   );
 
+  // Portal target. Computed on the client only — server render returns null
+  // since document doesn't exist there.
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setPortalTarget(typeof document !== "undefined" ? document.body : null);
+  }, []);
+
+  const modal =
+    open && portalTarget
+      ? createPortal(
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Sign in with HashPack"
+            onClick={closeSignIn}
+          >
+            <div className="relative w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                onClick={closeSignIn}
+                className="absolute top-2 right-3 z-10 text-lg font-medium leading-none text-white/60 hover:text-white"
+                aria-label="Close"
+              >
+                ×
+              </button>
+              {title && (
+                <p className="mb-3 text-center text-sm font-medium text-white/80">{title}</p>
+              )}
+              <SignInCard />
+            </div>
+          </div>,
+          portalTarget,
+        )
+      : null;
+
   return (
     <Ctx.Provider value={value}>
       {children}
-      {open && (
-        <div
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Sign in with HashPack"
-          onClick={closeSignIn}
-        >
-          <div className="relative w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              onClick={closeSignIn}
-              className="absolute top-2 right-3 z-10 text-lg font-medium leading-none text-white/60 hover:text-white"
-              aria-label="Close"
-            >
-              ×
-            </button>
-            {title && <p className="mb-3 text-center text-sm font-medium text-white/80">{title}</p>}
-            <SignInCard />
-          </div>
-        </div>
-      )}
+      {modal}
     </Ctx.Provider>
   );
 }
