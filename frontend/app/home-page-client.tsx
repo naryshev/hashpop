@@ -179,27 +179,12 @@ export default function HomePageClient({
   }, [listings, usdRate]);
 
   return (
-    <main className="h-screen overflow-hidden" style={{ backgroundColor: "#071b38" }}>
+    <main className="h-full overflow-hidden" style={{ backgroundColor: "#071b38" }}>
       <section className="relative flex h-full w-full flex-col overflow-hidden bg-[#0a2247] p-4 shadow-[0_24px_70px_rgba(0,0,0,0.35)] sm:p-6">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_115%,rgba(69,232,145,0.36),transparent_45%)]" />
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,rgba(72,170,255,0.18),transparent_42%)]" />
         <div className="relative z-10 flex h-full flex-col">
-          <div className="flex items-start justify-center sm:justify-start">
-            <Link href="/" className="inline-block" aria-label="Hashpop home">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/hashpop-cart-3d.PNG"
-                alt="Hashpop cart logo"
-                width={128}
-                height={128}
-                decoding="async"
-                fetchPriority="high"
-                className="relative h-24 w-auto max-h-28 bg-transparent object-contain object-left drop-shadow-[0_12px_24px_rgba(0,0,0,0.35)] sm:h-24"
-              />
-            </Link>
-          </div>
-
-          <div className="mt-4 text-center sm:mt-5">
+          <div className="text-center sm:mt-2">
             <p className="text-xs uppercase tracking-[0.2em] text-emerald-200/85">
               Verify • Trade • Collect
             </p>

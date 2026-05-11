@@ -153,6 +153,13 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
   }, [effectiveConnected]);
 
   const fallbackTitle = pathnameTitle(pathname);
+  // On the landing page we keep only the cart logo (top of rail) + the
+  // top-right cluster (alerts + sign-in / account). Everything else fades
+  // in once the user navigates into the app — e.g. clicks "Browse Listings".
+  const chromeRevealed = pathname !== "/";
+  const chromeFade = `transition-opacity duration-700 ease-out ${
+    chromeRevealed ? "opacity-100" : "pointer-events-none opacity-0"
+  }`;
 
   return (
     <div className="flex min-h-screen md:h-screen md:min-h-0 md:overflow-hidden">
@@ -162,6 +169,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
         aria-label="Primary navigation"
       >
         <div className="flex flex-col items-center gap-1">
+          {/* Cart logo: visible on every route — including the landing page. */}
           <Link
             href="/marketplace"
             className="mb-2 flex h-10 w-10 items-center justify-center"
@@ -171,24 +179,28 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/hashpop-cart-3d.PNG" alt="" className="h-7 w-auto object-contain" />
           </Link>
-          {items.map((item) => {
-            const active =
-              !!item.href &&
-              (pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href)));
-            return (
-              <RailButton
-                key={item.label}
-                label={item.label}
-                active={active}
-                href={item.href}
-                onClick={item.onClick}
-              >
-                {item.icon}
-              </RailButton>
-            );
-          })}
+          {/* Rail nav fades in once the user leaves the landing page. */}
+          <div className={`flex flex-col items-center gap-1 ${chromeFade}`}>
+            {items.map((item) => {
+              const active =
+                !!item.href &&
+                (pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href)));
+              return (
+                <RailButton
+                  key={item.label}
+                  label={item.label}
+                  active={active}
+                  href={item.href}
+                  onClick={item.onClick}
+                >
+                  {item.icon}
+                </RailButton>
+              );
+            })}
+          </div>
         </div>
-        <div className="flex flex-col items-center gap-1">
+        {/* Sign-in / sign-out rail button also fades in with the rest. */}
+        <div className={`flex flex-col items-center gap-1 ${chromeFade}`}>
           {effectiveConnected ? (
             <RailButton label="Sign out" onClick={() => void disconnect()}>
               <LogOut className="h-5 w-5" />
@@ -208,7 +220,9 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
           {/* Title region. The slot host stays empty so portal children
               don't coexist with the fallback. The fallback is a sibling
               shown only when no page has registered a title slot. */}
-          <div className="flex min-w-0 items-center gap-3 text-base font-semibold tracking-tight text-white">
+          <div
+            className={`flex min-w-0 items-center gap-3 text-base font-semibold tracking-tight text-white ${chromeFade}`}
+          >
             <div ref={titleSlotRef} className="flex min-w-0 items-center" />
             {!titleFilled && fallbackTitle && <span>{fallbackTitle}</span>}
           </div>
