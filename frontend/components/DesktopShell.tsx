@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { useHashpackWallet } from "../lib/hashpackWallet";
 import { useSignInModal } from "../lib/signInModal";
-import { useTopBarSlotRef } from "../lib/topBar";
+import { useTopBarSlotFilled, useTopBarSlotRef } from "../lib/topBar";
 import { cn } from "../lib/utils";
 
 type RailItem = {
@@ -122,6 +122,10 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
   const titleSlotRef = useTopBarSlotRef("title");
   const centerSlotRef = useTopBarSlotRef("center");
   const actionsSlotRef = useTopBarSlotRef("actions");
+  // Track whether each slot is filled by a page so we can hide the chrome's
+  // own fallback content. Slot hosts MUST stay empty — createPortal appends
+  // to existing children, which would duplicate fallback + portal content.
+  const titleFilled = useTopBarSlotFilled("title");
 
   const items = useMemo<RailItem[]>(() => {
     return [
@@ -151,7 +155,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
   const fallbackTitle = pathnameTitle(pathname);
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen md:h-screen md:min-h-0 md:overflow-hidden">
       {/* Left icon rail — desktop only, no border, floats on the canvas. */}
       <aside
         className="sticky top-0 z-30 hidden h-screen w-16 shrink-0 flex-col items-center justify-between bg-transparent py-3 md:flex"
@@ -198,18 +202,15 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main column */}
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col md:h-full md:min-h-0">
         {/* Top bar — desktop only. Borderless; floats on canvas. */}
-        <header className="sticky top-0 z-20 hidden h-14 items-center gap-4 bg-transparent px-2 md:flex">
-          {/* Title slot (page-provided or pathname fallback). Mirrors the
-              space the wordmark used to occupy in the top-left. */}
-          <div className="flex min-w-0 items-center gap-3">
-            <div
-              ref={titleSlotRef}
-              className="flex min-w-0 items-center text-base font-semibold tracking-tight text-white"
-            >
-              {fallbackTitle}
-            </div>
+        <header className="sticky top-0 z-20 hidden h-14 shrink-0 items-center gap-4 bg-transparent px-2 md:flex">
+          {/* Title region. The slot host stays empty so portal children
+              don't coexist with the fallback. The fallback is a sibling
+              shown only when no page has registered a title slot. */}
+          <div className="flex min-w-0 items-center gap-3 text-base font-semibold tracking-tight text-white">
+            <div ref={titleSlotRef} className="flex min-w-0 items-center" />
+            {!titleFilled && fallbackTitle && <span>{fallbackTitle}</span>}
           </div>
           {/* Center slot — typically a search input + filter dropdown. */}
           <div
@@ -250,14 +251,14 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        {/* Inner content card. The only bordered element in the chrome.
-            Mobile gets full-bleed content with top padding for BottomNav. */}
-        <main className="flex-1 pt-14 md:p-3 md:pt-1">
-          {/* Note: no overflow-hidden here. Combining overflow-hidden with
-              backdrop-blur creates a stacking context that destabilises
-              direct-DOM children like leaflet maps. Children that overflow
-              the rounded edge stay readable; the corners just don't clip. */}
-          <div className="md:min-h-[calc(100vh-3.5rem-1.5rem)] md:rounded-glass-lg md:border md:border-white/10 md:bg-[#0e1422]/60 md:backdrop-blur-glass">
+        {/* Content area: rounded canvas on desktop, full-bleed on mobile.
+            Mobile gets top padding to clear the fixed BottomNav. On desktop
+            the card itself is sized to the remaining viewport height and
+            scrolls internally — that way the card's full border (including
+            the bottom edge) is always visible while the page content
+            scrolls inside it instead of sliding under the chrome. */}
+        <main className="flex-1 pt-14 md:flex md:min-h-0 md:flex-1 md:p-3 md:pt-1">
+          <div className="scrollbar-none md:h-full md:min-h-0 md:flex-1 md:overflow-y-auto md:rounded-glass-lg md:border md:border-white/10 md:bg-[#0e1422]/60">
             {children}
           </div>
         </main>

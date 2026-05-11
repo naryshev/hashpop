@@ -108,7 +108,7 @@ export function SignInModalProvider({ children }: { children: React.ReactNode })
             <button
               type="button"
               onClick={closeSignIn}
-              className="absolute -top-3 -right-3 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-[#15181f] text-sm text-white shadow-lg hover:bg-white/10"
+              className="absolute top-2 right-3 z-10 text-lg font-medium leading-none text-white/60 hover:text-white"
               aria-label="Close"
             >
               ×

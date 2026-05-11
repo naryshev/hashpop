@@ -362,9 +362,11 @@ function CreatePageContent() {
           </p>
         )}
 
-        <div
-          className={`glass-card p-6 space-y-4 ${!walletConnected ? "pointer-events-none opacity-60" : ""}`}
-        >
+        {/* Render the form only when the wallet is connected. The disabled
+            form for unauthenticated visitors served no purpose and made the
+            page sensitive to leaflet/wallet cleanup races on navigation. */}
+        {walletConnected && (
+          <div className="glass-card p-6 space-y-4">
           <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
             <p className="text-sm font-medium text-amber-200">Transaction fee (HBAR)</p>
             <p className="text-sm text-silver mt-1">
@@ -588,16 +590,7 @@ function CreatePageContent() {
               Show buyers roughly where the item is. Search a city or click the map to drop a pin.
             </p>
             <div className="mt-2">
-              {/* Only mount the leaflet map once the wallet is connected so
-                  the (disabled) form for unauthenticated visitors doesn't
-                  spin up tile fetches that race React unmounts on nav. */}
-              {walletConnected ? (
-                <LocationPicker value={location} onChange={setLocation} />
-              ) : (
-                <div className="aspect-[16/7] w-full rounded-glass border border-white/10 bg-white/5 flex items-center justify-center text-silver text-sm">
-                  Connect your wallet to add a location.
-                </div>
-              )}
+              <LocationPicker value={location} onChange={setLocation} />
             </div>
           </div>
 
@@ -645,7 +638,8 @@ function CreatePageContent() {
               </p>
             </div>
           )}
-        </div>
+          </div>
+        )}
       </div>
     </main>
   );
