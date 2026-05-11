@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { useHashpackWallet } from "../lib/hashpackWallet";
 import { useSignInModal } from "../lib/signInModal";
-import { useTopBarSlotRef } from "../lib/topBar";
+import { useTopBarSlotFilled, useTopBarSlotRef } from "../lib/topBar";
 import { cn } from "../lib/utils";
 
 type RailItem = {
@@ -122,6 +122,10 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
   const titleSlotRef = useTopBarSlotRef("title");
   const centerSlotRef = useTopBarSlotRef("center");
   const actionsSlotRef = useTopBarSlotRef("actions");
+  // Track whether each slot is filled by a page so we can hide the chrome's
+  // own fallback content. Slot hosts MUST stay empty — createPortal appends
+  // to existing children, which would duplicate fallback + portal content.
+  const titleFilled = useTopBarSlotFilled("title");
 
   const items = useMemo<RailItem[]>(() => {
     return [
@@ -201,15 +205,12 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Top bar — desktop only. Borderless; floats on canvas. */}
         <header className="sticky top-0 z-20 hidden h-14 items-center gap-4 bg-transparent px-2 md:flex">
-          {/* Title slot (page-provided or pathname fallback). Mirrors the
-              space the wordmark used to occupy in the top-left. */}
-          <div className="flex min-w-0 items-center gap-3">
-            <div
-              ref={titleSlotRef}
-              className="flex min-w-0 items-center text-base font-semibold tracking-tight text-white"
-            >
-              {fallbackTitle}
-            </div>
+          {/* Title region. The slot host stays empty so portal children
+              don't coexist with the fallback. The fallback is a sibling
+              shown only when no page has registered a title slot. */}
+          <div className="flex min-w-0 items-center gap-3 text-base font-semibold tracking-tight text-white">
+            <div ref={titleSlotRef} className="flex min-w-0 items-center" />
+            {!titleFilled && fallbackTitle && <span>{fallbackTitle}</span>}
           </div>
           {/* Center slot — typically a search input + filter dropdown. */}
           <div

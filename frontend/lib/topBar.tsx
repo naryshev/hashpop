@@ -15,13 +15,16 @@ import { createPortal } from "react-dom";
 export type TopBarSlotName = "title" | "center" | "actions";
 
 type Ctx = {
-  /** Called by the slot host (DesktopShell) when each slot's DOM node mounts.
-   *  Returns true if the registration changed something (helps consumers avoid
-   *  no-op re-renders). */
+  /** Called by the slot host (DesktopShell) when each slot's DOM node mounts. */
   registerSlot: (name: TopBarSlotName, el: HTMLElement | null) => void;
   /** Read the live DOM node for a given slot, or null if it isn't mounted. */
   getSlot: (name: TopBarSlotName) => HTMLElement | null;
-  /** Subscribe to "slots changed" events. Returns an unsubscribe fn. */
+  /** Called by <TopBarSlot> on mount/unmount so the host knows when a page is
+   *  providing its own content and the chrome can hide its fallback. */
+  setFilled: (name: TopBarSlotName, filled: boolean) => void;
+  /** Synchronous "is the slot currently filled by a page?" check. */
+  isFilled: (name: TopBarSlotName) => boolean;
+  /** Subscribe to any registry change (slot mounted, fill flipped). */
   subscribe: (cb: () => void) => () => void;
 };
 
@@ -29,16 +32,10 @@ const TopBarContext = createContext<Ctx | null>(null);
 
 /**
  * Site-wide top-bar slot registry. The desktop chrome mounts three empty
- * `<div>`s (title / center / actions) and pages use <TopBarSlot> to portal
- * their own JSX into them. Portals keep the page's React tree intact so any
- * state inside the slot (e.g. the marketplace search input) survives nav.
- *
- * Important: the context value's identity is stable (memoized once) and slot
- * change notification goes through a separate subscriber list. If the context
- * value changed on every slot registration, the ref callback handed to the
- * slot host would be re-created → React would detach + re-attach the ref →
- * registerSlot would fire again → infinite loop (React error #185). The
- * subscribe/notify pattern keeps registration idempotent.
+ * `<div>`s (title / center / actions). Pages use <TopBarSlot> to portal their
+ * JSX into them. The host divs must be left empty — `createPortal` appends
+ * to existing children, so any chrome-provided fallback content lives in a
+ * sibling node that's hidden via `isFilled(name)`.
  */
 export function TopBarProvider({ children }: { children: ReactNode }) {
   const slots = useRef<Record<TopBarSlotName, HTMLElement | null>>({
@@ -46,20 +43,31 @@ export function TopBarProvider({ children }: { children: ReactNode }) {
     center: null,
     actions: null,
   });
+  const filled = useRef<Record<TopBarSlotName, number>>({
+    title: 0,
+    center: 0,
+    actions: 0,
+  });
   const subscribers = useRef<Set<() => void>>(new Set());
 
   const value = useMemo<Ctx>(() => {
-    const notify = () => {
-      subscribers.current.forEach((cb) => cb());
-    };
+    const notify = () => subscribers.current.forEach((cb) => cb());
     return {
       registerSlot(name, el) {
-        if (slots.current[name] === el) return; // no-op if same node
+        if (slots.current[name] === el) return;
         slots.current[name] = el;
         notify();
       },
       getSlot(name) {
         return slots.current[name];
+      },
+      setFilled(name, on) {
+        const next = (filled.current[name] ?? 0) + (on ? 1 : -1);
+        filled.current[name] = Math.max(0, next);
+        notify();
+      },
+      isFilled(name) {
+        return (filled.current[name] ?? 0) > 0;
       },
       subscribe(cb) {
         subscribers.current.add(cb);
@@ -74,14 +82,10 @@ export function TopBarProvider({ children }: { children: ReactNode }) {
 }
 
 /**
- * Imperative ref callback for the slot host. Pass to `ref` on the slot's
- * placeholder element inside DesktopShell. The returned callback identity is
- * stable across renders so React doesn't ping-pong attach/detach the ref.
+ * Imperative ref callback for the slot host. Stable identity across renders.
  */
 export function useTopBarSlotRef(name: TopBarSlotName) {
   const ctx = useContext(TopBarContext);
-  // Read the latest ctx through a ref so the returned callback's identity
-  // can stay stable even if ctx is re-created (it shouldn't, but defensive).
   const ctxRef = useRef(ctx);
   ctxRef.current = ctx;
   return useCallback(
@@ -92,18 +96,41 @@ export function useTopBarSlotRef(name: TopBarSlotName) {
   );
 }
 
+/** Returns the current "filled" state for a slot and re-renders on change. */
+export function useTopBarSlotFilled(name: TopBarSlotName) {
+  const ctx = useContext(TopBarContext);
+  const [filled, setFilledState] = useState(false);
+  useEffect(() => {
+    if (!ctx) return;
+    setFilledState(ctx.isFilled(name));
+    return ctx.subscribe(() => setFilledState(ctx.isFilled(name)));
+  }, [ctx, name]);
+  return filled;
+}
+
 /**
- * Render `children` into the named top-bar slot via a portal. Subscribes to
- * registry changes so once the host slot mounts (after first paint) the
- * portal re-renders into the now-available DOM node.
+ * Render `children` into the named top-bar slot via a portal. Marks the slot
+ * as filled so the chrome can hide its fallback. Falls back to nothing if
+ * the slot host hasn't mounted yet.
  */
 export function TopBarSlot({ name, children }: { name: TopBarSlotName; children: ReactNode }) {
   const ctx = useContext(TopBarContext);
   const [, force] = useState(0);
+
   useEffect(() => {
     if (!ctx) return;
     return ctx.subscribe(() => force((v) => v + 1));
   }, [ctx]);
+
+  // Mark the slot as filled while this component is mounted, regardless of
+  // whether the portal target is available yet (the chrome should hide its
+  // fallback as soon as a page declares intent to fill the slot).
+  useEffect(() => {
+    if (!ctx) return;
+    ctx.setFilled(name, true);
+    return () => ctx.setFilled(name, false);
+  }, [ctx, name]);
+
   if (!ctx) return null;
   const target = ctx.getSlot(name);
   if (!target) return null;
