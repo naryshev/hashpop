@@ -93,6 +93,36 @@ function parsePostedWithinDays(value: string): number | null {
   return daysMap[value] ?? null;
 }
 
+type ViewMode = "grid" | "feed" | "editorial";
+type SortMode = "recent" | "price-asc" | "price-desc" | "trending";
+
+function parseViewMode(value: string | null): ViewMode {
+  if (value === "feed" || value === "editorial") return value;
+  return "grid";
+}
+
+function parseSortMode(value: string | null): SortMode {
+  if (value === "price-asc" || value === "price-desc" || value === "trending") return value;
+  return "recent";
+}
+
+function relativeTimeShort(iso?: string): string {
+  if (!iso) return "";
+  const ms = Date.now() - new Date(iso).getTime();
+  if (Number.isNaN(ms) || ms < 0) return "";
+  const sec = Math.floor(ms / 1000);
+  if (sec < 60) return `${sec}s`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h`;
+  const d = Math.floor(hr / 24);
+  if (d < 30) return `${d}d`;
+  const mo = Math.floor(d / 30);
+  if (mo < 12) return `${mo}mo`;
+  return `${Math.floor(mo / 12)}y`;
+}
+
 export type ListingItem = {
   id: string;
   price?: string;
@@ -133,9 +163,19 @@ export default function MarketplacePageClient({
   const maxPriceQuery = searchParams.get("maxPrice")?.trim() ?? "";
   const postedWithinQuery = searchParams.get("postedWithin")?.trim() ?? "";
   const conditionQuery = searchParams.get("condition")?.trim() ?? "";
+  const viewMode: ViewMode = parseViewMode(searchParams.get("view"));
+  const sortMode: SortMode = parseSortMode(searchParams.get("sort"));
   const items = initialItems;
   const listingsError = initialError;
   const usdRate = useHbarUsd();
+
+  const setParam = (key: string, value: string | null) => {
+    const p = new URLSearchParams(searchParams.toString());
+    if (value && value !== "") p.set(key, value);
+    else p.delete(key);
+    const qs = p.toString();
+    router.push(qs ? `/marketplace?${qs}` : "/marketplace");
+  };
 
   const filteredItems = useMemo(() => {
     let categoryMatched = items;
@@ -194,7 +234,7 @@ export default function MarketplacePageClient({
     const now = Date.now();
     const maxAgeMs = postedDays ? postedDays * 24 * 60 * 60 * 1000 : null;
 
-    return queryMatched.filter((item) => {
+    const filtered = queryMatched.filter((item) => {
       const hbar = Number(formatPriceForDisplay(item.price || "0"));
       if (min != null && (Number.isNaN(hbar) || hbar < min)) return false;
       if (max != null && (Number.isNaN(hbar) || hbar > max)) return false;
@@ -207,6 +247,22 @@ export default function MarketplacePageClient({
         return false;
       return true;
     });
+
+    const sorted = [...filtered];
+    const priceOf = (i: ListingItem) => {
+      const n = Number(formatPriceForDisplay(i.price || "0"));
+      return Number.isNaN(n) ? 0 : n;
+    };
+    if (sortMode === "price-asc") sorted.sort((a, b) => priceOf(a) - priceOf(b));
+    else if (sortMode === "price-desc") sorted.sort((a, b) => priceOf(b) - priceOf(a));
+    else if (sortMode === "trending")
+      sorted.sort((a, b) => (b.watchlistCount ?? 0) - (a.watchlistCount ?? 0));
+    else
+      sorted.sort(
+        (a, b) =>
+          new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime(),
+      );
+    return sorted;
   }, [
     items,
     query,
@@ -215,6 +271,7 @@ export default function MarketplacePageClient({
     maxPriceQuery,
     postedWithinQuery,
     conditionQuery,
+    sortMode,
   ]);
 
   // Header chrome is hoisted into the global top bar via portals so the page
@@ -554,57 +611,304 @@ export default function MarketplacePageClient({
                 </Link>
               ))}
             </div>
-            <div className="hidden sm:grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {filteredItems.map((item) => (
-                <Link
-                  key={`${item.itemType}-${item.id}`}
-                  href={listingHref(item.id)}
-                  className="glass-card overflow-hidden transition-all duration-200 hover:border-white/20 hover:shadow-glow"
-                >
-                  <div className="relative bg-white/5">
-                    <ListingMedia
-                      listing={item}
-                      className="w-full"
-                      aspectRatio="square"
-                      navigation="arrows"
-                      cardSize
-                      compactHeight="220px"
-                    />
-                    <div className="absolute top-2 right-2">
-                      <WishlistButton itemId={item.id} itemType={item.itemType} compact />
-                    </div>
-                    <span
-                      className={`absolute top-2 left-2 rounded-full inline-flex items-center gap-1.5 border px-2 py-0.5 text-[10px] font-semibold ${getStatusBadge(item.status, item.onChainConfirmed).className}`}
+            <div className="hidden sm:flex items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-2">
+                {(
+                  [
+                    { id: "grid", label: "Grid" },
+                    { id: "feed", label: "Feed" },
+                    { id: "editorial", label: "Editorial" },
+                  ] as { id: ViewMode; label: string }[]
+                ).map((v) => {
+                  const active = viewMode === v.id;
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => setParam("view", v.id === "grid" ? null : v.id)}
+                      className={`rounded-full px-3 py-1 text-xs font-medium transition-colors border ${
+                        active
+                          ? "border-[#00ffa3]/40 bg-[#00ffa3]/10 text-[#00ffa3]"
+                          : "border-white/10 text-silver hover:text-white hover:border-white/20"
+                      }`}
                     >
-                      {getStatusBadge(item.status, item.onChainConfirmed).pulseDot ? (
-                        <span className="inline-flex h-2 w-2 rounded-full bg-green-400 animate-pulse shadow-[0_0_0_0_rgba(74,222,128,0.7)]" />
-                      ) : null}
-                      {getStatusBadge(item.status, item.onChainConfirmed).label}
-                    </span>
-                  </div>
-                  <div className="p-4">
-                    <h2 className="text-base font-semibold text-white line-clamp-2 leading-snug">
-                      {item.title || formatListingId(item.id) || "Untitled"}
-                    </h2>
-                    {item.seller && (
-                      <p className="text-silver/50 text-[11px] mt-1 font-mono truncate">
-                        {formatSellerDisplay(item.seller)}
-                      </p>
-                    )}
-                    <div className="flex items-center justify-between mt-2">
-                      <p className="text-chrome font-semibold text-lg">
-                        {formatHbarWithUsd(formatPriceForDisplay(item.price || "0"), usdRate)}
-                      </p>
-                      {(item.watchlistCount ?? 0) > 0 && (
-                        <span className="text-xs text-silver/50 flex items-center gap-1">
-                          ♡ {item.watchlistCount}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </Link>
-              ))}
+                      {v.label}
+                    </button>
+                  );
+                })}
+                <span className="text-xs text-silver/60 ml-2">
+                  {filteredItems.length.toLocaleString()} result
+                  {filteredItems.length === 1 ? "" : "s"}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] uppercase tracking-widest text-silver/60">
+                  Sort
+                </span>
+                {(
+                  [
+                    { id: "recent", label: "Recent" },
+                    { id: "price-asc", label: "Price ↑" },
+                    { id: "price-desc", label: "Price ↓" },
+                    { id: "trending", label: "Trending" },
+                  ] as { id: SortMode; label: string }[]
+                ).map((s) => {
+                  const active = sortMode === s.id;
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setParam("sort", s.id === "recent" ? null : s.id)}
+                      className={`rounded-full px-3 py-1 text-xs transition-colors border ${
+                        active
+                          ? "border-[#00ffa3]/40 bg-[#00ffa3]/10 text-[#00ffa3]"
+                          : "border-white/10 text-silver hover:text-white hover:border-white/20"
+                      }`}
+                    >
+                      {s.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+
+            {viewMode === "grid" && (
+              <div className="hidden sm:grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {filteredItems.map((item) => (
+                  <Link
+                    key={`${item.itemType}-${item.id}`}
+                    href={listingHref(item.id)}
+                    className="glass-card overflow-hidden transition-all duration-200 hover:border-white/20 hover:shadow-glow"
+                  >
+                    <div className="relative bg-white/5">
+                      <ListingMedia
+                        listing={item}
+                        className="w-full"
+                        aspectRatio="square"
+                        navigation="arrows"
+                        cardSize
+                        compactHeight="220px"
+                      />
+                      <div className="absolute top-2 right-2">
+                        <WishlistButton itemId={item.id} itemType={item.itemType} compact />
+                      </div>
+                      <span
+                        className={`absolute top-2 left-2 rounded-full inline-flex items-center gap-1.5 border px-2 py-0.5 text-[10px] font-semibold ${getStatusBadge(item.status, item.onChainConfirmed).className}`}
+                      >
+                        {getStatusBadge(item.status, item.onChainConfirmed).pulseDot ? (
+                          <span className="inline-flex h-2 w-2 rounded-full bg-green-400 animate-pulse shadow-[0_0_0_0_rgba(74,222,128,0.7)]" />
+                        ) : null}
+                        {getStatusBadge(item.status, item.onChainConfirmed).label}
+                      </span>
+                    </div>
+                    <div className="p-4">
+                      <h2 className="text-base font-semibold text-white line-clamp-2 leading-snug">
+                        {item.title || formatListingId(item.id) || "Untitled"}
+                      </h2>
+                      {item.seller && (
+                        <p className="text-silver/50 text-[11px] mt-1 font-mono truncate">
+                          {formatSellerDisplay(item.seller)}
+                        </p>
+                      )}
+                      <div className="flex items-center justify-between mt-2">
+                        <p className="text-chrome font-semibold text-lg">
+                          {formatHbarWithUsd(formatPriceForDisplay(item.price || "0"), usdRate)}
+                        </p>
+                        {(item.watchlistCount ?? 0) > 0 && (
+                          <span className="text-xs text-silver/50 flex items-center gap-1">
+                            ♡ {item.watchlistCount}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+
+            {viewMode === "feed" && (
+              <div className="hidden sm:block divide-y divide-white/5 rounded-xl border border-white/10 bg-white/[0.02]">
+                {filteredItems.map((item) => {
+                  const badge = getStatusBadge(item.status, item.onChainConfirmed);
+                  return (
+                    <Link
+                      key={`${item.itemType}-${item.id}`}
+                      href={listingHref(item.id)}
+                      className="grid grid-cols-[88px_minmax(0,1fr)_140px_120px] gap-4 items-center px-4 py-3 hover:bg-white/[0.03] transition-colors"
+                    >
+                      <div className="relative h-[88px] w-[88px] overflow-hidden rounded-lg bg-white/5">
+                        <ListingMedia
+                          listing={item}
+                          className="w-full"
+                          aspectRatio="square"
+                          cardSize
+                          compactHeight="88px"
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="text-sm font-semibold text-white truncate">
+                          {item.title || formatListingId(item.id) || "Untitled"}
+                        </h3>
+                        <div className="mt-1 flex items-center gap-3 text-[11px] text-silver/70 flex-wrap">
+                          {item.category && (
+                            <span className="rounded-full bg-white/5 px-2 py-0.5 text-silver/80">
+                              {item.category}
+                            </span>
+                          )}
+                          {item.condition && (
+                            <span className="text-silver/60">{item.condition}</span>
+                          )}
+                          {item.seller && (
+                            <span className="font-mono text-silver/50">
+                              {formatSellerDisplay(item.seller)}
+                            </span>
+                          )}
+                          <span
+                            className={`rounded-full inline-flex items-center gap-1.5 border px-2 py-0.5 text-[9px] font-semibold ${badge.className}`}
+                          >
+                            {badge.pulseDot ? (
+                              <span className="inline-flex h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
+                            ) : null}
+                            {badge.label}
+                          </span>
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-base font-bold text-chrome">
+                          {formatHbarWithUsd(formatPriceForDisplay(item.price || "0"), usdRate)}
+                        </div>
+                      </div>
+                      <div className="text-right text-[11px] text-silver/70 leading-relaxed">
+                        {item.createdAt && (
+                          <div>Listed {relativeTimeShort(item.createdAt)} ago</div>
+                        )}
+                        {(item.watchlistCount ?? 0) > 0 && (
+                          <div className="text-silver/50">
+                            ♡ {item.watchlistCount} watching
+                          </div>
+                        )}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+
+            {viewMode === "editorial" && (
+              <div className="hidden sm:block space-y-6">
+                {(() => {
+                  const hero =
+                    filteredItems.find(
+                      (i) => normalizeListingStatus(i.status) === "LISTED",
+                    ) || filteredItems[0];
+                  const rest = filteredItems.filter((i) => i.id !== hero?.id);
+                  return (
+                    <>
+                      {hero && (
+                        <Link
+                          href={listingHref(hero.id)}
+                          className="block relative overflow-hidden rounded-2xl border border-white/10 group"
+                        >
+                          <div className="relative h-[280px] sm:h-[320px] bg-gradient-to-br from-[#1b2940] to-[#0b111b]">
+                            <ListingMedia
+                              listing={hero}
+                              className="absolute inset-0 w-full h-full"
+                              aspectRatio="video"
+                              cardSize
+                              compactHeight="320px"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+                          </div>
+                          <div className="absolute left-6 top-6">
+                            <span className="rounded-full bg-[#00ffa3] text-black text-[10px] font-bold tracking-widest px-3 py-1">
+                              EDITOR&apos;S PICK
+                            </span>
+                          </div>
+                          <div className="absolute left-6 right-6 bottom-6 max-w-2xl">
+                            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+                              {hero.title || formatListingId(hero.id) || "Featured listing"}
+                            </h2>
+                            {hero.subtitle && (
+                              <p className="mt-2 text-sm text-white/75 line-clamp-2">
+                                {hero.subtitle}
+                              </p>
+                            )}
+                            <div className="mt-4 flex items-center gap-3 flex-wrap">
+                              <span className="rounded-glass btn-frost-cta px-4 py-2 text-sm">
+                                Buy for{" "}
+                                {formatHbarWithUsd(
+                                  formatPriceForDisplay(hero.price || "0"),
+                                  usdRate,
+                                )}
+                              </span>
+                              {hero.seller && (
+                                <span className="text-xs font-mono text-white/60">
+                                  Seller {formatSellerDisplay(hero.seller)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </Link>
+                      )}
+                      <div>
+                        <div className="flex items-baseline justify-between mb-3">
+                          <h3 className="text-lg font-bold tracking-tight">Recently listed</h3>
+                          <span className="text-xs text-silver/60">
+                            {rest.length.toLocaleString()} more
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 auto-rows-[120px]">
+                          {rest.map((item, i) => {
+                            const tall = i % 5 === 1 || i % 5 === 4;
+                            const badge = getStatusBadge(item.status, item.onChainConfirmed);
+                            return (
+                              <Link
+                                key={`${item.itemType}-${item.id}`}
+                                href={listingHref(item.id)}
+                                className={`relative block overflow-hidden rounded-xl border border-white/10 group ${
+                                  tall ? "row-span-2" : ""
+                                }`}
+                                style={{ minHeight: tall ? 256 : 120 }}
+                              >
+                                <ListingMedia
+                                  listing={item}
+                                  className="absolute inset-0 w-full h-full"
+                                  aspectRatio="square"
+                                  cardSize
+                                  compactHeight={tall ? "256px" : "120px"}
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+                                <span
+                                  className={`absolute top-2 left-2 rounded-full inline-flex items-center gap-1.5 border px-2 py-0.5 text-[9px] font-semibold ${badge.className}`}
+                                >
+                                  {badge.pulseDot ? (
+                                    <span className="inline-flex h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
+                                  ) : null}
+                                  {badge.label}
+                                </span>
+                                <div className="absolute left-3 right-3 bottom-2 text-white">
+                                  <div className="text-xs font-semibold line-clamp-1">
+                                    {item.title || formatListingId(item.id) || "Untitled"}
+                                  </div>
+                                  <div className="flex items-baseline justify-between mt-0.5">
+                                    <span className="text-sm font-bold text-chrome">
+                                      {formatHbarWithUsd(
+                                        formatPriceForDisplay(item.price || "0"),
+                                        usdRate,
+                                      )}
+                                    </span>
+                                  </div>
+                                </div>
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            )}
           </>
         )}
       </div>
