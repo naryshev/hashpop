@@ -94,6 +94,20 @@ model User {
   refunds           Int      @default(0)
   timeouts          Int      @default(0)
   reputationScore   Int      @default(0)
+  displayName       String?
+  bio               String?
+  kycLegalName      String?
+  kycDateOfBirth    String?  // ISO date (YYYY-MM-DD)
+  kycCountry        String?  // ISO 3166-1 alpha-2
+  kycIdType         String?  // "passport" | "drivers_license" | "national_id"
+  kycIdNumber       String?
+  kycAddressLine1   String?
+  kycAddressLine2   String?
+  kycCity           String?
+  kycRegion         String?
+  kycPostalCode     String?
+  kycStatus         String   @default("UNVERIFIED") // UNVERIFIED | PENDING | VERIFIED | REJECTED
+  kycSubmittedAt    DateTime?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 }

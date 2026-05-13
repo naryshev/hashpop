@@ -247,12 +247,16 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
               <Bell className="h-4 w-4" />
             </Link>
             {effectiveConnected ? (
-              <div className="flex items-center gap-2 rounded-glass border border-white/10 bg-white/5 px-3 py-1.5 text-xs">
+              <Link
+                href={`/profile/${accountId ?? address ?? ""}`}
+                className="flex items-center gap-2 rounded-glass border border-white/10 bg-white/5 px-3 py-1.5 text-xs hover:bg-white/10"
+                aria-label="Open profile"
+              >
                 <Wallet className="h-3.5 w-3.5 text-chrome" />
                 <span className="font-mono text-white/80">
                   {shortAccount(accountId ?? address ?? "")}
                 </span>
-              </div>
+              </Link>
             ) : (
               <button
                 type="button"
