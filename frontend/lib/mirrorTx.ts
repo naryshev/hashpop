@@ -129,3 +129,99 @@ export function tinybarToHbar(tinybar: number | string | null | undefined): stri
   const fracStr = frac.toString().padStart(8, "0").replace(/0+$/, "");
   return fracStr ? `${sign}${whole}.${fracStr}` : `${sign}${whole}`;
 }
+
+// ─── Account-scoped tx history (for /activity + dashboard sparkline) ────────
+
+export type AccountTransfer = {
+  account: string;
+  amount: number; // tinybar
+  is_approval?: boolean;
+};
+
+export type AccountTransaction = {
+  transaction_id: string;
+  name?: string;
+  consensus_timestamp?: string;
+  result?: string;
+  charged_tx_fee?: number;
+  transfers?: AccountTransfer[];
+  entity_id?: string | null;
+};
+
+/**
+ * List recent transactions for an account, newest first. `limit` is per page;
+ * we follow `links.next` until we've collected `max` records or run out.
+ */
+export async function fetchAccountTransactions(
+  accountId: string,
+  {
+    max = 50,
+    pageSize = 50,
+    minTimestamp,
+    signal,
+  }: { max?: number; pageSize?: number; minTimestamp?: string; signal?: AbortSignal } = {},
+): Promise<AccountTransaction[]> {
+  const out: AccountTransaction[] = [];
+  let url: string | null =
+    `${mirrorBase()}/api/v1/transactions?account.id=${encodeURIComponent(accountId)}` +
+    `&order=desc&limit=${Math.min(pageSize, 100)}` +
+    (minTimestamp ? `&timestamp=gte:${minTimestamp}` : "");
+  while (url && out.length < max) {
+    const r: Response = await fetch(url, { signal });
+    if (!r.ok) break;
+    const data: { transactions?: AccountTransaction[]; links?: { next?: string | null } } =
+      await r.json();
+    if (data.transactions?.length) out.push(...data.transactions);
+    const next = data.links?.next;
+    url = next ? `${mirrorBase()}${next}` : null;
+  }
+  return out.slice(0, max);
+}
+
+/**
+ * Pick out this account's signed delta in a transaction. Positive = received,
+ * negative = sent. Returns 0 if the account doesn't appear in transfers.
+ */
+export function deltaForAccount(tx: AccountTransaction, accountId: string): number {
+  if (!tx.transfers) return 0;
+  let sum = 0;
+  for (const t of tx.transfers) {
+    if (t.account === accountId) sum += Number(t.amount) || 0;
+  }
+  return sum;
+}
+
+export type BalancePoint = { t: number; balance: number };
+
+/**
+ * Reconstruct a 30-day-ish balance series for an account, working backwards
+ * from the current tinybar balance by undoing each transaction's net delta.
+ * Returns oldest→newest points suitable for an SVG sparkline.
+ */
+export async function fetchBalanceSeries(
+  accountId: string,
+  currentBalanceTinybar: bigint,
+  days = 30,
+  signal?: AbortSignal,
+): Promise<BalancePoint[]> {
+  const sinceSec = Math.floor(Date.now() / 1000) - days * 86400;
+  const txs = await fetchAccountTransactions(accountId, {
+    max: 250,
+    pageSize: 100,
+    minTimestamp: `${sinceSec}.0`,
+    signal,
+  });
+  // txs are newest→oldest; iterate that way to walk balance backwards.
+  let bal = Number(currentBalanceTinybar);
+  const points: BalancePoint[] = [{ t: Date.now(), balance: bal }];
+  for (const tx of txs) {
+    const delta = deltaForAccount(tx, accountId);
+    bal -= delta;
+    const ts = consensusToDate(tx.consensus_timestamp)?.getTime();
+    if (ts) points.push({ t: ts, balance: bal });
+  }
+  // Anchor the left edge of the window so the chart spans the full range
+  // even when the account has been quiet.
+  points.push({ t: sinceSec * 1000, balance: bal });
+  return points.reverse(); // oldest → newest
+}

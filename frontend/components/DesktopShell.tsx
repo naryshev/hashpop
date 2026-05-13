@@ -240,9 +240,9 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
               data-topbar-slot="actions"
             />
             <Link
-              href="/messages"
+              href="/activity"
               className="flex h-9 w-9 items-center justify-center rounded-glass text-neutral-300 hover:bg-white/5 hover:text-white"
-              aria-label="Messages"
+              aria-label="Activity"
             >
               <Bell className="h-4 w-4" />
             </Link>
