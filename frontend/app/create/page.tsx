@@ -22,7 +22,13 @@ const ALLOWED_IMAGE_TYPES = "image/jpeg,image/jpg,image/png,image/gif,image/webp
 const ALLOWED_VIDEO_TYPES = "video/mp4,video/webm,video/quicktime";
 const ALLOWED_MEDIA_TYPES = `${ALLOWED_IMAGE_TYPES},${ALLOWED_VIDEO_TYPES}`;
 
-const CONDITIONS = ["Like new", "Used", "Refurbished", "For parts or repair"];
+const CONDITIONS: { label: string; desc: string }[] = [
+  { label: "New", desc: "Sealed or unused" },
+  { label: "Like new", desc: "Used briefly · no flaws" },
+  { label: "Used", desc: "Normal wear · works perfectly" },
+  { label: "Worn", desc: "Visible wear · functional" },
+  { label: "For parts", desc: "Damaged / incomplete" },
+];
 
 type MediaItem = {
   id: string;
@@ -366,26 +372,12 @@ function CreatePageContent() {
             form for unauthenticated visitors served no purpose and made the
             page sensitive to leaflet/wallet cleanup races on navigation. */}
         {walletConnected && (
-          <div className="glass-card p-6 space-y-4">
-          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
-            <p className="text-sm font-medium text-amber-200">Transaction fee (HBAR)</p>
-            <p className="text-sm text-silver mt-1">
-              Posting a listing costs HBAR to cover the network (gas) fee. There is no platform
-              fee—you only pay the Hedera network fee.
-            </p>
-            <p className="text-chrome font-medium mt-2">Estimated fee: ~0.01 – 0.05 HBAR</p>
-            <p className="text-xs text-silver mt-1">
-              The exact amount will be shown in your wallet when you confirm the transaction. Fees
-              can vary with network load.
-            </p>
-          </div>
-
-          <div className="block">
-            <span className="text-sm text-silver">Media (optional)</span>
-            <p className="text-xs text-silver mt-0.5">
-              Drag to reorder; drag an image to the top slot to set it as featured. Max 15MB per
-              file.
-            </p>
+          <div className="space-y-8 pb-28">
+          <section>
+            <SectionHeader
+              title="Photos"
+              sub="First image becomes the cover. Drag to reorder; max 15MB per file."
+            />
             <input
               ref={fileInputRef}
               type="file"
@@ -497,129 +489,179 @@ function CreatePageContent() {
               </div>
             </div>
             {mediaError && <p className="text-rose-400 text-xs mt-1">{mediaError}</p>}
-          </div>
+          </section>
 
-          <label className="block">
-            <span className="text-sm text-silver">
-              Price (HBAR) <span className="text-rose-400">*</span>
-            </span>
-            <input
-              type="number"
-              step="any"
-              min="0"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              className="input-frost mt-1 w-full"
-              placeholder="1.5"
-            />
-          </label>
+          <section>
+            <SectionHeader title="Basics" />
+            <div className="space-y-4">
+              <label className="block">
+                <span className="text-xs font-semibold text-white">
+                  Title <span className="text-chrome">*</span>
+                </span>
+                <input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="input-frost mt-1 w-full h-12 text-base font-semibold"
+                  placeholder="e.g. Vintage Polaroid SX-70 — restored bellows"
+                />
+              </label>
 
-          <label className="block">
-            <span className="text-sm text-silver">
-              Title <span className="text-rose-400">*</span>
-            </span>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="input-frost mt-1 w-full"
-              placeholder="—"
-            />
-          </label>
+              <label className="block">
+                <span className="text-xs font-semibold text-white">Subtitle</span>
+                <input
+                  value={subtitle}
+                  onChange={(e) => setSubtitle(e.target.value)}
+                  className="input-frost mt-1 w-full"
+                  placeholder="One-line teaser shown on cards"
+                />
+              </label>
 
-          <label className="block">
-            <span className="text-sm text-silver">Subtitle / short description</span>
-            <input
-              value={subtitle}
-              onChange={(e) => setSubtitle(e.target.value)}
-              className="input-frost mt-1 w-full"
-              placeholder="—"
-            />
-          </label>
+              <label className="block">
+                <span className="flex items-baseline justify-between text-xs font-semibold text-white">
+                  Description
+                  <span className="font-mono text-[10px] uppercase tracking-wide text-silver">
+                    Markdown supported
+                  </span>
+                </span>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="input-frost mt-1 w-full min-h-[100px] resize-y"
+                  placeholder="What makes it worth buying? Condition notes, what's included, any flaws."
+                />
+              </label>
 
-          <label className="block">
-            <span className="text-sm text-silver">Item description</span>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="input-frost mt-1 w-full min-h-[100px] resize-y"
-              placeholder="—"
-            />
-          </label>
-
-          <label className="block">
-            <span className="text-sm text-silver">
-              Category <span className="text-rose-400">*</span>
-            </span>
-            <CategorySearch
-              value={category}
-              onChange={setCategory}
-              placeholder="Search categories (e.g. watches, cars, software)…"
-            />
-          </label>
-
-          <label className="block">
-            <span className="text-sm text-silver">Condition</span>
-            <select
-              value={condition}
-              onChange={(e) => setCondition(e.target.value)}
-              className="input-frost mt-1 w-full"
-            >
-              <option value="">Select condition</option>
-              {CONDITIONS.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="block">
-            <span className="text-sm text-silver">Year of production</span>
-            <input
-              type="text"
-              value={yearOfProduction}
-              onChange={(e) => setYearOfProduction(e.target.value)}
-              className="input-frost mt-1 w-full"
-              placeholder="—"
-            />
-          </label>
-
-          <div className="block">
-            <span className="text-sm text-silver">Location (optional)</span>
-            <p className="text-xs text-silver/70 mt-0.5">
-              Show buyers roughly where the item is. Search a city or click the map to drop a pin.
-            </p>
-            <div className="mt-2">
-              <LocationPicker value={location} onChange={setLocation} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <label className="block">
+                  <span className="text-xs font-semibold text-white">
+                    Price <span className="text-chrome">*</span>
+                  </span>
+                  <div className="relative mt-1">
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={price}
+                      onChange={(e) => setPrice(e.target.value)}
+                      className="input-frost w-full h-12 text-lg font-semibold font-mono pr-12"
+                      placeholder="0"
+                    />
+                    <span className="absolute inset-y-0 right-3 flex items-center font-mono text-sm text-silver">
+                      ℏ
+                    </span>
+                  </div>
+                </label>
+                <label className="block">
+                  <span className="flex items-baseline justify-between text-xs font-semibold text-white">
+                    Year of production
+                    <span className="font-mono text-[10px] uppercase tracking-wide text-silver">
+                      Optional
+                    </span>
+                  </span>
+                  <input
+                    type="text"
+                    value={yearOfProduction}
+                    onChange={(e) => setYearOfProduction(e.target.value)}
+                    className="input-frost mt-1 w-full h-12"
+                    placeholder="e.g. 1973"
+                  />
+                </label>
+              </div>
             </div>
-          </div>
+          </section>
 
-          <label className="flex items-start gap-3 rounded-lg border border-white/10 bg-white/5 p-3">
-            <input
-              type="checkbox"
-              checked={requireEscrow}
-              onChange={(e) => setRequireEscrow(e.target.checked)}
-              className="mt-0.5"
+          <section>
+            <SectionHeader title="Category & condition" />
+            <div className="space-y-5">
+              <div>
+                <span className="text-xs font-semibold text-white">
+                  Category <span className="text-chrome">*</span>
+                </span>
+                <div className="mt-1">
+                  <CategorySearch
+                    value={category}
+                    onChange={setCategory}
+                    placeholder="Search categories (e.g. watches, cars, software)…"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <span className="text-xs font-semibold text-white">
+                  Condition <span className="text-chrome">*</span>
+                </span>
+                <div className="mt-2 grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  {CONDITIONS.map((c) => {
+                    const active = condition === c.label;
+                    return (
+                      <button
+                        key={c.label}
+                        type="button"
+                        onClick={() => setCondition(c.label)}
+                        className={`text-left rounded-lg px-2.5 py-2.5 border transition-colors ${
+                          active
+                            ? "bg-[#00ffa3]/10 border-[#00ffa3]/50 text-chrome shadow-[0_0_16px_rgba(0,255,163,0.15)]"
+                            : "bg-white/5 border-white/10 text-white hover:border-white/20"
+                        }`}
+                      >
+                        <div className="text-xs font-bold">{c.label}</div>
+                        <div className="text-[10px] text-silver leading-tight mt-1">{c.desc}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <SectionHeader
+              title="Location"
+              sub="Shown publicly only down to neighborhood. Search a city or click the map to drop a pin."
             />
-            <span className="text-sm text-silver">
-              <span className="text-white font-medium">Require escrow + shipping proof</span>
-              <br />
-              Enable this for shippable items. Buyer payment remains in escrow until seller provides
-              shipment proof and buyer confirms receipt.
-            </span>
-          </label>
+            <LocationPicker value={location} onChange={setLocation} />
+          </section>
 
-          {walletConnected ? (
+          <section>
+            <SectionHeader title="Shipping & escrow" />
             <button
-              onClick={handleSubmit}
-              disabled={isPending || !canSubmit}
-              className="btn-frost-cta w-full disabled:opacity-60 disabled:cursor-not-allowed"
+              type="button"
+              onClick={() => setRequireEscrow(!requireEscrow)}
+              className={`w-full flex items-center gap-3 rounded-lg px-3.5 py-3 text-left border transition-colors ${
+                requireEscrow
+                  ? "bg-[#00ffa3]/[0.04] border-[#00ffa3]/25"
+                  : "bg-white/5 border-white/10"
+              }`}
+              aria-pressed={requireEscrow}
             >
-              {isPending ? "Confirm in wallet…" : "Create listing"}
+              <div className="flex-1">
+                <div className="text-sm font-semibold text-white">
+                  Require shipping + on-chain escrow
+                </div>
+                <div className="text-xs text-silver mt-0.5 leading-snug">
+                  Funds lock in the marketplace contract until the buyer confirms receipt. Tracking
+                  is required before escrow releases.
+                </div>
+              </div>
+              <span
+                className={`shrink-0 inline-flex w-9 h-5 rounded-full relative transition-colors ${
+                  requireEscrow ? "bg-chrome" : "bg-white/15"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${
+                    requireEscrow ? "left-[18px]" : "left-0.5"
+                  }`}
+                />
+              </span>
             </button>
-          ) : (
-            <ConnectWalletButton className="btn-frost-cta w-full ring-2 ring-chrome/70 ring-offset-2 ring-offset-[var(--bg)] disabled:opacity-50 disabled:cursor-not-allowed" />
-          )}
+          </section>
+
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-silver">
+            Posting a listing costs HBAR for the Hedera network (gas) fee — there's no platform fee.
+            Estimated <span className="text-chrome font-medium">~0.01 – 0.05 ℏ</span>; your wallet
+            will show the exact amount.
+          </div>
 
           {listingSuccess && !(createdListingIdRef.current ?? createdListingId) && (
             <p className="text-emerald-400 text-sm">Listing created on-chain. Redirecting…</p>
@@ -641,7 +683,75 @@ function CreatePageContent() {
           </div>
         )}
       </div>
+
+      {walletConnected && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#0b111b]/95 backdrop-blur-xl">
+          <div className="mx-auto max-w-2xl px-4 sm:px-6 py-3 flex items-center gap-3">
+            <PublishStatus
+              title={title}
+              price={price}
+              category={category}
+              condition={condition}
+              hasMedia={mediaItems.length > 0}
+              hasLocation={!!location.city || (location.lat != null && location.lng != null)}
+            />
+            <span className="flex-1" />
+            <button
+              onClick={handleSubmit}
+              disabled={isPending || !canSubmit}
+              className="rounded-lg px-5 py-2.5 bg-chrome text-black text-sm font-bold shadow-[0_0_20px_rgba(0,255,163,0.35)] disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none"
+            >
+              {isPending ? "Confirm in wallet…" : "Publish listing →"}
+            </button>
+          </div>
+        </div>
+      )}
     </main>
+  );
+}
+
+function SectionHeader({ title, sub }: { title: string; sub?: string }) {
+  return (
+    <div className="mb-3.5">
+      <h2 className="text-xs font-extrabold uppercase tracking-[0.12em] text-white">{title}</h2>
+      {sub && <p className="mt-1 text-xs text-silver leading-snug">{sub}</p>}
+    </div>
+  );
+}
+
+function PublishStatus({
+  title,
+  price,
+  category,
+  condition,
+  hasMedia,
+  hasLocation,
+}: {
+  title: string;
+  price: string;
+  category: string;
+  condition: string;
+  hasMedia: boolean;
+  hasLocation: boolean;
+}) {
+  const checks = [
+    !!title.trim(),
+    !!price && Number(price) > 0,
+    !!category,
+    !!condition,
+    hasMedia,
+    hasLocation,
+  ];
+  const done = checks.filter(Boolean).length;
+  const total = checks.length;
+  const ready = done >= 4 && checks[0] && checks[1];
+  return (
+    <div className="text-xs text-silver">
+      <span className={ready ? "text-chrome font-semibold" : "text-white font-semibold"}>
+        {done} of {total}
+      </span>{" "}
+      fields complete{ready ? " · ready to publish" : ""}
+    </div>
   );
 }
 
