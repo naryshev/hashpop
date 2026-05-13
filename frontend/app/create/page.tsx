@@ -316,11 +316,10 @@ function CreatePageContent() {
   const canSubmit = !!title.trim() && !!price && Number(price) > 0;
 
   const featuredItem = mediaItems[0];
-  const additionalItems = mediaItems.slice(1);
 
   return (
     <main className="min-h-screen">
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-6 relative">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 relative">
         {listingSuccess && (createdListingIdRef.current ?? createdListingId) && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
             <div className="glass-card p-8 max-w-sm text-center space-y-6">
@@ -372,7 +371,8 @@ function CreatePageContent() {
             form for unauthenticated visitors served no purpose and made the
             page sensitive to leaflet/wallet cleanup races on navigation. */}
         {walletConnected && (
-          <div className="space-y-8 pb-28">
+          <div className="grid gap-8 lg:grid-cols-[1fr_360px] lg:gap-10">
+          <div className="space-y-8 min-w-0">
           <section>
             <SectionHeader
               title="Photos"
@@ -681,32 +681,191 @@ function CreatePageContent() {
             </div>
           )}
           </div>
-        )}
-      </div>
 
-      {walletConnected && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#0b111b]/95 backdrop-blur-xl">
-          <div className="mx-auto max-w-2xl px-4 sm:px-6 py-3 flex items-center gap-3">
-            <PublishStatus
+          <aside className="lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto space-y-4">
+            <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-silver">
+              Live preview
+            </div>
+            <ListingPreviewCard
               title={title}
               price={price}
               category={category}
               condition={condition}
+              location={location.city}
+              featuredItem={featuredItem}
+              account={address}
+              requireEscrow={requireEscrow}
+            />
+            <ListingHealth
+              title={title}
+              price={price}
+              description={description}
               hasMedia={mediaItems.length > 0}
               hasLocation={!!location.city || (location.lat != null && location.lng != null)}
+              mediaCount={mediaItems.length}
             />
-            <span className="flex-1" />
             <button
               onClick={handleSubmit}
               disabled={isPending || !canSubmit}
-              className="rounded-lg px-5 py-2.5 bg-chrome text-black text-sm font-bold shadow-[0_0_20px_rgba(0,255,163,0.35)] disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none"
+              className="w-full rounded-lg px-5 py-3 bg-chrome text-black text-sm font-bold shadow-[0_0_20px_rgba(0,255,163,0.35)] disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none"
             >
               {isPending ? "Confirm in wallet…" : "Publish listing →"}
             </button>
+          </aside>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </main>
+  );
+}
+
+function ListingPreviewCard({
+  title,
+  price,
+  category,
+  condition,
+  location,
+  featuredItem,
+  account,
+  requireEscrow,
+}: {
+  title: string;
+  price: string;
+  category: string;
+  condition: string;
+  location: string | null;
+  featuredItem: MediaItem | undefined;
+  account: string | null | undefined;
+  requireEscrow: boolean;
+}) {
+  const displayTitle = title.trim() || "Your listing title";
+  const displayPrice = price && Number(price) > 0 ? `${price} ℏ` : "— ℏ";
+  return (
+    <div className="rounded-2xl overflow-hidden bg-white/[0.03] border border-white/10">
+      <div className="relative h-48 bg-gradient-to-br from-[#3b3b56] to-[#1a1a2e] flex items-center justify-center text-5xl">
+        {featuredItem ? (
+          featuredItem.isVideo ? (
+            <video
+              src={featuredItem.previewUrl}
+              className="absolute inset-0 w-full h-full object-cover"
+              muted
+              playsInline
+            />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={featuredItem.previewUrl}
+              alt=""
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+          )
+        ) : (
+          <span aria-hidden>📷</span>
+        )}
+        <span className="absolute top-2.5 left-2.5 inline-flex items-center gap-1 rounded-full bg-chrome text-black px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+          <span className="w-1.5 h-1.5 rounded-full bg-black/80" />
+          Listed
+        </span>
+        {category && (
+          <span className="absolute top-2.5 right-2.5 inline-flex items-center rounded-full bg-black/55 text-white px-2.5 py-0.5 text-[10px] font-medium">
+            {category}
+          </span>
+        )}
+      </div>
+      <div className="p-3.5">
+        <div className="text-sm font-bold text-white leading-snug line-clamp-2">{displayTitle}</div>
+        <p className="text-[11px] font-mono text-silver mt-1 truncate">
+          by {account ? `${account.slice(0, 6)}…${account.slice(-4)}` : "you"} · ★ 5.0
+        </p>
+        <div className="flex items-baseline justify-between mt-2.5">
+          <span className="text-lg font-extrabold text-chrome">{displayPrice}</span>
+          <span className="text-[11px] font-mono text-silver truncate ml-2">{location || "—"}</span>
+        </div>
+        <div className="flex flex-wrap gap-1.5 mt-2.5">
+          {condition && (
+            <span className="rounded-full bg-white/5 text-silver px-2 py-0.5 text-[10px]">
+              {condition}
+            </span>
+          )}
+          {requireEscrow && (
+            <>
+              <span className="rounded-full bg-[#00ffa3]/10 text-chrome px-2 py-0.5 text-[10px]">
+                Escrow
+              </span>
+              <span className="rounded-full bg-[#00ffa3]/10 text-chrome px-2 py-0.5 text-[10px]">
+                + Ships
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ListingHealth({
+  title,
+  price,
+  description,
+  hasMedia,
+  hasLocation,
+  mediaCount,
+}: {
+  title: string;
+  price: string;
+  description: string;
+  hasMedia: boolean;
+  hasLocation: boolean;
+  mediaCount: number;
+}) {
+  const wordCount = description.trim().split(/\s+/).filter(Boolean).length;
+  const titleTrimmed = title.trim();
+  const checks: { label: string; ok: boolean; hint?: string }[] = [
+    {
+      label: `${mediaCount >= 3 ? "3+ photos" : "Add at least 3 photos"}`,
+      ok: mediaCount >= 3,
+      hint: hasMedia && mediaCount < 3 ? `${3 - mediaCount} more` : undefined,
+    },
+    {
+      label: "Title under 60 chars",
+      ok: titleTrimmed.length > 0 && titleTrimmed.length <= 60,
+      hint: titleTrimmed.length > 60 ? "Shorten it" : undefined,
+    },
+    {
+      label: "Price set",
+      ok: !!price && Number(price) > 0,
+    },
+    {
+      label: "Location pinned",
+      ok: hasLocation,
+    },
+    {
+      label: "Description ≥ 60 words",
+      ok: wordCount >= 60,
+      hint: wordCount > 0 && wordCount < 60 ? `Add ~${60 - wordCount} more words` : undefined,
+    },
+  ];
+  return (
+    <div className="rounded-xl border border-[#00ffa3]/20 bg-[#00ffa3]/[0.04] p-3.5">
+      <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-chrome mb-2">
+        Listing health
+      </div>
+      {checks.map((c) => (
+        <div key={c.label} className="flex items-center gap-2 py-1 text-xs">
+          <span
+            className={`shrink-0 w-3.5 h-3.5 rounded-full inline-flex items-center justify-center text-[9px] font-extrabold ${
+              c.ok ? "bg-chrome text-black" : "bg-white/8 text-transparent"
+            }`}
+          >
+            ✓
+          </span>
+          <span className={`flex-1 ${c.ok ? "text-white" : "text-silver"}`}>{c.label}</span>
+          {c.hint && (
+            <span className="font-mono text-[10px] text-amber-300">{c.hint}</span>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -719,41 +878,6 @@ function SectionHeader({ title, sub }: { title: string; sub?: string }) {
   );
 }
 
-function PublishStatus({
-  title,
-  price,
-  category,
-  condition,
-  hasMedia,
-  hasLocation,
-}: {
-  title: string;
-  price: string;
-  category: string;
-  condition: string;
-  hasMedia: boolean;
-  hasLocation: boolean;
-}) {
-  const checks = [
-    !!title.trim(),
-    !!price && Number(price) > 0,
-    !!category,
-    !!condition,
-    hasMedia,
-    hasLocation,
-  ];
-  const done = checks.filter(Boolean).length;
-  const total = checks.length;
-  const ready = done >= 4 && checks[0] && checks[1];
-  return (
-    <div className="text-xs text-silver">
-      <span className={ready ? "text-chrome font-semibold" : "text-white font-semibold"}>
-        {done} of {total}
-      </span>{" "}
-      fields complete{ready ? " · ready to publish" : ""}
-    </div>
-  );
-}
 
 export default function CreatePage() {
   return (
