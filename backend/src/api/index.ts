@@ -2338,6 +2338,108 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     }
   });
 
+  router.get("/user/:address/profile", async (req, res) => {
+    try {
+      const addrLower = req.params.address.toLowerCase();
+      const u = await prisma.user.findUnique({ where: { address: addrLower } });
+      if (!u) {
+        return res.json({
+          address: addrLower,
+          displayName: null,
+          bio: null,
+          kyc: { status: "UNVERIFIED" },
+        });
+      }
+      res.json({
+        address: u.address,
+        displayName: u.displayName,
+        bio: u.bio,
+        kyc: {
+          status: u.kycStatus ?? "UNVERIFIED",
+          submittedAt: u.kycSubmittedAt,
+          legalName: u.kycLegalName,
+          dateOfBirth: u.kycDateOfBirth,
+          country: u.kycCountry,
+          idType: u.kycIdType,
+          idNumber: u.kycIdNumber,
+          addressLine1: u.kycAddressLine1,
+          addressLine2: u.kycAddressLine2,
+          city: u.kycCity,
+          region: u.kycRegion,
+          postalCode: u.kycPostalCode,
+        },
+      });
+    } catch (err) {
+      log.error({ err }, "Failed to fetch profile");
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  router.patch("/user/:address/profile", async (req, res) => {
+    try {
+      const addrLower = req.params.address.toLowerCase();
+      const body = req.body ?? {};
+      const trim = (v: unknown): string | null => {
+        if (typeof v !== "string") return null;
+        const t = v.trim();
+        return t.length === 0 ? null : t.slice(0, 500);
+      };
+      const kyc = (body.kyc ?? {}) as Record<string, unknown>;
+      const newKycFields = {
+        kycLegalName: trim(kyc.legalName),
+        kycDateOfBirth: trim(kyc.dateOfBirth),
+        kycCountry: trim(kyc.country),
+        kycIdType: trim(kyc.idType),
+        kycIdNumber: trim(kyc.idNumber),
+        kycAddressLine1: trim(kyc.addressLine1),
+        kycAddressLine2: trim(kyc.addressLine2),
+        kycCity: trim(kyc.city),
+        kycRegion: trim(kyc.region),
+        kycPostalCode: trim(kyc.postalCode),
+      };
+      // If any meaningful KYC field is set we move to PENDING; otherwise stay UNVERIFIED.
+      const hasAnyKyc = Object.values(newKycFields).some((v) => v !== null);
+      const status = hasAnyKyc ? "PENDING" : "UNVERIFIED";
+
+      const data = {
+        ...newKycFields,
+        displayName: trim(body.displayName),
+        bio: trim(body.bio),
+        kycStatus: status,
+        kycSubmittedAt: hasAnyKyc ? new Date() : null,
+      };
+
+      const u = await prisma.user.upsert({
+        where: { address: addrLower },
+        create: { id: addrLower, address: addrLower, ...data },
+        update: data,
+      });
+
+      res.json({
+        address: u.address,
+        displayName: u.displayName,
+        bio: u.bio,
+        kyc: {
+          status: u.kycStatus,
+          submittedAt: u.kycSubmittedAt,
+          legalName: u.kycLegalName,
+          dateOfBirth: u.kycDateOfBirth,
+          country: u.kycCountry,
+          idType: u.kycIdType,
+          idNumber: u.kycIdNumber,
+          addressLine1: u.kycAddressLine1,
+          addressLine2: u.kycAddressLine2,
+          city: u.kycCity,
+          region: u.kycRegion,
+          postalCode: u.kycPostalCode,
+        },
+      });
+    } catch (err) {
+      log.error({ err }, "Failed to update profile");
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   router.get("/debug/mirror-logs", async (req, res) => {
     const marketplaceAddress = process.env.MARKETPLACE_ADDRESS;
     const auctionHouseAddress = process.env.AUCTION_HOUSE_ADDRESS;

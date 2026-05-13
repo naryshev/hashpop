@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 const links = [
-  { href: "/messages", label: "Alerts", icon: "bell" },
+  { href: "/activity", label: "Alerts", icon: "bell" },
   { href: "/marketplace", label: "Search", icon: "search" },
   { href: "/dashboard", label: "My Hashpop", icon: "dashboard" },
   { href: "/selling", label: "Selling", icon: "sell" },
@@ -13,7 +13,7 @@ const links = [
 
 const signInLinks = [
   { href: "/dashboard", label: "My Hashpop", icon: "dashboard" },
-  { href: "/messages", label: "Alerts", icon: "bell" },
+  { href: "/activity", label: "Alerts", icon: "bell" },
 ];
 
 function Icon({ name }: { name: string }) {

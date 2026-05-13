@@ -1,7 +1,7 @@
 "use client";
 import { listingHref } from "../../lib/listingUrl";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { MessageSquare, ChevronDown, ChevronUp } from "lucide-react";
 import { formatPriceForDisplay } from "../../lib/formatPrice";
@@ -10,6 +10,14 @@ import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { formatListingDate } from "../../lib/formatDate";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
 import { getApiUrl } from "../../lib/apiUrl";
+import {
+  BalancePoint,
+  consensusToDate,
+  fetchAccountTransactions,
+  fetchBalanceSeries,
+  AccountTransaction,
+} from "../../lib/mirrorTx";
+import { Sparkline } from "../../components/dashboard/Sparkline";
 
 function formatListingId(id: string): string {
   if (!id || !id.startsWith("0x") || id.length !== 66) return id;
@@ -204,8 +212,86 @@ function SoldItemCard({
   );
 }
 
+type Period = "7D" | "30D" | "90D" | "1Y";
+const PERIOD_DAYS: Record<Period, number> = { "7D": 7, "30D": 30, "90D": 90, "1Y": 365 };
+
+function tinybarToHbarNum(tb: bigint | number | null | undefined): number {
+  if (tb == null) return 0;
+  const big = typeof tb === "bigint" ? tb : BigInt(Math.trunc(Number(tb)));
+  // 1 HBAR = 1e8 tinybar — display as a JS number; precision is fine for KPI.
+  const whole = Number(big / 100000000n);
+  const frac = Number(big % 100000000n) / 1e8;
+  return whole + frac;
+}
+
+function KPICard({
+  label,
+  value,
+  unit,
+  sub,
+  accent,
+}: {
+  label: string;
+  value: string;
+  unit?: string;
+  sub?: string;
+  accent: string;
+}) {
+  return (
+    <div className="rounded-glass-lg border border-white/10 bg-[#0e1422] p-[18px]">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-silver">
+        {label}
+      </div>
+      <div
+        className="mt-2.5 text-[32px] font-extrabold tracking-[-0.02em] leading-none"
+        style={{ color: accent }}
+      >
+        {value}
+        {unit ? <span className="ml-1 text-lg">{unit}</span> : null}
+      </div>
+      {sub ? <div className="mt-1.5 text-[11px] text-silver">{sub}</div> : null}
+    </div>
+  );
+}
+
+function activityLabel(tx: AccountTransaction, accountId: string): string {
+  const me = accountId;
+  const transfers = tx.transfers ?? [];
+  const myDelta = transfers
+    .filter((t) => t.account === me)
+    .reduce((a, b) => a + Number(b.amount), 0);
+  const name = (tx.name ?? "").replace(/_/g, " ").toLowerCase();
+  if (name === "contractcall") {
+    return `Contract call · ${tx.entity_id ?? "—"}`;
+  }
+  if (name === "cryptotransfer") {
+    if (myDelta > 0) return `Received ${(myDelta / 1e8).toLocaleString()} ℏ`;
+    if (myDelta < 0) return `Sent ${(Math.abs(myDelta) / 1e8).toLocaleString()} ℏ`;
+    return "Crypto transfer";
+  }
+  return name.replace(/\b\w/g, (c) => c.toUpperCase()) || "Activity";
+}
+
+function activityTone(tx: AccountTransaction, accountId: string): string {
+  const delta = (tx.transfers ?? [])
+    .filter((t) => t.account === accountId)
+    .reduce((a, b) => a + Number(b.amount), 0);
+  if (delta > 0) return "#00ffa3";
+  if (delta < 0) return "#fbbf24";
+  return "#a78bfa";
+}
+
+function timeAgo(d: Date | null): string {
+  if (!d) return "";
+  const s = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h`;
+  return `${Math.floor(s / 86400)}d`;
+}
+
 export default function DashboardPage() {
-  const { address, accountId, disconnect } = useHashpackWallet();
+  const { address, accountId, disconnect, balanceTinybar } = useHashpackWallet();
   const [mounted, setMounted] = useState(false);
   const [stats, setStats] = useState<any>(null);
   const [activeListings, setActiveListings] = useState<any[]>([]);
@@ -219,9 +305,47 @@ export default function DashboardPage() {
     sent: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState<Period>("30D");
+  const [series, setSeries] = useState<BalancePoint[]>([]);
+  const [recent, setRecent] = useState<AccountTransaction[]>([]);
+  const [escrowTinybar, setEscrowTinybar] = useState<number>(0);
   const usdRate = useHbarUsd();
 
   useEffect(() => setMounted(true), []);
+
+  // 30-day wallet series, reconstructed from Mirror tx history.
+  useEffect(() => {
+    if (!accountId || balanceTinybar == null) {
+      setSeries([]);
+      return;
+    }
+    const ac = new AbortController();
+    fetchBalanceSeries(accountId, balanceTinybar, PERIOD_DAYS[period], ac.signal)
+      .then((pts) => {
+        if (!ac.signal.aborted) setSeries(pts);
+      })
+      .catch(() => {
+        if (!ac.signal.aborted) setSeries([]);
+      });
+    return () => ac.abort();
+  }, [accountId, balanceTinybar, period]);
+
+  // Recent activity ticker (top 5).
+  useEffect(() => {
+    if (!accountId) {
+      setRecent([]);
+      return;
+    }
+    const ac = new AbortController();
+    fetchAccountTransactions(accountId, { max: 5, pageSize: 10, signal: ac.signal })
+      .then((txs) => {
+        if (!ac.signal.aborted) setRecent(txs);
+      })
+      .catch(() => {
+        if (!ac.signal.aborted) setRecent([]);
+      });
+    return () => ac.abort();
+  }, [accountId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -280,17 +404,47 @@ export default function DashboardPage() {
         }),
       fetch(`${getApiUrl()}/api/user/${address}/purchases`)
         .then((res) => (res.ok ? res.json() : Promise.reject(res)))
-        .then((data: { purchases?: SaleItem[] }) => {
-          if (!cancelled) {
-            const all = data.purchases ?? [];
-            setPurchaseCount(all.filter((s) => s.role === "buyer").length);
-            setSoldItems(all.filter((s) => s.role === "seller"));
-          }
+        .then(async (data: { purchases?: SaleItem[] & { listingId?: string }[] }) => {
+          if (cancelled) return;
+          const all = data.purchases ?? [];
+          setPurchaseCount(all.filter((s) => s.role === "buyer").length);
+          setSoldItems(all.filter((s) => s.role === "seller"));
+          // Sum on-chain escrow amounts for any non-COMPLETE escrow this user
+          // is party to. These are the funds "in flight" — the KPI hero card.
+          const ids = Array.from(
+            new Set(
+              all
+                .map((r) => (r as unknown as { listingId?: string | null }).listingId)
+                .filter((x): x is string => !!x),
+            ),
+          );
+          let total = 0;
+          await Promise.allSettled(
+            ids.map((lid) =>
+              fetch(`${getApiUrl()}/api/escrow/${encodeURIComponent(lid)}`)
+                .then((r) => (r.ok ? r.json() : null))
+                .then((e: { state?: string; amount?: string } | null) => {
+                  if (!e || e.state === "COMPLETE" || !e.amount) return;
+                  // amount is stored as tinybar (current) or wei (legacy) — we
+                  // accumulate in tinybar; wei amounts are ~1e10× larger so we
+                  // detect and rescale.
+                  try {
+                    const n = BigInt(e.amount);
+                    const tb = n >= 10n ** 15n ? Number(n / 10n ** 10n) : Number(n);
+                    total += tb;
+                  } catch {
+                    /* skip */
+                  }
+                }),
+            ),
+          );
+          if (!cancelled) setEscrowTinybar(total);
         })
         .catch(() => {
           if (!cancelled) {
             setPurchaseCount(0);
             setSoldItems([]);
+            setEscrowTinybar(0);
           }
         }),
       fetch(`${getApiUrl()}/api/user/${address}/offers`)
@@ -335,42 +489,126 @@ export default function DashboardPage() {
             <p className="text-silver">Please connect your wallet to see your dashboard.</p>
           ) : (
             <>
-              {/* Stats */}
-              <div className="grid gap-4 md:grid-cols-4">
-                <div className="glass-card p-4 rounded-xl">
-                  <p className="text-sm text-silver">Sales</p>
-                  <p className="text-2xl font-semibold text-white mt-1">{stats?.totalSales ?? 0}</p>
+              {/* Greeting */}
+              <div className="flex items-baseline justify-between">
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-silver">
+                    Welcome back
+                  </div>
+                  <h1 className="mt-1 text-[28px] font-extrabold tracking-[-0.01em] text-white">
+                    {accountId ? `@${accountId}` : "My Hashpop"}
+                  </h1>
                 </div>
-                <div className="glass-card p-4 rounded-xl">
-                  <p className="text-sm text-silver">Listings</p>
-                  <p className="text-2xl font-semibold text-white mt-1">
-                    {stats?.activeListings ?? 0}
-                  </p>
-                </div>
-                <div className="glass-card p-4 rounded-xl">
-                  <p className="text-sm text-silver">Purchases</p>
-                  <p className="text-2xl font-semibold text-white mt-1">{purchaseCount}</p>
+                <div className="flex gap-2">
+                  <Link
+                    href="/create"
+                    className="rounded-full bg-[linear-gradient(110deg,#00b37a_0%,#00ffa3_50%,#00e5ff_100%)] px-3.5 py-2 text-xs font-bold text-black shadow-glow"
+                  >
+                    + List item
+                  </Link>
                   <Link
                     href="/purchases"
-                    className="text-xs text-chrome hover:text-white mt-1 inline-block"
+                    className="rounded-full border border-white/10 px-3.5 py-2 text-xs text-white hover:bg-white/5"
                   >
-                    View purchases
+                    Purchases
                   </Link>
                 </div>
-                <div className="glass-card p-4 rounded-xl">
-                  <p className="text-sm text-silver">Offers</p>
-                  <p className="text-2xl font-semibold text-white mt-1">
-                    {offerCounts.received + offerCounts.sent}
-                  </p>
-                  <p className="text-xs text-silver/70 mt-0.5">
-                    {offerCounts.received} received · {offerCounts.sent} sent
-                  </p>
-                  <Link
-                    href="/offers"
-                    className="text-xs text-chrome hover:text-white mt-1 inline-block"
-                  >
-                    View offers
-                  </Link>
+              </div>
+
+              {/* KPI cards */}
+              <div className="grid gap-3.5 md:grid-cols-4">
+                <KPICard
+                  label="Wallet balance"
+                  value={Math.round(tinybarToHbarNum(balanceTinybar)).toLocaleString()}
+                  unit="ℏ"
+                  sub={
+                    balanceTinybar != null && usdRate
+                      ? `≈ $${Math.round(tinybarToHbarNum(balanceTinybar) * usdRate).toLocaleString()} USD`
+                      : "Connect wallet to view"
+                  }
+                  accent="#00ffa3"
+                />
+                <KPICard
+                  label="In escrow"
+                  value={Math.round(escrowTinybar / 1e8).toLocaleString()}
+                  unit="ℏ"
+                  sub={`${purchaseCount + soldItems.length} active orders`}
+                  accent="#fbbf24"
+                />
+                <KPICard
+                  label="Trades"
+                  value={String((stats?.totalSales ?? 0) + purchaseCount)}
+                  sub={`${stats?.totalSales ?? 0} sold · ${purchaseCount} bought`}
+                  accent="#00e5ff"
+                />
+                <KPICard
+                  label="Avg rating"
+                  value={Number(stats?.ratingAverage ?? 0).toFixed(1)}
+                  unit="★"
+                  sub={`${stats?.ratingCount ?? 0} ratings`}
+                  accent="#a78bfa"
+                />
+              </div>
+
+              {/* Wallet sparkline + Recent activity ticker */}
+              <div className="grid gap-3.5 md:grid-cols-[1.6fr_1fr]">
+                <div className="rounded-glass-lg border border-white/10 bg-[#0e1422] p-[18px]">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="text-[12px] font-semibold uppercase tracking-[0.12em] text-silver">
+                      Wallet · {period.toLowerCase()}
+                    </div>
+                    <div className="flex gap-1">
+                      {(["7D", "30D", "90D", "1Y"] as const).map((p) => (
+                        <button
+                          key={p}
+                          onClick={() => setPeriod(p)}
+                          className={`rounded-md px-2.5 py-1 text-[10px] font-semibold ${
+                            p === period
+                              ? "bg-chrome/10 text-chrome"
+                              : "text-silver hover:text-white"
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <Sparkline points={series} height={140} />
+                </div>
+                <div className="rounded-glass-lg border border-white/10 bg-[#0e1422] p-[18px]">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="text-[12px] font-semibold uppercase tracking-[0.12em] text-silver">
+                      Recent
+                    </div>
+                    <Link href="/activity" className="text-[11px] text-chrome hover:text-white">
+                      View all
+                    </Link>
+                  </div>
+                  {recent.length === 0 ? (
+                    <p className="text-sm text-silver">No on-chain activity yet.</p>
+                  ) : (
+                    <ul className="space-y-1.5">
+                      {recent.map((tx) => (
+                        <li
+                          key={tx.transaction_id}
+                          className="flex items-center gap-2.5 text-[12px]"
+                        >
+                          <span
+                            className="h-1.5 w-1.5 shrink-0 rounded-full"
+                            style={{
+                              background: activityTone(tx, accountId ?? ""),
+                            }}
+                          />
+                          <span className="flex-1 truncate text-white">
+                            {activityLabel(tx, accountId ?? "")}
+                          </span>
+                          <span className="font-mono text-[11px] text-silver">
+                            {timeAgo(consensusToDate(tx.consensus_timestamp))}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               </div>
 
