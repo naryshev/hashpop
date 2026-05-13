@@ -658,7 +658,7 @@ function CreatePageContent() {
           </section>
 
           <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-silver">
-            Posting a listing costs HBAR for the Hedera network (gas) fee — there's no platform fee.
+            Posting a listing costs HBAR for the Hedera network (gas) fee — no platform fee.
             Estimated <span className="text-chrome font-medium">~0.01 – 0.05 ℏ</span>; your wallet
             will show the exact amount.
           </div>
