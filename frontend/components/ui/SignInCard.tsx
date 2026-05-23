@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Wallet, Copy, Check, QrCode, ChevronUp } from "lucide-react";
+import { Wallet, Copy, Check, QrCode, ChevronUp, AlertTriangle, ArrowRight } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useHashpackWallet, buildHashPackDeepLink } from "../../lib/hashpackWallet";
 
@@ -16,7 +16,8 @@ type SignInCardProps = {
  * and inside RequireWalletModal so both surfaces share connection logic.
  */
 export function SignInCard({ onConnected, className }: SignInCardProps) {
-  const { connect, isConnecting, isReady, error, isConnected, pairingUri } = useHashpackWallet();
+  const { connect, isConnecting, isReady, error, isConnected, notDetected, pairingUri } =
+    useHashpackWallet();
   const lastPressAtRef = useRef(0);
   const [deepLinkFired, setDeepLinkFired] = useState(false);
   const [showQr, setShowQr] = useState(false);
@@ -88,6 +89,40 @@ export function SignInCard({ onConnected, className }: SignInCardProps) {
         <Wallet size={18} />
         {buttonLabel}
       </button>
+
+      {notDetected && !isConnecting && !isConnected && (
+        <div className="mt-4 rounded-2xl border border-amber-400/30 bg-amber-400/[0.06] p-4">
+          <p className="flex items-center gap-2 text-sm font-semibold text-amber-200">
+            <AlertTriangle size={15} />
+            HashPack not detected
+          </p>
+          <p className="mt-1 text-xs text-slate-300/90">
+            We couldn&apos;t reach a HashPack wallet. Install the extension, or pair from your phone
+            with a QR code.
+          </p>
+          <div className="mt-3 flex flex-col gap-2">
+            <a
+              href="https://www.hashpack.app/download"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-amber-300/40 bg-amber-400/10 px-4 py-2.5 text-xs font-semibold text-amber-100 transition hover:bg-amber-400/20"
+            >
+              Install HashPack
+              <ArrowRight size={13} />
+            </a>
+            {pairingUri && (
+              <button
+                type="button"
+                onClick={() => setShowQr(true)}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-medium text-slate-300 transition hover:bg-white/10 hover:text-white"
+              >
+                <QrCode size={13} />
+                Connect via QR code instead
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {deepLinkFired && isConnecting && (
         <p className="mt-3 text-center text-xs text-slate-300/80">

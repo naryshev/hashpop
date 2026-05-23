@@ -15,6 +15,7 @@ import {
   UserCircle,
   Tag,
   Receipt,
+  LayoutGrid,
 } from "lucide-react";
 import { Sidebar, SidebarBody, SidebarLink } from "./ui/sidebar";
 import { cn } from "../lib/utils";
@@ -62,6 +63,11 @@ export function AppSidebar({
         label: "Marketplace",
         href: "/marketplace",
         icon: <Store className="h-5 w-5 flex-shrink-0" />,
+      },
+      {
+        label: "Categories",
+        href: "/categories",
+        icon: <LayoutGrid className="h-5 w-5 flex-shrink-0" />,
       },
       ...(effectiveConnected
         ? [

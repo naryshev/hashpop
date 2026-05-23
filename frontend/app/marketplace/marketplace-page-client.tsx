@@ -592,6 +592,11 @@ export default function MarketplacePageClient({
                     <h2 className="text-sm font-semibold text-white line-clamp-2 leading-tight">
                       {item.title || formatListingId(item.id) || "Untitled"}
                     </h2>
+                    {item.category && (
+                      <span className="mt-1 inline-flex rounded-full bg-white/5 px-2 py-0.5 text-[9px] text-silver/80">
+                        {canonicalizeCategory(item.category)}
+                      </span>
+                    )}
                     {item.seller && (
                       <p className="text-silver/50 text-[10px] mt-1 font-mono truncate">
                         {formatSellerDisplay(item.seller)}
@@ -705,6 +710,11 @@ export default function MarketplacePageClient({
                       <h2 className="text-base font-semibold text-white line-clamp-2 leading-snug">
                         {item.title || formatListingId(item.id) || "Untitled"}
                       </h2>
+                      {item.category && (
+                        <span className="mt-1.5 inline-flex rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-silver/80">
+                          {canonicalizeCategory(item.category)}
+                        </span>
+                      )}
                       {item.seller && (
                         <p className="text-silver/50 text-[11px] mt-1 font-mono truncate">
                           {formatSellerDisplay(item.seller)}
