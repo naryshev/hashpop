@@ -1386,6 +1386,12 @@ export default function ListingPage() {
               />
             )}
             {listing && isListed && !isSeller && (
+              <p className="text-[11px] text-silver/60">
+                You pay in HBAR. Any USD figure shown is approximate and updates with the live HBAR
+                price.
+              </p>
+            )}
+            {listing && isListed && !isSeller && (
               <BuyButton
                 listingId={listing.id}
                 price={listing.price}

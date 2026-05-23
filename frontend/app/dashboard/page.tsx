@@ -18,6 +18,7 @@ import {
   AccountTransaction,
 } from "../../lib/mirrorTx";
 import { Sparkline } from "../../components/dashboard/Sparkline";
+import { OnboardingChecklist } from "../../components/OnboardingChecklist";
 
 function formatListingId(id: string): string {
   if (!id || !id.startsWith("0x") || id.length !== 66) return id;
@@ -514,6 +515,13 @@ export default function DashboardPage() {
                   </Link>
                 </div>
               </div>
+
+              {/* Onboarding checklist — only for brand-new users. */}
+              <OnboardingChecklist
+                address={address}
+                hasListings={activeListings.length > 0}
+                hasTrades={(stats?.totalSales ?? 0) + purchaseCount > 0}
+              />
 
               {/* KPI cards */}
               <div className="grid gap-3.5 md:grid-cols-4">

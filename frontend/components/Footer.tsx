@@ -12,6 +12,10 @@ export function Footer() {
           at your own risk. This is not financial or legal advice. We do not guarantee security,
           uptime, or any particular outcome.
         </p>
+        <p className="text-xs text-silver/70 max-w-2xl mb-4">
+          USD values are approximate, based on the current HBAR price and updated as it fluctuates.
+          All payments are made in HBAR.
+        </p>
         <div className="flex flex-wrap items-center justify-between gap-y-2">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
             <Link href="/terms" className="text-chrome hover:text-white">
