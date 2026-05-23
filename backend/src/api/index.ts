@@ -1492,6 +1492,68 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     }
   });
 
+  // Open a dispute on an escrow transaction. Records the dispute (freezing the
+  // order in the UI), notifies the counterparty in their message thread, and
+  // returns so the client can route the structured ticket to Discord support.
+  router.post("/listing/:id/dispute", async (req, res) => {
+    try {
+      const rawId = req.params.id ?? "";
+      const id =
+        rawId.startsWith("0x") && rawId.length === 66
+          ? normalizeListingId(rawId)
+          : listingIdToBytes32(rawId);
+      const { openerAddress, reason } = (req.body || {}) as {
+        openerAddress?: string;
+        reason?: string;
+      };
+      const opener = (openerAddress || "").trim().toLowerCase();
+      if (!opener) return res.status(400).json({ error: "openerAddress is required" });
+      const reasonText = typeof reason === "string" ? reason.trim().slice(0, 1000) : "";
+      if (reasonText.length < 5) {
+        return res.status(400).json({ error: "Please describe the issue (at least 5 characters)." });
+      }
+
+      const listing = await prisma.listing.findUnique({ where: { id } });
+      if (!listing) return res.status(404).json({ error: "Listing not found" });
+      const buyer = (listing.buyer || "").toLowerCase();
+      const seller = (listing.seller || "").toLowerCase();
+      if (opener !== buyer && opener !== seller) {
+        return res.status(403).json({ error: "Only the buyer or seller can open a dispute." });
+      }
+      if ((listing as any).disputeStatus === "OPEN") {
+        return res.status(409).json({ error: "A dispute is already open for this transaction." });
+      }
+
+      const updated = await prisma.listing.update({
+        where: { id },
+        data: {
+          disputeStatus: "OPEN",
+          disputeReason: reasonText,
+          disputeOpenedBy: opener,
+          disputeOpenedAt: new Date(),
+        },
+      });
+
+      const counterparty = opener === buyer ? seller : buyer;
+      if (counterparty) {
+        await prisma.message.create({
+          data: {
+            fromAddress: opener,
+            toAddress: counterparty,
+            listingId: id,
+            encrypted: false,
+            body: `⚠️ A dispute was opened for "${listing.title ?? id}". Reason: ${reasonText} — escrow is frozen pending review. Please respond here or open a ticket in the Hashpop Discord.`,
+          },
+        });
+      }
+
+      return res.json({ ok: true, disputeStatus: updated.disputeStatus });
+    } catch (err) {
+      log.error({ err }, "Failed to open dispute");
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   /**
    * GET /api/escrow/:listingId — read escrow state from chain (buyer, seller, amount, state, timeoutAt).
    * State: 0 = AWAITING_SHIPMENT, 1 = AWAITING_CONFIRMATION, 2 = COMPLETE.
@@ -1864,6 +1926,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
                 trackingCarrier: (s.listing as any).trackingCarrier ?? null,
                 shippedAt: (s.listing as any).shippedAt ?? null,
                 exchangeConfirmedAt: (s.listing as any).exchangeConfirmedAt ?? null,
+                disputeStatus: (s.listing as any).disputeStatus ?? null,
               }
             : null,
           auction: s.auction

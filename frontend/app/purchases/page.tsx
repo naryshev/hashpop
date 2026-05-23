@@ -13,6 +13,8 @@ import { getApiUrl } from "../../lib/apiUrl";
 import { AddressDisplay } from "../../components/AddressDisplay";
 import { ConnectWalletButton } from "../../components/ConnectWalletButton";
 import { RateCounterpartyModal } from "../../components/RateCounterpartyModal";
+import { OpenDisputeModal } from "../../components/OpenDisputeModal";
+import { carrierTrackingUrl } from "../../lib/trackingUrl";
 
 type PurchaseRow = {
   id: string;
@@ -34,6 +36,7 @@ type PurchaseRow = {
     trackingCarrier?: string | null;
     shippedAt?: string | null;
     exchangeConfirmedAt?: string | null;
+    disputeStatus?: string | null;
   } | null;
   auction?: { id: string; title?: string | null; status?: string; imageUrl?: string | null } | null;
 };
@@ -161,6 +164,8 @@ export default function PurchasesPage() {
     ratedAddress: string;
     role: "seller" | "buyer";
   } | null>(null);
+  const [dispute, setDispute] = useState<{ listingId: string; title: string } | null>(null);
+  const [disputedIds, setDisputedIds] = useState<Set<string>>(new Set());
 
   const ratedKey = address ? `hashpop.rated.${address.toLowerCase()}` : null;
   useEffect(() => {
@@ -322,6 +327,14 @@ export default function PurchasesPage() {
                   const thumb = row.listing?.imageUrl || row.auction?.imageUrl || null;
                   const step = stepFor(row);
                   const counterpartyAddr = row.role === "buyer" ? row.seller : row.buyer;
+                  const disputed =
+                    row.listing?.disputeStatus === "OPEN" ||
+                    (!!row.listingId && disputedIds.has(row.listingId));
+                  const canDispute =
+                    step.isEscrow &&
+                    !disputed &&
+                    step.state === "AWAITING_CONFIRMATION" &&
+                    !!row.listingId;
                   // Per-order detail screen (matches Mobile Order & Escrow design handoff).
                   const detailHref = row.listingId
                     ? `/purchases/${encodeListingIdForUrl(row.listingId)}`
@@ -413,7 +426,7 @@ export default function PurchasesPage() {
                             </p>
                             <p className="mt-0.5 text-xs text-silver/80">{step.detail}</p>
                           </div>
-                          {step.cta && (
+                          {step.cta && !disputed && (
                             <Link
                               href={step.cta.href}
                               className="shrink-0 rounded-glass border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/15"
@@ -424,11 +437,71 @@ export default function PurchasesPage() {
                         </div>
                       </div>
 
+                      {/* Tracking link — once a tracking number is on file, give
+                          the buyer a direct link to the carrier's tracking page. */}
+                      {row.listing?.trackingNumber &&
+                        (() => {
+                          const url = carrierTrackingUrl(
+                            row.listing.trackingCarrier,
+                            row.listing.trackingNumber,
+                          );
+                          return (
+                            <p className="mt-2 text-xs text-silver">
+                              Tracking:{" "}
+                              {url ? (
+                                <a
+                                  href={url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-chrome underline underline-offset-2 hover:text-white"
+                                >
+                                  {row.listing.trackingNumber}
+                                  {row.listing.trackingCarrier
+                                    ? ` (${row.listing.trackingCarrier})`
+                                    : ""}
+                                </a>
+                              ) : (
+                                <span className="text-chrome">{row.listing.trackingNumber}</span>
+                              )}
+                            </p>
+                          );
+                        })()}
+
                       {/* Progress stepper — only for escrow-backed transactions. */}
                       {step.isEscrow && (
                         <div className="mt-2">
                           <TransactionProgress escrowState={step.state} compact />
                         </div>
+                      )}
+
+                      {/* Dispute state — frozen banner, or an entry point to open one. */}
+                      {disputed ? (
+                        <div className="mt-2 flex items-center gap-2 rounded-lg border border-amber-400/40 bg-amber-400/10 px-3 py-2">
+                          <span className="rounded-full border border-amber-400/40 bg-amber-400/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-amber-200">
+                            Disputed
+                          </span>
+                          <p className="text-xs text-amber-200/90">
+                            Escrow is frozen while this dispute is reviewed. Continue in the Hashpop
+                            Discord.
+                          </p>
+                        </div>
+                      ) : (
+                        canDispute && (
+                          <div className="mt-2 text-right">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setDispute({
+                                  listingId: row.listingId as string,
+                                  title: String(title),
+                                })
+                              }
+                              className="text-xs font-medium text-rose-300/90 underline underline-offset-2 hover:text-rose-200"
+                            >
+                              Open dispute
+                            </button>
+                          </div>
+                        )
                       )}
 
                       {/* Rating prompt — once the transaction is complete, invite
@@ -472,6 +545,17 @@ export default function PurchasesPage() {
           counterpartyRole={rating.role}
           onClose={() => setRating(null)}
           onRated={() => markRated(rating.saleId)}
+        />
+      )}
+      {dispute && address && (
+        <OpenDisputeModal
+          listingId={dispute.listingId}
+          listingTitle={dispute.title}
+          openerAddress={address}
+          onClose={() => setDispute(null)}
+          onOpened={() =>
+            setDisputedIds((prev) => new Set(prev).add(dispute.listingId))
+          }
         />
       )}
     </main>

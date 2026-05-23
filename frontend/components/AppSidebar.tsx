@@ -16,6 +16,7 @@ import {
   Tag,
   Receipt,
   LayoutGrid,
+  HelpCircle,
 } from "lucide-react";
 import { Sidebar, SidebarBody, SidebarLink } from "./ui/sidebar";
 import { cn } from "../lib/utils";
@@ -175,6 +176,13 @@ export function AppSidebar({
               {open && <span className="text-sm">Sign out</span>}
             </button>
           )}
+          <Link
+            href="/help"
+            className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-neutral-600 transition-colors hover:bg-neutral-200/50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-white/5 dark:hover:text-white"
+          >
+            <HelpCircle className="h-4 w-4 flex-shrink-0" />
+            {open && <span className="text-sm">Help</span>}
+          </Link>
           <div className="border-t border-black/10 dark:border-white/10 pt-2">
             <p className="text-xs text-neutral-600 dark:text-neutral-300 px-2">
               {open ? `App ${appVersion}` : appVersion}

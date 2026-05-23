@@ -20,6 +20,10 @@ model Listing {
     onChainConfirmed  Boolean @default(false)
   shippedAt          DateTime?
   exchangeConfirmedAt DateTime?
+  disputeStatus      String?
+  disputeReason      String?
+  disputeOpenedBy    String?
+  disputeOpenedAt    DateTime?
   title              String?
   subtitle           String?
   description        String?
