@@ -54,6 +54,8 @@ function CreatePageContent() {
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [triedSubmit, setTriedSubmit] = useState(false);
+  const [duplicateMediaCount, setDuplicateMediaCount] = useState(0);
   const [createdListingId, setCreatedListingId] = useState<string | null>(null);
   const createdListingIdRef = useRef<string | null>(null);
   const duplicateMediaUrlsRef = useRef<string[]>([]);
@@ -142,6 +144,7 @@ function CreatePageContent() {
         setPrice(formatPriceForDisplay(item.price ?? "0"));
         const urls = item.mediaUrls?.length ? item.mediaUrls : item.imageUrl ? [item.imageUrl] : [];
         duplicateMediaUrlsRef.current = urls;
+        setDuplicateMediaCount(urls.length);
       })
       .catch(() => {});
   }, [duplicateId]);
@@ -262,8 +265,31 @@ function CreatePageContent() {
     return urls;
   };
 
+  // Minimum publish requirements. Listings that fail any of these are blocked
+  // from publishing so the marketplace can't fill up with empty/low-quality
+  // posts (titleless items, no photos, no description, etc.).
+  const descriptionWordCount = useMemo(
+    () => description.trim().split(/\s+/).filter(Boolean).length,
+    [description],
+  );
+  const validation = useMemo(() => {
+    const photoCount = mediaItems.length + duplicateMediaCount;
+    return {
+      photos: photoCount >= 1 ? null : "Add at least 1 photo.",
+      title: title.trim() ? null : "Add a title.",
+      price: price && Number(price) > 0 ? null : "Enter a price greater than 0.",
+      category: category.trim() ? null : "Select a category.",
+      description:
+        descriptionWordCount >= 20
+          ? null
+          : `Write at least 20 words (currently ${descriptionWordCount}).`,
+    };
+  }, [mediaItems.length, duplicateMediaCount, title, price, category, descriptionWordCount]);
+  const isValid = !Object.values(validation).some(Boolean);
+
   const handleSubmit = async () => {
     setSubmitError(null);
+    setTriedSubmit(true);
     const fromDuplicate = duplicateMediaUrlsRef.current.length > 0;
     titleRef.current = title.trim() || null;
     subtitleRef.current = subtitle.trim() || null;
@@ -276,13 +302,8 @@ function CreatePageContent() {
     locationLngRef.current = typeof location.lng === "number" ? location.lng : null;
     requireEscrowRef.current = requireEscrow;
 
-    if (!price || Number(price) <= 0) {
-      setSubmitError("Enter a price.");
-      return;
-    }
-
-    if (!category.trim()) {
-      setSubmitError("Select a category.");
+    if (!isValid) {
+      setSubmitError("Please fix the highlighted fields before publishing.");
       return;
     }
 
@@ -312,8 +333,6 @@ function CreatePageContent() {
       setSubmitError(friendly || (err instanceof Error ? err.message : "Create listing failed"));
     }
   };
-
-  const canSubmit = !!title.trim() && !!price && Number(price) > 0;
 
   const featuredItem = mediaItems[0];
 
@@ -489,6 +508,9 @@ function CreatePageContent() {
               </div>
             </div>
             {mediaError && <p className="text-rose-400 text-xs mt-1">{mediaError}</p>}
+            {triedSubmit && validation.photos && (
+              <p className="text-rose-400 text-xs mt-1">{validation.photos}</p>
+            )}
           </section>
 
           <section>
@@ -504,6 +526,9 @@ function CreatePageContent() {
                   className="input-frost mt-1 w-full h-12 text-base font-semibold"
                   placeholder="e.g. Vintage Polaroid SX-70 — restored bellows"
                 />
+                {triedSubmit && validation.title && (
+                  <span className="mt-1 block text-xs text-rose-400">{validation.title}</span>
+                )}
               </label>
 
               <label className="block">
@@ -529,6 +554,9 @@ function CreatePageContent() {
                   className="input-frost mt-1 w-full min-h-[100px] resize-y"
                   placeholder="What makes it worth buying? Condition notes, what's included, any flaws."
                 />
+                {triedSubmit && validation.description && (
+                  <span className="mt-1 block text-xs text-rose-400">{validation.description}</span>
+                )}
               </label>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -550,6 +578,9 @@ function CreatePageContent() {
                       ℏ
                     </span>
                   </div>
+                  {triedSubmit && validation.price && (
+                    <span className="mt-1 block text-xs text-rose-400">{validation.price}</span>
+                  )}
                 </label>
                 <label className="block">
                   <span className="flex items-baseline justify-between text-xs font-semibold text-white">
@@ -584,6 +615,9 @@ function CreatePageContent() {
                     placeholder="Search categories (e.g. watches, cars, software)…"
                   />
                 </div>
+                {triedSubmit && validation.category && (
+                  <span className="mt-1 block text-xs text-rose-400">{validation.category}</span>
+                )}
               </div>
 
               <div>
@@ -706,11 +740,18 @@ function CreatePageContent() {
             />
             <button
               onClick={handleSubmit}
-              disabled={isPending || !canSubmit}
+              disabled={isPending}
               className="w-full rounded-lg px-5 py-3 bg-chrome text-black text-sm font-bold shadow-[0_0_20px_rgba(0,255,163,0.35)] disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none"
             >
               {isPending ? "Confirm in wallet…" : "Publish listing →"}
             </button>
+            {triedSubmit && !isValid && (
+              <p className="text-xs text-rose-300">
+                {Object.values(validation).filter(Boolean).length} requirement
+                {Object.values(validation).filter(Boolean).length === 1 ? "" : "s"} left before you
+                can publish.
+              </p>
+            )}
           </aside>
           </div>
         )}

@@ -2347,6 +2347,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           address: addrLower,
           displayName: null,
           bio: null,
+          avatarUrl: null,
           kyc: { status: "UNVERIFIED" },
         });
       }
@@ -2354,6 +2355,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         address: u.address,
         displayName: u.displayName,
         bio: u.bio,
+        avatarUrl: u.avatarUrl,
         kyc: {
           status: u.kycStatus ?? "UNVERIFIED",
           submittedAt: u.kycSubmittedAt,
@@ -2405,6 +2407,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         ...newKycFields,
         displayName: trim(body.displayName),
         bio: trim(body.bio),
+        avatarUrl: trim(body.avatarUrl),
         kycStatus: status,
         kycSubmittedAt: hasAnyKyc ? new Date() : null,
       };
@@ -2419,6 +2422,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         address: u.address,
         displayName: u.displayName,
         bio: u.bio,
+        avatarUrl: u.avatarUrl,
         kyc: {
           status: u.kycStatus,
           submittedAt: u.kycSubmittedAt,
@@ -2436,6 +2440,76 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       });
     } catch (err) {
       log.error({ err }, "Failed to update profile");
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Batch public-profile lookup used to render display names, avatars, KYC
+  // badges and ratings on listing cards / detail pages without N round-trips.
+  router.get("/users/profiles", async (req, res) => {
+    try {
+      const raw = String(req.query.addresses ?? "");
+      const addresses = Array.from(
+        new Set(
+          raw
+            .split(",")
+            .map((a) => a.trim().toLowerCase())
+            .filter(Boolean),
+        ),
+      ).slice(0, 100);
+      if (addresses.length === 0) return res.json({ profiles: {} });
+
+      const [users, ratingGroups] = await Promise.all([
+        prisma.user.findMany({
+          where: { address: { in: addresses } },
+          select: {
+            address: true,
+            displayName: true,
+            avatarUrl: true,
+            kycStatus: true,
+          },
+        }),
+        prisma.rating.groupBy({
+          by: ["ratedAddress"],
+          where: { ratedAddress: { in: addresses } },
+          _avg: { score: true },
+          _count: { _all: true },
+        }),
+      ]);
+
+      const ratingByAddress = new Map(
+        ratingGroups.map((g) => [
+          g.ratedAddress,
+          { average: g._avg.score ?? null, count: g._count._all ?? 0 },
+        ]),
+      );
+
+      const profiles: Record<
+        string,
+        {
+          address: string;
+          displayName: string | null;
+          avatarUrl: string | null;
+          kycVerified: boolean;
+          ratingAverage: number | null;
+          ratingCount: number;
+        }
+      > = {};
+      for (const addr of addresses) {
+        const u = users.find((x) => x.address === addr);
+        const r = ratingByAddress.get(addr);
+        profiles[addr] = {
+          address: addr,
+          displayName: u?.displayName ?? null,
+          avatarUrl: u?.avatarUrl ?? null,
+          kycVerified: u?.kycStatus === "VERIFIED",
+          ratingAverage: r?.average ?? null,
+          ratingCount: r?.count ?? 0,
+        };
+      }
+      res.json({ profiles });
+    } catch (err) {
+      log.error({ err }, "Failed to fetch batch profiles");
       res.status(500).json({ error: "Internal server error" });
     }
   });

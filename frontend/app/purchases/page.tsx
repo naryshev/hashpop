@@ -12,6 +12,7 @@ import { TransactionProgress } from "../../components/TransactionProgress";
 import { getApiUrl } from "../../lib/apiUrl";
 import { AddressDisplay } from "../../components/AddressDisplay";
 import { ConnectWalletButton } from "../../components/ConnectWalletButton";
+import { RateCounterpartyModal } from "../../components/RateCounterpartyModal";
 
 type PurchaseRow = {
   id: string;
@@ -154,6 +155,37 @@ export default function PurchasesPage() {
   const [loading, setLoading] = useState(true);
   const [escrowStates, setEscrowStates] = useState<Record<string, EscrowState>>({});
   const [tab, setTab] = useState<Tab>("bought");
+  const [ratedSales, setRatedSales] = useState<Set<string>>(new Set());
+  const [rating, setRating] = useState<{
+    saleId: string;
+    ratedAddress: string;
+    role: "seller" | "buyer";
+  } | null>(null);
+
+  const ratedKey = address ? `hashpop.rated.${address.toLowerCase()}` : null;
+  useEffect(() => {
+    if (!ratedKey) return;
+    try {
+      const raw = window.localStorage.getItem(ratedKey);
+      if (raw) setRatedSales(new Set(JSON.parse(raw) as string[]));
+    } catch {
+      // ignore
+    }
+  }, [ratedKey]);
+
+  const markRated = (saleId: string) => {
+    setRatedSales((prev) => {
+      const next = new Set(prev).add(saleId);
+      if (ratedKey) {
+        try {
+          window.localStorage.setItem(ratedKey, JSON.stringify(Array.from(next)));
+        } catch {
+          // ignore
+        }
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!address) {
@@ -398,6 +430,33 @@ export default function PurchasesPage() {
                           <TransactionProgress escrowState={step.state} compact />
                         </div>
                       )}
+
+                      {/* Rating prompt — once the transaction is complete, invite
+                          the participant to rate their counterparty. */}
+                      {step.state === "COMPLETE" && (
+                        <div className="mt-2 flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                          <p className="text-xs text-silver">
+                            {ratedSales.has(row.id)
+                              ? `You rated this ${row.role === "buyer" ? "seller" : "buyer"}.`
+                              : `How was your experience with this ${row.role === "buyer" ? "seller" : "buyer"}?`}
+                          </p>
+                          {!ratedSales.has(row.id) && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setRating({
+                                  saleId: row.id,
+                                  ratedAddress: counterpartyAddr,
+                                  role: row.role === "buyer" ? "seller" : "buyer",
+                                })
+                              }
+                              className="shrink-0 rounded-glass border border-amber-400/40 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-200 hover:bg-amber-400/20"
+                            >
+                              ★ Rate {row.role === "buyer" ? "seller" : "buyer"}
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </li>
                   );
                 })}
@@ -406,6 +465,15 @@ export default function PurchasesPage() {
           </>
         )}
       </div>
+      {rating && (
+        <RateCounterpartyModal
+          saleId={rating.saleId}
+          ratedAddress={rating.ratedAddress}
+          counterpartyRole={rating.role}
+          onClose={() => setRating(null)}
+          onRated={() => markRated(rating.saleId)}
+        />
+      )}
     </main>
   );
 }

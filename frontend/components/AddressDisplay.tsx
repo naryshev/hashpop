@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { BadgeCheck } from "lucide-react";
 
 import { getApiUrl } from "../lib/apiUrl";
+import { useProfile } from "../lib/profiles";
 
 function truncateEvm(address: string): string {
   if (!address || address.length < 12) return address;
@@ -12,38 +14,52 @@ function truncateEvm(address: string): string {
 }
 
 /**
- * Displays an EVM address (0x...) as Hedera account ID (0.0.xxxxx) when resolvable; otherwise truncated 0x.
+ * Renders a wallet identity. Prefers the user's display name when set, falling
+ * back to the Hedera account ID (0.0.xxxxx) when resolvable, then a truncated
+ * 0x address. Shows a verified badge for KYC-verified users.
  */
-export function AddressDisplay({ address, className }: { address: string; className?: string }) {
+export function AddressDisplay({
+  address,
+  className,
+  showVerified = true,
+}: {
+  address: string;
+  className?: string;
+  showVerified?: boolean;
+}) {
   const [accountId, setAccountId] = useState<string | null>(null);
-  const [loaded, setLoaded] = useState(false);
+  const profile = useProfile(address);
 
   useEffect(() => {
     if (!address || !address.startsWith("0x") || address.length !== 42) {
       setAccountId(null);
-      setLoaded(true);
       return;
     }
     setAccountId(null);
-    setLoaded(false);
     const evm = address.toLowerCase();
     fetch(`${getApiUrl()}/api/relay/account-id?evmAddress=${encodeURIComponent(evm)}`)
       .then((r) => (r.ok ? r.json() : Promise.reject(r)))
-      .then((data: { accountId?: string }) => {
-        setAccountId(data.accountId ?? null);
-        setLoaded(true);
-      })
-      .catch(() => setLoaded(true));
+      .then((data: { accountId?: string }) => setAccountId(data.accountId ?? null))
+      .catch(() => {});
   }, [address]);
 
-  const display =
+  const displayName = profile?.displayName?.trim() || null;
+  const fallback =
     accountId ??
     (address && address.startsWith("0x") && address.length === 42 ? truncateEvm(address) : address);
+  const display = displayName ?? fallback;
   const title = accountId ? `${accountId} (${address})` : address;
 
   return (
     <span className={className} title={title}>
       {display}
+      {showVerified && profile?.kycVerified && (
+        <BadgeCheck
+          size={13}
+          className="ml-1 inline-block align-text-bottom text-[#00ffa3]"
+          aria-label="KYC verified"
+        />
+      )}
     </span>
   );
 }

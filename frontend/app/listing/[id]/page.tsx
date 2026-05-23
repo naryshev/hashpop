@@ -7,6 +7,7 @@ import Link from "next/link";
 import { BuyButton } from "../../../components/BuyButton";
 import { EscrowPanel } from "../../../components/EscrowPanel";
 import { AddressDisplay } from "../../../components/AddressDisplay";
+import { useProfile } from "../../../lib/profiles";
 import { formatContractAmountToHbar, formatPriceForDisplay } from "../../../lib/formatPrice";
 import { formatHbarWithUsd } from "../../../lib/hbarUsd";
 import { useHbarUsd } from "../../../hooks/useHbarUsd";
@@ -26,6 +27,48 @@ import { LocationPicker, type LocationValue } from "../../../components/Location
 import { OffersPanel } from "../../../components/OffersPanel";
 
 import { getApiUrl } from "../../../lib/apiUrl";
+
+/** Seller avatar + display name + KYC badge + rating, shown on the listing detail. */
+function SellerProfileMeta({ seller }: { seller: string }) {
+  const profile = useProfile(seller);
+  const name = profile?.displayName?.trim();
+  const hasRating = profile && profile.ratingCount > 0 && profile.ratingAverage != null;
+  return (
+    <div className="flex items-center gap-2.5">
+      {profile?.avatarUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={profile.avatarUrl}
+          alt=""
+          className="h-9 w-9 shrink-0 rounded-full object-cover"
+        />
+      ) : (
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs text-silver">
+          {(name ?? seller).slice(0, 2).toUpperCase()}
+        </div>
+      )}
+      <div className="min-w-0">
+        <div className="flex items-center gap-1 text-sm font-medium text-white">
+          <span className="truncate">{name ?? "Hashpop seller"}</span>
+          {profile?.kycVerified && (
+            <span className="rounded-full bg-[#00ffa3]/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#00ffa3]">
+              Verified
+            </span>
+          )}
+        </div>
+        {hasRating ? (
+          <div className="text-xs text-amber-300/90">
+            ★ {profile!.ratingAverage!.toFixed(1)}{" "}
+            <span className="text-silver/50">({profile!.ratingCount} ratings)</span>
+          </div>
+        ) : (
+          <div className="text-xs text-silver/50">No ratings yet</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024;
 const ALLOWED_TYPES = "image/jpeg,image/jpg,image/png,image/gif,image/webp";
 
@@ -1495,7 +1538,8 @@ export default function ListingPage() {
 
             <div>
               <h3 className="text-white font-medium mb-2">Seller</h3>
-              <p className="text-silver text-sm flex items-center gap-2">
+              <SellerProfileMeta seller={item!.seller} />
+              <p className="text-silver text-sm flex items-center gap-2 mt-1">
                 <AddressDisplay address={item!.seller} className="text-chrome font-mono text-xs" />
               </p>
               {isSeller && isSellerActiveListing && !isLockedOnChain && !editing && (
