@@ -450,8 +450,8 @@ export default function DashboardPage() {
 
   return (
     <main className="min-h-screen">
-      <div className="space-y-6 p-3 md:p-3">
-        <div className="space-y-6" suppressHydrationWarning>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-8">
+        <div className="space-y-8" suppressHydrationWarning>
           {!mounted ? (
             <p className="text-silver">Loading…</p>
           ) : !address ? (

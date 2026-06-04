@@ -799,7 +799,10 @@ export default function MarketplacePageClient({
                     >
                       <div className="relative h-[88px] w-[88px] overflow-hidden rounded-lg bg-white/5">
                         <ListingMedia
-                          listing={item}
+                          listing={{
+                            imageUrl: item.imageUrl,
+                            mediaUrls: item.mediaUrls?.slice(0, 1) ?? null,
+                          }}
                           className="w-full"
                           aspectRatio="square"
                           cardSize

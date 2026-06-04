@@ -150,7 +150,7 @@ export default function ProfilePage() {
 
   return (
     <main className="min-h-screen">
-      <div className="mx-auto max-w-2xl space-y-6 p-3 md:p-3">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             {avatarUrl ? (
