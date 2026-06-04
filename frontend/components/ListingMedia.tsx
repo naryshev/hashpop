@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getListingMediaUrls } from "../lib/listingMedia";
 
 /** Standard height for card media so all marketplace/home cards are the same size */
@@ -14,6 +14,12 @@ type ListingMediaProps = {
   scrollable?: boolean;
   /** "arrows" = one image at a time with prev/next buttons; "scroll" = horizontal scrollbar */
   navigation?: "scroll" | "arrows";
+  /**
+   * Crossfade through all images one at a time. "auto" cycles continuously;
+   * "hover" only cycles while the pointer is over the media (resets to the
+   * first image on leave). Single-image listings render the lone image.
+   */
+  slideshow?: "auto" | "hover";
   /** When true, use fixed height for consistent card size (e.g. marketplace cards) */
   cardSize?: boolean;
   /** Override height when cardSize (e.g. "88px" for compact carousel) */
@@ -26,19 +32,36 @@ export function ListingMedia({
   aspectRatio = "video",
   scrollable = false,
   navigation = "scroll",
+  slideshow,
   cardSize = false,
   compactHeight,
 }: ListingMediaProps) {
   const [failed, setFailed] = useState<Set<number>>(new Set());
   const [index, setIndex] = useState(0);
+  const [hovering, setHovering] = useState(false);
   const touchStartX = useRef<number | null>(null);
   const urls = getListingMediaUrls(listing);
   const ratioClass = aspectRatio === "video" ? "aspect-video" : "aspect-square";
-  const useArrows = navigation === "arrows" && urls.length > 1;
+  const isSlideshow = !!slideshow && urls.length > 1;
+  const useArrows = !slideshow && navigation === "arrows" && urls.length > 1;
   const mediaHeight = compactHeight ?? CARD_MEDIA_HEIGHT;
   const sizeClass = cardSize ? "w-full min-h-0 shrink-0" : "";
 
   const heightStyle = cardSize ? { height: mediaHeight } : undefined;
+
+  // Drive the crossfade. "auto" runs continuously; "hover" only advances while
+  // the pointer is over the media and snaps back to the first frame on leave.
+  useEffect(() => {
+    if (!isSlideshow) return;
+    if (slideshow === "hover" && !hovering) {
+      setIndex(0);
+      return;
+    }
+    const id = setInterval(() => {
+      setIndex((i) => (i + 1) % urls.length);
+    }, 3000);
+    return () => clearInterval(id);
+  }, [isSlideshow, slideshow, hovering, urls.length]);
 
   if (urls.length === 0) {
     return (
@@ -84,6 +107,35 @@ export function ListingMedia({
       );
     }
     return imgEl;
+  }
+
+  if (isSlideshow) {
+    const current = index % urls.length;
+    return (
+      <div
+        className={`overflow-hidden rounded-glass-lg border border-white/10 ${cardSize ? sizeClass : ratioClass} ${className}`}
+        style={heightStyle}
+        onMouseEnter={slideshow === "hover" ? () => setHovering(true) : undefined}
+        onMouseLeave={slideshow === "hover" ? () => setHovering(false) : undefined}
+      >
+        <div className="relative h-full w-full">
+          {urls.map((url, i) =>
+            failed.has(i) ? null : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={i}
+                src={url}
+                alt={`Listing ${i + 1}`}
+                className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ease-in-out ${
+                  i === current ? "opacity-100" : "opacity-0"
+                }`}
+                onError={() => setFailed((prev) => new Set([...prev, i]))}
+              />
+            ),
+          )}
+        </div>
+      </div>
+    );
   }
 
   if (useArrows) {
