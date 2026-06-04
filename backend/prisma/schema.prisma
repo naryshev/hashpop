@@ -20,6 +20,10 @@ model Listing {
     onChainConfirmed  Boolean @default(false)
   shippedAt          DateTime?
   exchangeConfirmedAt DateTime?
+  disputeStatus      String?
+  disputeReason      String?
+  disputeOpenedBy    String?
+  disputeOpenedAt    DateTime?
   title              String?
   subtitle           String?
   description        String?
@@ -96,6 +100,7 @@ model User {
   reputationScore   Int      @default(0)
   displayName       String?
   bio               String?
+  avatarUrl         String?
   kycLegalName      String?
   kycDateOfBirth    String?  // ISO date (YYYY-MM-DD)
   kycCountry        String?  // ISO 3166-1 alpha-2

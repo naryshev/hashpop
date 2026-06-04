@@ -13,7 +13,9 @@ import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { canonicalizeCategory } from "../../lib/categories";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
+import { useProfile, useProfiles } from "../../lib/profiles";
 import { TopBarSlot } from "../../lib/topBar";
+import { BadgeCheck } from "lucide-react";
 
 function formatListingId(id: string): string {
   if (!id || !id.startsWith("0x") || id.length !== 66) return id;
@@ -123,6 +125,46 @@ function relativeTimeShort(iso?: string): string {
   return `${Math.floor(mo / 12)}y`;
 }
 
+/** Seller identity line: avatar + display name (or wallet) + verified badge. */
+function SellerInline({ seller, size = 16 }: { seller?: string; size?: number }) {
+  const profile = useProfile(seller);
+  if (!seller) return null;
+  const name = profile?.displayName?.trim();
+  return (
+    <span className="mt-1 flex items-center gap-1 truncate">
+      {profile?.avatarUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={profile.avatarUrl}
+          alt=""
+          className="shrink-0 rounded-full object-cover"
+          style={{ width: size, height: size }}
+        />
+      ) : null}
+      {name ? (
+        <span className="truncate text-silver/70">{name}</span>
+      ) : (
+        <span className="truncate font-mono text-silver/50">{formatSellerDisplay(seller)}</span>
+      )}
+      {profile?.kycVerified && (
+        <BadgeCheck size={12} className="shrink-0 text-[#00ffa3]" aria-label="KYC verified" />
+      )}
+    </span>
+  );
+}
+
+/** Compact star-rating pill; renders nothing when the seller has no ratings. */
+function SellerRating({ seller, className }: { seller?: string; className?: string }) {
+  const profile = useProfile(seller);
+  if (!profile || profile.ratingCount === 0 || profile.ratingAverage == null) return null;
+  return (
+    <span className={className ?? "flex items-center gap-0.5 text-[10px] text-amber-300/90"}>
+      ★ {profile.ratingAverage.toFixed(1)}
+      <span className="text-silver/50">({profile.ratingCount})</span>
+    </span>
+  );
+}
+
 export type ListingItem = {
   id: string;
   price?: string;
@@ -168,6 +210,9 @@ export default function MarketplacePageClient({
   const items = initialItems;
   const listingsError = initialError;
   const usdRate = useHbarUsd();
+  // Warm the profile cache for every seller in one batched request so cards
+  // can render display names, avatars and ratings without per-card fetches.
+  useProfiles(items.map((i) => i.seller));
 
   const setParam = (key: string, value: string | null) => {
     const p = new URLSearchParams(searchParams.toString());
@@ -592,20 +637,28 @@ export default function MarketplacePageClient({
                     <h2 className="text-sm font-semibold text-white line-clamp-2 leading-tight">
                       {item.title || formatListingId(item.id) || "Untitled"}
                     </h2>
+                    {item.category && (
+                      <span className="mt-1 inline-flex rounded-full bg-white/5 px-2 py-0.5 text-[9px] text-silver/80">
+                        {canonicalizeCategory(item.category)}
+                      </span>
+                    )}
                     {item.seller && (
-                      <p className="text-silver/50 text-[10px] mt-1 font-mono truncate">
-                        {formatSellerDisplay(item.seller)}
-                      </p>
+                      <div className="text-[10px]">
+                        <SellerInline seller={item.seller} size={14} />
+                      </div>
                     )}
                     <div className="flex items-center justify-between mt-1.5">
                       <p className="text-chrome font-semibold">
                         {formatHbarWithUsd(formatPriceForDisplay(item.price || "0"), usdRate)}
                       </p>
-                      {(item.watchlistCount ?? 0) > 0 && (
-                        <span className="text-[10px] text-silver/50 flex items-center gap-0.5">
-                          ♡ {item.watchlistCount}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        <SellerRating seller={item.seller} />
+                        {(item.watchlistCount ?? 0) > 0 && (
+                          <span className="text-[10px] text-silver/50 flex items-center gap-0.5">
+                            ♡ {item.watchlistCount}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </Link>
@@ -705,20 +758,28 @@ export default function MarketplacePageClient({
                       <h2 className="text-base font-semibold text-white line-clamp-2 leading-snug">
                         {item.title || formatListingId(item.id) || "Untitled"}
                       </h2>
+                      {item.category && (
+                        <span className="mt-1.5 inline-flex rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-silver/80">
+                          {canonicalizeCategory(item.category)}
+                        </span>
+                      )}
                       {item.seller && (
-                        <p className="text-silver/50 text-[11px] mt-1 font-mono truncate">
-                          {formatSellerDisplay(item.seller)}
-                        </p>
+                        <div className="text-[11px]">
+                          <SellerInline seller={item.seller} />
+                        </div>
                       )}
                       <div className="flex items-center justify-between mt-2">
                         <p className="text-chrome font-semibold text-lg">
                           {formatHbarWithUsd(formatPriceForDisplay(item.price || "0"), usdRate)}
                         </p>
-                        {(item.watchlistCount ?? 0) > 0 && (
-                          <span className="text-xs text-silver/50 flex items-center gap-1">
-                            ♡ {item.watchlistCount}
-                          </span>
-                        )}
+                        <div className="flex items-center gap-2">
+                          <SellerRating seller={item.seller} className="flex items-center gap-0.5 text-xs text-amber-300/90" />
+                          {(item.watchlistCount ?? 0) > 0 && (
+                            <span className="text-xs text-silver/50 flex items-center gap-1">
+                              ♡ {item.watchlistCount}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </Link>
@@ -758,11 +819,8 @@ export default function MarketplacePageClient({
                           {item.condition && (
                             <span className="text-silver/60">{item.condition}</span>
                           )}
-                          {item.seller && (
-                            <span className="font-mono text-silver/50">
-                              {formatSellerDisplay(item.seller)}
-                            </span>
-                          )}
+                          {item.seller && <SellerInline seller={item.seller} size={14} />}
+                          <SellerRating seller={item.seller} />
                           <span
                             className={`rounded-full inline-flex items-center gap-1.5 border px-2 py-0.5 text-[9px] font-semibold ${badge.className}`}
                           >

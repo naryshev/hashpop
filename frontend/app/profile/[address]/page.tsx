@@ -3,9 +3,11 @@
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { BadgeCheck, ShieldCheck } from "lucide-react";
 import { AddressDisplay } from "../../../components/AddressDisplay";
 import { getApiUrl } from "../../../lib/apiUrl";
 import { useHashpackWallet } from "../../../lib/hashpackWallet";
+import { compressImage } from "../../../lib/compressImage";
 
 type ProfileStats = {
   address: string;
@@ -36,6 +38,7 @@ type ProfileData = {
   address: string;
   displayName?: string | null;
   bio?: string | null;
+  avatarUrl?: string | null;
   kyc: Kyc;
 };
 
@@ -61,6 +64,7 @@ export default function ProfilePage() {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<ProfileData | null>(null);
   const [saving, setSaving] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   useEffect(() => {
     if (!address) return;
@@ -89,6 +93,7 @@ export default function ProfilePage() {
         body: JSON.stringify({
           displayName: draft.displayName ?? "",
           bio: draft.bio ?? "",
+          avatarUrl: draft.avatarUrl ?? "",
           kyc: {
             legalName: draft.kyc.legalName ?? "",
             dateOfBirth: draft.kyc.dateOfBirth ?? "",
@@ -115,8 +120,36 @@ export default function ProfilePage() {
     }
   };
 
+  const onAvatarSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !isSelf) return;
+    if (!/^image\/(jpeg|jpg|png|gif|webp)$/i.test(file.type)) return;
+    setAvatarUploading(true);
+    try {
+      const compressed = await compressImage(file);
+      const form = new FormData();
+      form.append("media", compressed);
+      const res = await fetch(`${getApiUrl()}/api/upload-listing-media`, {
+        method: "POST",
+        body: form,
+      });
+      if (!res.ok) throw new Error("upload failed");
+      const data = (await res.json()) as { mediaUrl?: string };
+      if (data.mediaUrl) {
+        setDraft((d) => (d ? { ...d, avatarUrl: data.mediaUrl } : d));
+      }
+    } catch {
+      // Silently ignore; user can retry.
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
   const kyc = profile?.kyc ?? { status: "UNVERIFIED" };
   const statusClass = KYC_STATUS_STYLE[kyc.status] ?? KYC_STATUS_STYLE.UNVERIFIED;
+  const avatarUrl = (editing ? draft?.avatarUrl : profile?.avatarUrl)?.trim() || null;
+  const isVerified = kyc.status === "VERIFIED";
 
   const setKyc = <K extends keyof Kyc>(k: K, v: Kyc[K]) =>
     setDraft((d) => (d ? { ...d, kyc: { ...d.kyc, [k]: v } } : d));
@@ -125,13 +158,30 @@ export default function ProfilePage() {
     <main className="min-h-screen">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-white">
-              {profile?.displayName?.trim() || "Profile"}
-            </h1>
-            <p className="text-sm text-silver mt-1">
-              <AddressDisplay address={address} />
-            </p>
+          <div className="flex items-center gap-3">
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={avatarUrl}
+                alt=""
+                className="h-14 w-14 shrink-0 rounded-full object-cover border border-white/10"
+              />
+            ) : (
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white/10 text-base text-silver">
+                {(profile?.displayName?.trim() || address).slice(0, 2).toUpperCase()}
+              </div>
+            )}
+            <div>
+              <h1 className="flex items-center gap-1.5 text-xl sm:text-2xl font-bold text-white">
+                {profile?.displayName?.trim() || "Profile"}
+                {isVerified && (
+                  <BadgeCheck size={20} className="text-[#00ffa3]" aria-label="KYC verified" />
+                )}
+              </h1>
+              <p className="text-sm text-silver mt-1">
+                <AddressDisplay address={address} showVerified={false} />
+              </p>
+            </div>
           </div>
           <Link href="/" className="text-sm text-chrome hover:text-white font-medium">
             Home
@@ -203,6 +253,44 @@ export default function ProfilePage() {
             </>
           ) : (
             <div className="space-y-3">
+              <div>
+                <span className="text-xs uppercase tracking-wide text-silver">Avatar</span>
+                <div className="mt-1 flex items-center gap-3">
+                  {avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={avatarUrl}
+                      alt=""
+                      className="h-14 w-14 rounded-full object-cover border border-white/10"
+                    />
+                  ) : (
+                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10 text-silver">
+                      ?
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <label className="cursor-pointer rounded-md border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white hover:bg-white/10">
+                      {avatarUploading ? "Uploading…" : "Upload"}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/gif,image/webp"
+                        className="hidden"
+                        disabled={avatarUploading}
+                        onChange={onAvatarSelected}
+                      />
+                    </label>
+                    {avatarUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setDraft((d) => (d ? { ...d, avatarUrl: null } : d))}
+                        className="text-xs text-silver hover:text-rose-300"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
               <label className="block">
                 <span className="text-xs uppercase tracking-wide text-silver">Display name</span>
                 <input
@@ -248,7 +336,42 @@ export default function ProfilePage() {
               Status: <span className="text-white">{kyc.status}</span>
             </p>
           ) : !editing ? (
-            <KycReadOnly kyc={kyc} />
+            <>
+              {kyc.status === "UNVERIFIED" && (
+                <div className="rounded-xl border border-[#00ffa3]/25 bg-[#00ffa3]/[0.05] p-4">
+                  <div className="flex items-start gap-3">
+                    <ShieldCheck size={20} className="mt-0.5 shrink-0 text-[#00ffa3]" />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-white">Verify your identity</p>
+                      <p className="mt-1 text-xs text-silver">
+                        Verification unlocks a verified badge on your listings and profile, builds
+                        buyer trust, and lets you list high-value items. Your details are private and
+                        only used for verification.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setEditing(true)}
+                        className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-[#00ffa3] px-4 py-2 text-sm font-semibold text-black"
+                      >
+                        Start verification →
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {kyc.status === "PENDING" && (
+                <p className="rounded-lg border border-amber-400/30 bg-amber-400/[0.06] px-3 py-2 text-sm text-amber-200">
+                  Your verification is pending review. We&apos;ll update your status once it&apos;s
+                  processed.
+                </p>
+              )}
+              {kyc.status === "VERIFIED" && (
+                <p className="flex items-center gap-2 rounded-lg border border-[#00ffa3]/30 bg-[#00ffa3]/[0.06] px-3 py-2 text-sm text-[#00ffa3]">
+                  <BadgeCheck size={16} /> Your identity is verified.
+                </p>
+              )}
+              <KycReadOnly kyc={kyc} />
+            </>
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <KycField label="Legal name" value={draft?.kyc.legalName ?? ""} onChange={(v) => setKyc("legalName", v)} />

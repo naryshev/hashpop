@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { HashpackWalletProvider } from "../lib/hashpackWallet";
 import { HashPackConfirmProvider } from "../lib/hashpackConfirm";
 import { SignInModalProvider } from "../lib/signInModal";
+import { ProfilesProvider } from "../lib/profiles";
 import { TopBarProvider } from "../lib/topBar";
 import { Footer } from "./Footer";
 import { BottomNav } from "./BottomNav";
@@ -23,6 +24,7 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
       <QueryClientProvider client={qc}>
         <HashPackConfirmProvider>
           <SignInModalProvider>
+            <ProfilesProvider>
             <TopBarProvider>
               <WalletAccountSync />
               <DesktopShell>
@@ -37,6 +39,7 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
                 <BottomNav showMenu onMenuClick={() => setSidebarOpen(true)} />
               </div>
             </TopBarProvider>
+            </ProfilesProvider>
           </SignInModalProvider>
         </HashPackConfirmProvider>
       </QueryClientProvider>

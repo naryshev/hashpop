@@ -12,6 +12,39 @@ import { TransactionProgress } from "./TransactionProgress";
 import { useRobustContractWrite } from "../hooks/useRobustContractWrite";
 import { useHashpackWallet } from "../lib/hashpackWallet";
 import { activeHederaChain } from "../lib/hederaChains";
+import { CARRIERS, carrierTrackingUrl } from "../lib/trackingUrl";
+
+/** Buyer-facing tracking line with a clickable link to the carrier's tracking page. */
+function TrackingLink({
+  trackingNumber,
+  trackingCarrier,
+}: {
+  trackingNumber: string;
+  trackingCarrier?: string | null;
+}) {
+  const url = carrierTrackingUrl(trackingCarrier, trackingNumber);
+  return (
+    <p className="text-xs text-chrome">
+      Tracking:{" "}
+      {url ? (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline underline-offset-2 hover:text-white"
+        >
+          {trackingNumber}
+          {trackingCarrier ? ` (${trackingCarrier})` : ""}
+        </a>
+      ) : (
+        <>
+          {trackingNumber}
+          {trackingCarrier ? ` (${trackingCarrier})` : ""}
+        </>
+      )}
+    </p>
+  );
+}
 
 function toBytes32(listingId: string): `0x${string}` {
   if (listingId.startsWith("0x") && listingId.length === 66) return listingId as `0x${string}`;
@@ -293,9 +326,15 @@ export function EscrowPanel({
                 <input
                   value={carrierInput}
                   onChange={(e) => setCarrierInput(e.target.value)}
-                  placeholder="Carrier (optional)"
+                  placeholder="Carrier (e.g. USPS, UPS, FedEx)"
+                  list="escrow-carriers"
                   className="input-frost w-full text-sm"
                 />
+                <datalist id="escrow-carriers">
+                  {CARRIERS.map((c) => (
+                    <option key={c} value={c} />
+                  ))}
+                </datalist>
               </div>
             )}
             <button
@@ -326,10 +365,7 @@ export function EscrowPanel({
             </p>
             {trackingNumber && (
               <div className="rounded-glass bg-white/5 border border-white/10 px-3 py-2">
-                <p className="text-xs text-chrome">
-                  Tracking: {trackingNumber}
-                  {trackingCarrier ? ` (${trackingCarrier})` : ""}
-                </p>
+                <TrackingLink trackingNumber={trackingNumber} trackingCarrier={trackingCarrier} />
               </div>
             )}
             <button
@@ -353,10 +389,7 @@ export function EscrowPanel({
               or handoff.
             </p>
             {trackingNumber && (
-              <p className="text-xs text-chrome">
-                Tracking: {trackingNumber}
-                {trackingCarrier ? ` (${trackingCarrier})` : ""}
-              </p>
+              <TrackingLink trackingNumber={trackingNumber} trackingCarrier={trackingCarrier} />
             )}
           </div>
         )}
@@ -367,10 +400,7 @@ export function EscrowPanel({
               to your wallet once confirmed.
             </p>
             {trackingNumber && (
-              <p className="text-xs text-chrome">
-                Tracking: {trackingNumber}
-                {trackingCarrier ? ` (${trackingCarrier})` : ""}
-              </p>
+              <TrackingLink trackingNumber={trackingNumber} trackingCarrier={trackingCarrier} />
             )}
           </div>
         )}

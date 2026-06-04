@@ -28,6 +28,8 @@ type HashpackWalletContextValue = {
   isConnected: boolean;
   isConnecting: boolean;
   error: string | null;
+  /** True when a desktop connect attempt elapsed without any wallet response — HashPack is likely not installed. */
+  notDetected: boolean;
   network: HederaNetwork;
   /** Pre-cached WalletConnect pairing URI. Use this for synchronous deep-links in click handlers. */
   pairingUri: string | null;
@@ -39,6 +41,10 @@ type HashpackWalletContextValue = {
 const HashpackWalletContext = createContext<HashpackWalletContextValue | null>(null);
 
 const PAIRING_WAIT_MS = 120_000;
+// On desktop, if no wallet (extension) responds within this window we assume
+// HashPack isn't installed and surface an actionable "not detected" state
+// instead of spinning indefinitely.
+const DETECT_TIMEOUT_MS = 6_000;
 const WALLET_SESSION_STORAGE_KEY = "hashpop.wallet.session.v1";
 
 let sharedHashconnect: HashConnect | null = null;
@@ -319,6 +325,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
   const [balanceTinybar, setBalanceTinybar] = useState<bigint | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notDetected, setNotDetected] = useState(false);
   const [pairingUri, setPairingUri] = useState<string | null>(null);
   const network = getNetwork();
   const connectWaitRef = useRef<((value: void | PromiseLike<void>) => void) | null>(null);
@@ -335,6 +342,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
     setAddress(null);
     setBalanceTinybar(null);
     setError(null);
+    setNotDetected(false);
     clearWalletSessionStorage();
     if (clearConnectorData) clearWalletConnectorStorage();
   }, []);
@@ -395,6 +403,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
           const first = normalizeAccountId(session.accountIds[0] ?? null);
           setAccountId(first);
           setError(null);
+          setNotDetected(false);
           if (first) {
             const mirrorData = await fetchMirrorAccount(first, network);
             if (!mounted) return;
@@ -474,6 +483,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
     connectInFlightRef.current = true;
     setIsConnecting(true);
     setError(null);
+    setNotDetected(false);
     try {
       let hc = hashconnect;
       if (!hc && initPromiseRef.current) {
@@ -524,7 +534,28 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
         void maybeConnectToExtension.call(hc).catch(() => {});
       }
 
-      await waitForPairing(connectWaitRef, PAIRING_WAIT_MS);
+      if (isMobileBrowser()) {
+        // Mobile pairs via the deep link / QR; give the user time to approve
+        // in the HashPack app and come back.
+        await waitForPairing(connectWaitRef, PAIRING_WAIT_MS);
+      } else {
+        // Desktop pairs via the browser extension, which responds near-instantly
+        // when installed. If nothing responds within DETECT_TIMEOUT_MS, assume
+        // HashPack isn't installed and surface guidance instead of hanging. The
+        // shared pairing listener stays registered, so a late approval still
+        // connects.
+        const paired = await new Promise<boolean>((resolve) => {
+          const timeout = setTimeout(() => {
+            connectWaitRef.current = null;
+            resolve(false);
+          }, DETECT_TIMEOUT_MS);
+          connectWaitRef.current = () => {
+            clearTimeout(timeout);
+            resolve(true);
+          };
+        });
+        if (!paired) setNotDetected(true);
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Wallet connection failed.";
       setError(msg);
@@ -555,6 +586,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
       isConnected: !!address && !!accountId,
       isConnecting,
       error,
+      notDetected,
       network,
       pairingUri,
       connect,
@@ -569,6 +601,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
       isReady,
       isConnecting,
       error,
+      notDetected,
       network,
       pairingUri,
       connect,

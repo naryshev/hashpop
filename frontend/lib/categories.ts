@@ -98,6 +98,129 @@ const LISTING_CATEGORIES: string[] = [
   "Other",
 ];
 
+/** Categories organized into browsable top-level groups. */
+export const CATEGORY_GROUPS: { group: string; categories: string[] }[] = [
+  {
+    group: "Electronics",
+    categories: [
+      "Smartphones & Phones",
+      "Laptops",
+      "Tablets",
+      "TVs & Monitors",
+      "Cameras & Photography",
+      "Headphones & Audio",
+      "Gaming Consoles & Games",
+      "Smart Home Devices",
+      "Computer Parts & Accessories",
+      "Drones & RC",
+    ],
+  },
+  {
+    group: "Vehicles",
+    categories: [
+      "Cars & Trucks",
+      "Motorcycles & Scooters",
+      "Boats & Watercraft",
+      "Bicycles & E-Bikes",
+      "Vehicle Parts & Accessories",
+      "ATVs & Off-Road",
+    ],
+  },
+  {
+    group: "Fashion",
+    categories: [
+      "Men's Clothing",
+      "Women's Clothing",
+      "Kids' Clothing",
+      "Shoes & Sneakers",
+      "Watches",
+      "Jewelry",
+      "Bags & Luggage",
+      "Sunglasses & Eyewear",
+      "Hats & Headwear",
+      "Accessories",
+    ],
+  },
+  {
+    group: "Home & Garden",
+    categories: [
+      "Furniture",
+      "Kitchen & Dining",
+      "Bedding & Bath",
+      "Home Décor",
+      "Garden & Outdoor",
+      "Tools & Hardware",
+      "Appliances",
+      "Lighting",
+    ],
+  },
+  {
+    group: "Collectibles & Hobbies",
+    categories: [
+      "Trading Cards",
+      "Coins & Currency",
+      "Stamps",
+      "Art & Prints",
+      "Antiques & Collectibles",
+      "Comics & Manga",
+      "Sports Memorabilia",
+      "Toys & Action Figures",
+    ],
+  },
+  {
+    group: "Media",
+    categories: [
+      "Books",
+      "Vinyl & Music",
+      "Movies & TV",
+      "Video Games",
+      "Magazines & Paper Media",
+    ],
+  },
+  {
+    group: "Sports & Outdoors",
+    categories: [
+      "Exercise Equipment",
+      "Outdoor & Camping",
+      "Fishing & Hunting",
+      "Sports Equipment",
+      "Cycling Gear",
+    ],
+  },
+  {
+    group: "Health & Beauty",
+    categories: ["Beauty & Skincare", "Health & Wellness", "Supplements & Vitamins"],
+  },
+  {
+    group: "Food & Beverages",
+    categories: ["Food & Groceries", "Beverages", "Coffee & Tea"],
+  },
+  {
+    group: "Digital & Software",
+    categories: [
+      "Software",
+      "Digital Downloads",
+      "Access Codes & Gift Cards",
+      "NFTs & Digital Art",
+    ],
+  },
+  {
+    group: "Precious & Luxury",
+    categories: ["Gold & Silver", "Precious Gems & Metals", "Luxury Goods"],
+  },
+  {
+    group: "Other",
+    categories: [
+      "Musical Instruments",
+      "Baby & Kids Gear",
+      "Pet Supplies",
+      "Office Supplies",
+      "Industrial & Business",
+      "Other",
+    ],
+  },
+];
+
 const CATEGORY_ALIASES: Record<string, string> = {
   // Smartphones & Phones
   phone: "Smartphones & Phones",

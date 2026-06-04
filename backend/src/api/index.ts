@@ -1492,6 +1492,68 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     }
   });
 
+  // Open a dispute on an escrow transaction. Records the dispute (freezing the
+  // order in the UI), notifies the counterparty in their message thread, and
+  // returns so the client can route the structured ticket to Discord support.
+  router.post("/listing/:id/dispute", async (req, res) => {
+    try {
+      const rawId = req.params.id ?? "";
+      const id =
+        rawId.startsWith("0x") && rawId.length === 66
+          ? normalizeListingId(rawId)
+          : listingIdToBytes32(rawId);
+      const { openerAddress, reason } = (req.body || {}) as {
+        openerAddress?: string;
+        reason?: string;
+      };
+      const opener = (openerAddress || "").trim().toLowerCase();
+      if (!opener) return res.status(400).json({ error: "openerAddress is required" });
+      const reasonText = typeof reason === "string" ? reason.trim().slice(0, 1000) : "";
+      if (reasonText.length < 5) {
+        return res.status(400).json({ error: "Please describe the issue (at least 5 characters)." });
+      }
+
+      const listing = await prisma.listing.findUnique({ where: { id } });
+      if (!listing) return res.status(404).json({ error: "Listing not found" });
+      const buyer = (listing.buyer || "").toLowerCase();
+      const seller = (listing.seller || "").toLowerCase();
+      if (opener !== buyer && opener !== seller) {
+        return res.status(403).json({ error: "Only the buyer or seller can open a dispute." });
+      }
+      if ((listing as any).disputeStatus === "OPEN") {
+        return res.status(409).json({ error: "A dispute is already open for this transaction." });
+      }
+
+      const updated = await prisma.listing.update({
+        where: { id },
+        data: {
+          disputeStatus: "OPEN",
+          disputeReason: reasonText,
+          disputeOpenedBy: opener,
+          disputeOpenedAt: new Date(),
+        },
+      });
+
+      const counterparty = opener === buyer ? seller : buyer;
+      if (counterparty) {
+        await prisma.message.create({
+          data: {
+            fromAddress: opener,
+            toAddress: counterparty,
+            listingId: id,
+            encrypted: false,
+            body: `⚠️ A dispute was opened for "${listing.title ?? id}". Reason: ${reasonText} — escrow is frozen pending review. Please respond here or open a ticket in the Hashpop Discord.`,
+          },
+        });
+      }
+
+      return res.json({ ok: true, disputeStatus: updated.disputeStatus });
+    } catch (err) {
+      log.error({ err }, "Failed to open dispute");
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   /**
    * GET /api/escrow/:listingId — read escrow state from chain (buyer, seller, amount, state, timeoutAt).
    * State: 0 = AWAITING_SHIPMENT, 1 = AWAITING_CONFIRMATION, 2 = COMPLETE.
@@ -1864,6 +1926,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
                 trackingCarrier: (s.listing as any).trackingCarrier ?? null,
                 shippedAt: (s.listing as any).shippedAt ?? null,
                 exchangeConfirmedAt: (s.listing as any).exchangeConfirmedAt ?? null,
+                disputeStatus: (s.listing as any).disputeStatus ?? null,
               }
             : null,
           auction: s.auction
@@ -2347,6 +2410,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           address: addrLower,
           displayName: null,
           bio: null,
+          avatarUrl: null,
           kyc: { status: "UNVERIFIED" },
         });
       }
@@ -2354,6 +2418,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         address: u.address,
         displayName: u.displayName,
         bio: u.bio,
+        avatarUrl: u.avatarUrl,
         kyc: {
           status: u.kycStatus ?? "UNVERIFIED",
           submittedAt: u.kycSubmittedAt,
@@ -2405,6 +2470,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         ...newKycFields,
         displayName: trim(body.displayName),
         bio: trim(body.bio),
+        avatarUrl: trim(body.avatarUrl),
         kycStatus: status,
         kycSubmittedAt: hasAnyKyc ? new Date() : null,
       };
@@ -2419,6 +2485,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         address: u.address,
         displayName: u.displayName,
         bio: u.bio,
+        avatarUrl: u.avatarUrl,
         kyc: {
           status: u.kycStatus,
           submittedAt: u.kycSubmittedAt,
@@ -2436,6 +2503,76 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       });
     } catch (err) {
       log.error({ err }, "Failed to update profile");
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Batch public-profile lookup used to render display names, avatars, KYC
+  // badges and ratings on listing cards / detail pages without N round-trips.
+  router.get("/users/profiles", async (req, res) => {
+    try {
+      const raw = String(req.query.addresses ?? "");
+      const addresses = Array.from(
+        new Set(
+          raw
+            .split(",")
+            .map((a) => a.trim().toLowerCase())
+            .filter(Boolean),
+        ),
+      ).slice(0, 100);
+      if (addresses.length === 0) return res.json({ profiles: {} });
+
+      const [users, ratingGroups] = await Promise.all([
+        prisma.user.findMany({
+          where: { address: { in: addresses } },
+          select: {
+            address: true,
+            displayName: true,
+            avatarUrl: true,
+            kycStatus: true,
+          },
+        }),
+        prisma.rating.groupBy({
+          by: ["ratedAddress"],
+          where: { ratedAddress: { in: addresses } },
+          _avg: { score: true },
+          _count: { _all: true },
+        }),
+      ]);
+
+      const ratingByAddress = new Map(
+        ratingGroups.map((g) => [
+          g.ratedAddress,
+          { average: g._avg.score ?? null, count: g._count._all ?? 0 },
+        ]),
+      );
+
+      const profiles: Record<
+        string,
+        {
+          address: string;
+          displayName: string | null;
+          avatarUrl: string | null;
+          kycVerified: boolean;
+          ratingAverage: number | null;
+          ratingCount: number;
+        }
+      > = {};
+      for (const addr of addresses) {
+        const u = users.find((x) => x.address === addr);
+        const r = ratingByAddress.get(addr);
+        profiles[addr] = {
+          address: addr,
+          displayName: u?.displayName ?? null,
+          avatarUrl: u?.avatarUrl ?? null,
+          kycVerified: u?.kycStatus === "VERIFIED",
+          ratingAverage: r?.average ?? null,
+          ratingCount: r?.count ?? 0,
+        };
+      }
+      res.json({ profiles });
+    } catch (err) {
+      log.error({ err }, "Failed to fetch batch profiles");
       res.status(500).json({ error: "Internal server error" });
     }
   });
