@@ -28,13 +28,17 @@ import { OffersPanel } from "../../../components/OffersPanel";
 
 import { getApiUrl } from "../../../lib/apiUrl";
 
-/** Seller avatar + display name + KYC badge + rating, shown on the listing detail. */
+/** Seller avatar + display name + KYC badge + inline rating, shown on the listing detail. */
 function SellerProfileMeta({ seller }: { seller: string }) {
   const profile = useProfile(seller);
   const name = profile?.displayName?.trim();
   const hasRating = profile && profile.ratingCount > 0 && profile.ratingAverage != null;
   return (
-    <div className="flex items-center gap-2.5">
+    <Link
+      href={`/profile/${encodeURIComponent(seller)}`}
+      className="group flex items-center gap-2.5 rounded-lg -mx-1 px-1 py-1 hover:bg-white/5 transition-colors"
+      aria-label="View seller profile"
+    >
       {profile?.avatarUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -48,24 +52,24 @@ function SellerProfileMeta({ seller }: { seller: string }) {
         </div>
       )}
       <div className="min-w-0">
-        <div className="flex items-center gap-1 text-sm font-medium text-white">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm font-medium text-white group-hover:text-chrome">
           <span className="truncate">{name ?? "Hashpop seller"}</span>
           {profile?.kycVerified && (
             <span className="rounded-full bg-[#00ffa3]/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#00ffa3]">
               Verified
             </span>
           )}
+          {hasRating ? (
+            <span className="text-xs font-normal text-amber-300/90">
+              ★ {profile!.ratingAverage!.toFixed(1)}{" "}
+              <span className="text-silver/60">({profile!.ratingCount})</span>
+            </span>
+          ) : (
+            <span className="text-xs font-normal text-silver/50">No ratings yet</span>
+          )}
         </div>
-        {hasRating ? (
-          <div className="text-xs text-amber-300/90">
-            ★ {profile!.ratingAverage!.toFixed(1)}{" "}
-            <span className="text-silver/50">({profile!.ratingCount} ratings)</span>
-          </div>
-        ) : (
-          <div className="text-xs text-silver/50">No ratings yet</div>
-        )}
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -1545,9 +1549,12 @@ export default function ListingPage() {
             <div>
               <h3 className="text-white font-medium mb-2">Seller</h3>
               <SellerProfileMeta seller={item!.seller} />
-              <p className="text-silver text-sm flex items-center gap-2 mt-1">
+              <Link
+                href={`/profile/${encodeURIComponent(item!.seller)}`}
+                className="mt-1 flex items-center gap-2 text-silver text-sm hover:text-white transition-colors"
+              >
                 <AddressDisplay address={item!.seller} className="text-chrome font-mono text-xs" />
-              </p>
+              </Link>
               {isSeller && isSellerActiveListing && !isLockedOnChain && !editing && (
                 <div className="flex gap-2 mt-2">
                   <button
