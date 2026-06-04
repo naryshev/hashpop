@@ -738,7 +738,7 @@ export default function MarketplacePageClient({
                         listing={item}
                         className="w-full"
                         aspectRatio="square"
-                        navigation="arrows"
+                        slideshow="hover"
                         cardSize
                         compactHeight="220px"
                       />
@@ -799,7 +799,10 @@ export default function MarketplacePageClient({
                     >
                       <div className="relative h-[88px] w-[88px] overflow-hidden rounded-lg bg-white/5">
                         <ListingMedia
-                          listing={item}
+                          listing={{
+                            imageUrl: item.imageUrl,
+                            mediaUrls: item.mediaUrls?.slice(0, 1) ?? null,
+                          }}
                           className="w-full"
                           aspectRatio="square"
                           cardSize
@@ -872,6 +875,7 @@ export default function MarketplacePageClient({
                               listing={hero}
                               className="absolute inset-0 w-full h-full"
                               aspectRatio="video"
+                              slideshow="auto"
                               cardSize
                               compactHeight="320px"
                             />
@@ -932,6 +936,7 @@ export default function MarketplacePageClient({
                                   listing={item}
                                   className="absolute inset-0 w-full h-full"
                                   aspectRatio="square"
+                                  slideshow="auto"
                                   cardSize
                                   compactHeight={tall ? "256px" : "120px"}
                                 />

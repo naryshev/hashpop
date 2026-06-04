@@ -144,10 +144,10 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
         ? [
             { label: "Offers", href: "/offers", icon: <Tag className="h-5 w-5" /> },
             { label: "Purchases", href: "/purchases", icon: <Receipt className="h-5 w-5" /> },
+            { label: "Watchlist", href: "/watchlist", icon: <Heart className="h-5 w-5" /> },
+            { label: "Messages", href: "/messages", icon: <MessageSquare className="h-5 w-5" /> },
           ]
         : []),
-      { label: "Watchlist", href: "/watchlist", icon: <Heart className="h-5 w-5" /> },
-      { label: "Messages", href: "/messages", icon: <MessageSquare className="h-5 w-5" /> },
       { label: "Support", href: "/support", icon: <LifeBuoy className="h-5 w-5" /> },
     ];
   }, [effectiveConnected]);
@@ -165,7 +165,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen md:h-screen md:min-h-0 md:overflow-hidden">
       {/* Left icon rail — desktop only, no border, floats on the canvas. */}
       <aside
-        className="sticky top-0 z-30 hidden h-screen w-16 shrink-0 flex-col items-center justify-between bg-transparent py-3 md:flex"
+        className="sticky top-0 z-30 hidden h-screen w-14 shrink-0 flex-col items-center justify-between bg-transparent py-3 md:flex"
         aria-label="Primary navigation"
       >
         <div className="flex flex-col items-center gap-1">
@@ -248,9 +248,9 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
             </Link>
             {effectiveConnected ? (
               <Link
-                href={`/profile/${accountId ?? address ?? ""}`}
+                href="/dashboard"
                 className="flex items-center gap-2 rounded-glass border border-white/10 bg-white/5 px-3 py-1.5 text-xs hover:bg-white/10"
-                aria-label="Open profile"
+                aria-label="Open My Hashpop"
               >
                 <Wallet className="h-3.5 w-3.5 text-chrome" />
                 <span className="font-mono text-white/80">
@@ -275,7 +275,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
             scrolls internally — that way the card's full border (including
             the bottom edge) is always visible while the page content
             scrolls inside it instead of sliding under the chrome. */}
-        <main className="flex-1 pt-14 md:flex md:min-h-0 md:flex-1 md:p-3 md:pt-1">
+        <main className="flex-1 pt-14 md:flex md:min-h-0 md:flex-1 md:py-3 md:pl-1 md:pr-3 md:pt-1">
           <div className="scrollbar-none md:h-full md:min-h-0 md:flex-1 md:overflow-y-auto md:rounded-glass-lg md:border md:border-white/10 md:bg-[#0e1422]/60">
             {children}
           </div>

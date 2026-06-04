@@ -3,21 +3,19 @@ import { listingHref } from "../../lib/listingUrl";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { MessageSquare, ChevronDown, ChevronUp } from "lucide-react";
+import { MessageSquare, ChevronDown, ChevronUp, User } from "lucide-react";
 import { formatPriceForDisplay } from "../../lib/formatPrice";
 import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { formatListingDate } from "../../lib/formatDate";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
+import { useProfile } from "../../lib/profiles";
 import { getApiUrl } from "../../lib/apiUrl";
 import {
-  BalancePoint,
   consensusToDate,
   fetchAccountTransactions,
-  fetchBalanceSeries,
   AccountTransaction,
 } from "../../lib/mirrorTx";
-import { Sparkline } from "../../components/dashboard/Sparkline";
 import { OnboardingChecklist } from "../../components/OnboardingChecklist";
 
 function formatListingId(id: string): string {
@@ -213,9 +211,6 @@ function SoldItemCard({
   );
 }
 
-type Period = "7D" | "30D" | "90D" | "1Y";
-const PERIOD_DAYS: Record<Period, number> = { "7D": 7, "30D": 30, "90D": 90, "1Y": 365 };
-
 function tinybarToHbarNum(tb: bigint | number | null | undefined): number {
   if (tb == null) return 0;
   const big = typeof tb === "bigint" ? tb : BigInt(Math.trunc(Number(tb)));
@@ -306,30 +301,14 @@ export default function DashboardPage() {
     sent: 0,
   });
   const [loading, setLoading] = useState(true);
-  const [period, setPeriod] = useState<Period>("30D");
-  const [series, setSeries] = useState<BalancePoint[]>([]);
   const [recent, setRecent] = useState<AccountTransaction[]>([]);
   const [escrowTinybar, setEscrowTinybar] = useState<number>(0);
   const usdRate = useHbarUsd();
+  const myProfile = useProfile(address ?? null);
+  const avatarUrl = myProfile?.avatarUrl?.trim() || null;
+  const displayName = myProfile?.displayName?.trim() || null;
 
   useEffect(() => setMounted(true), []);
-
-  // 30-day wallet series, reconstructed from Mirror tx history.
-  useEffect(() => {
-    if (!accountId || balanceTinybar == null) {
-      setSeries([]);
-      return;
-    }
-    const ac = new AbortController();
-    fetchBalanceSeries(accountId, balanceTinybar, PERIOD_DAYS[period], ac.signal)
-      .then((pts) => {
-        if (!ac.signal.aborted) setSeries(pts);
-      })
-      .catch(() => {
-        if (!ac.signal.aborted) setSeries([]);
-      });
-    return () => ac.abort();
-  }, [accountId, balanceTinybar, period]);
 
   // Recent activity ticker (top 5).
   useEffect(() => {
@@ -472,17 +451,6 @@ export default function DashboardPage() {
   return (
     <main className="min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-8">
-        {address && (
-          <div className="flex items-center justify-end">
-            <Link
-              href={`/profile/${encodeURIComponent(address)}`}
-              className="text-sm text-chrome hover:text-white font-medium"
-            >
-              ★ {Number(stats?.ratingAverage ?? 0).toFixed(1)}
-            </Link>
-          </div>
-        )}
-
         <div className="space-y-8" suppressHydrationWarning>
           {!mounted ? (
             <p className="text-silver">Loading…</p>
@@ -490,17 +458,37 @@ export default function DashboardPage() {
             <p className="text-silver">Please connect your wallet to see your dashboard.</p>
           ) : (
             <>
-              {/* Greeting */}
-              <div className="flex items-baseline justify-between">
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-silver">
-                    Welcome back
+              {/* Greeting + actions — one aligned row */}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  {avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={avatarUrl}
+                      alt=""
+                      className="h-12 w-12 shrink-0 rounded-full border border-white/10 object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-silver/60">
+                      <User size={22} />
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-silver">
+                      Welcome back
+                    </div>
+                    <h1 className="mt-0.5 truncate text-[24px] font-extrabold tracking-[-0.01em] text-white sm:text-[28px]">
+                      {displayName ?? (accountId ? `@${accountId}` : "My Hashpop")}
+                    </h1>
                   </div>
-                  <h1 className="mt-1 text-[28px] font-extrabold tracking-[-0.01em] text-white">
-                    {accountId ? `@${accountId}` : "My Hashpop"}
-                  </h1>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link
+                    href={`/profile/${encodeURIComponent(address)}`}
+                    className="rounded-full border border-white/10 px-3 py-1.5 text-xs font-semibold text-chrome hover:bg-white/5"
+                  >
+                    ★ {Number(stats?.ratingAverage ?? 0).toFixed(1)}
+                  </Link>
                   <Link
                     href="/create"
                     className="rounded-full bg-[linear-gradient(110deg,#00b37a_0%,#00ffa3_50%,#00e5ff_100%)] px-3.5 py-2 text-xs font-bold text-black shadow-glow"
@@ -508,11 +496,24 @@ export default function DashboardPage() {
                     + List item
                   </Link>
                   <Link
+                    href={`/profile/${encodeURIComponent(address)}?edit=1`}
+                    className="rounded-full border border-white/10 px-3.5 py-2 text-xs text-white hover:bg-white/5"
+                  >
+                    Edit profile
+                  </Link>
+                  <Link
                     href="/purchases"
                     className="rounded-full border border-white/10 px-3.5 py-2 text-xs text-white hover:bg-white/5"
                   >
                     Purchases
                   </Link>
+                  <button
+                    type="button"
+                    onClick={() => void disconnect()}
+                    className="rounded-full border border-rose-500/60 bg-rose-500/10 px-3.5 py-2 text-xs font-semibold text-rose-300 hover:bg-rose-500/20"
+                  >
+                    Sign out
+                  </button>
                 </div>
               </div>
 
@@ -558,66 +559,41 @@ export default function DashboardPage() {
                 />
               </div>
 
-              {/* Wallet sparkline + Recent activity ticker */}
-              <div className="grid gap-3.5 md:grid-cols-[1.6fr_1fr]">
-                <div className="rounded-glass-lg border border-white/10 bg-[#0e1422] p-[18px]">
-                  <div className="mb-3 flex items-center justify-between">
-                    <div className="text-[12px] font-semibold uppercase tracking-[0.12em] text-silver">
-                      Wallet · {period.toLowerCase()}
-                    </div>
-                    <div className="flex gap-1">
-                      {(["7D", "30D", "90D", "1Y"] as const).map((p) => (
-                        <button
-                          key={p}
-                          onClick={() => setPeriod(p)}
-                          className={`rounded-md px-2.5 py-1 text-[10px] font-semibold ${
-                            p === period
-                              ? "bg-chrome/10 text-chrome"
-                              : "text-silver hover:text-white"
-                          }`}
-                        >
-                          {p}
-                        </button>
-                      ))}
-                    </div>
+              {/* Recent on-chain activity */}
+              <div className="rounded-glass-lg border border-white/10 bg-[#0e1422] p-[18px]">
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="text-[12px] font-semibold uppercase tracking-[0.12em] text-silver">
+                    Recent activity
                   </div>
-                  <Sparkline points={series} height={140} />
+                  <Link href="/activity" className="text-[11px] text-chrome hover:text-white">
+                    View all
+                  </Link>
                 </div>
-                <div className="rounded-glass-lg border border-white/10 bg-[#0e1422] p-[18px]">
-                  <div className="mb-3 flex items-center justify-between">
-                    <div className="text-[12px] font-semibold uppercase tracking-[0.12em] text-silver">
-                      Recent
-                    </div>
-                    <Link href="/activity" className="text-[11px] text-chrome hover:text-white">
-                      View all
-                    </Link>
-                  </div>
-                  {recent.length === 0 ? (
-                    <p className="text-sm text-silver">No on-chain activity yet.</p>
-                  ) : (
-                    <ul className="space-y-1.5">
-                      {recent.map((tx) => (
-                        <li
-                          key={tx.transaction_id}
-                          className="flex items-center gap-2.5 text-[12px]"
-                        >
-                          <span
-                            className="h-1.5 w-1.5 shrink-0 rounded-full"
-                            style={{
-                              background: activityTone(tx, accountId ?? ""),
-                            }}
-                          />
-                          <span className="flex-1 truncate text-white">
-                            {activityLabel(tx, accountId ?? "")}
-                          </span>
-                          <span className="font-mono text-[11px] text-silver">
-                            {timeAgo(consensusToDate(tx.consensus_timestamp))}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+                {recent.length === 0 ? (
+                  <p className="text-sm text-silver">No on-chain activity yet.</p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {recent.map((tx) => (
+                      <li
+                        key={tx.transaction_id}
+                        className="flex items-center gap-2.5 text-[12px]"
+                      >
+                        <span
+                          className="h-1.5 w-1.5 shrink-0 rounded-full"
+                          style={{
+                            background: activityTone(tx, accountId ?? ""),
+                          }}
+                        />
+                        <span className="flex-1 truncate text-white">
+                          {activityLabel(tx, accountId ?? "")}
+                        </span>
+                        <span className="font-mono text-[11px] text-silver">
+                          {timeAgo(consensusToDate(tx.consensus_timestamp))}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
 
               {/* Active Listings */}
@@ -761,17 +737,6 @@ export default function DashboardPage() {
                 )}
               </section>
 
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    void disconnect();
-                  }}
-                  className="inline-flex items-center rounded-lg border border-white/20 px-4 py-2 text-sm font-medium text-silver transition hover:border-white/30 hover:text-white"
-                >
-                  Sign out
-                </button>
-              </div>
             </>
           )}
         </div>
