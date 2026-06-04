@@ -92,14 +92,18 @@ export function AppSidebar({
               href: "/purchases",
               icon: <Receipt className="h-5 w-5 flex-shrink-0" />,
             },
+            {
+              label: "Watchlist",
+              href: "/watchlist",
+              icon: <Heart className="h-5 w-5 flex-shrink-0" />,
+            },
+            {
+              label: "Messages",
+              href: "/messages",
+              icon: <MessageSquare className="h-5 w-5 flex-shrink-0" />,
+            },
           ]
         : []),
-      { label: "Watchlist", href: "/watchlist", icon: <Heart className="h-5 w-5 flex-shrink-0" /> },
-      {
-        label: "Messages",
-        href: "/messages",
-        icon: <MessageSquare className="h-5 w-5 flex-shrink-0" />,
-      },
       { label: "Support", href: "/support", icon: <LifeBuoy className="h-5 w-5 flex-shrink-0" /> },
     ],
     [effectiveConnected],

@@ -144,10 +144,10 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
         ? [
             { label: "Offers", href: "/offers", icon: <Tag className="h-5 w-5" /> },
             { label: "Purchases", href: "/purchases", icon: <Receipt className="h-5 w-5" /> },
+            { label: "Watchlist", href: "/watchlist", icon: <Heart className="h-5 w-5" /> },
+            { label: "Messages", href: "/messages", icon: <MessageSquare className="h-5 w-5" /> },
           ]
         : []),
-      { label: "Watchlist", href: "/watchlist", icon: <Heart className="h-5 w-5" /> },
-      { label: "Messages", href: "/messages", icon: <MessageSquare className="h-5 w-5" /> },
       { label: "Support", href: "/support", icon: <LifeBuoy className="h-5 w-5" /> },
     ];
   }, [effectiveConnected]);
@@ -248,9 +248,9 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
             </Link>
             {effectiveConnected ? (
               <Link
-                href={`/profile/${accountId ?? address ?? ""}`}
+                href="/dashboard"
                 className="flex items-center gap-2 rounded-glass border border-white/10 bg-white/5 px-3 py-1.5 text-xs hover:bg-white/10"
-                aria-label="Open profile"
+                aria-label="Open My Hashpop"
               >
                 <Wallet className="h-3.5 w-3.5 text-chrome" />
                 <span className="font-mono text-white/80">
