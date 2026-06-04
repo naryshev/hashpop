@@ -51,16 +51,25 @@ export function ListingMedia({
 
   // Drive the crossfade. "auto" runs continuously; "hover" only advances while
   // the pointer is over the media and snaps back to the first frame on leave.
+  // The first advance on hover fires quickly so the slideshow feels responsive
+  // — subsequent frames roll at the regular cadence.
   useEffect(() => {
     if (!isSlideshow) return;
     if (slideshow === "hover" && !hovering) {
       setIndex(0);
       return;
     }
-    const id = setInterval(() => {
-      setIndex((i) => (i + 1) % urls.length);
-    }, 3000);
-    return () => clearInterval(id);
+    const firstDelay = slideshow === "hover" ? 500 : 3000;
+    const cadence = 3000;
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = (delay: number) => {
+      timer = setTimeout(() => {
+        setIndex((i) => (i + 1) % urls.length);
+        tick(cadence);
+      }, delay);
+    };
+    tick(firstDelay);
+    return () => clearTimeout(timer);
   }, [isSlideshow, slideshow, hovering, urls.length]);
 
   if (urls.length === 0) {
