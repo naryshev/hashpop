@@ -165,7 +165,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen md:h-screen md:min-h-0 md:overflow-hidden">
       {/* Left icon rail — desktop only, no border, floats on the canvas. */}
       <aside
-        className="sticky top-0 z-30 hidden h-screen w-16 shrink-0 flex-col items-center justify-between bg-transparent py-3 md:flex"
+        className="sticky top-0 z-30 hidden h-screen w-14 shrink-0 flex-col items-center justify-between bg-transparent py-3 md:flex"
         aria-label="Primary navigation"
       >
         <div className="flex flex-col items-center gap-1">
@@ -275,7 +275,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
             scrolls internally — that way the card's full border (including
             the bottom edge) is always visible while the page content
             scrolls inside it instead of sliding under the chrome. */}
-        <main className="flex-1 pt-14 md:flex md:min-h-0 md:flex-1 md:p-3 md:pt-1">
+        <main className="flex-1 pt-14 md:flex md:min-h-0 md:flex-1 md:py-3 md:pl-1 md:pr-3 md:pt-1">
           <div className="scrollbar-none md:h-full md:min-h-0 md:flex-1 md:overflow-y-auto md:rounded-glass-lg md:border md:border-white/10 md:bg-[#0e1422]/60">
             {children}
           </div>
