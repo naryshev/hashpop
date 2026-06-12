@@ -99,8 +99,8 @@ type ViewMode = "grid" | "feed" | "editorial";
 type SortMode = "recent" | "price-asc" | "price-desc" | "trending";
 
 function parseViewMode(value: string | null): ViewMode {
-  if (value === "feed" || value === "editorial") return value;
-  return "grid";
+  if (value === "feed" || value === "grid") return value;
+  return "editorial";
 }
 
 function parseSortMode(value: string | null): SortMode {
@@ -669,9 +669,9 @@ export default function MarketplacePageClient({
               <div className="flex items-center gap-2">
                 {(
                   [
-                    { id: "grid", label: "Grid" },
-                    { id: "feed", label: "Feed" },
                     { id: "editorial", label: "Editorial" },
+                    { id: "feed", label: "Feed" },
+                    { id: "grid", label: "Grid" },
                   ] as { id: ViewMode; label: string }[]
                 ).map((v) => {
                   const active = viewMode === v.id;
@@ -679,7 +679,7 @@ export default function MarketplacePageClient({
                     <button
                       key={v.id}
                       type="button"
-                      onClick={() => setParam("view", v.id === "grid" ? null : v.id)}
+                      onClick={() => setParam("view", v.id === "editorial" ? null : v.id)}
                       className={`rounded-full px-3 py-1 text-xs font-medium transition-colors border ${
                         active
                           ? "border-[#00ffa3]/40 bg-[#00ffa3]/10 text-[#00ffa3]"
