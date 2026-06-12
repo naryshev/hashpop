@@ -2507,6 +2507,80 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     }
   });
 
+  // Resolve an address (EVM 0x or Hedera 0.0.x) to its Hedera account ID via
+  // the mirror node. Returns null if it can't be resolved.
+  async function resolveAccountId(address: string): Promise<string | null> {
+    if (/^0\.0\.\d+$/.test(address)) return address;
+    if (!/^0x[0-9a-f]{40}$/.test(address)) return null;
+    const mirrorUrl = process.env.MIRROR_URL || "https://testnet.mirrornode.hedera.com";
+    try {
+      const r = await fetch(`${mirrorUrl}/api/v1/accounts/${address}`, {
+        signal: AbortSignal.timeout(4000),
+      });
+      if (!r.ok) return null;
+      const data = (await r.json()) as { account?: string | number };
+      const id = data.account;
+      if (typeof id === "string" && /^0\.0\.\d+$/.test(id)) return id;
+      if (typeof id === "number") return `0.0.${id}`;
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  // Pull profile info (HNS-style username + PFP NFT thumbnail) from HashPack's
+  // public profile API for the given Hedera account IDs.
+  // POST https://api.hashpack.app/user-profile/get-multiple { accountIds, network }
+  async function fetchHashPackProfiles(
+    accountIds: string[],
+  ): Promise<Map<string, { name: string | null; avatarUrl: string | null }>> {
+    const out = new Map<string, { name: string | null; avatarUrl: string | null }>();
+    if (accountIds.length === 0) return out;
+    const mirrorUrl = process.env.MIRROR_URL || "https://testnet.mirrornode.hedera.com";
+    const network = mirrorUrl.includes("mainnet") ? "mainnet" : "testnet";
+    try {
+      const r = await fetch("https://api.hashpack.app/user-profile/get-multiple", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountIds, network }),
+        signal: AbortSignal.timeout(7000),
+      });
+      if (!r.ok) return out;
+      const data = (await r.json()) as
+        | {
+            profiles?: Array<{
+              accountId?: string;
+              name?: { name?: string } | string | null;
+              picture?: { thumbnail?: string } | string | null;
+            }>;
+          }
+        | Array<{
+            accountId?: string;
+            name?: { name?: string } | string | null;
+            picture?: { thumbnail?: string } | string | null;
+          }>;
+      const list = Array.isArray(data) ? data : (data?.profiles ?? []);
+      for (const p of list) {
+        if (!p?.accountId) continue;
+        const nameRaw =
+          typeof p.name === "string" ? p.name : (p.name && typeof p.name === "object" ? p.name.name : null);
+        const pictureRaw =
+          typeof p.picture === "string"
+            ? p.picture
+            : p.picture && typeof p.picture === "object"
+              ? p.picture.thumbnail
+              : null;
+        out.set(p.accountId, {
+          name: typeof nameRaw === "string" && nameRaw.trim() ? nameRaw.trim() : null,
+          avatarUrl: typeof pictureRaw === "string" && pictureRaw.trim() ? pictureRaw.trim() : null,
+        });
+      }
+    } catch {
+      // Network/timeout failures fall back to whatever Hashpop has on file.
+    }
+    return out;
+  }
+
   // Batch public-profile lookup used to render display names, avatars, KYC
   // badges and ratings on listing cards / detail pages without N round-trips.
   router.get("/users/profiles", async (req, res) => {
@@ -2522,7 +2596,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       ).slice(0, 100);
       if (addresses.length === 0) return res.json({ profiles: {} });
 
-      const [users, ratingGroups] = await Promise.all([
+      const [users, ratingGroups, accountIds] = await Promise.all([
         prisma.user.findMany({
           where: { address: { in: addresses } },
           select: {
@@ -2538,6 +2612,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           _avg: { score: true },
           _count: { _all: true },
         }),
+        Promise.all(addresses.map(resolveAccountId)),
       ]);
 
       const ratingByAddress = new Map(
@@ -2547,12 +2622,25 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         ]),
       );
 
+      const addressToAccount = new Map<string, string>();
+      const uniqueAccountIds: string[] = [];
+      addresses.forEach((a, i) => {
+        const id = accountIds[i];
+        if (id) {
+          addressToAccount.set(a, id);
+          if (!uniqueAccountIds.includes(id)) uniqueAccountIds.push(id);
+        }
+      });
+      const hashpackByAccount = await fetchHashPackProfiles(uniqueAccountIds);
+
       const profiles: Record<
         string,
         {
           address: string;
           displayName: string | null;
           avatarUrl: string | null;
+          hashpackName: string | null;
+          hashpackAvatarUrl: string | null;
           kycVerified: boolean;
           ratingAverage: number | null;
           ratingCount: number;
@@ -2561,10 +2649,14 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       for (const addr of addresses) {
         const u = users.find((x) => x.address === addr);
         const r = ratingByAddress.get(addr);
+        const accountId = addressToAccount.get(addr);
+        const hp = accountId ? hashpackByAccount.get(accountId) : undefined;
         profiles[addr] = {
           address: addr,
           displayName: u?.displayName ?? null,
           avatarUrl: u?.avatarUrl ?? null,
+          hashpackName: hp?.name ?? null,
+          hashpackAvatarUrl: hp?.avatarUrl ?? null,
           kycVerified: u?.kycStatus === "VERIFIED",
           ratingAverage: r?.average ?? null,
           ratingCount: r?.count ?? 0,

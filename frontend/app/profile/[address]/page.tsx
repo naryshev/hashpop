@@ -7,6 +7,7 @@ import { AddressDisplay } from "../../../components/AddressDisplay";
 import { getApiUrl } from "../../../lib/apiUrl";
 import { useHashpackWallet } from "../../../lib/hashpackWallet";
 import { compressImage } from "../../../lib/compressImage";
+import { profileAvatarUrl, profileDisplayName, useProfile } from "../../../lib/profiles";
 
 type ProfileStats = {
   address: string;
@@ -145,7 +146,15 @@ export default function ProfilePage() {
     }
   };
 
-  const avatarUrl = (editing ? draft?.avatarUrl : profile?.avatarUrl)?.trim() || null;
+  // Fall back to the user's HashPack wallet username + profile picture when
+  // they haven't set their own on Hashpop. Editing always shows the draft so
+  // upload + remove preview immediately.
+  const publicProfile = useProfile(address ?? null);
+  const fallbackAvatar = profileAvatarUrl(publicProfile);
+  const fallbackName = profileDisplayName(publicProfile);
+  const stagedAvatar = editing ? draft?.avatarUrl?.trim() || null : profile?.avatarUrl?.trim() || null;
+  const avatarUrl = stagedAvatar ?? fallbackAvatar;
+  const headerName = profile?.displayName?.trim() || fallbackName || "Profile";
   const isVerified = profile?.kyc?.status === "VERIFIED";
 
   return (
@@ -167,7 +176,7 @@ export default function ProfilePage() {
             )}
             <div className="min-w-0">
               <h1 className="flex items-center gap-1.5 truncate text-xl sm:text-2xl font-bold text-white">
-                {profile?.displayName?.trim() || "Profile"}
+                {headerName}
                 {isVerified && (
                   <BadgeCheck size={20} className="text-[#00ffa3]" aria-label="KYC verified" />
                 )}
@@ -257,7 +266,12 @@ export default function ProfilePage() {
             <>
               <div>
                 <p className="text-xs uppercase tracking-wide text-silver">Display name</p>
-                <p className="text-white mt-0.5">{profile?.displayName?.trim() || "—"}</p>
+                <p className="text-white mt-0.5">
+                  {profile?.displayName?.trim() ||
+                    (publicProfile?.hashpackName?.trim()
+                      ? `${publicProfile.hashpackName} (from HashPack)`
+                      : "—")}
+                </p>
               </div>
               <div>
                 <p className="text-xs uppercase tracking-wide text-silver">Bio</p>
@@ -310,8 +324,15 @@ export default function ProfilePage() {
                   className="mt-1 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
                   value={draft?.displayName ?? ""}
                   onChange={(e) => setDraft((d) => (d ? { ...d, displayName: e.target.value } : d))}
+                  placeholder={publicProfile?.hashpackName ?? "Your name"}
                   maxLength={80}
                 />
+                {publicProfile?.hashpackName && (
+                  <span className="mt-1 block text-[11px] text-silver/70">
+                    Leave blank to use your HashPack username
+                    (<span className="text-chrome">{publicProfile.hashpackName}</span>).
+                  </span>
+                )}
               </label>
               <label className="block">
                 <span className="text-xs uppercase tracking-wide text-silver">Bio</span>

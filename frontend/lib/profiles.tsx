@@ -15,6 +15,10 @@ export type PublicProfile = {
   address: string;
   displayName: string | null;
   avatarUrl: string | null;
+  /** Username from the user's HashPack wallet profile, if they've set one. */
+  hashpackName: string | null;
+  /** Profile-picture URL from the user's HashPack wallet profile, if set. */
+  hashpackAvatarUrl: string | null;
   kycVerified: boolean;
   ratingAverage: number | null;
   ratingCount: number;
@@ -117,8 +121,24 @@ export function useProfiles(addresses: (string | null | undefined)[]): Record<st
   return cache;
 }
 
-/** Best display label for an address: display name if set, else null. */
+/**
+ * Resolve the best display name for a profile, in order: Hashpop-set name →
+ * HashPack wallet username → null (caller falls back to wallet address / id).
+ */
 export function profileDisplayName(profile: PublicProfile | undefined): string | null {
-  const name = profile?.displayName?.trim();
-  return name ? name : null;
+  const own = profile?.displayName?.trim();
+  if (own) return own;
+  const hp = profile?.hashpackName?.trim();
+  return hp ? hp : null;
+}
+
+/**
+ * Resolve the best avatar URL for a profile, in order: Hashpop-uploaded
+ * avatar → HashPack profile picture → null.
+ */
+export function profileAvatarUrl(profile: PublicProfile | undefined): string | null {
+  const own = profile?.avatarUrl?.trim();
+  if (own) return own;
+  const hp = profile?.hashpackAvatarUrl?.trim();
+  return hp ? hp : null;
 }

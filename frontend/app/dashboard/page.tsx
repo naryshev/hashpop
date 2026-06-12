@@ -9,7 +9,7 @@ import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { formatListingDate } from "../../lib/formatDate";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
-import { useProfile } from "../../lib/profiles";
+import { profileAvatarUrl, profileDisplayName, useProfile } from "../../lib/profiles";
 import { getApiUrl } from "../../lib/apiUrl";
 import {
   consensusToDate,
@@ -305,8 +305,8 @@ export default function DashboardPage() {
   const [escrowTinybar, setEscrowTinybar] = useState<number>(0);
   const usdRate = useHbarUsd();
   const myProfile = useProfile(address ?? null);
-  const avatarUrl = myProfile?.avatarUrl?.trim() || null;
-  const displayName = myProfile?.displayName?.trim() || null;
+  const avatarUrl = profileAvatarUrl(myProfile);
+  const displayName = profileDisplayName(myProfile);
 
   useEffect(() => setMounted(true), []);
 

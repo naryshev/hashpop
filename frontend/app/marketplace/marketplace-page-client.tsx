@@ -13,7 +13,7 @@ import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { canonicalizeCategory } from "../../lib/categories";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
-import { useProfile, useProfiles } from "../../lib/profiles";
+import { profileAvatarUrl, profileDisplayName, useProfile, useProfiles } from "../../lib/profiles";
 import { TopBarSlot } from "../../lib/topBar";
 import { BadgeCheck } from "lucide-react";
 
@@ -129,13 +129,14 @@ function relativeTimeShort(iso?: string): string {
 function SellerInline({ seller, size = 16 }: { seller?: string; size?: number }) {
   const profile = useProfile(seller);
   if (!seller) return null;
-  const name = profile?.displayName?.trim();
+  const name = profileDisplayName(profile);
+  const avatar = profileAvatarUrl(profile);
   return (
     <span className="mt-1 flex items-center gap-1 truncate">
-      {profile?.avatarUrl ? (
+      {avatar ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={profile.avatarUrl}
+          src={avatar}
           alt=""
           className="shrink-0 rounded-full object-cover"
           style={{ width: size, height: size }}

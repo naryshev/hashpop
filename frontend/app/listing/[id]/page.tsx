@@ -7,7 +7,7 @@ import Link from "next/link";
 import { BuyButton } from "../../../components/BuyButton";
 import { EscrowPanel } from "../../../components/EscrowPanel";
 import { AddressDisplay } from "../../../components/AddressDisplay";
-import { useProfile } from "../../../lib/profiles";
+import { profileAvatarUrl, profileDisplayName, useProfile } from "../../../lib/profiles";
 import { formatContractAmountToHbar, formatPriceForDisplay } from "../../../lib/formatPrice";
 import { formatHbarWithUsd } from "../../../lib/hbarUsd";
 import { useHbarUsd } from "../../../hooks/useHbarUsd";
@@ -31,7 +31,8 @@ import { getApiUrl } from "../../../lib/apiUrl";
 /** Seller avatar + display name + KYC badge + inline rating, shown on the listing detail. */
 function SellerProfileMeta({ seller }: { seller: string }) {
   const profile = useProfile(seller);
-  const name = profile?.displayName?.trim();
+  const name = profileDisplayName(profile);
+  const avatar = profileAvatarUrl(profile);
   const hasRating = profile && profile.ratingCount > 0 && profile.ratingAverage != null;
   return (
     <Link
@@ -39,10 +40,10 @@ function SellerProfileMeta({ seller }: { seller: string }) {
       className="group flex items-center gap-2.5 rounded-lg -mx-1 px-1 py-1 hover:bg-white/5 transition-colors"
       aria-label="View seller profile"
     >
-      {profile?.avatarUrl ? (
+      {avatar ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={profile.avatarUrl}
+          src={avatar}
           alt=""
           className="h-9 w-9 shrink-0 rounded-full object-cover"
         />

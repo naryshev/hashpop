@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { BadgeCheck } from "lucide-react";
 
 import { getApiUrl } from "../lib/apiUrl";
-import { useProfile } from "../lib/profiles";
+import { profileDisplayName, useProfile } from "../lib/profiles";
 
 function truncateEvm(address: string): string {
   if (!address || address.length < 12) return address;
@@ -43,7 +43,7 @@ export function AddressDisplay({
       .catch(() => {});
   }, [address]);
 
-  const displayName = profile?.displayName?.trim() || null;
+  const displayName = profileDisplayName(profile);
   const fallback =
     accountId ??
     (address && address.startsWith("0x") && address.length === 42 ? truncateEvm(address) : address);
