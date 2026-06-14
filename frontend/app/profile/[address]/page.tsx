@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { BadgeCheck, User } from "lucide-react";
+import { BadgeCheck, Mail, User } from "lucide-react";
 import { AddressDisplay } from "../../../components/AddressDisplay";
 import { getApiUrl } from "../../../lib/apiUrl";
 import { useHashpackWallet } from "../../../lib/hashpackWallet";
@@ -186,8 +187,8 @@ export default function ProfilePage() {
               </p>
             </div>
           </div>
-          {isSelf &&
-            (editing ? (
+          {isSelf ? (
+            editing ? (
               <button
                 type="button"
                 onClick={onSave}
@@ -204,7 +205,16 @@ export default function ProfilePage() {
               >
                 Edit
               </button>
-            ))}
+            )
+          ) : (
+            <Link
+              href={`/messages?openThread=${encodeURIComponent(address)}`}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[linear-gradient(110deg,#00b37a_0%,#00ffa3_50%,#00e5ff_100%)] px-3.5 py-2 text-xs font-bold text-black shadow-glow"
+            >
+              <Mail size={14} />
+              Message
+            </Link>
+          )}
         </div>
 
         {stats ? (
