@@ -1,6 +1,6 @@
 import path from "path";
 import fs from "fs";
-import { Router } from "express";
+import { Router, type Request as ExpressRequest } from "express";
 import multer from "multer";
 import { PrismaClient } from "../generated/prisma/client";
 import type { Logger } from "pino";
@@ -292,8 +292,11 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
 
   router.get("/listings", async (req, res) => {
     try {
+      // Only surface listings whose create transaction has been confirmed
+      // on-chain. PENDING / unconfirmed listings stay out of the public
+      // marketplace so buyers don't see items that may never actually appear.
       const listings = await prisma.listing.findMany({
-        where: { status: "LISTED" },
+        where: { status: "LISTED", onChainConfirmed: true },
         orderBy: { createdAt: "desc" },
         take: 100,
       });
@@ -2666,6 +2669,173 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     } catch (err) {
       log.error({ err }, "Failed to fetch batch profiles");
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // /area51 admin portal
+  // ---------------------------------------------------------------------------
+  // Admin addresses are configured via the ADMIN_ADDRESSES env var (a
+  // comma-separated list of lowercased EVM addresses). To access the portal,
+  // an admin signs `hashpop.admin.session:<unix-ms>` with their wallet; the
+  // resulting token (base64-encoded JSON of {address, t, signature}) is sent
+  // in the `x-admin-token` header on every admin request and verified server
+  // side. Tokens are valid for 24h.
+
+  function isAdminAddress(addr: string | null | undefined): boolean {
+    if (!addr) return false;
+    const raw = process.env.ADMIN_ADDRESSES || "";
+    const set = new Set(
+      raw
+        .split(",")
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean),
+    );
+    return set.has(addr.toLowerCase());
+  }
+
+  function verifyAdminToken(
+    req: ExpressRequest,
+  ): { ok: true; address: string } | { ok: false; error: string; status: number } {
+    const raw = req.headers["x-admin-token"];
+    if (!raw || typeof raw !== "string") {
+      return { ok: false, error: "Missing admin token", status: 401 };
+    }
+    let parsed: { address?: unknown; t?: unknown; signature?: unknown };
+    try {
+      parsed = JSON.parse(Buffer.from(raw, "base64").toString("utf8"));
+    } catch {
+      return { ok: false, error: "Malformed admin token", status: 401 };
+    }
+    const { address, t, signature } = parsed;
+    if (typeof address !== "string" || typeof t !== "number" || typeof signature !== "string") {
+      return { ok: false, error: "Malformed admin token", status: 401 };
+    }
+    const ageMs = Date.now() - t;
+    if (ageMs < 0 || ageMs > 24 * 60 * 60 * 1000) {
+      return { ok: false, error: "Admin session expired", status: 401 };
+    }
+    const message = `hashpop.admin.session:${t}`;
+    let recovered: string;
+    try {
+      recovered = ethers.verifyMessage(message, signature).toLowerCase();
+    } catch {
+      return { ok: false, error: "Invalid admin signature", status: 401 };
+    }
+    const normalized = address.toLowerCase();
+    if (recovered !== normalized) {
+      return { ok: false, error: "Admin signature mismatch", status: 401 };
+    }
+    if (!isAdminAddress(normalized)) {
+      return { ok: false, error: "Not authorised", status: 403 };
+    }
+    return { ok: true, address: normalized };
+  }
+
+  // Tells the frontend whether the given address is in the admin allowlist.
+  // This is the only admin endpoint that doesn't require a signed session —
+  // it just answers "should this wallet see the sign-in screen?".
+  router.get("/admin/check", (req, res) => {
+    const address = String(req.query.address ?? "").trim().toLowerCase();
+    if (!address) return res.json({ isAdmin: false });
+    return res.json({ isAdmin: isAdminAddress(address) });
+  });
+
+  router.get("/admin/stats", async (req, res) => {
+    const auth = verifyAdminToken(req);
+    if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
+    try {
+      const [total, active, pending, sold, locked, salesCount, salesAgg, usersCount] =
+        await Promise.all([
+          prisma.listing.count(),
+          prisma.listing.count({ where: { status: "LISTED", onChainConfirmed: true } }),
+          prisma.listing.count({ where: { status: "LISTED", onChainConfirmed: false } }),
+          prisma.listing.count({ where: { status: "SOLD" } }),
+          prisma.listing.count({ where: { status: "LOCKED" } }),
+          prisma.sale.count(),
+          prisma.sale.findMany({ select: { amount: true } }),
+          prisma.user.count(),
+        ]);
+      const volumeTinybar = salesAgg.reduce((sum, s) => {
+        try {
+          return sum + BigInt(s.amount || "0");
+        } catch {
+          return sum;
+        }
+      }, 0n);
+      // 1 HBAR = 1e8 tinybar; report a string to avoid number precision loss.
+      const volumeHbar = (Number(volumeTinybar) / 1e8).toFixed(2);
+      return res.json({
+        listings: { total, active, pending, sold, locked },
+        sales: { count: salesCount, volumeHbar },
+        users: { count: usersCount },
+      });
+    } catch (err) {
+      log.error({ err }, "Admin: failed to compute stats");
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  router.get("/admin/listings", async (req, res) => {
+    const auth = verifyAdminToken(req);
+    if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
+    try {
+      const status = String(req.query.status ?? "").trim().toUpperCase();
+      const q = String(req.query.q ?? "").trim();
+      const where: Record<string, unknown> = {};
+      if (status) where.status = status;
+      if (q) {
+        where.OR = [
+          { id: { contains: q } },
+          { title: { contains: q, mode: "insensitive" } },
+          { seller: { contains: q.toLowerCase() } },
+          { buyer: { contains: q.toLowerCase() } },
+        ];
+      }
+      const listings = await prisma.listing.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        take: 500,
+      });
+      return res.json({
+        listings: listings.map((l) => ({
+          ...l,
+          imageUrl: rewriteMediaUrlForClient((l as any).imageUrl),
+          mediaUrls: rewriteMediaUrlsForClient((l as any).mediaUrls) ?? (l as any).mediaUrls,
+          price: toHbarForClient(l.price),
+        })),
+      });
+    } catch (err) {
+      log.error({ err }, "Admin: failed to list listings");
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Cascade-delete a listing along with its offers and wishlist entries; sales
+  // are preserved with listingId set to null so historical totals remain
+  // intact. Used for moderation takedowns.
+  router.delete("/admin/listing/:id", async (req, res) => {
+    const auth = verifyAdminToken(req);
+    if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
+    try {
+      const rawId = req.params.id ?? "";
+      const id =
+        rawId.startsWith("0x") && rawId.length === 66
+          ? normalizeListingId(rawId)
+          : listingIdToBytes32(rawId);
+      const listing = await prisma.listing.findUnique({ where: { id } });
+      if (!listing) return res.status(404).json({ error: "Listing not found" });
+      await prisma.$transaction([
+        prisma.sale.updateMany({ where: { listingId: id }, data: { listingId: null } }),
+        prisma.offer.deleteMany({ where: { listingId: id } }),
+        prisma.wishlistItem.deleteMany({ where: { itemId: id, itemType: "listing" } }),
+        prisma.listing.delete({ where: { id } }),
+      ]);
+      log.info({ admin: auth.address, listingId: id }, "Admin removed listing");
+      return res.json({ ok: true });
+    } catch (err) {
+      log.error({ err }, "Admin: failed to delete listing");
+      return res.status(500).json({ error: "Internal server error" });
     }
   });
 

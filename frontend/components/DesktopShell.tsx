@@ -9,13 +9,15 @@ import {
   PlusSquare,
   Heart,
   MessageSquare,
-  LifeBuoy,
+  Info,
   LogIn,
   LogOut,
   Tag,
   Receipt,
   Bell,
   Wallet,
+  LayoutGrid,
+  UserCircle,
 } from "lucide-react";
 import { useHashpackWallet } from "../lib/hashpackWallet";
 import { useSignInModal } from "../lib/signInModal";
@@ -127,9 +129,11 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
   // to existing children, which would duplicate fallback + portal content.
   const titleFilled = useTopBarSlotFilled("title");
 
+  const profileHref = address || accountId ? `/profile/${encodeURIComponent(address || accountId || "")}` : null;
   const items = useMemo<RailItem[]>(() => {
     return [
       { label: "Marketplace", href: "/marketplace", icon: <Store className="h-5 w-5" /> },
+      { label: "Categories", href: "/categories", icon: <LayoutGrid className="h-5 w-5" /> },
       ...(effectiveConnected
         ? [
             {
@@ -148,9 +152,11 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
             { label: "Messages", href: "/messages", icon: <MessageSquare className="h-5 w-5" /> },
           ]
         : []),
-      { label: "Support", href: "/support", icon: <LifeBuoy className="h-5 w-5" /> },
+      ...(effectiveConnected && profileHref
+        ? [{ label: "Profile", href: profileHref, icon: <UserCircle className="h-5 w-5" /> }]
+        : []),
     ];
-  }, [effectiveConnected]);
+  }, [effectiveConnected, profileHref]);
 
   const fallbackTitle = pathnameTitle(pathname);
   // On the landing page we keep only the cart logo (top of rail) + the
@@ -199,8 +205,11 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
             })}
           </div>
         </div>
-        {/* Sign-in / sign-out rail button also fades in with the rest. */}
+        {/* Help + sign-in / sign-out rail buttons fade in with the rest. */}
         <div className={`flex flex-col items-center gap-1 ${chromeFade}`}>
+          <RailButton label="Help" href="/support">
+            <Info className="h-5 w-5" />
+          </RailButton>
           {effectiveConnected ? (
             <RailButton label="Sign out" onClick={() => void disconnect()}>
               <LogOut className="h-5 w-5" />
