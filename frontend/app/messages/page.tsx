@@ -239,20 +239,6 @@ function StatePill({ stateKey, size = "sm" }: { stateKey: StateKey; size?: "sm" 
   );
 }
 
-type TabKey = "active" | "awaiting" | "disputed" | "closed";
-const TABS: { key: TabKey; label: string }[] = [
-  { key: "active", label: "Active" },
-  { key: "awaiting", label: "Awaiting" },
-  { key: "disputed", label: "Disputed" },
-  { key: "closed", label: "Closed" },
-];
-
-function tabFor(stateKey: StateKey): TabKey {
-  if (stateKey === "DISPUTED") return "disputed";
-  if (stateKey === "RELEASED") return "closed";
-  if (stateKey === "AWAITING") return "awaiting";
-  return "active"; // PAID, SHIPPED, DELIVERED
-}
 
 function MessagesPageContent() {
   const { address } = useHashpackWallet();
@@ -267,12 +253,7 @@ function MessagesPageContent() {
   const [threadLoading, setThreadLoading] = useState(false);
   const [replyBody, setReplyBody] = useState("");
   const [sending, setSending] = useState(false);
-  const [showCompose, setShowCompose] = useState(false);
-  const [composeAddress, setComposeAddress] = useState("");
-  const [composeBody, setComposeBody] = useState("");
-  const [composeSending, setComposeSending] = useState(false);
   const [listingPreviews, setListingPreviews] = useState<Record<string, ListingPreview>>({});
-  const [activeTab, setActiveTab] = useState<TabKey>("active");
   const { keypair, ensureKeypair } = useEncryptionKey();
 
   const publicKeyCache = useRef<Record<string, string | null>>({});
@@ -466,55 +447,6 @@ function MessagesPageContent() {
     }
   }, [address, selectedThread, replyBody, sending, fetchInbox, ensureKeypair, fetchPublicKey]);
 
-  const sendCompose = useCallback(async () => {
-    if (!address || !composeAddress.trim() || !composeBody.trim() || composeSending) return;
-    const toAddr = composeAddress.trim().toLowerCase();
-    if (toAddr === address.toLowerCase()) return;
-    setComposeSending(true);
-    try {
-      const kp = await ensureKeypair();
-      const recipientPubKey = await fetchPublicKey(toAddr);
-
-      let msgBody = composeBody.trim();
-      let encrypted = false;
-      let nonce: string | undefined;
-
-      if (kp && recipientPubKey) {
-        const result = encryptMessage(msgBody, recipientPubKey, kp.secretKey);
-        msgBody = result.ciphertext;
-        nonce = result.nonce;
-        encrypted = true;
-      }
-
-      await fetch(`${getApiUrl()}/api/messages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fromAddress: address,
-          toAddress: toAddr,
-          body: msgBody,
-          encrypted,
-          nonce,
-        }),
-      });
-      setShowCompose(false);
-      setComposeAddress("");
-      setComposeBody("");
-      setSelectedThread({ other: toAddr, listingId: "" });
-      fetchInbox();
-    } finally {
-      setComposeSending(false);
-    }
-  }, [
-    address,
-    composeAddress,
-    composeBody,
-    composeSending,
-    ensureKeypair,
-    fetchPublicKey,
-    fetchInbox,
-  ]);
-
   const getDisplayBody = (m: Message): string => {
     if (m.encrypted) {
       return decryptedBodies[m.id] ?? "[Decrypting…]";
@@ -522,47 +454,20 @@ function MessagesPageContent() {
     return m.body;
   };
 
-  // Bucket conversations by tab. Listing-bound chats route into the tab that
-  // matches their derived escrow state; inquiries with no order land in
-  // "Awaiting" so the sidebar always has a place for them.
-  const conversationsByTab = useMemo(() => {
-    const buckets: Record<TabKey, InboxConversation[]> = {
-      active: [],
-      awaiting: [],
-      disputed: [],
-      closed: [],
-    };
-    for (const c of conversations) {
-      if (!c.listingId) {
-        buckets.awaiting.push(c);
-        continue;
-      }
-      const listing = listingPreviews[c.listingId];
-      const key = tabFor(stateKeyFor(listing));
-      buckets[key].push(c);
-    }
-    return buckets;
-  }, [conversations, listingPreviews]);
-
-  const visibleConversations = useMemo(() => {
-    const list = [...conversationsByTab[activeTab]];
-    list.sort(
-      (a, b) =>
-        new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime(),
-    );
-    return list;
-  }, [conversationsByTab, activeTab]);
-
-  // Keep the active tab in sync with whatever the user selected — if they
-  // open a disputed conversation we shouldn't leave the sidebar showing
-  // Active and the focused row hidden.
-  useEffect(() => {
-    if (!selectedThread?.listingId) return;
-    const listing = listingPreviews[selectedThread.listingId];
-    if (!listing) return;
-    const tab = tabFor(stateKeyFor(listing));
-    setActiveTab(tab);
-  }, [selectedThread, listingPreviews]);
+  // Split into listing-bound chats vs direct messages — those are the only
+  // two flavours of conversation now. Order each section by most-recent
+  // activity so live threads sit at the top.
+  const byRecency = (a: InboxConversation, b: InboxConversation) =>
+    new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime();
+  const listingConvs = useMemo(
+    () => conversations.filter((c) => !!c.listingId).sort(byRecency),
+    [conversations],
+  );
+  const directConvs = useMemo(
+    () => conversations.filter((c) => !c.listingId).sort(byRecency),
+    [conversations],
+  );
+  const hasConversations = listingConvs.length + directConvs.length > 0;
 
   const selectedListing = selectedThread?.listingId
     ? listingPreviews[selectedThread.listingId]
@@ -570,6 +475,74 @@ function MessagesPageContent() {
   const selectedState = stateKeyFor(selectedListing);
   const stepIdx = deriveStepIndex(selectedListing);
   const swatch = selectedListing ? paletteFor(selectedListing.id) : null;
+
+  // Single row template reused by both the "Listings" and "Direct messages"
+  // sections so the only difference between sections is the heading above.
+  const renderConversationRow = (c: InboxConversation) => {
+    const listingKey = c.listingId ?? "";
+    const isSelected =
+      selectedThread?.other === c.otherAddress && selectedThread?.listingId === listingKey;
+    const listing = c.listingId ? listingPreviews[c.listingId] : undefined;
+    const stateKey = stateKeyFor(listing);
+    return (
+      <li key={`${c.otherAddress}-${listingKey}`}>
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedThread({ other: c.otherAddress, listingId: listingKey });
+          }}
+          className={`block w-full rounded-glass-lg border p-3 text-left transition-colors ${
+            isSelected
+              ? "border-chrome/40 bg-[#0e1422]/85"
+              : "border-transparent hover:bg-white/[0.03]"
+          }`}
+        >
+          <div className="flex items-center gap-2.5">
+            {listing ? (
+              <ItemThumb listing={listing} size={42} />
+            ) : (
+              <Avatar address={c.otherAddress} size={42} />
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[13px] font-bold text-white">
+                {listing?.title ?? (
+                  <AddressDisplay
+                    address={c.otherAddress}
+                    className="text-white font-mono text-xs"
+                  />
+                )}
+              </div>
+              <div className="mt-1 flex items-center gap-1.5">
+                {listing?.price && (
+                  <span className="text-[11px] font-semibold text-chrome">
+                    {listing.price} ℏ
+                  </span>
+                )}
+                {c.listingId && <StatePill stateKey={stateKey} />}
+              </div>
+            </div>
+          </div>
+          <div className="mt-2 flex items-center gap-2 border-t border-white/[0.06] pt-2">
+            <Avatar address={c.otherAddress} size={20} />
+            <span className="min-w-0 flex-1 truncate text-[11px] text-silver">
+              {c.lastMessage.encrypted && (
+                <LockIcon className="mr-1 inline-block h-2.5 w-2.5 opacity-60" />
+              )}
+              {c.preview}
+            </span>
+            <span className="font-mono text-[10px] text-silver">
+              {c.lastMessage.createdAt
+                ? new Date(c.lastMessage.createdAt).toLocaleDateString([], {
+                    month: "short",
+                    day: "numeric",
+                  })
+                : ""}
+            </span>
+          </div>
+        </button>
+      </li>
+    );
+  };
   const isBuyer =
     !!address && !!selectedListing?.buyer &&
     selectedListing.buyer.toLowerCase() === address.toLowerCase();
@@ -580,75 +553,16 @@ function MessagesPageContent() {
     <main className="min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         <div
-          className={`items-center justify-between gap-3 flex-wrap ${
+          className={`items-center gap-3 flex-wrap ${
             selectedThread ? "hidden lg:flex" : "flex"
           }`}
         >
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl sm:text-2xl font-bold text-white">Conversations</h1>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-chrome/10 border border-chrome/30 px-2.5 py-1 text-[11px] font-semibold text-chrome">
-              <LockIcon className="h-3 w-3" />
-              End-to-end encrypted
-            </span>
-          </div>
-          {address && (
-            <button
-              type="button"
-              onClick={() => setShowCompose(true)}
-              className="btn-frost-cta text-sm px-4 py-2"
-            >
-              Compose
-            </button>
-          )}
+          <h1 className="text-xl sm:text-2xl font-bold text-white">Conversations</h1>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-chrome/10 border border-chrome/30 px-2.5 py-1 text-[11px] font-semibold text-chrome">
+            <LockIcon className="h-3 w-3" />
+            End-to-end encrypted
+          </span>
         </div>
-
-        {showCompose && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-            onClick={() => setShowCompose(false)}
-          >
-            <div
-              className="glass-card w-full max-w-md mx-4 p-6 space-y-4"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h2 className="text-lg font-bold text-white">New message</h2>
-              <input
-                type="text"
-                value={composeAddress}
-                onChange={(e) => setComposeAddress(e.target.value)}
-                placeholder="Recipient wallet address (0x…) or account ID (0.0.XXXXX)"
-                className="input-frost w-full text-sm"
-              />
-              <textarea
-                value={composeBody}
-                onChange={(e) => setComposeBody(e.target.value)}
-                placeholder="Type your message…"
-                className="input-frost w-full text-sm min-h-[100px] resize-y"
-                rows={4}
-              />
-              <div className="flex items-center justify-between gap-3">
-                <E2EBadge />
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowCompose(false)}
-                    className="text-silver text-sm hover:text-white transition-colors px-4 py-2"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={sendCompose}
-                    disabled={!composeAddress.trim() || !composeBody.trim() || composeSending}
-                    className="btn-frost-cta text-sm px-4 py-2 disabled:opacity-50"
-                  >
-                    {composeSending ? "Sending…" : "Send"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {!address ? (
           <p className="text-silver">Connect your wallet to view messages.</p>
@@ -661,117 +575,37 @@ function MessagesPageContent() {
                 selectedThread ? "hidden lg:flex" : "flex"
               }`}
             >
-              <div className="flex flex-wrap items-center gap-1.5 border-b border-white/10 p-3">
-                {TABS.map((t) => {
-                  const isActive = t.key === activeTab;
-                  const count = conversationsByTab[t.key].length;
-                  return (
-                    <button
-                      key={t.key}
-                      type="button"
-                      onClick={() => setActiveTab(t.key)}
-                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold transition-colors ${
-                        isActive
-                          ? "border border-chrome/40 bg-chrome/[0.08] text-chrome"
-                          : "border border-white/10 text-silver hover:bg-white/5"
-                      }`}
-                    >
-                      {t.label}
-                      <span
-                        className={`font-mono text-[10px] ${isActive ? "text-chrome" : "text-silver"}`}
-                      >
-                        {count}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
               <div className="flex-1 overflow-y-auto py-2">
                 {inboxLoading ? (
                   <p className="px-4 py-3 text-silver text-sm">Loading…</p>
-                ) : visibleConversations.length === 0 ? (
+                ) : !hasConversations ? (
                   <p className="px-4 py-3 text-silver text-sm">
-                    {activeTab === "active"
-                      ? "No active escrows."
-                      : activeTab === "awaiting"
-                        ? "No inquiries waiting."
-                        : activeTab === "disputed"
-                          ? "No disputes — nice."
-                          : "Nothing closed yet."}
+                    No conversations yet. Message a seller from a listing or their profile to start
+                    a chat.
                   </p>
                 ) : (
-                  <ul className="space-y-1.5 px-2">
-                    {visibleConversations.map((c) => {
-                      const listingKey = c.listingId ?? "";
-                      const isSelected =
-                        selectedThread?.other === c.otherAddress &&
-                        selectedThread?.listingId === listingKey;
-                      const listing = c.listingId ? listingPreviews[c.listingId] : undefined;
-                      const stateKey = stateKeyFor(listing);
-                      return (
-                        <li key={`${c.otherAddress}-${listingKey}`}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedThread({
-                                other: c.otherAddress,
-                                listingId: listingKey,
-                              });
-                            }}
-                            className={`block w-full rounded-glass-lg border p-3 text-left transition-colors ${
-                              isSelected
-                                ? "border-chrome/40 bg-[#0e1422]/85"
-                                : "border-transparent hover:bg-white/[0.03]"
-                            }`}
-                          >
-                            <div className="flex items-center gap-2.5">
-                              {listing ? (
-                                <ItemThumb listing={listing} size={42} />
-                              ) : (
-                                <Avatar address={c.otherAddress} size={42} />
-                              )}
-                              <div className="min-w-0 flex-1">
-                                <div className="truncate text-[13px] font-bold text-white">
-                                  {listing?.title ?? (
-                                    <AddressDisplay
-                                      address={c.otherAddress}
-                                      className="text-white font-mono text-xs"
-                                    />
-                                  )}
-                                </div>
-                                <div className="mt-1 flex items-center gap-1.5">
-                                  {listing?.price && (
-                                    <span className="text-[11px] font-semibold text-chrome">
-                                      {listing.price} ℏ
-                                    </span>
-                                  )}
-                                  <StatePill stateKey={stateKey} />
-                                </div>
-                              </div>
-                            </div>
-                            <div className="mt-2 flex items-center gap-2 border-t border-white/[0.06] pt-2">
-                              <Avatar address={c.otherAddress} size={20} />
-                              <span className="min-w-0 flex-1 truncate text-[11px] text-silver">
-                                {c.lastMessage.encrypted && (
-                                  <LockIcon className="mr-1 inline-block h-2.5 w-2.5 opacity-60" />
-                                )}
-                                {c.preview}
-                              </span>
-                              <span className="font-mono text-[10px] text-silver">
-                                {c.lastMessage.createdAt
-                                  ? new Date(c.lastMessage.createdAt).toLocaleDateString([], {
-                                      month: "short",
-                                      day: "numeric",
-                                    })
-                                  : ""}
-                              </span>
-                            </div>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
+                  <>
+                    {listingConvs.length > 0 && (
+                      <section>
+                        <h2 className="sticky top-0 z-10 bg-[#0e1422]/95 px-4 pt-1 pb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-silver backdrop-blur">
+                          Listings
+                        </h2>
+                        <ul className="space-y-1.5 px-2">
+                          {listingConvs.map((c) => renderConversationRow(c))}
+                        </ul>
+                      </section>
+                    )}
+                    {directConvs.length > 0 && (
+                      <section className={listingConvs.length > 0 ? "mt-4" : ""}>
+                        <h2 className="sticky top-0 z-10 bg-[#0e1422]/95 px-4 pt-1 pb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-silver backdrop-blur">
+                          Direct messages
+                        </h2>
+                        <ul className="space-y-1.5 px-2">
+                          {directConvs.map((c) => renderConversationRow(c))}
+                        </ul>
+                      </section>
+                    )}
+                  </>
                 )}
               </div>
             </aside>
