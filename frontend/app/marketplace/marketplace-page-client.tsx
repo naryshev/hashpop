@@ -19,6 +19,7 @@ import {
   BadgeCheck,
   Bell,
   ChevronDown,
+  LayoutDashboard,
   MapPin,
   Search as SearchIcon,
   ShoppingCart,
@@ -642,6 +643,13 @@ export default function MarketplacePageClient({
                 className="rounded-full border border-white/10 bg-white/5 p-2 text-silver hover:text-white"
               >
                 <Bell size={16} />
+              </Link>
+              <Link
+                href="/dashboard"
+                aria-label="My Hashpop"
+                className="rounded-full border border-white/10 bg-white/5 p-2 text-silver hover:text-white"
+              >
+                <LayoutDashboard size={16} />
               </Link>
               <Link
                 href={
