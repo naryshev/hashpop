@@ -279,12 +279,12 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Content area: rounded canvas on desktop, full-bleed on mobile.
-            Mobile gets top padding to clear the fixed BottomNav. On desktop
-            the card itself is sized to the remaining viewport height and
-            scrolls internally — that way the card's full border (including
-            the bottom edge) is always visible while the page content
-            scrolls inside it instead of sliding under the chrome. */}
-        <main className="flex-1 pt-14 md:flex md:min-h-0 md:flex-1 md:py-3 md:pl-1 md:pr-3 md:pt-1">
+            Both viewports get bottom padding so content clears the floating
+            BottomNav. On desktop the card is sized to the remaining viewport
+            height and scrolls internally — that way the card's full border
+            (including the bottom edge) is always visible while the page
+            content scrolls inside it instead of sliding under the chrome. */}
+        <main className="flex-1 pb-24 md:flex md:min-h-0 md:flex-1 md:py-3 md:pb-24 md:pl-1 md:pr-3 md:pt-1">
           <div className="scrollbar-none md:h-full md:min-h-0 md:flex-1 md:overflow-y-auto md:rounded-glass-lg md:border md:border-white/10 md:bg-[#0e1422]/60">
             {children}
           </div>

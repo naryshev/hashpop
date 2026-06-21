@@ -31,13 +31,12 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
                 {children}
                 <Footer />
               </DesktopShell>
-              {/* Mobile-only nav chrome. AppSidebar provides the slide-out
-                  drawer; BottomNav renders the floating top bar with a
-                  hamburger. Both are no-ops on desktop via md:hidden. */}
+              {/* Mobile sidebar drawer stays mobile-only; the floating
+                  BottomNav is shared across mobile and desktop. */}
               <div className="md:hidden">
                 <AppSidebar open={sidebarOpen} setOpen={setSidebarOpen} />
-                <BottomNav showMenu onMenuClick={() => setSidebarOpen(true)} />
               </div>
+              <BottomNav />
             </TopBarProvider>
             </ProfilesProvider>
           </SignInModalProvider>

@@ -496,10 +496,10 @@ export default function DashboardPage() {
                     + List item
                   </Link>
                   <Link
-                    href={`/profile/${encodeURIComponent(address)}?edit=1`}
+                    href={`/profile/${encodeURIComponent(address)}`}
                     className="rounded-full border border-white/10 px-3.5 py-2 text-xs text-white hover:bg-white/5"
                   >
-                    Edit profile
+                    View profile
                   </Link>
                   <Link
                     href="/purchases"
