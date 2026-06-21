@@ -15,7 +15,14 @@ import { canonicalizeCategory } from "../../lib/categories";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
 import { profileAvatarUrl, profileDisplayName, useProfile, useProfiles } from "../../lib/profiles";
 import { TopBarSlot } from "../../lib/topBar";
-import { BadgeCheck } from "lucide-react";
+import {
+  BadgeCheck,
+  Bell,
+  MapPin,
+  Search as SearchIcon,
+  ShoppingCart,
+  SlidersHorizontal,
+} from "lucide-react";
 
 function formatListingId(id: string): string {
   if (!id || !id.startsWith("0x") || id.length !== 66) return id;
@@ -341,168 +348,169 @@ export default function MarketplacePageClient({
     </div>
   );
 
-  const searchCluster = (
-    <div className="relative flex w-full max-w-md justify-center">
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          const q = searchInput.trim();
-          const p = new URLSearchParams(searchParams.toString());
-          if (q) p.set("q", q);
-          else p.delete("q");
-          router.push(p.toString() ? `/marketplace?${p.toString()}` : "/marketplace");
-          setSearchInput("");
-          setFilterOpen(false);
-        }}
-      >
-        <div className="flex items-center gap-1.5 rounded-full border border-[#00ffa3]/50 bg-[#00ffa3]/[0.08] px-3 py-1.5 shadow-[0_0_14px_rgba(0,255,163,0.12),inset_0_0_8px_rgba(0,255,163,0.04)]">
-          <svg
-            className="h-3.5 w-3.5 shrink-0 text-[#00ffa3]"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            aria-hidden
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M21 21l-4.35-4.35M16 10.5A5.5 5.5 0 115 10.5a5.5 5.5 0 0111 0z"
+  const submitSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = searchInput.trim();
+    const p = new URLSearchParams(searchParams.toString());
+    if (q) p.set("q", q);
+    else p.delete("q");
+    router.push(p.toString() ? `/marketplace?${p.toString()}` : "/marketplace");
+    setSearchInput("");
+    setFilterOpen(false);
+  };
+
+  const openFilterPanel = () => {
+    setFilterOpen((o) => !o);
+    setFilterMinPrice(minPriceQuery);
+    setFilterMaxPrice(maxPriceQuery);
+    setFilterPostedWithin(postedWithinQuery);
+    setFilterCondition(conditionQuery);
+  };
+
+  const hasActiveFilter =
+    !!(minPriceQuery || maxPriceQuery || postedWithinQuery || conditionQuery || sortMode !== "recent");
+
+  const renderFilterSortPanel = () => (
+    <div className="absolute right-0 top-full mt-2 w-72 rounded-xl border border-white/10 bg-[#0a0a0a] p-4 shadow-2xl z-50">
+      <p className="text-xs font-semibold uppercase tracking-widest text-silver">Sort</p>
+      <div className="mt-2 grid grid-cols-2 gap-1.5">
+        {(
+          [
+            { id: "recent", label: "Recent" },
+            { id: "trending", label: "Trending" },
+            { id: "price-asc", label: "Price ↑" },
+            { id: "price-desc", label: "Price ↓" },
+          ] as { id: SortMode; label: string }[]
+        ).map((s) => {
+          const active = sortMode === s.id;
+          return (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => setParam("sort", s.id === "recent" ? null : s.id)}
+              className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                active
+                  ? "border-[#00ffa3]/40 bg-[#00ffa3]/10 text-[#00ffa3]"
+                  : "border-white/10 text-silver hover:border-white/20 hover:text-white"
+              }`}
+            >
+              {s.label}
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-4 text-xs font-semibold uppercase tracking-widest text-silver">Filters</p>
+      <div className="mt-2 space-y-3">
+        <div>
+          <span className="mb-1 block text-xs text-silver/70">Price (HBAR)</span>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min="0"
+              step="any"
+              value={filterMinPrice}
+              onChange={(e) => setFilterMinPrice(e.target.value)}
+              placeholder="Min"
+              className="input-frost w-full py-1.5 text-sm"
             />
-          </svg>
-          <input
-            type="text"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search listings…"
-            className="w-36 bg-transparent text-sm text-white placeholder:text-[#00ffa3]/40 focus:outline-none"
-          />
-          {/* Filter toggle — replaces the second X */}
+            <span className="shrink-0 text-xs text-silver/40">to</span>
+            <input
+              type="number"
+              min="0"
+              step="any"
+              value={filterMaxPrice}
+              onChange={(e) => setFilterMaxPrice(e.target.value)}
+              placeholder="Max"
+              className="input-frost w-full py-1.5 text-sm"
+            />
+          </div>
+        </div>
+        <div>
+          <span className="mb-1 block text-xs text-silver/70">Date listed</span>
+          <select
+            value={filterPostedWithin}
+            onChange={(e) => setFilterPostedWithin(e.target.value)}
+            className="input-frost w-full py-1.5 text-sm"
+          >
+            <option value="">Any time</option>
+            <option value="1d">Last 24 hours</option>
+            <option value="1w">Last week</option>
+            <option value="1m">Last month</option>
+            <option value="3m">Last 3 months</option>
+            <option value="6m">Last 6 months</option>
+            <option value="1y">Last year</option>
+          </select>
+        </div>
+        <div>
+          <span className="mb-1 block text-xs text-silver/70">Condition</span>
+          <select
+            value={filterCondition}
+            onChange={(e) => setFilterCondition(e.target.value)}
+            className="input-frost w-full py-1.5 text-sm"
+          >
+            <option value="">Any condition</option>
+            <option value="Like new">Like new</option>
+            <option value="Used">Used</option>
+            <option value="Refurbished">Refurbished</option>
+            <option value="For parts or repair">For parts or repair</option>
+          </select>
+        </div>
+        <div className="flex gap-2 pt-1">
           <button
             type="button"
             onClick={() => {
-              setFilterOpen((o) => !o);
-              setFilterMinPrice(minPriceQuery);
-              setFilterMaxPrice(maxPriceQuery);
-              setFilterPostedWithin(postedWithinQuery);
-              setFilterCondition(conditionQuery);
+              const p = new URLSearchParams(searchParams.toString());
+              p.delete("minPrice");
+              p.delete("maxPrice");
+              p.delete("postedWithin");
+              p.delete("condition");
+              p.delete("sort");
+              setFilterOpen(false);
+              router.push(p.toString() ? `/marketplace?${p.toString()}` : "/marketplace");
             }}
-            aria-label="Filters"
-            className={`shrink-0 transition-colors ${filterOpen || minPriceQuery || maxPriceQuery || postedWithinQuery || conditionQuery ? "text-[#00ffa3]" : "text-[#00ffa3]/50 hover:text-[#00ffa3]"}`}
+            className="flex-1 rounded-lg border border-white/15 py-1.5 text-xs text-silver transition-colors hover:text-white"
           >
-            {/* sliders / funnel icon */}
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 4h18M7 12h10M11 20h2"
-              />
-            </svg>
+            Reset
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const p = new URLSearchParams(searchParams.toString());
+              if (filterMinPrice) p.set("minPrice", filterMinPrice);
+              else p.delete("minPrice");
+              if (filterMaxPrice) p.set("maxPrice", filterMaxPrice);
+              else p.delete("maxPrice");
+              if (filterPostedWithin) p.set("postedWithin", filterPostedWithin);
+              else p.delete("postedWithin");
+              if (filterCondition) p.set("condition", filterCondition);
+              else p.delete("condition");
+              setFilterOpen(false);
+              router.push(p.toString() ? `/marketplace?${p.toString()}` : "/marketplace");
+            }}
+            className="btn-frost-cta flex-1 py-1.5 text-xs"
+          >
+            Apply
           </button>
         </div>
-      </form>
-      {/* Filter dropdown */}
-      {filterOpen && (
-        <div className="absolute right-0 top-full mt-2 w-72 rounded-xl border border-white/10 bg-[#0a0a0a] shadow-2xl p-4 z-50">
-          <p className="text-xs font-semibold tracking-widest text-silver uppercase mb-3">
-            Filters
-          </p>
-          <div className="space-y-3">
-            <div>
-              <span className="text-xs text-silver/70 mb-1 block">Price (HBAR)</span>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={filterMinPrice}
-                  onChange={(e) => setFilterMinPrice(e.target.value)}
-                  placeholder="Min"
-                  className="input-frost w-full text-sm py-1.5"
-                />
-                <span className="text-silver/40 text-xs shrink-0">to</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={filterMaxPrice}
-                  onChange={(e) => setFilterMaxPrice(e.target.value)}
-                  placeholder="Max"
-                  className="input-frost w-full text-sm py-1.5"
-                />
-              </div>
-            </div>
-            <div>
-              <span className="text-xs text-silver/70 mb-1 block">Date listed</span>
-              <select
-                value={filterPostedWithin}
-                onChange={(e) => setFilterPostedWithin(e.target.value)}
-                className="input-frost w-full text-sm py-1.5"
-              >
-                <option value="">Any time</option>
-                <option value="1d">Last 24 hours</option>
-                <option value="1w">Last week</option>
-                <option value="1m">Last month</option>
-                <option value="3m">Last 3 months</option>
-                <option value="6m">Last 6 months</option>
-                <option value="1y">Last year</option>
-              </select>
-            </div>
-            <div>
-              <span className="text-xs text-silver/70 mb-1 block">Condition</span>
-              <select
-                value={filterCondition}
-                onChange={(e) => setFilterCondition(e.target.value)}
-                className="input-frost w-full text-sm py-1.5"
-              >
-                <option value="">Any condition</option>
-                <option value="Like new">Like new</option>
-                <option value="Used">Used</option>
-                <option value="Refurbished">Refurbished</option>
-                <option value="For parts or repair">For parts or repair</option>
-              </select>
-            </div>
-            <div className="flex gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  const p = new URLSearchParams(searchParams.toString());
-                  p.delete("minPrice");
-                  p.delete("maxPrice");
-                  p.delete("postedWithin");
-                  p.delete("condition");
-                  setFilterOpen(false);
-                  router.push(p.toString() ? `/marketplace?${p.toString()}` : "/marketplace");
-                }}
-                className="flex-1 text-xs text-silver hover:text-white border border-white/15 rounded-lg py-1.5 transition-colors"
-              >
-                Reset
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const p = new URLSearchParams(searchParams.toString());
-                  if (filterMinPrice) p.set("minPrice", filterMinPrice);
-                  else p.delete("minPrice");
-                  if (filterMaxPrice) p.set("maxPrice", filterMaxPrice);
-                  else p.delete("maxPrice");
-                  if (filterPostedWithin) p.set("postedWithin", filterPostedWithin);
-                  else p.delete("postedWithin");
-                  if (filterCondition) p.set("condition", filterCondition);
-                  else p.delete("condition");
-                  setFilterOpen(false);
-                  router.push(p.toString() ? `/marketplace?${p.toString()}` : "/marketplace");
-                }}
-                className="flex-1 text-xs btn-frost-cta py-1.5"
-              >
-                Apply
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      </div>
     </div>
+  );
+
+  // Compact desktop search bubble — used to the right of the view-mode
+  // pills since the global top-bar no longer hosts the search input.
+  const desktopInlineSearch = (
+    <form onSubmit={submitSearch}>
+      <div className="flex items-center gap-1.5 rounded-full border border-[#00ffa3]/50 bg-[#00ffa3]/[0.08] px-3 py-1.5 shadow-[0_0_14px_rgba(0,255,163,0.12),inset_0_0_8px_rgba(0,255,163,0.04)]">
+        <SearchIcon size={14} className="shrink-0 text-[#00ffa3]" />
+        <input
+          type="text"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder="Search listings…"
+          className="w-40 bg-transparent text-sm text-white placeholder:text-[#00ffa3]/40 focus:outline-none"
+        />
+      </div>
+    </form>
   );
 
   const actionsCluster = (
@@ -514,9 +522,118 @@ export default function MarketplacePageClient({
   return (
     <main className="min-h-screen">
       <TopBarSlot name="title">{headerCluster}</TopBarSlot>
-      <TopBarSlot name="center">{searchCluster}</TopBarSlot>
       <TopBarSlot name="actions">{actionsCluster}</TopBarSlot>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+        {/* Mobile-only top section: location chip, watchlist/alerts icons,
+            inline search + filter button, and a horizontal category carousel
+            matching the redesigned mobile marketplace. */}
+        <div className="sm:hidden mb-4 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
+              <MapPin size={14} className="text-[#00ffa3]" />
+              <div className="leading-tight">
+                <div className="text-[9px] uppercase tracking-wide text-silver/60">
+                  Location
+                </div>
+                <div className="text-xs font-semibold text-white">All locations</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/watchlist"
+                aria-label="Watchlist"
+                className="rounded-full border border-white/10 bg-white/5 p-2 text-silver hover:text-white"
+              >
+                <ShoppingCart size={16} />
+              </Link>
+              <Link
+                href="/activity"
+                aria-label="Alerts"
+                className="rounded-full border border-white/10 bg-white/5 p-2 text-silver hover:text-white"
+              >
+                <Bell size={16} />
+              </Link>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <form onSubmit={submitSearch} className="flex-1">
+              <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 focus-within:border-[#00ffa3]/40">
+                <SearchIcon size={14} className="text-silver" />
+                <input
+                  type="text"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  placeholder="What are you looking for?"
+                  className="flex-1 bg-transparent text-sm text-white placeholder:text-silver/50 focus:outline-none"
+                />
+              </div>
+            </form>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={openFilterPanel}
+                aria-label="Filters & sort"
+                className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${
+                  filterOpen || hasActiveFilter
+                    ? "border-[#00ffa3]/50 bg-[#00ffa3]/10 text-[#00ffa3]"
+                    : "border-white/10 bg-white/5 text-silver hover:text-white"
+                }`}
+              >
+                <SlidersHorizontal size={16} />
+              </button>
+              {filterOpen && renderFilterSortPanel()}
+            </div>
+          </div>
+          <div>
+            <div className="mb-1.5 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-white">Categories</h3>
+              <Link
+                href="/categories"
+                className="text-[11px] text-silver/70 hover:text-white"
+              >
+                See all
+              </Link>
+            </div>
+            <div className="-mx-1 flex gap-2 overflow-x-auto pb-1 px-1 scrollbar-none">
+              {(
+                [
+                  { label: "All", href: "/marketplace" },
+                  { label: "Watches", href: "/marketplace?category=Watches" },
+                  {
+                    label: "Phones",
+                    href: "/marketplace?category=Smartphones%20%26%20Phones",
+                  },
+                  { label: "Cars", href: "/marketplace?category=Cars%20%26%20Trucks" },
+                  { label: "Laptops", href: "/marketplace?category=Laptops" },
+                  { label: "Furniture", href: "/marketplace?category=Furniture" },
+                  { label: "Art", href: "/marketplace?category=Art%20%26%20Prints" },
+                  {
+                    label: "Sneakers",
+                    href: "/marketplace?category=Shoes%20%26%20Sneakers",
+                  },
+                ] as { label: string; href: string }[]
+              ).map((c) => {
+                const isActive =
+                  (c.label === "All" && !categoryQuery) ||
+                  decodeURIComponent(c.href.split("category=")[1] ?? "") === categoryQuery;
+                return (
+                  <Link
+                    key={c.label}
+                    href={c.href}
+                    className={`shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors ${
+                      isActive
+                        ? "border-[#00ffa3]/40 bg-[#00ffa3]/10 text-[#00ffa3]"
+                        : "border-white/10 bg-white/5 text-silver hover:text-white"
+                    }`}
+                  >
+                    {c.label}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
         {(() => {
           const removeFilter = (keys: string[]) => {
             const p = new URLSearchParams(searchParams.toString());
@@ -696,33 +813,22 @@ export default function MarketplacePageClient({
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] uppercase tracking-widest text-silver/60">
-                  Sort
-                </span>
-                {(
-                  [
-                    { id: "recent", label: "Recent" },
-                    { id: "price-asc", label: "Price ↑" },
-                    { id: "price-desc", label: "Price ↓" },
-                    { id: "trending", label: "Trending" },
-                  ] as { id: SortMode; label: string }[]
-                ).map((s) => {
-                  const active = sortMode === s.id;
-                  return (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => setParam("sort", s.id === "recent" ? null : s.id)}
-                      className={`rounded-full px-3 py-1 text-xs transition-colors border ${
-                        active
-                          ? "border-[#00ffa3]/40 bg-[#00ffa3]/10 text-[#00ffa3]"
-                          : "border-white/10 text-silver hover:text-white hover:border-white/20"
-                      }`}
-                    >
-                      {s.label}
-                    </button>
-                  );
-                })}
+                {desktopInlineSearch}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={openFilterPanel}
+                    aria-label="Filters & sort"
+                    className={`inline-flex h-9 w-9 items-center justify-center rounded-full border transition-colors ${
+                      filterOpen || hasActiveFilter
+                        ? "border-[#00ffa3]/50 bg-[#00ffa3]/10 text-[#00ffa3]"
+                        : "border-white/10 bg-white/5 text-silver hover:text-white"
+                    }`}
+                  >
+                    <SlidersHorizontal size={14} />
+                  </button>
+                  {filterOpen && renderFilterSortPanel()}
+                </div>
               </div>
             </div>
 

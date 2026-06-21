@@ -66,11 +66,11 @@ export function BottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-40 px-3"
+      className="fixed bottom-0 left-0 right-0 z-40 px-3 md:hidden"
       style={{ paddingBottom: "max(env(safe-area-inset-bottom), 12px)" }}
       aria-label="Primary navigation"
     >
-      <div className="mx-auto grid max-w-sm grid-cols-5 items-center rounded-3xl border border-white/10 bg-[#0e1422]/95 px-2 py-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.45)] backdrop-blur-xl md:max-w-md md:px-3 md:py-2">
+      <div className="mx-auto grid max-w-sm grid-cols-5 items-center rounded-3xl border border-white/10 bg-[#0e1422]/95 px-2 py-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.45)] backdrop-blur-xl">
         {leftItems.map((item) => (
           <NavBtn key={item.href} item={item} />
         ))}
