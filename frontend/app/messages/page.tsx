@@ -553,8 +553,14 @@ function MessagesPageContent() {
   const isClosed = selectedState === "RELEASED";
 
   return (
-    <main className="min-h-screen">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+    <main className={selectedThread ? "sm:min-h-screen" : "min-h-screen"}>
+      <div
+        className={
+          selectedThread
+            ? "sm:max-w-6xl sm:mx-auto sm:px-6 sm:py-6 sm:space-y-6"
+            : "max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6"
+        }
+      >
         <div
           className={`items-center gap-3 flex-wrap ${
             selectedThread ? "hidden lg:flex" : "flex"
@@ -570,7 +576,13 @@ function MessagesPageContent() {
         {!address ? (
           <p className="text-silver">Connect your wallet to view messages.</p>
         ) : (
-          <div className="glass-card overflow-hidden flex flex-col lg:flex-row min-h-[640px] rounded-glass-lg">
+          <div
+            className={`glass-card overflow-hidden flex flex-col lg:flex-row rounded-glass-lg ${
+              selectedThread
+                ? "h-[calc(100dvh-7rem)] sm:h-auto sm:min-h-[640px]"
+                : "min-h-[640px]"
+            }`}
+          >
             {/* Order-grouped sidebar — full-screen list on mobile when no
                 conversation is selected, fixed 320px column on desktop. */}
             <aside
@@ -628,16 +640,16 @@ function MessagesPageContent() {
                   <button
                     type="button"
                     onClick={() => setSelectedThread(null)}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white/85 hover:bg-white/10 lg:hidden"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white hover:bg-white/20 active:scale-95 transition lg:hidden"
                     aria-label="Back to inbox"
                   >
                     <svg
-                      width="18"
-                      height="18"
+                      width="22"
+                      height="22"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
-                      strokeWidth="2.5"
+                      strokeWidth="2.75"
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       aria-hidden
