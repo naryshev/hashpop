@@ -18,10 +18,12 @@ import { TopBarSlot } from "../../lib/topBar";
 import {
   BadgeCheck,
   Bell,
+  ChevronDown,
   MapPin,
   Search as SearchIcon,
   ShoppingCart,
   SlidersHorizontal,
+  UserCircle,
 } from "lucide-react";
 
 function formatListingId(id: string): string {
@@ -185,6 +187,7 @@ export type ListingItem = {
   seller?: string;
   imageUrl?: string | null;
   mediaUrls?: string[];
+  city?: string | null;
   createdAt?: string;
   status?: string;
   onChainConfirmed?: boolean;
@@ -198,11 +201,12 @@ export default function MarketplacePageClient({
   initialItems: ListingItem[];
   initialError: string | null;
 }) {
-  const { isConnected } = useHashpackWallet();
+  const { isConnected, address, accountId } = useHashpackWallet();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [searchInput, setSearchInput] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
+  const [locationOpen, setLocationOpen] = useState(false);
   const [filterMinPrice, setFilterMinPrice] = useState("");
   const [filterMaxPrice, setFilterMaxPrice] = useState("");
   const [filterPostedWithin, setFilterPostedWithin] = useState("");
@@ -213,6 +217,7 @@ export default function MarketplacePageClient({
   const maxPriceQuery = searchParams.get("maxPrice")?.trim() ?? "";
   const postedWithinQuery = searchParams.get("postedWithin")?.trim() ?? "";
   const conditionQuery = searchParams.get("condition")?.trim() ?? "";
+  const locationQuery = searchParams.get("location")?.trim() ?? "";
   const viewMode: ViewMode = parseViewMode(searchParams.get("view"));
   const sortMode: SortMode = parseSortMode(searchParams.get("sort"));
   const items = initialItems;
@@ -298,6 +303,11 @@ export default function MarketplacePageClient({
       }
       if (conditionQuery && item.condition?.toLowerCase() !== conditionQuery.toLowerCase())
         return false;
+      if (
+        locationQuery &&
+        (item.city ?? "").trim().toLowerCase() !== locationQuery.toLowerCase()
+      )
+        return false;
       return true;
     });
 
@@ -320,6 +330,7 @@ export default function MarketplacePageClient({
     items,
     query,
     categoryQuery,
+    locationQuery,
     minPriceQuery,
     maxPriceQuery,
     postedWithinQuery,
@@ -368,7 +379,23 @@ export default function MarketplacePageClient({
   };
 
   const hasActiveFilter =
-    !!(minPriceQuery || maxPriceQuery || postedWithinQuery || conditionQuery || sortMode !== "recent");
+    !!(minPriceQuery || maxPriceQuery || postedWithinQuery || conditionQuery || locationQuery || sortMode !== "recent");
+
+  // Distinct cities present in the current listing set, used to populate the
+  // location dropdown. Cap to 50 to keep the panel manageable.
+  const knownCities = useMemo(() => {
+    const set = new Set<string>();
+    for (const it of items) {
+      const c = it.city?.trim();
+      if (c) set.add(c);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b)).slice(0, 50);
+  }, [items]);
+
+  const setLocation = (value: string | null) => {
+    setLocationOpen(false);
+    setParam("location", value);
+  };
 
   const renderFilterSortPanel = () => (
     <div className="absolute right-0 top-full mt-2 w-72 rounded-xl border border-white/10 bg-[#0a0a0a] p-4 shadow-2xl z-50">
@@ -496,6 +523,77 @@ export default function MarketplacePageClient({
     </div>
   );
 
+  // Location chip + dropdown reused on both viewports. Cities surface from
+  // the listings currently loaded; selecting one writes to the `location`
+  // URL param and is applied by the filter step above.
+  const renderLocationSelect = (variant: "compact" | "stacked") => {
+    const label = locationQuery || "All locations";
+    return (
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setLocationOpen((o) => !o)}
+          className={`flex items-center gap-2 rounded-full border px-3 py-1.5 transition-colors ${
+            locationQuery
+              ? "border-[#00ffa3]/40 bg-[#00ffa3]/10 text-[#00ffa3]"
+              : "border-white/10 bg-white/5 text-white hover:border-white/20"
+          }`}
+        >
+          <MapPin size={14} className={locationQuery ? "text-[#00ffa3]" : "text-silver"} />
+          {variant === "stacked" ? (
+            <span className="leading-tight text-left">
+              <span className="block text-[9px] uppercase tracking-wide text-silver/60">
+                Location
+              </span>
+              <span className="block text-xs font-semibold">{label}</span>
+            </span>
+          ) : (
+            <span className="text-xs font-medium">{label}</span>
+          )}
+          <ChevronDown size={12} className="text-silver/60" />
+        </button>
+        {locationOpen && (
+          <div className="absolute left-0 top-full z-50 mt-2 w-56 rounded-xl border border-white/10 bg-[#0a0a0a] p-2 shadow-2xl">
+            <button
+              type="button"
+              onClick={() => setLocation(null)}
+              className={`block w-full rounded-lg px-3 py-1.5 text-left text-xs transition-colors ${
+                !locationQuery
+                  ? "bg-[#00ffa3]/10 text-[#00ffa3]"
+                  : "text-white hover:bg-white/5"
+              }`}
+            >
+              All locations
+            </button>
+            <div className="my-1 border-t border-white/5" />
+            <div className="max-h-64 overflow-y-auto">
+              {knownCities.length === 0 ? (
+                <p className="px-3 py-1.5 text-[11px] text-silver/60">
+                  No cities on current listings.
+                </p>
+              ) : (
+                knownCities.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setLocation(c)}
+                    className={`block w-full rounded-lg px-3 py-1.5 text-left text-xs transition-colors ${
+                      locationQuery === c
+                        ? "bg-[#00ffa3]/10 text-[#00ffa3]"
+                        : "text-white hover:bg-white/5"
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // Compact desktop search bubble — used to the right of the view-mode
   // pills since the global top-bar no longer hosts the search input.
   const desktopInlineSearch = (
@@ -529,15 +627,7 @@ export default function MarketplacePageClient({
             matching the redesigned mobile marketplace. */}
         <div className="sm:hidden mb-4 space-y-3">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
-              <MapPin size={14} className="text-[#00ffa3]" />
-              <div className="leading-tight">
-                <div className="text-[9px] uppercase tracking-wide text-silver/60">
-                  Location
-                </div>
-                <div className="text-xs font-semibold text-white">All locations</div>
-              </div>
-            </div>
+            {renderLocationSelect("stacked")}
             <div className="flex items-center gap-2">
               <Link
                 href="/watchlist"
@@ -552,6 +642,19 @@ export default function MarketplacePageClient({
                 className="rounded-full border border-white/10 bg-white/5 p-2 text-silver hover:text-white"
               >
                 <Bell size={16} />
+              </Link>
+              <Link
+                href={
+                  address
+                    ? `/profile/${encodeURIComponent(address)}`
+                    : accountId
+                      ? `/profile/${encodeURIComponent(accountId)}`
+                      : "/dashboard"
+                }
+                aria-label="Profile"
+                className="rounded-full border border-white/10 bg-white/5 p-2 text-silver hover:text-white"
+              >
+                <UserCircle size={16} />
               </Link>
             </div>
           </div>
@@ -670,6 +773,7 @@ export default function MarketplacePageClient({
             });
           }
           if (conditionQuery) pills.push({ label: conditionQuery, keys: ["condition"] });
+          if (locationQuery) pills.push({ label: `📍 ${locationQuery}`, keys: ["location"] });
 
           if (!pills.length) return null;
           return (
@@ -784,6 +888,7 @@ export default function MarketplacePageClient({
             </div>
             <div className="hidden sm:flex items-center justify-between gap-3 mb-4">
               <div className="flex items-center gap-2">
+                {renderLocationSelect("compact")}
                 {(
                   [
                     { id: "editorial", label: "Editorial" },

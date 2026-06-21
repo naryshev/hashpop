@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, LayoutDashboard, MessageSquare, Plus, Store } from "lucide-react";
+import { Bell, MessageSquare, Plus, Store, UserCircle } from "lucide-react";
+import { useHashpackWallet } from "../lib/hashpackWallet";
 
 type NavItem = {
   href: string;
@@ -11,14 +12,17 @@ type NavItem = {
 };
 
 /**
- * Floating bottom navigation bar shared across mobile and desktop. Five
- * cells: two nav buttons on the left, a centred Create FAB raised above the
- * bar, and two on the right. Labels are dropped — each cell is an icon-only
- * tap target. On desktop the bar is the same component scaled up to a
- * slightly wider max-width so it looks balanced on a large viewport.
+ * Floating bottom navigation bar shown on mobile. Five cells: two nav buttons
+ * on the left, a centred Create FAB raised above the bar, and two on the
+ * right. Labels are dropped — each cell is an icon-only tap target.
  */
 export function BottomNav() {
   const pathname = usePathname();
+  const { address, accountId } = useHashpackWallet();
+  const profileHref =
+    address || accountId
+      ? `/profile/${encodeURIComponent(address || accountId || "")}`
+      : "/dashboard";
 
   const leftItems: NavItem[] = [
     {
@@ -35,9 +39,9 @@ export function BottomNav() {
 
   const rightItems: NavItem[] = [
     {
-      href: "/dashboard",
-      icon: <LayoutDashboard className="h-5 w-5 md:h-6 md:w-6" />,
-      label: "My Hashpop",
+      href: profileHref,
+      icon: <UserCircle className="h-5 w-5 md:h-6 md:w-6" />,
+      label: "Profile",
     },
     {
       href: "/messages",
