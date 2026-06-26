@@ -8,6 +8,7 @@ import { BuyButton } from "../../../components/BuyButton";
 import { EscrowPanel } from "../../../components/EscrowPanel";
 import { AddressDisplay } from "../../../components/AddressDisplay";
 import { profileAvatarUrl, profileDisplayName, useProfile } from "../../../lib/profiles";
+import { BadgeCheck } from "lucide-react";
 import { formatContractAmountToHbar, formatPriceForDisplay } from "../../../lib/formatPrice";
 import { formatHbarWithUsd } from "../../../lib/hbarUsd";
 import { useHbarUsd } from "../../../hooks/useHbarUsd";
@@ -28,7 +29,11 @@ import { OffersPanel } from "../../../components/OffersPanel";
 
 import { getApiUrl } from "../../../lib/apiUrl";
 
-/** Seller avatar + display name + KYC badge + inline rating, shown on the listing detail. */
+/**
+ * Compact seller chip: avatar on the left, display name + Hedera account ID
+ * stacked on the right. Matches the HashPack PFP chip pattern shown in their
+ * profile docs. Inline KYC tick + rating sit next to the name.
+ */
 function SellerProfileMeta({ seller }: { seller: string }) {
   const profile = useProfile(seller);
   const name = profileDisplayName(profile);
@@ -37,38 +42,37 @@ function SellerProfileMeta({ seller }: { seller: string }) {
   return (
     <Link
       href={`/profile/${encodeURIComponent(seller)}`}
-      className="group flex items-center gap-2.5 rounded-lg -mx-1 px-1 py-1 hover:bg-white/5 transition-colors"
+      className="group inline-flex max-w-full items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 transition-colors hover:bg-white/[0.07]"
       aria-label="View seller profile"
     >
       {avatar ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={avatar}
-          alt=""
-          className="h-9 w-9 shrink-0 rounded-full object-cover"
-        />
+        <img src={avatar} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
       ) : (
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs text-silver">
           {(name ?? seller).slice(0, 2).toUpperCase()}
         </div>
       )}
       <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm font-medium text-white group-hover:text-chrome">
+        <div className="flex items-center gap-1.5 text-sm font-semibold text-white group-hover:text-chrome">
           <span className="truncate">{name ?? "Hashpop seller"}</span>
           {profile?.kycVerified && (
-            <span className="rounded-full bg-[#00ffa3]/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#00ffa3]">
-              Verified
-            </span>
+            <BadgeCheck size={13} className="shrink-0 text-[#00ffa3]" aria-label="KYC verified" />
           )}
           {hasRating ? (
-            <span className="text-xs font-normal text-amber-300/90">
-              ★ {profile!.ratingAverage!.toFixed(1)}{" "}
-              <span className="text-silver/60">({profile!.ratingCount})</span>
+            <span className="text-[11px] font-normal text-amber-300/90">
+              ★ {profile!.ratingAverage!.toFixed(1)}
+              <span className="ml-0.5 text-silver/60">({profile!.ratingCount})</span>
             </span>
           ) : (
-            <span className="text-xs font-normal text-silver/50">No ratings yet</span>
+            <span className="text-[11px] font-normal text-silver/50">No ratings yet</span>
           )}
         </div>
+        <AddressDisplay
+          address={seller}
+          showVerified={false}
+          className="block truncate font-mono text-[11px] text-silver/70"
+        />
       </div>
     </Link>
   );
@@ -1204,16 +1208,38 @@ export default function ListingPage() {
             </div>
             {/* Description — shown inline under image gallery when not editing */}
             {listing?.description && !editing && (
-              <div className="border border-[#4a5e83]/40 bg-gradient-to-b from-[#121a29]/80 to-[#0f1522]/80 p-5">
+              <div className="bg-gradient-to-b from-[#121a29]/80 to-[#0f1522]/80 p-5">
                 <h3 className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-3">
                   Description
                 </h3>
                 <p className="text-silver text-sm whitespace-pre-wrap leading-relaxed">
                   {listing.description}
                 </p>
-                <p className="text-white/30 text-xs mt-4 pt-3 border-t border-white/5">
-                  Listed: {formatListingDate(listing.createdAt)} · {listing.status}
-                </p>
+                <div className="text-white/30 text-xs mt-4 pt-3 border-t border-white/5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span>Listed: {formatListingDate(listing.createdAt)}</span>
+                  <span>· {listing.status}</span>
+                  {listing.txHash &&
+                    (() => {
+                      const url = getTransactionExplorerUrl(listing.txHash, chainId);
+                      const short = `${listing.txHash.slice(0, 8)}…${listing.txHash.slice(-6)}`;
+                      return (
+                        <>
+                          <span aria-hidden>·</span>
+                          <span className="font-mono">tx {short}</span>
+                          {url && (
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-chrome hover:text-white underline"
+                            >
+                              View on HashScan
+                            </a>
+                          )}
+                        </>
+                      );
+                    })()}
+                </div>
               </div>
             )}
             {!editing &&
@@ -1467,14 +1493,14 @@ export default function ListingPage() {
                 listing.buyer.toLowerCase() === address.toLowerCase()
               ) &&
               !(listing.status === "LOCKED" || isLockedOnChain) && (
-                <div className="glass-card p-4 rounded-glass border border-white/10">
+                <div className="border-t border-white/10 pt-4">
                   <p className="text-silver text-sm">
                     This listing is no longer available for purchase.
                   </p>
                 </div>
               )}
             {listing && (isListed || isUnconfirmed) && isSeller && (
-              <div className="glass-card p-4 rounded-glass border border-white/10 space-y-3">
+              <div className="space-y-3 border-t border-white/10 pt-4">
                 <div>
                   <p className="text-xs text-silver uppercase tracking-wider mb-1">
                     Your listing price
@@ -1508,54 +1534,58 @@ export default function ListingPage() {
                 </div>
               )}
 
-            {listing?.txHash && (
-              <div className="glass-card p-4 rounded-glass border border-white/10">
-                <h3 className="text-white font-medium mb-2">Transaction</h3>
-                <div className="text-sm text-silver space-y-1">
-                  <p className="font-mono text-xs text-silver/80 break-all">{listing.txHash}</p>
-                  {(() => {
-                    const url = getTransactionExplorerUrl(listing.txHash, chainId);
-                    return url ? (
-                      <a
-                        href={url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-chrome hover:text-white underline"
-                      >
-                        View on HashScan
-                      </a>
-                    ) : null;
-                  })()}
-                </div>
+            {listing && isListed && (
+              <div className="border-t border-white/10 pt-4">
+                <h3 className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-3">
+                  Shipping, returns &amp; payments
+                </h3>
+                <dl className="divide-y divide-white/5 text-sm">
+                  <div className="grid grid-cols-[110px_minmax(0,1fr)] gap-3 py-2">
+                    <dt className="text-silver/70">Shipping:</dt>
+                    <dd className="text-silver">
+                      {listing.requireEscrow
+                        ? "Seller ships once payment is locked in escrow."
+                        : "Buyer arranges with seller after payment."}
+                    </dd>
+                  </div>
+                  {listing.city && (
+                    <div className="grid grid-cols-[110px_minmax(0,1fr)] gap-3 py-2">
+                      <dt className="text-silver/70">Located in:</dt>
+                      <dd className="text-white">{listing.city}</dd>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-[110px_minmax(0,1fr)] gap-3 py-2">
+                    <dt className="text-silver/70">Returns:</dt>
+                    <dd className="text-silver">
+                      {listing.requireEscrow ? (
+                        <>
+                          Buyer-protected: escrow auto-refunds if the item isn&apos;t shipped or
+                          received.
+                        </>
+                      ) : (
+                        <>No returns — private sale.</>
+                      )}
+                    </dd>
+                  </div>
+                  <div className="grid grid-cols-[110px_minmax(0,1fr)] gap-3 py-2">
+                    <dt className="text-silver/70">Payments:</dt>
+                    <dd>
+                      <span className="inline-flex items-center gap-1.5 rounded-md border border-[#5b21b6]/40 bg-gradient-to-br from-[#5b21b6]/25 to-[#1e1b4b]/25 px-2.5 py-1 text-xs font-semibold text-white">
+                        <span aria-hidden className="text-[#a78bfa]">⚡</span>
+                        HashPack
+                        <span className="text-silver/60">· HBAR</span>
+                      </span>
+                    </dd>
+                  </div>
+                </dl>
               </div>
             )}
 
-            <div className="glass-card p-4 rounded-glass border border-white/10">
-              <h3 className="text-white font-medium mb-2">Security</h3>
-              <ul className="text-sm text-silver space-y-1">
-                <li className="flex items-center gap-2">✓ Payment via escrow</li>
-                {isUnconfirmed ? (
-                  <li className="flex items-center gap-2 text-amber-300/80">
-                    ✗ Ownership not yet confirmed on-chain
-                  </li>
-                ) : (
-                  <li className="flex items-center gap-2">✓ Ownership confirmed on-chain</li>
-                )}
-                <li className="flex items-center gap-2 text-rose-300/80">
-                  ✗ No legal obligation to accept returns for private sales
-                </li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="text-white font-medium mb-2">Seller</h3>
+            <div className="border-t border-white/10 pt-4">
+              <h3 className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-2">
+                Seller
+              </h3>
               <SellerProfileMeta seller={item!.seller} />
-              <Link
-                href={`/profile/${encodeURIComponent(item!.seller)}`}
-                className="mt-1 flex items-center gap-2 text-silver text-sm hover:text-white transition-colors"
-              >
-                <AddressDisplay address={item!.seller} className="text-chrome font-mono text-xs" />
-              </Link>
               {isSeller && isSellerActiveListing && !isLockedOnChain && !editing && (
                 <div className="flex gap-2 mt-2">
                   <button
