@@ -725,6 +725,129 @@ export default function ListingPage() {
     setSelectedMediaIndex((prev) => (prev + 1) % keptMediaUrls.length);
   };
 
+  // Title block + secondary blocks (want-to-sell, description, location)
+  // are rendered in two places so the page can put them in the desktop
+  // 2-column grid and reorder them on mobile (title above the photo;
+  // want-to-sell / description / location below the seller chip).
+  const titleBlockJsx = (
+    <div>
+      <nav className="mb-3 flex flex-wrap items-center gap-1 text-sm text-silver">
+        <Link href="/marketplace" className="hover:text-white">
+          Marketplace
+        </Link>
+        {categoryLabel && categoryLabel !== "Marketplace" && (
+          <>
+            <span>{">"}</span>
+            <span className="text-white">{categoryLabel}</span>
+          </>
+        )}
+      </nav>
+      <div className="flex flex-wrap items-start gap-2">
+        <h1 className="min-w-0 flex-1 text-2xl font-bold text-white">
+          {editing ? editTitle || displayTitle : displayTitle}
+        </h1>
+        {!isListed && !isUnconfirmed && (
+          <span className="mt-1 flex-shrink-0 border border-white/10 bg-white/10 px-2 py-0.5 text-xs font-medium text-silver">
+            Archived
+          </span>
+        )}
+      </div>
+      {displaySubtitle && (
+        <p className="mt-1 text-sm text-silver">
+          {editing ? editSubtitle : displaySubtitle}
+        </p>
+      )}
+      {attributesLine && (
+        <p className="mt-0.5 text-sm text-silver/70">
+          {editing
+            ? [editCondition, editYearOfProduction].filter(Boolean).join(" | ")
+            : attributesLine}
+        </p>
+      )}
+    </div>
+  );
+
+  const wantToSellJsx = (
+    <div className="flex flex-wrap gap-4 text-sm text-silver">
+      <span>Want to sell a similar item?</span>
+      <Link
+        href="/create"
+        className="text-chrome hover:text-white underline inline-flex items-center gap-1"
+      >
+        Create a listing now
+      </Link>
+      {!isSeller && (
+        <>
+          <span className="text-white/40">|</span>
+          <button
+            type="button"
+            onClick={() => {
+              setReportOpen(true);
+              setReportMessage(null);
+            }}
+            className="text-silver hover:text-rose-300 underline"
+          >
+            Report listing
+          </button>
+        </>
+      )}
+    </div>
+  );
+
+  const descriptionJsx =
+    listing?.description && !editing ? (
+      <div className="border-t border-white/10 pt-4">
+        <h3 className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-3">
+          Description
+        </h3>
+        <p className="text-silver text-sm whitespace-pre-wrap leading-relaxed">
+          {listing.description}
+        </p>
+        <div className="text-white/30 text-xs mt-4 pt-3 border-t border-white/5 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span>Listed: {formatListingDate(listing.createdAt)}</span>
+          <span>· {listing.status}</span>
+          {listing.txHash &&
+            (() => {
+              const url = getTransactionExplorerUrl(listing.txHash, chainId);
+              const short = `${listing.txHash.slice(0, 8)}…${listing.txHash.slice(-6)}`;
+              return (
+                <>
+                  <span aria-hidden>·</span>
+                  <span className="font-mono">tx {short}</span>
+                  {url && (
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-chrome hover:text-white underline"
+                    >
+                      View on HashScan
+                    </a>
+                  )}
+                </>
+              );
+            })()}
+        </div>
+      </div>
+    ) : null;
+
+  const locationJsx =
+    !editing &&
+    listing &&
+    typeof listing.locationLat === "number" &&
+    typeof listing.locationLng === "number" ? (
+      <div className="border-t border-white/10 pt-4">
+        <h3 className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-3">
+          Location
+        </h3>
+        <LocationMap
+          lat={listing.locationLat}
+          lng={listing.locationLng}
+          city={listing.city}
+        />
+      </div>
+    ) : null;
+
   return (
     <main className="min-h-screen overflow-x-hidden">
       <div className="relative overflow-x-hidden px-3 py-4 sm:px-4">
@@ -1049,6 +1172,10 @@ export default function ListingPage() {
             </div>
           )}
 
+        {/* Mobile-only title block above the photo. On desktop the title
+            block lives at the top of the right column inside the grid. */}
+        <div className="lg:hidden mb-4">{titleBlockJsx}</div>
+
         {/* Content grid — image left, action panels right.
             The breadcrumb + title block now lives at the top of the right
             column instead of spanning above the image, so the listing detail
@@ -1152,81 +1279,14 @@ export default function ListingPage() {
                 )}
               </div>
             </div>
-            <div className="flex flex-wrap gap-4 text-sm text-silver">
-              <span>Want to sell a similar item?</span>
-              <Link
-                href="/create"
-                className="text-chrome hover:text-white underline inline-flex items-center gap-1"
-              >
-                Create a listing now
-              </Link>
-              {!isSeller && (
-                <>
-                  <span className="text-white/40">|</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setReportOpen(true);
-                      setReportMessage(null);
-                    }}
-                    className="text-silver hover:text-rose-300 underline"
-                  >
-                    Report listing
-                  </button>
-                </>
-              )}
-            </div>
-            {/* Description — shown inline under image gallery when not editing */}
-            {listing?.description && !editing && (
-              <div className="border-t border-white/10 pt-4">
-                <h3 className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-3">
-                  Description
-                </h3>
-                <p className="text-silver text-sm whitespace-pre-wrap leading-relaxed">
-                  {listing.description}
-                </p>
-                <div className="text-white/30 text-xs mt-4 pt-3 border-t border-white/5 flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <span>Listed: {formatListingDate(listing.createdAt)}</span>
-                  <span>· {listing.status}</span>
-                  {listing.txHash &&
-                    (() => {
-                      const url = getTransactionExplorerUrl(listing.txHash, chainId);
-                      const short = `${listing.txHash.slice(0, 8)}…${listing.txHash.slice(-6)}`;
-                      return (
-                        <>
-                          <span aria-hidden>·</span>
-                          <span className="font-mono">tx {short}</span>
-                          {url && (
-                            <a
-                              href={url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-chrome hover:text-white underline"
-                            >
-                              View on HashScan
-                            </a>
-                          )}
-                        </>
-                      );
-                    })()}
-                </div>
-              </div>
-            )}
-            {!editing &&
-              listing &&
-              typeof listing.locationLat === "number" &&
-              typeof listing.locationLng === "number" && (
-                <div className="border-t border-white/10 pt-4">
-                  <h3 className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-3">
-                    Location
-                  </h3>
-                  <LocationMap
-                    lat={listing.locationLat}
-                    lng={listing.locationLng}
-                    city={listing.city}
-                  />
-                </div>
-              )}
+            {/* Desktop-only: want-to-sell + description + location live in
+                the left column under the photo on desktop. On mobile these
+                are rendered as a separate block below the grid so the buy
+                panel / shipping / seller surface immediately after the
+                photo. */}
+            <div className="hidden lg:block">{wantToSellJsx}</div>
+            <div className="hidden lg:block">{descriptionJsx}</div>
+            <div className="hidden lg:block">{locationJsx}</div>
             {isSeller && isSellerActiveListing && editing && (
               <div className="glass-card p-4 space-y-3">
                 <h3 className="text-white font-medium">Configure</h3>
@@ -1356,46 +1416,13 @@ export default function ListingPage() {
             )}
           </div>
 
-          {/* Right: title + price + buy/escrow panel */}
+          {/* Right: title + price + buy/escrow panel.
+              Title block + grey divider only show on desktop here; on mobile
+              the title is rendered above the photo and the buy panel sits
+              directly below the photo. */}
           <div className="min-w-0 space-y-4">
-            <div>
-              <nav className="mb-3 flex flex-wrap items-center gap-1 text-sm text-silver">
-                <Link href="/marketplace" className="hover:text-white">
-                  Marketplace
-                </Link>
-                {categoryLabel && categoryLabel !== "Marketplace" && (
-                  <>
-                    <span>{">"}</span>
-                    <span className="text-white">{categoryLabel}</span>
-                  </>
-                )}
-              </nav>
-              <div className="flex flex-wrap items-start gap-2">
-                <h1 className="min-w-0 flex-1 text-2xl font-bold text-white">
-                  {editing ? editTitle || displayTitle : displayTitle}
-                </h1>
-                {!isListed && !isUnconfirmed && (
-                  <span className="mt-1 flex-shrink-0 border border-white/10 bg-white/10 px-2 py-0.5 text-xs font-medium text-silver">
-                    Archived
-                  </span>
-                )}
-              </div>
-              {displaySubtitle && (
-                <p className="mt-1 text-sm text-silver">
-                  {editing ? editSubtitle : displaySubtitle}
-                </p>
-              )}
-              {attributesLine && (
-                <p className="mt-0.5 text-sm text-silver/70">
-                  {editing
-                    ? [editCondition, editYearOfProduction].filter(Boolean).join(" | ")
-                    : attributesLine}
-                </p>
-              )}
-            </div>
-
-            {/* Grey divider — separates the title block from the buy panel. */}
-            <div className="border-t border-white/10" />
+            <div className="hidden lg:block">{titleBlockJsx}</div>
+            <div className="hidden lg:block border-t border-white/10" />
 
             {listing && priceMismatch && onChainPriceHbar && (
               <p className="text-sm text-amber-300/90 mt-1">
@@ -1640,6 +1667,15 @@ export default function ListingPage() {
                 ))}
             </div>
           </div>
+        </div>
+
+        {/* Mobile-only: want-to-sell + description + location appear below
+            the buy panel / shipping / seller on mobile. Desktop renders
+            these inside the grid's left column instead. */}
+        <div className="mt-4 space-y-4 lg:hidden">
+          {wantToSellJsx}
+          {descriptionJsx}
+          {locationJsx}
         </div>
 
         {/* Chat thread — shown when user is buyer or seller of a purchased listing */}
