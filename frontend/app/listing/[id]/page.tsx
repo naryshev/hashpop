@@ -1049,139 +1049,109 @@ export default function ListingPage() {
             </div>
           )}
 
-        {/* Title row — left column only, right side intentionally empty so image aligns with panel top */}
-        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-x-8 mb-4">
-          <div>
-            <nav className="flex items-center gap-1 text-sm text-silver flex-wrap mb-3">
-              <Link href="/marketplace" className="hover:text-white">
-                Marketplace
-              </Link>
-              {categoryLabel && categoryLabel !== "Marketplace" && (
-                <>
-                  <span>{">"}</span>
-                  <span className="text-white">{categoryLabel}</span>
-                </>
-              )}
-            </nav>
-            <div className="flex items-start gap-2 flex-wrap">
-              <h1 className="text-2xl font-bold text-white flex-1 min-w-0">
-                {editing ? editTitle || displayTitle : displayTitle}
-              </h1>
-              {!isListed && !isUnconfirmed && (
-                <span className="px-2 py-0.5 text-xs font-medium bg-white/10 text-silver border border-white/10 mt-1 flex-shrink-0">
-                  Archived
-                </span>
-              )}
-            </div>
-            {displaySubtitle && (
-              <p className="text-silver text-sm mt-1">{editing ? editSubtitle : displaySubtitle}</p>
-            )}
-            {attributesLine && (
-              <p className="text-silver/70 text-sm mt-0.5">
-                {editing
-                  ? [editCondition, editYearOfProduction].filter(Boolean).join(" | ")
-                  : attributesLine}
-              </p>
-            )}
-          </div>
-          {/* right side empty — right panel starts at image level below */}
-        </div>
-
-        {/* Content grid — image left, action panels right */}
+        {/* Content grid — image left, action panels right.
+            The breadcrumb + title block now lives at the top of the right
+            column instead of spanning above the image, so the listing detail
+            reads top-to-bottom in one column on the right while the media
+            gallery takes the full left side. */}
         <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_400px]">
-          {/* Left: media gallery */}
+          {/* Left: media gallery — vertical thumb strip on the left of a
+              large main image that fills more of the viewport. Thumbs are
+              hidden when the listing only has a single media item. */}
           <div className="min-w-0 space-y-4">
-            <div className="relative aspect-[4/3] max-h-[62vh] overflow-hidden rounded-glass-lg border border-white/10 bg-black">
-              {mainImageUrl ? (
-                <>
-                  {isVideoMedia(mainImageUrl) ? (
-                    <video
-                      src={mainImageUrl}
-                      className="h-full w-full object-contain"
-                      controls
-                      playsInline
-                      muted
-                    />
-                  ) : (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={mainImageUrl} alt="" className="h-full w-full object-contain" />
-                  )}
-                  <div className="absolute top-3 right-3 flex gap-2">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        toggleWishlist();
-                      }}
-                      className={`w-10 h-10 rounded-full flex items-center justify-center text-white ${inWishlist ? "bg-emerald-600/90" : "bg-black/60 hover:bg-black/80"}`}
-                      aria-label={inWishlist ? "In wishlist" : "Add to wishlist"}
-                      disabled={wishlistLoading}
+            <div className="flex gap-3">
+              {keptMediaUrls.length > 1 && (
+                <div className="flex w-20 shrink-0 flex-col gap-2 overflow-y-auto pb-1 max-h-[80vh]">
+                  {keptMediaUrls.map((url, i) => (
+                    <div
+                      key={url}
+                      role={editing ? undefined : "button"}
+                      tabIndex={editing ? undefined : 0}
+                      onClick={() => !editing && setSelectedMediaIndex(i)}
+                      onKeyDown={(e) =>
+                        !editing && (e.key === "Enter" || e.key === " ") && setSelectedMediaIndex(i)
+                      }
+                      className={`relative flex-shrink-0 h-20 w-20 cursor-pointer overflow-hidden rounded-glass border-2 transition-colors ${i === safeMediaIndex ? "border-chrome" : "border-white/20 hover:border-white/40"}`}
                     >
-                      {inWishlist ? "✓" : "♡"}
-                    </button>
-                    <button
-                      type="button"
-                      className="w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center text-white"
-                      aria-label="Share"
-                    >
-                      ⎘
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setGalleryOpen(true)}
-                    className="absolute inset-0 z-10 cursor-zoom-in"
-                    aria-label="Open media gallery"
-                  />
-                </>
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center text-silver">
-                  No image
+                      {isVideoMedia(url) ? (
+                        <video
+                          src={url}
+                          className="h-full w-full object-contain bg-black"
+                          muted
+                          playsInline
+                        />
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={url} alt="" className="h-full w-full object-contain bg-black" />
+                      )}
+                      {editing && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeExistingMedia(url);
+                          }}
+                          className="absolute right-0 top-0 flex h-6 w-6 items-center justify-center rounded-bl-lg bg-black/70 text-sm text-white hover:bg-rose-500"
+                          aria-label="Remove"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
-            </div>
-            {keptMediaUrls.length > 1 && (
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {keptMediaUrls.map((url, i) => (
-                  <div
-                    key={url}
-                    role={editing ? undefined : "button"}
-                    tabIndex={editing ? undefined : 0}
-                    onClick={() => !editing && setSelectedMediaIndex(i)}
-                    onKeyDown={(e) =>
-                      !editing && (e.key === "Enter" || e.key === " ") && setSelectedMediaIndex(i)
-                    }
-                    className={`relative flex-shrink-0 w-20 h-20 rounded-glass overflow-hidden border-2 transition-colors cursor-pointer ${i === safeMediaIndex ? "border-chrome" : "border-white/20 hover:border-white/40"}`}
-                  >
-                    {isVideoMedia(url) ? (
+              <div className="relative aspect-square max-h-[80vh] flex-1 overflow-hidden rounded-glass-lg border border-white/10 bg-black">
+                {mainImageUrl ? (
+                  <>
+                    {isVideoMedia(mainImageUrl) ? (
                       <video
-                        src={url}
-                        className="w-full h-full object-contain bg-black"
-                        muted
+                        src={mainImageUrl}
+                        className="h-full w-full object-contain"
+                        controls
                         playsInline
+                        muted
                       />
                     ) : (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={url} alt="" className="w-full h-full object-contain bg-black" />
+                      <img src={mainImageUrl} alt="" className="h-full w-full object-contain" />
                     )}
-                    {editing && (
+                    <div className="absolute top-3 right-3 flex gap-2">
                       <button
                         type="button"
                         onClick={(e) => {
+                          e.preventDefault();
                           e.stopPropagation();
-                          removeExistingMedia(url);
+                          toggleWishlist();
                         }}
-                        className="absolute top-0 right-0 w-6 h-6 flex items-center justify-center bg-black/70 text-white text-sm rounded-bl-lg hover:bg-rose-500"
-                        aria-label="Remove"
+                        className={`flex h-10 w-10 items-center justify-center rounded-full text-white ${inWishlist ? "bg-emerald-600/90" : "bg-black/60 hover:bg-black/80"}`}
+                        aria-label={inWishlist ? "In wishlist" : "Add to wishlist"}
+                        disabled={wishlistLoading}
                       >
-                        ×
+                        {inWishlist ? "✓" : "♡"}
                       </button>
-                    )}
+                      <button
+                        type="button"
+                        className="flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+                        aria-label="Share"
+                      >
+                        ⎘
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setGalleryOpen(true)}
+                      className="absolute inset-0 z-10 cursor-zoom-in"
+                      aria-label="Open media gallery"
+                    />
+                  </>
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center text-silver">
+                    No image
                   </div>
-                ))}
+                )}
               </div>
-            )}
+            </div>
             <div className="flex flex-wrap gap-4 text-sm text-silver">
               <span>Want to sell a similar item?</span>
               <Link
@@ -1386,8 +1356,47 @@ export default function ListingPage() {
             )}
           </div>
 
-          {/* Right: price + buy/escrow panel */}
+          {/* Right: title + price + buy/escrow panel */}
           <div className="min-w-0 space-y-4">
+            <div>
+              <nav className="mb-3 flex flex-wrap items-center gap-1 text-sm text-silver">
+                <Link href="/marketplace" className="hover:text-white">
+                  Marketplace
+                </Link>
+                {categoryLabel && categoryLabel !== "Marketplace" && (
+                  <>
+                    <span>{">"}</span>
+                    <span className="text-white">{categoryLabel}</span>
+                  </>
+                )}
+              </nav>
+              <div className="flex flex-wrap items-start gap-2">
+                <h1 className="min-w-0 flex-1 text-2xl font-bold text-white">
+                  {editing ? editTitle || displayTitle : displayTitle}
+                </h1>
+                {!isListed && !isUnconfirmed && (
+                  <span className="mt-1 flex-shrink-0 border border-white/10 bg-white/10 px-2 py-0.5 text-xs font-medium text-silver">
+                    Archived
+                  </span>
+                )}
+              </div>
+              {displaySubtitle && (
+                <p className="mt-1 text-sm text-silver">
+                  {editing ? editSubtitle : displaySubtitle}
+                </p>
+              )}
+              {attributesLine && (
+                <p className="mt-0.5 text-sm text-silver/70">
+                  {editing
+                    ? [editCondition, editYearOfProduction].filter(Boolean).join(" | ")
+                    : attributesLine}
+                </p>
+              )}
+            </div>
+
+            {/* Grey divider — separates the title block from the buy panel. */}
+            <div className="border-t border-white/10" />
+
             {listing && priceMismatch && onChainPriceHbar && (
               <p className="text-sm text-amber-300/90 mt-1">
                 Listing price: <strong>{formatPriceForDisplay(listing.price)} HBAR</strong>.
