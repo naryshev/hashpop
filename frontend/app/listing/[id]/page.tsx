@@ -727,7 +727,7 @@ export default function ListingPage() {
 
   return (
     <main className="min-h-screen overflow-x-hidden">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 relative overflow-x-hidden">
+      <div className="relative overflow-x-hidden px-3 py-4 sm:px-4">
         {cancelSuccess && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity duration-300 p-4">
             <div className="glass-card p-8 max-w-sm w-full text-center space-y-5">
@@ -1054,7 +1054,7 @@ export default function ListingPage() {
             column instead of spanning above the image, so the listing detail
             reads top-to-bottom in one column on the right while the media
             gallery takes the full left side. */}
-        <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_400px]">
+        <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_420px]">
           {/* Left: media gallery — vertical thumb strip on the left of a
               large main image that fills more of the viewport. Thumbs are
               hidden when the listing only has a single media item. */}
@@ -1178,7 +1178,7 @@ export default function ListingPage() {
             </div>
             {/* Description — shown inline under image gallery when not editing */}
             {listing?.description && !editing && (
-              <div className="bg-gradient-to-b from-[#121a29]/80 to-[#0f1522]/80 p-5">
+              <div className="border-t border-white/10 pt-4">
                 <h3 className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-3">
                   Description
                 </h3>
@@ -1216,7 +1216,7 @@ export default function ListingPage() {
               listing &&
               typeof listing.locationLat === "number" &&
               typeof listing.locationLng === "number" && (
-                <div className="border border-[#4a5e83]/40 bg-gradient-to-b from-[#121a29]/80 to-[#0f1522]/80 p-5">
+                <div className="border-t border-white/10 pt-4">
                   <h3 className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-3">
                     Location
                   </h3>
