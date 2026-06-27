@@ -622,7 +622,7 @@ export default function MarketplacePageClient({
     <main className="min-h-screen">
       <TopBarSlot name="title">{headerCluster}</TopBarSlot>
       <TopBarSlot name="actions">{actionsCluster}</TopBarSlot>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+      <div className="px-3 py-4 sm:px-4">
         {/* Mobile-only top section: location chip, watchlist/alerts icons,
             inline search + filter button, and a horizontal category carousel
             matching the redesigned mobile marketplace. */}
@@ -946,7 +946,7 @@ export default function MarketplacePageClient({
             </div>
 
             {viewMode === "grid" && (
-              <div className="hidden sm:grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="hidden sm:grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                 {filteredItems.map((item) => (
                   <Link
                     key={`${item.itemType}-${item.id}`}
@@ -1139,7 +1139,7 @@ export default function MarketplacePageClient({
                             {rest.length.toLocaleString()} more
                           </span>
                         </div>
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 auto-rows-[120px]">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6 gap-4 auto-rows-[120px]">
                           {rest.map((item, i) => {
                             const tall = i % 5 === 1 || i % 5 === 4;
                             const badge = getStatusBadge(item.status, item.onChainConfirmed);
