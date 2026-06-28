@@ -13,6 +13,7 @@ import { BottomNav } from "./BottomNav";
 import { WalletAccountSync } from "./WalletAccountSync";
 import { AppSidebar } from "./AppSidebar";
 import { DesktopShell } from "./DesktopShell";
+import { PwaInstallPrompt } from "./PwaInstallPrompt";
 
 const qc = new QueryClient();
 
@@ -37,6 +38,7 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
                 <AppSidebar open={sidebarOpen} setOpen={setSidebarOpen} />
               </div>
               <BottomNav />
+              <PwaInstallPrompt />
             </TopBarProvider>
             </ProfilesProvider>
           </SignInModalProvider>
