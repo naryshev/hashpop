@@ -1,7 +1,7 @@
 "use client";
 import { listingHref } from "../../lib/listingUrl";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Fuse from "fuse.js";
@@ -227,6 +227,14 @@ export default function MarketplacePageClient({
   // Warm the profile cache for every seller in one batched request so cards
   // can render display names, avatars and ratings without per-card fetches.
   useProfiles(items.map((i) => i.seller));
+
+  // Signal the boot splash that the marketplace (the default landing route)
+  // has mounted and its content is in the DOM, so the splash fades into a
+  // fully-rendered page rather than the empty Suspense fallback.
+  useEffect(() => {
+    (window as unknown as { __hashpopReady?: boolean }).__hashpopReady = true;
+    window.dispatchEvent(new Event("hashpop:ready"));
+  }, []);
 
   const setParam = (key: string, value: string | null) => {
     const p = new URLSearchParams(searchParams.toString());

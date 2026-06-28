@@ -12,26 +12,33 @@ export function BootSplash() {
   const [removed, setRemoved] = useState(false);
 
   useEffect(() => {
-    const MIN_VISIBLE_MS = 450;
+    const MIN_VISIBLE_MS = 400;
+    // Hard cap so the splash never hangs on routes that don't emit a ready
+    // signal (or if data is unusually slow).
+    const MAX_VISIBLE_MS = 3500;
     const start = performance.now();
+    let done = false;
 
     const finish = () => {
-      const elapsed = performance.now() - start;
-      const wait = Math.max(0, MIN_VISIBLE_MS - elapsed);
+      if (done) return;
+      done = true;
+      const wait = Math.max(0, MIN_VISIBLE_MS - (performance.now() - start));
       window.setTimeout(() => setHidden(true), wait);
     };
 
-    if (document.readyState === "complete") {
+    // The active page dispatches `hashpop:ready` once its real content has
+    // mounted (see MarketplacePageClient). If it already fired before this
+    // effect ran, the global flag catches it.
+    if ((window as unknown as { __hashpopReady?: boolean }).__hashpopReady) {
       finish();
-    } else {
-      window.addEventListener("load", finish, { once: true });
-      // Safety net in case `load` never fires (cached assets, etc.).
-      const fallback = window.setTimeout(finish, 2500);
-      return () => {
-        window.removeEventListener("load", finish);
-        window.clearTimeout(fallback);
-      };
+      return;
     }
+    window.addEventListener("hashpop:ready", finish, { once: true });
+    const cap = window.setTimeout(finish, MAX_VISIBLE_MS);
+    return () => {
+      window.removeEventListener("hashpop:ready", finish);
+      window.clearTimeout(cap);
+    };
   }, []);
 
   // Unmount after the fade-out transition completes.
