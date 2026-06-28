@@ -42,6 +42,36 @@ body {
   }
 }
 
+/* Boot splash: gentle logo breathing + an indeterminate sweeping bar. */
+@keyframes hp-splash-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+}
+
+@keyframes hp-splash-sweep {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+.hp-splash-logo {
+  animation: hp-splash-breathe 1.6s ease-in-out infinite;
+}
+
+.hp-splash-bar {
+  animation: hp-splash-sweep 1.15s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
 /* Used by the order/escrow detail screen for pending tx pills. */
 @keyframes hp-pulse {
   0%,
