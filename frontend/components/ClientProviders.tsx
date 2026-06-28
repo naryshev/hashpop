@@ -8,7 +8,6 @@ import { HashPackConfirmProvider } from "../lib/hashpackConfirm";
 import { SignInModalProvider } from "../lib/signInModal";
 import { ProfilesProvider } from "../lib/profiles";
 import { TopBarProvider } from "../lib/topBar";
-import { Footer } from "./Footer";
 import { BottomNav } from "./BottomNav";
 import { WalletAccountSync } from "./WalletAccountSync";
 import { AppSidebar } from "./AppSidebar";
@@ -28,10 +27,7 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
             <ProfilesProvider>
             <TopBarProvider>
               <WalletAccountSync />
-              <DesktopShell>
-                {children}
-                <Footer />
-              </DesktopShell>
+              <DesktopShell>{children}</DesktopShell>
               {/* Mobile sidebar drawer stays mobile-only; the floating
                   BottomNav is shared across mobile and desktop. */}
               <div className="md:hidden">

@@ -23,6 +23,7 @@ import { useHashpackWallet } from "../lib/hashpackWallet";
 import { useSignInModal } from "../lib/signInModal";
 import { useTopBarSlotFilled, useTopBarSlotRef } from "../lib/topBar";
 import { cn } from "../lib/utils";
+import { Footer } from "./Footer";
 
 type RailItem = {
   label: string;
@@ -281,9 +282,13 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
         {/* Content area: rounded canvas on desktop, full-bleed on mobile.
             Mobile gets bottom padding so content clears the floating BottomNav.
             Desktop has no bottom nav, so just standard internal padding. */}
-        <main className="flex-1 pb-24 md:flex md:min-h-0 md:flex-1 md:py-3 md:pb-3 md:pl-1 md:pr-3 md:pt-1">
-          <div className="scrollbar-none md:h-full md:min-h-0 md:flex-1 md:overflow-y-auto md:rounded-glass-lg md:border md:border-white/10 md:bg-[#0e1422]/60">
-            {children}
+        <main className="flex min-h-[100dvh] flex-col pb-24 md:min-h-0 md:flex-1 md:py-3 md:pb-3 md:pl-1 md:pr-3 md:pt-1">
+          <div className="scrollbar-none flex flex-1 flex-col md:h-full md:min-h-0 md:overflow-y-auto md:rounded-glass-lg md:border md:border-white/10 md:bg-[#0e1422]/60">
+            {/* Content takes the available height so the footer is always
+                pinned to the bottom — it never flashes near the top during
+                the brief empty state while a page's data loads. */}
+            <div className="flex-1">{children}</div>
+            <Footer />
           </div>
         </main>
       </div>
