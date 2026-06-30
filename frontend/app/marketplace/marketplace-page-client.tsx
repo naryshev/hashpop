@@ -18,14 +18,20 @@ import { TopBarSlot } from "../../lib/topBar";
 import {
   BadgeCheck,
   Bell,
+  Car,
   ChevronDown,
-  LayoutDashboard,
-  MapPin,
+  Footprints,
+  Laptop,
+  LayoutGrid,
+  Palette,
   Search as SearchIcon,
   ShoppingCart,
   SlidersHorizontal,
-  UserCircle,
+  Smartphone,
+  Sofa,
+  Watch,
 } from "lucide-react";
+import { ProfileCardSheet } from "../../components/ProfileCardSheet";
 
 function formatListingId(id: string): string {
   if (!id || !id.startsWith("0x") || id.length !== 66) return id;
@@ -207,11 +213,12 @@ export default function MarketplacePageClient({
   const searchParams = useSearchParams();
   const [searchInput, setSearchInput] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
-  const [locationOpen, setLocationOpen] = useState(false);
+  const [profileCardOpen, setProfileCardOpen] = useState(false);
   const [filterMinPrice, setFilterMinPrice] = useState("");
   const [filterMaxPrice, setFilterMaxPrice] = useState("");
   const [filterPostedWithin, setFilterPostedWithin] = useState("");
   const [filterCondition, setFilterCondition] = useState("");
+  const [filterLocation, setFilterLocation] = useState("");
   const query = searchParams.get("q")?.trim() ?? "";
   const categoryQuery = canonicalizeCategory(searchParams.get("category")?.trim() ?? "");
   const minPriceQuery = searchParams.get("minPrice")?.trim() ?? "";
@@ -385,6 +392,7 @@ export default function MarketplacePageClient({
     setFilterMaxPrice(maxPriceQuery);
     setFilterPostedWithin(postedWithinQuery);
     setFilterCondition(conditionQuery);
+    setFilterLocation(locationQuery);
   };
 
   const hasActiveFilter =
@@ -400,11 +408,6 @@ export default function MarketplacePageClient({
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b)).slice(0, 50);
   }, [items]);
-
-  const setLocation = (value: string | null) => {
-    setLocationOpen(false);
-    setParam("location", value);
-  };
 
   const renderFilterSortPanel = () => (
     <div className="absolute right-0 top-full mt-2 w-72 rounded-xl border border-white/10 bg-[#0a0a0a] p-4 shadow-2xl z-50">
@@ -437,6 +440,21 @@ export default function MarketplacePageClient({
       </div>
       <p className="mt-4 text-xs font-semibold uppercase tracking-widest text-silver">Filters</p>
       <div className="mt-2 space-y-3">
+        <div>
+          <span className="mb-1 block text-xs text-silver/70">Location</span>
+          <select
+            value={filterLocation}
+            onChange={(e) => setFilterLocation(e.target.value)}
+            className="input-frost w-full py-1.5 text-sm"
+          >
+            <option value="">All locations</option>
+            {knownCities.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </div>
         <div>
           <span className="mb-1 block text-xs text-silver/70">Price (HBAR)</span>
           <div className="flex items-center gap-2">
@@ -500,6 +518,7 @@ export default function MarketplacePageClient({
               p.delete("maxPrice");
               p.delete("postedWithin");
               p.delete("condition");
+              p.delete("location");
               p.delete("sort");
               setFilterOpen(false);
               router.push(p.toString() ? `/marketplace?${p.toString()}` : "/marketplace");
@@ -520,6 +539,8 @@ export default function MarketplacePageClient({
               else p.delete("postedWithin");
               if (filterCondition) p.set("condition", filterCondition);
               else p.delete("condition");
+              if (filterLocation) p.set("location", filterLocation);
+              else p.delete("location");
               setFilterOpen(false);
               router.push(p.toString() ? `/marketplace?${p.toString()}` : "/marketplace");
             }}
@@ -532,76 +553,9 @@ export default function MarketplacePageClient({
     </div>
   );
 
-  // Location chip + dropdown reused on both viewports. Cities surface from
-  // the listings currently loaded; selecting one writes to the `location`
-  // URL param and is applied by the filter step above.
-  const renderLocationSelect = (variant: "compact" | "stacked") => {
-    const label = locationQuery || "All locations";
-    return (
-      <div className="relative">
-        <button
-          type="button"
-          onClick={() => setLocationOpen((o) => !o)}
-          className={`flex items-center gap-2 rounded-full border px-3 py-1.5 transition-colors ${
-            locationQuery
-              ? "border-[#00ffa3]/40 bg-[#00ffa3]/10 text-[#00ffa3]"
-              : "border-white/10 bg-white/5 text-white hover:border-white/20"
-          }`}
-        >
-          <MapPin size={14} className={locationQuery ? "text-[#00ffa3]" : "text-silver"} />
-          {variant === "stacked" ? (
-            <span className="leading-tight text-left">
-              <span className="block text-[9px] uppercase tracking-wide text-silver/60">
-                Location
-              </span>
-              <span className="block text-xs font-semibold">{label}</span>
-            </span>
-          ) : (
-            <span className="text-xs font-medium">{label}</span>
-          )}
-          <ChevronDown size={12} className="text-silver/60" />
-        </button>
-        {locationOpen && (
-          <div className="absolute left-0 top-full z-50 mt-2 w-56 rounded-xl border border-white/10 bg-[#0a0a0a] p-2 shadow-2xl">
-            <button
-              type="button"
-              onClick={() => setLocation(null)}
-              className={`block w-full rounded-lg px-3 py-1.5 text-left text-xs transition-colors ${
-                !locationQuery
-                  ? "bg-[#00ffa3]/10 text-[#00ffa3]"
-                  : "text-white hover:bg-white/5"
-              }`}
-            >
-              All locations
-            </button>
-            <div className="my-1 border-t border-white/5" />
-            <div className="max-h-64 overflow-y-auto">
-              {knownCities.length === 0 ? (
-                <p className="px-3 py-1.5 text-[11px] text-silver/60">
-                  No cities on current listings.
-                </p>
-              ) : (
-                knownCities.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setLocation(c)}
-                    className={`block w-full rounded-lg px-3 py-1.5 text-left text-xs transition-colors ${
-                      locationQuery === c
-                        ? "bg-[#00ffa3]/10 text-[#00ffa3]"
-                        : "text-white hover:bg-white/5"
-                    }`}
-                  >
-                    {c}
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
+  // Wallet chip shown top-left of the mobile header — account number only
+  // (no avatar) with a carat that slides up the profile card sheet.
+  const walletLabel = accountId ?? (address ? `${address.slice(0, 6)}…${address.slice(-4)}` : null);
 
   // Compact desktop search bubble — used to the right of the view-mode
   // pills since the global top-bar no longer hosts the search input.
@@ -636,41 +590,33 @@ export default function MarketplacePageClient({
             matching the redesigned mobile marketplace. */}
         <div className="sm:hidden mb-4 space-y-3">
           <div className="flex items-center justify-between gap-3">
-            {renderLocationSelect("stacked")}
+            {walletLabel ? (
+              <button
+                type="button"
+                onClick={() => setProfileCardOpen(true)}
+                aria-label="Open profile"
+                className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-white"
+              >
+                <span className="font-mono text-sm font-semibold">{walletLabel}</span>
+                <ChevronDown size={14} className="text-silver" />
+              </button>
+            ) : (
+              <span />
+            )}
             <div className="flex items-center gap-2">
               <Link
                 href="/watchlist"
-                aria-label="Watchlist"
+                aria-label="Cart"
                 className="rounded-full border border-white/10 bg-white/5 p-2 text-silver hover:text-white"
               >
-                <ShoppingCart size={16} />
+                <ShoppingCart size={18} />
               </Link>
               <Link
                 href="/activity"
-                aria-label="Alerts"
+                aria-label="Notifications"
                 className="rounded-full border border-white/10 bg-white/5 p-2 text-silver hover:text-white"
               >
-                <Bell size={16} />
-              </Link>
-              <Link
-                href="/dashboard"
-                aria-label="My Hashpop"
-                className="rounded-full border border-white/10 bg-white/5 p-2 text-silver hover:text-white"
-              >
-                <LayoutDashboard size={16} />
-              </Link>
-              <Link
-                href={
-                  address
-                    ? `/profile/${encodeURIComponent(address)}`
-                    : accountId
-                      ? `/profile/${encodeURIComponent(accountId)}`
-                      : "/dashboard"
-                }
-                aria-label="Profile"
-                className="rounded-full border border-white/10 bg-white/5 p-2 text-silver hover:text-white"
-              >
-                <UserCircle size={16} />
+                <Bell size={18} />
               </Link>
             </div>
           </div>
@@ -716,35 +662,39 @@ export default function MarketplacePageClient({
             <div className="-mx-1 flex gap-2 overflow-x-auto pb-1 px-1 scrollbar-none">
               {(
                 [
-                  { label: "All", href: "/marketplace" },
-                  { label: "Watches", href: "/marketplace?category=Watches" },
+                  { label: "All", href: "/marketplace", icon: LayoutGrid },
+                  { label: "Watches", href: "/marketplace?category=Watches", icon: Watch },
                   {
                     label: "Phones",
                     href: "/marketplace?category=Smartphones%20%26%20Phones",
+                    icon: Smartphone,
                   },
-                  { label: "Cars", href: "/marketplace?category=Cars%20%26%20Trucks" },
-                  { label: "Laptops", href: "/marketplace?category=Laptops" },
-                  { label: "Furniture", href: "/marketplace?category=Furniture" },
-                  { label: "Art", href: "/marketplace?category=Art%20%26%20Prints" },
+                  { label: "Cars", href: "/marketplace?category=Cars%20%26%20Trucks", icon: Car },
+                  { label: "Laptops", href: "/marketplace?category=Laptops", icon: Laptop },
+                  { label: "Furniture", href: "/marketplace?category=Furniture", icon: Sofa },
+                  { label: "Art", href: "/marketplace?category=Art%20%26%20Prints", icon: Palette },
                   {
                     label: "Sneakers",
                     href: "/marketplace?category=Shoes%20%26%20Sneakers",
+                    icon: Footprints,
                   },
-                ] as { label: string; href: string }[]
+                ] as { label: string; href: string; icon: typeof LayoutGrid }[]
               ).map((c) => {
                 const isActive =
                   (c.label === "All" && !categoryQuery) ||
                   decodeURIComponent(c.href.split("category=")[1] ?? "") === categoryQuery;
+                const Icon = c.icon;
                 return (
                   <Link
                     key={c.label}
                     href={c.href}
-                    className={`shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors ${
+                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors ${
                       isActive
                         ? "border-[#00ffa3]/40 bg-[#00ffa3]/10 text-[#00ffa3]"
                         : "border-white/10 bg-white/5 text-silver hover:text-white"
                     }`}
                   >
+                    <Icon size={14} />
                     {c.label}
                   </Link>
                 );
@@ -904,7 +854,6 @@ export default function MarketplacePageClient({
             </div>
             <div className="hidden sm:flex items-center justify-between gap-3 mb-4">
               <div className="flex items-center gap-2">
-                {renderLocationSelect("compact")}
                 {(
                   [
                     { id: "editorial", label: "Editorial" },
@@ -1203,6 +1152,7 @@ export default function MarketplacePageClient({
           </>
         )}
       </div>
+      <ProfileCardSheet open={profileCardOpen} onClose={() => setProfileCardOpen(false)} />
     </main>
   );
 }
