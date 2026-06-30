@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, MessageSquare, Plus, Store, UserCircle } from "lucide-react";
+import { Map as MapIcon, MessageSquare, Plus, Store, UserCircle } from "lucide-react";
 import { useHashpackWallet } from "../lib/hashpackWallet";
+import { NearbyMap } from "./NearbyMap";
 
 type NavItem = {
   href: string;
@@ -19,6 +21,7 @@ type NavItem = {
 export function BottomNav() {
   const pathname = usePathname();
   const { address, accountId } = useHashpackWallet();
+  const [mapOpen, setMapOpen] = useState(false);
   const profileHref =
     address || accountId
       ? `/profile/${encodeURIComponent(address || accountId || "")}`
@@ -29,11 +32,6 @@ export function BottomNav() {
       href: "/marketplace",
       icon: <Store className="h-5 w-5 md:h-6 md:w-6" />,
       label: "Marketplace",
-    },
-    {
-      href: "/activity",
-      icon: <Bell className="h-5 w-5 md:h-6 md:w-6" />,
-      label: "Alerts",
     },
   ];
 
@@ -78,6 +76,14 @@ export function BottomNav() {
         {leftItems.map((item) => (
           <NavBtn key={item.href} item={item} />
         ))}
+        <button
+          type="button"
+          onClick={() => setMapOpen(true)}
+          aria-label="Items near you"
+          className="flex h-12 items-center justify-center text-silver/70 transition-colors hover:text-white md:h-14"
+        >
+          <MapIcon className="h-5 w-5 md:h-6 md:w-6" />
+        </button>
         <Link
           href="/create"
           aria-label="Create listing"
@@ -91,6 +97,7 @@ export function BottomNav() {
           <NavBtn key={item.href} item={item} />
         ))}
       </div>
+      <NearbyMap open={mapOpen} onClose={() => setMapOpen(false)} />
     </nav>
   );
 }
