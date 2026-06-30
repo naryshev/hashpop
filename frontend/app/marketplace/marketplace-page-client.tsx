@@ -597,7 +597,7 @@ export default function MarketplacePageClient({
                 type="button"
                 onClick={() => setProfileCardOpen(true)}
                 aria-label="Open profile"
-                className="flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-2 text-white"
+                className="-ml-2 flex items-center gap-1.5 rounded-full px-2 py-2 text-white"
               >
                 <span className="font-mono text-sm font-semibold">{walletLabel}</span>
                 <ChevronDown size={14} className="text-silver" />
@@ -607,24 +607,24 @@ export default function MarketplacePageClient({
                 type="button"
                 onClick={() => openSignIn()}
                 aria-label="Log in"
-                className="flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-2 text-white"
+                className="-ml-2 flex items-center gap-1.5 rounded-full px-2 py-2 text-white"
               >
                 <span className="text-sm font-semibold">Login</span>
                 <ChevronDown size={14} className="text-silver" />
               </button>
             )}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               <Link
                 href="/watchlist"
                 aria-label="Cart"
-                className="rounded-full bg-white/5 p-2 text-silver hover:text-white"
+                className="rounded-full p-2 text-silver hover:text-white"
               >
                 <ShoppingCart size={18} />
               </Link>
               <Link
                 href="/activity"
                 aria-label="Notifications"
-                className="rounded-full bg-white/5 p-2 text-silver hover:text-white"
+                className="rounded-full p-2 text-silver hover:text-white"
               >
                 <Bell size={18} />
               </Link>
