@@ -13,6 +13,7 @@ import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { canonicalizeCategory } from "../../lib/categories";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
+import { useSignInModal } from "../../lib/signInModal";
 import { profileAvatarUrl, profileDisplayName, useProfile, useProfiles } from "../../lib/profiles";
 import { TopBarSlot } from "../../lib/topBar";
 import {
@@ -209,6 +210,7 @@ export default function MarketplacePageClient({
   initialError: string | null;
 }) {
   const { isConnected, address, accountId } = useHashpackWallet();
+  const { openSignIn } = useSignInModal();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [searchInput, setSearchInput] = useState("");
@@ -601,7 +603,15 @@ export default function MarketplacePageClient({
                 <ChevronDown size={14} className="text-silver" />
               </button>
             ) : (
-              <span />
+              <button
+                type="button"
+                onClick={() => openSignIn()}
+                aria-label="Log in"
+                className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-white"
+              >
+                <span className="text-sm font-semibold">Login</span>
+                <ChevronDown size={14} className="text-silver" />
+              </button>
             )}
             <div className="flex items-center gap-2">
               <Link
