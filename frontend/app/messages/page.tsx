@@ -8,7 +8,7 @@ import { AddressDisplay } from "../../components/AddressDisplay";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
 import { getApiUrl } from "../../lib/apiUrl";
 import { useEncryptionKey } from "../../lib/useEncryptionKey";
-import { encryptMessage, decryptMessage } from "../../lib/chatEncryption";
+import { decryptMessage } from "../../lib/chatEncryption";
 
 type InboxConversation = {
   otherAddress: string;
@@ -111,15 +111,6 @@ function LockIcon({ className }: { className?: string }) {
   );
 }
 
-function E2EBadge({ tone = "chrome" }: { tone?: "chrome" | "muted" }) {
-  const color = tone === "chrome" ? "text-chrome" : "text-silver";
-  return (
-    <span className={`inline-flex items-center gap-1 font-mono text-[10px] ${color}`}>
-      <LockIcon className="h-2.5 w-2.5" />
-      E2E
-    </span>
-  );
-}
 
 function SendArrow() {
   return (
@@ -255,7 +246,9 @@ function MessagesPageContent() {
   const [sending, setSending] = useState(false);
   const [listingPreviews, setListingPreviews] = useState<Record<string, ListingPreview>>({});
   const [escrowExpanded, setEscrowExpanded] = useState(false);
-  const { keypair, ensureKeypair } = useEncryptionKey();
+  // keypair is used only to opportunistically decrypt legacy encrypted
+  // history if a key was already derived; new messages are plaintext.
+  const { keypair } = useEncryptionKey();
 
   const publicKeyCache = useRef<Record<string, string | null>>({});
   const listingFetchInFlight = useRef<Set<string>>(new Set());
@@ -351,15 +344,16 @@ function MessagesPageContent() {
     });
   }, [conversations, selectedThread, fetchListingPreview]);
 
+  // Legacy encrypted messages: decrypt only if a key already exists in memory
+  // — never trigger a wallet signature just to open a thread. New messages are
+  // plaintext off-chain, so this only affects old history.
   useEffect(() => {
-    if (!threadMessages.length || !address) return;
+    if (!threadMessages.length || !address || !keypair) return;
     const encryptedMsgs = threadMessages.filter((m) => m.encrypted && m.nonce);
     if (!encryptedMsgs.length) return;
 
     const doDecrypt = async () => {
-      const kp = keypair ?? (await ensureKeypair());
-      if (!kp) return;
-
+      const kp = keypair;
       const newDecrypted: Record<string, string> = {};
       for (const m of encryptedMsgs) {
         if (decryptedBodies[m.id]) continue;
@@ -367,18 +361,18 @@ function MessagesPageContent() {
         const otherAddr = isMe ? m.toAddress : m.fromAddress;
         const otherPubKey = await fetchPublicKey(otherAddr);
         if (!otherPubKey || !m.nonce) {
-          newDecrypted[m.id] = "[Unable to decrypt]";
+          newDecrypted[m.id] = "[Encrypted message]";
           continue;
         }
         const plaintext = decryptMessage(m.body, m.nonce, otherPubKey, kp.secretKey);
-        newDecrypted[m.id] = plaintext ?? "[Unable to decrypt]";
+        newDecrypted[m.id] = plaintext ?? "[Encrypted message]";
       }
       if (Object.keys(newDecrypted).length > 0) {
         setDecryptedBodies((prev) => ({ ...prev, ...newDecrypted }));
       }
     };
     doDecrypt();
-  }, [threadMessages, keypair, address, ensureKeypair, fetchPublicKey, decryptedBodies]);
+  }, [threadMessages, keypair, address, fetchPublicKey, decryptedBodies]);
 
   // While a thread is open on mobile, lock body scroll so the screen behaves
   // like a native chat — only the message list scrolls, and the empty area
@@ -463,30 +457,17 @@ function MessagesPageContent() {
     if (!address || !selectedThread || !replyBody.trim() || sending) return;
     setSending(true);
     try {
-      const kp = await ensureKeypair();
-      const recipientPubKey = await fetchPublicKey(selectedThread.other);
-
-      let msgBody = replyBody.trim();
-      let encrypted = false;
-      let nonce: string | undefined;
-
-      if (kp && recipientPubKey) {
-        const result = encryptMessage(msgBody, recipientPubKey, kp.secretKey);
-        msgBody = result.ciphertext;
-        nonce = result.nonce;
-        encrypted = true;
-      }
-
+      // Messages are plain off-chain wallet-to-wallet notes — no wallet
+      // signature / on-chain step, so sending is instant and never hangs.
       await fetch(`${getApiUrl()}/api/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fromAddress: address,
           toAddress: selectedThread.other,
-          body: msgBody,
+          body: replyBody.trim(),
           listingId: selectedThread.listingId || undefined,
-          encrypted,
-          nonce,
+          encrypted: false,
         }),
       });
       setReplyBody("");
@@ -502,11 +483,11 @@ function MessagesPageContent() {
     } finally {
       setSending(false);
     }
-  }, [address, selectedThread, replyBody, sending, fetchInbox, ensureKeypair, fetchPublicKey]);
+  }, [address, selectedThread, replyBody, sending, fetchInbox]);
 
   const getDisplayBody = (m: Message): string => {
     if (m.encrypted) {
-      return decryptedBodies[m.id] ?? "[Decrypting…]";
+      return decryptedBodies[m.id] ?? "[Encrypted message]";
     }
     return m.body;
   };
@@ -623,7 +604,7 @@ function MessagesPageContent() {
           <h1 className="text-xl sm:text-2xl font-bold text-white">Conversations</h1>
           <span className="inline-flex items-center gap-1.5 rounded-full bg-chrome/10 border border-chrome/30 px-2.5 py-1 text-[11px] font-semibold text-chrome">
             <LockIcon className="h-3 w-3" />
-            End-to-end encrypted
+            Private wallet-to-wallet
           </span>
         </div>
 
@@ -733,7 +714,6 @@ function MessagesPageContent() {
                           className="text-white/80 font-mono text-[11px]"
                         />
                       </span>
-                      <E2EBadge />
                     </div>
                   </div>
                   {selectedListing?.price && (
@@ -923,7 +903,6 @@ function MessagesPageContent() {
                     <div className="border-t border-white/10 bg-[#0b111b] px-4 py-3">
                       <div className="flex items-end gap-2">
                         <div className="flex flex-1 items-end gap-2 rounded-glass-lg border border-white/10 bg-[#0f1726]/90 px-3 py-2 focus-within:border-chrome/50">
-                          <E2EBadge />
                           <textarea
                             value={replyBody}
                             onChange={(e) => setReplyBody(e.target.value)}
@@ -933,7 +912,7 @@ function MessagesPageContent() {
                                 void sendReply();
                               }
                             }}
-                            placeholder={`Encrypted message to ${selectedThread.other.slice(0, 10)}…`}
+                            placeholder={`Message ${selectedThread.other.slice(0, 10)}…`}
                             rows={1}
                             className="flex-1 resize-none bg-transparent text-sm text-white placeholder:text-silver focus:outline-none min-h-[24px] max-h-32"
                           />
@@ -958,7 +937,7 @@ function MessagesPageContent() {
                 <div>
                   <div className="text-sm">Select a conversation to read messages.</div>
                   <div className="mt-1 font-mono text-[11px]">
-                    Chats are grouped by order · all messages are end-to-end encrypted.
+                    Chats are grouped by order · private off-chain wallet-to-wallet.
                   </div>
                 </div>
               </div>
