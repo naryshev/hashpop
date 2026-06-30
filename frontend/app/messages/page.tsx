@@ -380,6 +380,21 @@ function MessagesPageContent() {
     doDecrypt();
   }, [threadMessages, keypair, address, ensureKeypair, fetchPublicKey, decryptedBodies]);
 
+  // While a thread is open on mobile, lock body scroll so the screen behaves
+  // like a native chat — only the message list scrolls, and the empty area
+  // below the composer can't be dragged up.
+  useEffect(() => {
+    if (!selectedThread) return;
+    const isMobile =
+      typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches;
+    if (!isMobile) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [selectedThread]);
+
   useEffect(() => {
     if (!address || !selectedThread) {
       setThreadMessages([]);
@@ -579,7 +594,7 @@ function MessagesPageContent() {
           <div
             className={`glass-card overflow-hidden flex flex-col lg:flex-row rounded-glass-lg ${
               selectedThread
-                ? "h-[calc(100dvh-7rem)] sm:h-auto sm:min-h-[640px]"
+                ? "h-[calc(100dvh-6rem)] sm:h-auto sm:min-h-[640px]"
                 : "min-h-[640px]"
             }`}
           >
