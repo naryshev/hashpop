@@ -395,6 +395,45 @@ function MessagesPageContent() {
     };
   }, [selectedThread]);
 
+  // Drive the thread card's height/offset directly from the visual viewport so
+  // the composer rides the on-screen keyboard up and snaps back to the bottom
+  // when it closes (dvh units don't restore reliably on iOS). When the
+  // keyboard is closed we reserve room for the floating bottom nav; when it's
+  // open the chat fills the whole visible area above the keyboard.
+  const NAV_RESERVE_PX = 92;
+  const [threadViewport, setThreadViewport] = useState<{ top: number; height: number } | null>(
+    null,
+  );
+  useEffect(() => {
+    if (!selectedThread || typeof window === "undefined") {
+      setThreadViewport(null);
+      return;
+    }
+    if (!window.matchMedia("(max-width: 1023px)").matches) {
+      setThreadViewport(null);
+      return;
+    }
+    const vv = window.visualViewport;
+    const update = () => {
+      const vh = vv ? vv.height : window.innerHeight;
+      const top = vv ? vv.offsetTop : 0;
+      // Keyboard up when the visual viewport is meaningfully shorter than the
+      // full window (visualViewport shrinks for the keyboard by default).
+      const keyboardOpen = window.innerHeight - vh - top > 100;
+      const height = keyboardOpen ? vh : Math.max(0, vh - NAV_RESERVE_PX);
+      setThreadViewport({ top, height });
+    };
+    update();
+    vv?.addEventListener("resize", update);
+    vv?.addEventListener("scroll", update);
+    window.addEventListener("orientationchange", update);
+    return () => {
+      vv?.removeEventListener("resize", update);
+      vv?.removeEventListener("scroll", update);
+      window.removeEventListener("orientationchange", update);
+    };
+  }, [selectedThread]);
+
   useEffect(() => {
     if (!address || !selectedThread) {
       setThreadMessages([]);
@@ -592,11 +631,16 @@ function MessagesPageContent() {
           <p className="text-silver">Connect your wallet to view messages.</p>
         ) : (
           <div
-            className={`glass-card overflow-hidden flex flex-col lg:flex-row rounded-glass-lg ${
+            className={`glass-card overflow-hidden flex flex-col lg:flex-row ${
               selectedThread
-                ? "h-[calc(100dvh-6rem)] sm:h-auto sm:min-h-[640px]"
-                : "min-h-[640px]"
+                ? "fixed inset-x-0 top-0 z-50 h-[100dvh] rounded-none lg:static lg:z-auto lg:h-auto lg:min-h-[640px] lg:rounded-glass-lg"
+                : "min-h-[640px] rounded-glass-lg"
             }`}
+            style={
+              threadViewport
+                ? { top: threadViewport.top, height: threadViewport.height }
+                : undefined
+            }
           >
             {/* Order-grouped sidebar — full-screen list on mobile when no
                 conversation is selected, fixed 320px column on desktop. */}
