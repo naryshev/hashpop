@@ -1669,13 +1669,13 @@ export default function ListingPage() {
           </div>
         </div>
 
-        {/* Mobile-only: want-to-sell + description + location appear below
-            the buy panel / shipping / seller on mobile. Desktop renders
-            these inside the grid's left column instead. */}
+        {/* Mobile-only: below the buy panel / shipping / seller, show the
+            location map first, then the description, then the want-to-sell
+            link. Desktop renders these inside the grid's left column. */}
         <div className="mt-4 space-y-4 lg:hidden">
-          {wantToSellJsx}
-          {descriptionJsx}
           {locationJsx}
+          {descriptionJsx}
+          {wantToSellJsx}
         </div>
 
         {/* Chat thread — shown when user is buyer or seller of a purchased listing */}
