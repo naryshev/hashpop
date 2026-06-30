@@ -9,6 +9,7 @@ import { useHashpackWallet } from "../../lib/hashpackWallet";
 import { getApiUrl } from "../../lib/apiUrl";
 import { useEncryptionKey } from "../../lib/useEncryptionKey";
 import { decryptMessage } from "../../lib/chatEncryption";
+import { profileDisplayName, useProfile } from "../../lib/profiles";
 
 type InboxConversation = {
   otherAddress: string;
@@ -374,8 +375,10 @@ function MessagesPageContent() {
     doDecrypt();
   }, [threadMessages, keypair, address, fetchPublicKey, decryptedBodies]);
 
-  // Resolve the counterparty's Hedera account ID (0.0.x) for the composer
-  // placeholder; fall back to a short 0x address while it resolves.
+  // Counterparty identity for the composer placeholder: prefer a set username
+  // (Hashpop display name / HashPack), then Hedera account id, then a short
+  // 0x address.
+  const otherProfile = useProfile(selectedThread?.other ?? null);
   const [otherAccountId, setOtherAccountId] = useState<string | null>(null);
   useEffect(() => {
     const other = selectedThread?.other;
@@ -945,6 +948,7 @@ function MessagesPageContent() {
                               }
                             }}
                             placeholder={`Message ${
+                              profileDisplayName(otherProfile) ??
                               otherAccountId ??
                               (selectedThread.other.startsWith("0x") &&
                               selectedThread.other.length === 42
