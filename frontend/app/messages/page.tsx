@@ -374,6 +374,38 @@ function MessagesPageContent() {
     doDecrypt();
   }, [threadMessages, keypair, address, fetchPublicKey, decryptedBodies]);
 
+  // Resolve the counterparty's Hedera account ID (0.0.x) for the composer
+  // placeholder; fall back to a short 0x address while it resolves.
+  const [otherAccountId, setOtherAccountId] = useState<string | null>(null);
+  useEffect(() => {
+    const other = selectedThread?.other;
+    if (!other) {
+      setOtherAccountId(null);
+      return;
+    }
+    if (/^\d+\.\d+\.\d+$/.test(other)) {
+      setOtherAccountId(other);
+      return;
+    }
+    if (!(other.startsWith("0x") && other.length === 42)) {
+      setOtherAccountId(null);
+      return;
+    }
+    let cancelled = false;
+    setOtherAccountId(null);
+    fetch(`${getApiUrl()}/api/relay/account-id?evmAddress=${encodeURIComponent(other.toLowerCase())}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(r)))
+      .then((d: { accountId?: string }) => {
+        if (!cancelled) setOtherAccountId(d.accountId ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setOtherAccountId(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedThread]);
+
   // While a thread is open on mobile, lock body scroll so the screen behaves
   // like a native chat — only the message list scrolls, and the empty area
   // below the composer can't be dragged up.
@@ -912,7 +944,13 @@ function MessagesPageContent() {
                                 void sendReply();
                               }
                             }}
-                            placeholder={`Message ${selectedThread.other.slice(0, 10)}…`}
+                            placeholder={`Message ${
+                              otherAccountId ??
+                              (selectedThread.other.startsWith("0x") &&
+                              selectedThread.other.length === 42
+                                ? `${selectedThread.other.slice(0, 6)}…${selectedThread.other.slice(-4)}`
+                                : selectedThread.other.slice(0, 10))
+                            }…`}
                             rows={1}
                             className="flex-1 resize-none bg-transparent text-sm text-white placeholder:text-silver focus:outline-none min-h-[24px] max-h-32"
                           />
