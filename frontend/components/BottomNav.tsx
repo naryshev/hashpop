@@ -68,11 +68,11 @@ export function BottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-40 px-3 md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-[60] px-3 md:hidden"
       style={{ paddingBottom: "max(env(safe-area-inset-bottom), 12px)" }}
       aria-label="Primary navigation"
     >
-      <div className="mx-auto grid max-w-sm grid-cols-5 items-center rounded-3xl border border-white/10 bg-[#0e1422]/95 px-2 py-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+      <div className="mx-auto grid max-w-sm grid-cols-5 items-center rounded-3xl border border-white/10 bg-[#0e1422]/95 px-2 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.45)] backdrop-blur-xl">
         {leftItems.map((item) => (
           <NavBtn key={item.href} item={item} />
         ))}
@@ -80,17 +80,17 @@ export function BottomNav() {
           type="button"
           onClick={() => setMapOpen(true)}
           aria-label="Items near you"
-          className="flex h-12 items-center justify-center text-silver/70 transition-colors hover:text-white md:h-14"
+          className="flex h-12 items-center justify-center text-silver/70 transition-colors hover:text-white"
         >
-          <MapIcon className="h-5 w-5 md:h-6 md:w-6" />
+          <MapIcon className="h-5 w-5" />
         </button>
         <Link
           href="/create"
           aria-label="Create listing"
           className="flex items-center justify-center"
         >
-          <span className="-mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-[linear-gradient(135deg,#00b37a_0%,#00ffa3_55%,#00e5ff_100%)] text-black shadow-[0_10px_28px_rgba(0,255,163,0.45)] transition-transform hover:scale-105 md:-mt-8 md:h-16 md:w-16">
-            <Plus className="h-7 w-7 md:h-8 md:w-8" strokeWidth={2.6} />
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[linear-gradient(135deg,#00b37a_0%,#00ffa3_55%,#00e5ff_100%)] text-black shadow-[0_4px_16px_rgba(0,255,163,0.4)] transition-transform hover:scale-105">
+            <Plus className="h-6 w-6" strokeWidth={2.6} />
           </span>
         </Link>
         {rightItems.map((item) => (
