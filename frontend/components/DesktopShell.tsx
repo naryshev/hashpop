@@ -167,6 +167,9 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
   const chromeFade = `transition-opacity duration-700 ease-out ${
     chromeRevealed ? "opacity-100" : "pointer-events-none opacity-0"
   }`;
+  // The legal/USD disclaimer footer is marketplace-only; every other route is
+  // an app-like full-height screen with no footer.
+  const showFooter = pathname === "/marketplace" || pathname.startsWith("/marketplace");
 
   return (
     <div className="flex min-h-screen md:h-screen md:min-h-0 md:overflow-hidden">
@@ -284,11 +287,11 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
             Desktop has no bottom nav, so just standard internal padding. */}
         <main className="flex min-h-[100dvh] flex-col pb-24 md:min-h-0 md:flex-1 md:py-3 md:pb-3 md:pl-1 md:pr-3 md:pt-1">
           <div className="scrollbar-none flex flex-1 flex-col md:h-full md:min-h-0 md:overflow-y-auto md:rounded-glass-lg md:border md:border-white/10 md:bg-[#0e1422]/60">
-            {/* Content takes the available height so the footer is always
-                pinned to the bottom — it never flashes near the top during
-                the brief empty state while a page's data loads. */}
+            {/* Content takes the available height so the footer (marketplace
+                only) stays pinned to the bottom. Every other route is
+                app-like — no footer, no extra scroll. */}
             <div className="flex-1">{children}</div>
-            <Footer />
+            {showFooter && <Footer />}
           </div>
         </main>
       </div>
