@@ -597,7 +597,7 @@ export default function MarketplacePageClient({
                 type="button"
                 onClick={() => setProfileCardOpen(true)}
                 aria-label="Open profile"
-                className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-white"
+                className="flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-2 text-white"
               >
                 <span className="font-mono text-sm font-semibold">{walletLabel}</span>
                 <ChevronDown size={14} className="text-silver" />
@@ -607,7 +607,7 @@ export default function MarketplacePageClient({
                 type="button"
                 onClick={() => openSignIn()}
                 aria-label="Log in"
-                className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-white"
+                className="flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-2 text-white"
               >
                 <span className="text-sm font-semibold">Login</span>
                 <ChevronDown size={14} className="text-silver" />
@@ -617,14 +617,14 @@ export default function MarketplacePageClient({
               <Link
                 href="/watchlist"
                 aria-label="Cart"
-                className="rounded-full border border-white/10 bg-white/5 p-2 text-silver hover:text-white"
+                className="rounded-full bg-white/5 p-2 text-silver hover:text-white"
               >
                 <ShoppingCart size={18} />
               </Link>
               <Link
                 href="/activity"
                 aria-label="Notifications"
-                className="rounded-full border border-white/10 bg-white/5 p-2 text-silver hover:text-white"
+                className="rounded-full bg-white/5 p-2 text-silver hover:text-white"
               >
                 <Bell size={18} />
               </Link>
@@ -648,10 +648,10 @@ export default function MarketplacePageClient({
                 type="button"
                 onClick={openFilterPanel}
                 aria-label="Filters & sort"
-                className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${
+                className={`inline-flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
                   filterOpen || hasActiveFilter
-                    ? "border-[#00ffa3]/50 bg-[#00ffa3]/10 text-[#00ffa3]"
-                    : "border-white/10 bg-white/5 text-silver hover:text-white"
+                    ? "bg-[#00ffa3]/10 text-[#00ffa3]"
+                    : "bg-white/5 text-silver hover:text-white"
                 }`}
               >
                 <SlidersHorizontal size={16} />
