@@ -51,27 +51,8 @@ type ListingPreview = {
   createdAt: string | null;
 };
 
-// Escrow stepper states for the right-rail controller. Map the on-chain
-// listing status + delivery timestamps down to one of these positions so the
-// stepper reflects reality without the page having to consult the contract.
-type StepKey = "funded" | "shipped" | "delivered" | "released";
-const STEPS: { key: StepKey; label: string }[] = [
-  { key: "funded", label: "Funded" },
-  { key: "shipped", label: "Shipped" },
-  { key: "delivered", label: "Delivered" },
-  { key: "released", label: "Released" },
-];
-
-function deriveStepIndex(listing: ListingPreview | undefined): number {
-  if (!listing) return -1;
-  const status = (listing.status ?? "").toUpperCase();
-  if (status === "SOLD") return 3; // released
-  if (listing.exchangeConfirmedAt) return 2; // delivered
-  if (listing.shippedAt || listing.trackingNumber) return 1; // shipped
-  if (status === "LOCKED") return 0; // funded
-  return -1;
-}
-
+// Per-conversation status pill shown on inbox rows, derived from the listing's
+// on-chain status + delivery timestamps.
 type StateKey = "PAID" | "SHIPPED" | "DELIVERED" | "RELEASED" | "DISPUTED" | "AWAITING";
 const STATE_STYLE: Record<StateKey, { bg: string; text: string; label: string }> = {
   PAID: { bg: "bg-chrome", text: "text-black", label: "PAID" },
@@ -246,7 +227,6 @@ function MessagesPageContent() {
   const [replyBody, setReplyBody] = useState("");
   const [sending, setSending] = useState(false);
   const [listingPreviews, setListingPreviews] = useState<Record<string, ListingPreview>>({});
-  const [escrowExpanded, setEscrowExpanded] = useState(false);
   // keypair is used only to opportunistically decrypt legacy encrypted
   // history if a key was already derived; new messages are plaintext.
   const { keypair } = useEncryptionKey();
@@ -467,11 +447,9 @@ function MessagesPageContent() {
     if (!address || !selectedThread) {
       setThreadMessages([]);
       setDecryptedBodies({});
-      setEscrowExpanded(false);
       return;
     }
     setThreadLoading(true);
-    setEscrowExpanded(false);
     const q = new URLSearchParams({ address, other: selectedThread.other });
     if (selectedThread.listingId) {
       q.set("listingId", selectedThread.listingId);
@@ -545,8 +523,6 @@ function MessagesPageContent() {
   const selectedListing = selectedThread?.listingId
     ? listingPreviews[selectedThread.listingId]
     : undefined;
-  const selectedState = stateKeyFor(selectedListing);
-  const stepIdx = deriveStepIndex(selectedListing);
   const swatch = selectedListing ? paletteFor(selectedListing.id) : null;
 
   // Single row template reused by both the "Listings" and "Direct messages"
@@ -616,11 +592,6 @@ function MessagesPageContent() {
       </li>
     );
   };
-  const isBuyer =
-    !!address && !!selectedListing?.buyer &&
-    selectedListing.buyer.toLowerCase() === address.toLowerCase();
-  const canRelease = isBuyer && stepIdx >= 1 && selectedState !== "RELEASED";
-  const isClosed = selectedState === "RELEASED";
 
   return (
     <main className={selectedThread ? "sm:min-h-screen" : "min-h-screen"}>
@@ -762,121 +733,6 @@ function MessagesPageContent() {
                 </div>
 
                 <div className="flex min-h-0 flex-1 flex-col">
-                  {/* Order status disclosure — replaces the old escrow rail.
-                      Collapsed shows just the current state pill + a chevron;
-                      tapping expands the step history, View order, and Open
-                      dispute controls inline above the messages list. */}
-                  {selectedListing && (
-                    <div className="border-b border-white/10 px-4 py-2.5 sm:px-5">
-                      <button
-                        type="button"
-                        onClick={() => setEscrowExpanded((v) => !v)}
-                        aria-expanded={escrowExpanded}
-                        className="flex w-full items-center justify-between gap-2 rounded-glass-lg border border-white/10 bg-white/[0.03] px-3 py-2 transition-colors hover:bg-white/[0.06]"
-                      >
-                        <span className="flex min-w-0 items-center gap-2">
-                          <StatePill stateKey={selectedState} />
-                          <span className="truncate text-xs font-semibold text-white">
-                            Order status
-                          </span>
-                        </span>
-                        <svg
-                          width="14"
-                          height="14"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          aria-hidden
-                          className={`shrink-0 text-silver transition-transform ${
-                            escrowExpanded ? "rotate-180" : ""
-                          }`}
-                        >
-                          <path d="m6 9 6 6 6-6" />
-                        </svg>
-                      </button>
-
-                      {escrowExpanded && (
-                        <div className="mt-3 space-y-3 rounded-glass-lg border border-white/10 bg-white/[0.02] p-3">
-                          <div className="rounded-glass border border-chrome/25 bg-chrome/[0.04] px-3 py-2">
-                            <div className="font-mono text-[10px] text-chrome">Listing</div>
-                            <div className="mt-1 break-all font-mono text-[11px] text-white">
-                              {formatListingId(selectedListing.id)}
-                            </div>
-                          </div>
-
-                          <div className="space-y-1.5">
-                            {STEPS.map((s, i) => {
-                              const done = stepIdx >= i;
-                              const current = stepIdx === i;
-                              return (
-                                <div
-                                  key={s.key}
-                                  className={`flex items-center gap-2.5 py-1 text-[12px] ${
-                                    done ? "text-white" : "text-silver"
-                                  }`}
-                                >
-                                  <span
-                                    className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[10px] font-extrabold ${
-                                      done ? "bg-chrome text-black" : "bg-white/[0.05] text-silver"
-                                    } ${current ? "ring-1 ring-chrome/60" : ""}`}
-                                  >
-                                    {done && !current ? "✓" : i + 1}
-                                  </span>
-                                  {s.label}
-                                </div>
-                              );
-                            })}
-                          </div>
-
-                          <div className="flex flex-col gap-2 sm:flex-row">
-                            {canRelease ? (
-                              <Link
-                                href={listingHref(selectedListing.id)}
-                                className="btn-frost-cta inline-flex flex-1 items-center justify-center rounded-glass px-3 py-2 text-[12px] font-semibold"
-                              >
-                                Release {selectedListing.price} ℏ
-                              </Link>
-                            ) : (
-                              <Link
-                                href={listingHref(selectedListing.id)}
-                                className="inline-flex flex-1 items-center justify-center rounded-glass border border-white/10 px-3 py-2 text-[12px] text-silver transition-colors hover:border-chrome/40 hover:text-chrome"
-                              >
-                                View order →
-                              </Link>
-                            )}
-                            {!isClosed && (
-                              <button
-                                type="button"
-                                className="inline-flex flex-1 items-center justify-center rounded-glass border border-rose-500/30 px-3 py-2 text-[12px] text-rose-400 transition-colors hover:bg-rose-500/[0.08]"
-                              >
-                                Open dispute
-                              </button>
-                            )}
-                          </div>
-
-                          {(selectedListing.trackingNumber || selectedListing.trackingCarrier) && (
-                            <div>
-                              <div className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-silver">
-                                Shipping
-                              </div>
-                              <div className="rounded-glass border border-white/10 bg-white/[0.02] px-3 py-2 text-[11px] text-white">
-                                <div className="text-silver">
-                                  {selectedListing.trackingCarrier ?? "Carrier"}
-                                </div>
-                                <div className="break-all font-mono">
-                                  {selectedListing.trackingNumber ?? "—"}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
                   {/* Messages column */}
                   <div className="flex min-h-0 flex-1 flex-col">
                     <div className="flex-1 space-y-2 overflow-y-auto px-5 py-4">
