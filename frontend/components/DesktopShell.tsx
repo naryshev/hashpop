@@ -146,9 +146,10 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
   const showFooter = pathname === "/marketplace" || pathname.startsWith("/marketplace");
 
   return (
-    <div className="flex min-h-screen flex-col md:h-screen md:min-h-0 md:overflow-hidden">
-      {/* Top bar — desktop only. Borderless; floats on canvas. */}
-      <header className="sticky top-0 z-20 hidden h-14 shrink-0 items-center gap-3 bg-transparent px-3 md:flex">
+    <div className="flex min-h-screen flex-col">
+      {/* Top bar — desktop only. Sticky with a blurred backdrop so page
+          content scrolls beneath it seamlessly. */}
+      <header className="sticky top-0 z-20 hidden h-14 shrink-0 items-center gap-3 border-b border-white/5 bg-[#0b111b]/90 px-3 backdrop-blur-xl md:flex">
         {/* Logo + horizontal nav strip (replaces the old left rail). */}
         <Link
           href="/marketplace"
@@ -226,17 +227,15 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      {/* Content area: rounded canvas on desktop, full-bleed on mobile.
-          Mobile gets bottom padding so content clears the floating BottomNav.
-          Desktop has no bottom nav, so just standard internal padding. */}
-      <main className="flex min-h-[100dvh] flex-col pb-24 md:min-h-0 md:flex-1 md:px-3 md:pb-3 md:pt-1">
-        <div className="scrollbar-none flex flex-1 flex-col md:h-full md:min-h-0 md:overflow-y-auto md:rounded-glass-lg md:border md:border-white/10 md:bg-[#0e1422]/60">
-          {/* Content takes the available height so the footer (marketplace
-              only) stays pinned to the bottom. Every other route is
-              app-like — no footer, no extra scroll. */}
-          <div className="flex-1">{children}</div>
-          {showFooter && <Footer />}
-        </div>
+      {/* Content area: seamless full-bleed page on both viewports — no
+          bordered center card. Mobile gets bottom padding so content clears
+          the floating BottomNav; the document itself scrolls. */}
+      <main className="flex min-h-[100dvh] flex-1 flex-col pb-24 md:min-h-0 md:pb-0">
+        {/* Content takes the available height so the footer (marketplace
+            only) stays pinned to the bottom. Every other route is
+            app-like — no footer, no extra scroll. */}
+        <div className="flex-1">{children}</div>
+        {showFooter && <Footer />}
       </main>
 
       {/* Desktop overlays: profile card + messages, so these flows never
