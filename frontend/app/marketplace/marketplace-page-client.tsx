@@ -603,9 +603,9 @@ export default function MarketplacePageClient({
   // Top-bar search — rectangular rounded "Find…" field with an F shortcut
   // hint, hosted in the global top bar's center slot next to the logo/nav.
   const topBarSearch = (
-    <div className="flex items-center gap-2">
+    <div className="relative">
       <form onSubmit={submitSearch}>
-        <div className="flex w-80 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.06] px-3 py-1.5 transition-colors duration-300 focus-within:border-[#00ffa3]/40">
+        <div className="flex w-80 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.06] py-1 pl-3 pr-1 transition-colors duration-300 focus-within:border-[#00ffa3]/40">
           <SearchIcon size={14} className="shrink-0 text-silver" />
           <input
             ref={searchInputRef}
@@ -615,26 +615,21 @@ export default function MarketplacePageClient({
             placeholder="Find..."
             className="flex-1 bg-transparent text-sm text-white placeholder:text-silver/50 focus:outline-none"
           />
-          <kbd className="rounded border border-white/15 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-silver/70">
-            F
-          </kbd>
+          <button
+            type="button"
+            onClick={openFilterPanel}
+            aria-label="Filters & sort"
+            className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors duration-300 ${
+              filterOpen || hasActiveFilter
+                ? "bg-[#00ffa3]/10 text-[#00ffa3]"
+                : "text-silver hover:bg-white/10 hover:text-white"
+            }`}
+          >
+            <SlidersHorizontal size={14} />
+          </button>
         </div>
       </form>
-      <div className="relative">
-        <button
-          type="button"
-          onClick={openFilterPanel}
-          aria-label="Filters & sort"
-          className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border transition-colors duration-300 ${
-            filterOpen || hasActiveFilter
-              ? "border-[#00ffa3]/50 bg-[#00ffa3]/10 text-[#00ffa3]"
-              : "border-white/10 bg-white/5 text-silver hover:text-white"
-          }`}
-        >
-          <SlidersHorizontal size={14} />
-        </button>
-        {filterOpen && renderFilterSortPanel()}
-      </div>
+      {filterOpen && renderFilterSortPanel()}
     </div>
   );
 

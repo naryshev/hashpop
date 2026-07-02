@@ -45,9 +45,13 @@ type ProfileData = {
 export function ProfileContent({
   address,
   startInEdit = false,
+  embedded = false,
 }: {
   address: string;
   startInEdit?: boolean;
+  /** When rendered inside a modal/sheet, skip the full-viewport min-height so
+   *  the container only scrolls when the content actually overflows. */
+  embedded?: boolean;
 }) {
   const addressLower = address?.toLowerCase() ?? "";
   const { address: connectedAddress, accountId } = useHashpackWallet();
@@ -160,7 +164,7 @@ export function ProfileContent({
   const isVerified = profile?.kyc?.status === "VERIFIED";
 
   return (
-    <main className="min-h-screen">
+    <main className={embedded ? "" : "min-h-screen"}>
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">

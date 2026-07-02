@@ -258,7 +258,7 @@ export function ProfileCardSheet({ open, onClose }: { open: boolean; onClose: ()
           {/* Full profile rendered in-modal. */}
           {view === "profile" && apiAddr && (
             <div className="-mx-5 pb-2">
-              <ProfileContent address={apiAddr} />
+              <ProfileContent address={apiAddr} embedded />
             </div>
           )}
 
