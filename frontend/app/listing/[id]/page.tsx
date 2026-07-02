@@ -1383,12 +1383,23 @@ export default function ListingPage() {
                   </div>
                 )}
                 <label className="block">
-                  <span className="text-xs text-silver">Add photos (optional), max 2MB each</span>
+                  <span className="text-xs text-silver">
+                    Add photos (optional) — max 10 per listing, 2MB each
+                  </span>
                   <input
                     type="file"
                     accept={ALLOWED_TYPES}
                     multiple
-                    onChange={(e) => setEditImageFiles(Array.from(e.target.files ?? []))}
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files ?? []);
+                      const room = Math.max(0, 10 - keptMediaUrls.length);
+                      if (files.length > room) {
+                        setEditError(`Listings are limited to 10 photos (${room} slot${room === 1 ? "" : "s"} left).`);
+                      } else {
+                        setEditError(null);
+                      }
+                      setEditImageFiles(files.slice(0, room));
+                    }}
                     className="input-frost mt-1 w-full text-silver text-sm file:text-xs"
                   />
                   {editImageFiles.length > 0 && (

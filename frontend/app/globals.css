@@ -6,6 +6,33 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Sitewide scrollbars: transparent track with a translucent grey pill thumb.
+   Replaces the default white/track scrollbars everywhere (page + inner
+   scroll areas). Firefox uses the two-value scrollbar-color shorthand. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.28);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(148, 163, 184, 0.5);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 :root {
   --bg: #0b111b;
   --text: #edf2ff;

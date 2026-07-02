@@ -155,6 +155,19 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
 const chainViewCache = new Map<string, { at: number; view: MarketplaceListingView }>();
 const CHAIN_VIEW_TTL_MS = 30_000;
 
+// Escrow views change while an order is in flight, so cache them for a
+// shorter window (null = confirmed "no escrow").
+type EscrowView = {
+  buyer: string;
+  seller: string;
+  amount: string;
+  createdAt: number;
+  timeoutAt: number;
+  state: string;
+} | null;
+const escrowViewCache = new Map<string, { at: number; view: EscrowView }>();
+const ESCROW_VIEW_TTL_MS = 10_000;
+
 async function readListingViewCached(
   rpcUrl: string,
   marketplaceAddr: string,
@@ -1610,22 +1623,36 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     try {
       const rawId = req.params.listingId ?? "";
       const listingIdBytes32 = listingIdToBytes32(rawId);
-      const provider = getRpcProvider(rpcUrl);
-      const contract = new ethers.Contract(escrowAddr, ESCROW_ABI_VIEW, provider);
-      const data = await contract.escrows(listingIdBytes32);
-      const [buyer, seller, amount, createdAt, timeoutAt, stateNum] = data;
-      if (!buyer || buyer === ethers.ZeroAddress) {
+
+      // Purchases/dashboard fan this endpoint out once per listing — cache
+      // the on-chain view briefly and bound the RPC read so a slow relay
+      // can't stall those pages.
+      const cached = escrowViewCache.get(listingIdBytes32);
+      let view = cached && Date.now() - cached.at < ESCROW_VIEW_TTL_MS ? cached.view : undefined;
+      if (view === undefined) {
+        const provider = getRpcProvider(rpcUrl);
+        const contract = new ethers.Contract(escrowAddr, ESCROW_ABI_VIEW, provider);
+        const data = await withTimeout(contract.escrows(listingIdBytes32), 2500);
+        const [buyer, seller, amount, createdAt, timeoutAt, stateNum] = data;
+        if (!buyer || buyer === ethers.ZeroAddress) {
+          view = null;
+        } else {
+          const stateNames = ["AWAITING_SHIPMENT", "AWAITING_CONFIRMATION", "COMPLETE"];
+          view = {
+            buyer: buyer.toLowerCase(),
+            seller: seller.toLowerCase(),
+            amount: amount.toString(),
+            createdAt: Number(createdAt),
+            timeoutAt: Number(timeoutAt),
+            state: stateNames[Number(stateNum)] ?? "UNKNOWN",
+          };
+        }
+        escrowViewCache.set(listingIdBytes32, { at: Date.now(), view });
+      }
+      if (view === null) {
         return res.status(404).json({ error: "No escrow for this listing" });
       }
-      const stateNames = ["AWAITING_SHIPMENT", "AWAITING_CONFIRMATION", "COMPLETE"];
-      res.json({
-        buyer: buyer.toLowerCase(),
-        seller: seller.toLowerCase(),
-        amount: amount.toString(),
-        createdAt: Number(createdAt),
-        timeoutAt: Number(timeoutAt),
-        state: stateNames[Number(stateNum)] ?? "UNKNOWN",
-      });
+      res.json(view);
     } catch (err) {
       log.error({ err }, "Failed to fetch escrow");
       res.status(500).json({ error: "Internal server error" });

@@ -18,6 +18,7 @@ import { getTransactionExplorerUrl } from "../../lib/explorer";
 import { getApiUrl } from "../../lib/apiUrl";
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB
 const MAX_MEDIA_SIZE = 15 * 1024 * 1024; // 15MB for video
+const MAX_MEDIA_COUNT = 10; // photos + videos per listing
 const ALLOWED_IMAGE_TYPES = "image/jpeg,image/jpg,image/png,image/gif,image/webp";
 const ALLOWED_VIDEO_TYPES = "video/mp4,video/webm,video/quicktime";
 const ALLOWED_MEDIA_TYPES = `${ALLOWED_IMAGE_TYPES},${ALLOWED_VIDEO_TYPES}`;
@@ -258,7 +259,16 @@ function CreatePageContent() {
         isVideo: isVideoFile(file),
       });
     }
-    setMediaItems((prev) => [...prev, ...newItems]);
+    setMediaItems((prev) => {
+      const room = MAX_MEDIA_COUNT - prev.length - duplicateMediaUrlsRef.current.length;
+      if (newItems.length > room) {
+        setMediaError(`Listings are limited to ${MAX_MEDIA_COUNT} photos/videos.`);
+        newItems
+          .slice(Math.max(0, room))
+          .forEach((item) => URL.revokeObjectURL(item.previewUrl));
+      }
+      return room <= 0 ? prev : [...prev, ...newItems.slice(0, room)];
+    });
     e.target.value = "";
   }, []);
 
@@ -491,7 +501,7 @@ function CreatePageContent() {
           <section>
             <SectionHeader
               title="Photos"
-              sub="First image becomes the cover. Drag to reorder; max 15MB per file."
+              sub="First image becomes the cover. Drag to reorder; max 10 files, 15MB each."
             />
             <input
               ref={fileInputRef}
