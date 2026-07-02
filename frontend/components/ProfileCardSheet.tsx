@@ -160,7 +160,7 @@ export function ProfileCardSheet({ open, onClose }: { open: boolean; onClose: ()
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[130] flex items-end justify-center"
+      className="fixed inset-0 z-[130] flex items-end justify-center md:items-center md:p-4"
       role="dialog"
       aria-modal="true"
       aria-label="Your profile"
@@ -172,8 +172,8 @@ export function ProfileCardSheet({ open, onClose }: { open: boolean; onClose: ()
         onClick={onClose}
       />
       <div
-        className={`relative flex w-full max-w-md flex-col rounded-t-3xl border border-white/10 bg-[#12161f] shadow-[0_-12px_40px_rgba(0,0,0,0.5)] transition-transform duration-300 ease-out ${
-          shown ? "translate-y-0" : "translate-y-full"
+        className={`relative flex w-full max-w-md flex-col rounded-t-3xl border border-white/10 bg-[#12161f] shadow-[0_-12px_40px_rgba(0,0,0,0.5)] transition-all duration-300 ease-out md:rounded-3xl ${
+          shown ? "translate-y-0 opacity-100" : "translate-y-full opacity-0 md:translate-y-4"
         }`}
         style={{ maxHeight: "85dvh" }}
       >

@@ -11,11 +11,6 @@ import { formatListingDate } from "../../lib/formatDate";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
 import { profileAvatarUrl, profileDisplayName, useProfile } from "../../lib/profiles";
 import { getApiUrl } from "../../lib/apiUrl";
-import {
-  consensusToDate,
-  fetchAccountTransactions,
-  AccountTransaction,
-} from "../../lib/mirrorTx";
 import { OnboardingChecklist } from "../../components/OnboardingChecklist";
 
 function formatListingId(id: string): string {
@@ -250,33 +245,6 @@ function KPICard({
   );
 }
 
-function activityLabel(tx: AccountTransaction, accountId: string): string {
-  const me = accountId;
-  const transfers = tx.transfers ?? [];
-  const myDelta = transfers
-    .filter((t) => t.account === me)
-    .reduce((a, b) => a + Number(b.amount), 0);
-  const name = (tx.name ?? "").replace(/_/g, " ").toLowerCase();
-  if (name === "contractcall") {
-    return `Contract call · ${tx.entity_id ?? "—"}`;
-  }
-  if (name === "cryptotransfer") {
-    if (myDelta > 0) return `Received ${(myDelta / 1e8).toLocaleString()} ℏ`;
-    if (myDelta < 0) return `Sent ${(Math.abs(myDelta) / 1e8).toLocaleString()} ℏ`;
-    return "Crypto transfer";
-  }
-  return name.replace(/\b\w/g, (c) => c.toUpperCase()) || "Activity";
-}
-
-function activityTone(tx: AccountTransaction, accountId: string): string {
-  const delta = (tx.transfers ?? [])
-    .filter((t) => t.account === accountId)
-    .reduce((a, b) => a + Number(b.amount), 0);
-  if (delta > 0) return "#00ffa3";
-  if (delta < 0) return "#fbbf24";
-  return "#a78bfa";
-}
-
 function timeAgo(d: Date | null): string {
   if (!d) return "";
   const s = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
@@ -301,7 +269,10 @@ export default function DashboardPage() {
     sent: 0,
   });
   const [loading, setLoading] = useState(true);
-  const [recent, setRecent] = useState<AccountTransaction[]>([]);
+  const [allSales, setAllSales] = useState<SaleItem[]>([]);
+  const [offerRows, setOfferRows] = useState<
+    { amount: string; status: string; createdAt: string; listingId?: string; listing?: { title?: string | null } | null; direction: "received" | "sent" }[]
+  >([]);
   const [escrowTinybar, setEscrowTinybar] = useState<number>(0);
   const usdRate = useHbarUsd();
   const myProfile = useProfile(address ?? null);
@@ -310,28 +281,57 @@ export default function DashboardPage() {
 
   useEffect(() => setMounted(true), []);
 
-  // Recent activity ticker (top 5).
-  useEffect(() => {
-    if (!accountId) {
-      setRecent([]);
-      return;
-    }
-    const ac = new AbortController();
-    fetchAccountTransactions(accountId, { max: 5, pageSize: 10, signal: ac.signal })
-      .then((txs) => {
-        if (!ac.signal.aborted) setRecent(txs);
-      })
-      .catch(() => {
-        if (!ac.signal.aborted) setRecent([]);
+  // Recent activity — real marketplace events (sales, buys, offers) merged
+  // and sorted by time, instead of raw mirror-node "Contract call" rows.
+  const recentEvents = useMemo(() => {
+    type Evt = { key: string; label: string; tone: string; at: number; href: string };
+    const events: Evt[] = [];
+    for (const s of allSales) {
+      const title =
+        s.listing?.title || (s.listingId ? formatListingId(s.listingId) : "listing");
+      const amount = `${formatPriceForDisplay(s.amount || "0")} ℏ`;
+      const targetId = s.listingId ?? s.listing?.id ?? "";
+      events.push({
+        key: `sale-${s.id}`,
+        label:
+          s.role === "seller" ? `Sold ${title} · ${amount}` : `Bought ${title} · ${amount}`,
+        tone: s.role === "seller" ? "#00ffa3" : "#00e5ff",
+        at: new Date(s.createdAt).getTime(),
+        href: targetId ? listingHref(targetId) : "/purchases",
       });
-    return () => ac.abort();
-  }, [accountId]);
+    }
+    for (const o of offerRows) {
+      const title = o.listing?.title || "listing";
+      const amount = `${formatPriceForDisplay(o.amount || "0")} ℏ`;
+      const verb =
+        o.direction === "received"
+          ? o.status === "ACCEPTED"
+            ? `Accepted offer on ${title}`
+            : `Offer received on ${title}`
+          : o.status === "ACCEPTED"
+            ? `Your offer accepted on ${title}`
+            : `Offer sent on ${title}`;
+      events.push({
+        key: `offer-${o.direction}-${o.createdAt}-${o.amount}`,
+        label: `${verb} · ${amount}`,
+        tone: o.status === "ACCEPTED" ? "#00ffa3" : "#fbbf24",
+        at: new Date(o.createdAt).getTime(),
+        href: o.listingId ? listingHref(o.listingId) : "/offers",
+      });
+    }
+    return events
+      .filter((e) => Number.isFinite(e.at))
+      .sort((a, b) => b.at - a.at)
+      .slice(0, 6);
+  }, [allSales, offerRows]);
 
   useEffect(() => {
     let cancelled = false;
     setStats(null);
     setActiveListings([]);
     setSoldItems([]);
+    setAllSales([]);
+    setOfferRows([]);
     setWishlistItems([]);
     setPurchaseCount(0);
     setOfferCounts({ received: 0, sent: 0 });
@@ -387,6 +387,7 @@ export default function DashboardPage() {
         .then(async (data: { purchases?: SaleItem[] & { listingId?: string }[] }) => {
           if (cancelled) return;
           const all = data.purchases ?? [];
+          setAllSales(all);
           setPurchaseCount(all.filter((s) => s.role === "buyer").length);
           setSoldItems(all.filter((s) => s.role === "seller"));
           // Sum on-chain escrow amounts for any non-COMPLETE escrow this user
@@ -429,16 +430,28 @@ export default function DashboardPage() {
         }),
       fetch(`${getApiUrl()}/api/user/${address}/offers`)
         .then((res) => (res.ok ? res.json() : Promise.reject(res)))
-        .then((data: { received?: { status: string }[]; sent?: { status: string }[] }) => {
-          if (cancelled) return;
-          const isActive = (o: { status: string }) => o.status === "ACTIVE";
-          setOfferCounts({
-            received: (data.received ?? []).filter(isActive).length,
-            sent: (data.sent ?? []).filter(isActive).length,
-          });
-        })
+        .then(
+          (data: {
+            received?: { amount: string; status: string; createdAt: string; listingId?: string; listing?: { title?: string | null } | null }[];
+            sent?: { amount: string; status: string; createdAt: string; listingId?: string; listing?: { title?: string | null } | null }[];
+          }) => {
+            if (cancelled) return;
+            const isActive = (o: { status: string }) => o.status === "ACTIVE";
+            setOfferCounts({
+              received: (data.received ?? []).filter(isActive).length,
+              sent: (data.sent ?? []).filter(isActive).length,
+            });
+            setOfferRows([
+              ...(data.received ?? []).map((o) => ({ ...o, direction: "received" as const })),
+              ...(data.sent ?? []).map((o) => ({ ...o, direction: "sent" as const })),
+            ]);
+          },
+        )
         .catch(() => {
-          if (!cancelled) setOfferCounts({ received: 0, sent: 0 });
+          if (!cancelled) {
+            setOfferCounts({ received: 0, sent: 0 });
+            setOfferRows([]);
+          }
         }),
     ]).finally(() => {
       if (!cancelled) setLoading(false);
@@ -559,7 +572,7 @@ export default function DashboardPage() {
                 />
               </div>
 
-              {/* Recent on-chain activity */}
+              {/* Recent marketplace activity */}
               <div className="rounded-glass-lg border border-white/10 bg-[#0e1422] p-[18px]">
                 <div className="mb-3 flex items-center justify-between">
                   <div className="text-[12px] font-semibold uppercase tracking-[0.12em] text-silver">
@@ -569,27 +582,27 @@ export default function DashboardPage() {
                     View all
                   </Link>
                 </div>
-                {recent.length === 0 ? (
-                  <p className="text-sm text-silver">No on-chain activity yet.</p>
+                {recentEvents.length === 0 ? (
+                  <p className="text-sm text-silver">
+                    No activity yet — sales, purchases and offers will show up here.
+                  </p>
                 ) : (
                   <ul className="space-y-1.5">
-                    {recent.map((tx) => (
-                      <li
-                        key={tx.transaction_id}
-                        className="flex items-center gap-2.5 text-[12px]"
-                      >
-                        <span
-                          className="h-1.5 w-1.5 shrink-0 rounded-full"
-                          style={{
-                            background: activityTone(tx, accountId ?? ""),
-                          }}
-                        />
-                        <span className="flex-1 truncate text-white">
-                          {activityLabel(tx, accountId ?? "")}
-                        </span>
-                        <span className="font-mono text-[11px] text-silver">
-                          {timeAgo(consensusToDate(tx.consensus_timestamp))}
-                        </span>
+                    {recentEvents.map((e) => (
+                      <li key={e.key}>
+                        <Link
+                          href={e.href}
+                          className="flex items-center gap-2.5 rounded-md py-0.5 text-[12px] hover:bg-white/[0.03]"
+                        >
+                          <span
+                            className="h-1.5 w-1.5 shrink-0 rounded-full"
+                            style={{ background: e.tone }}
+                          />
+                          <span className="flex-1 truncate text-white">{e.label}</span>
+                          <span className="font-mono text-[11px] text-silver">
+                            {timeAgo(new Date(e.at))}
+                          </span>
+                        </Link>
                       </li>
                     ))}
                   </ul>
