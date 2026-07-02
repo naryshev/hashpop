@@ -252,16 +252,24 @@ export default function ListingPage() {
   const fetchListing = useCallback(
     (attempt = 0, clearFirst = true) => {
       if (!id) return;
+      // Retry transient failures (slow backend, RPC hiccups, fresh listings
+      // that haven't synced yet) before declaring the listing not found.
       const maxRetries = 4;
       const retryDelayMs = 1600;
       if (attempt === 0 && clearFirst) {
         setLoading(true);
         setListing(null);
       }
+      const retryOrGiveUp = () => {
+        if (attempt < maxRetries) {
+          setTimeout(() => fetchListing(attempt + 1, false), retryDelayMs);
+        } else {
+          setLoading(false);
+        }
+      };
       fetch(`${getApiUrl()}/api/listing/${encodeURIComponent(id)}`)
         .then((res) => {
           if (res.ok) return res.json().then((data: { listing: Listing }) => data.listing);
-          if (res.status === 404) return null;
           return Promise.reject(res);
         })
         .then((listingData) => {
@@ -270,9 +278,9 @@ export default function ListingPage() {
             setLoading(false);
             return;
           }
-          setLoading(false);
+          retryOrGiveUp();
         })
-        .catch(() => setLoading(false));
+        .catch(() => retryOrGiveUp());
     },
     [id],
   );

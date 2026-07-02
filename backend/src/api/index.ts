@@ -129,6 +129,47 @@ type MarketplaceListingView = {
   status: number;
 };
 
+// Shared JSON-RPC provider. Hedera's public relay is slow and rate-limited;
+// creating a provider per request forces an extra eth_chainId detection
+// round-trip in ethers v6 and multiplies load. staticNetwork skips detection.
+let sharedRpcProvider: ethers.JsonRpcProvider | null = null;
+let sharedRpcProviderUrl: string | null = null;
+function getRpcProvider(rpcUrl: string): ethers.JsonRpcProvider {
+  if (!sharedRpcProvider || sharedRpcProviderUrl !== rpcUrl) {
+    sharedRpcProvider = new ethers.JsonRpcProvider(rpcUrl, undefined, { staticNetwork: true });
+    sharedRpcProviderUrl = rpcUrl;
+  }
+  return sharedRpcProvider;
+}
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error("rpc timeout")), ms)),
+  ]);
+}
+
+// Short-lived cache of on-chain listing views so repeat page loads and the
+// /listings fan-out don't hammer the relay. On-chain data only changes on a
+// transaction, so 30s of staleness is invisible in practice.
+const chainViewCache = new Map<string, { at: number; view: MarketplaceListingView }>();
+const CHAIN_VIEW_TTL_MS = 30_000;
+
+async function readListingViewCached(
+  rpcUrl: string,
+  marketplaceAddr: string,
+  listingId: string,
+): Promise<MarketplaceListingView> {
+  const hit = chainViewCache.get(listingId);
+  if (hit && Date.now() - hit.at < CHAIN_VIEW_TTL_MS) return hit.view;
+  const view = await withTimeout(
+    readMarketplaceListingCompat(getRpcProvider(rpcUrl), marketplaceAddr, listingId),
+    2500,
+  );
+  chainViewCache.set(listingId, { at: Date.now(), view });
+  return view;
+}
+
 async function readMarketplaceListingCompat(
   provider: ethers.JsonRpcProvider,
   marketplaceAddr: string,
@@ -316,11 +357,10 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       const rpcUrl = process.env.HEDERA_RPC_URL;
       if (isUsableContractAddress(marketplaceAddr) && rpcUrl && listings.length > 0) {
         try {
-          const provider = new ethers.JsonRpcProvider(rpcUrl);
           const overrides = await Promise.all(
             listings.map(async (l) => {
               try {
-                const data = await readMarketplaceListingCompat(provider, marketplaceAddr, l.id);
+                const data = await readListingViewCached(rpcUrl, marketplaceAddr, l.id);
                 const priceStr = data.price.toString();
                 const statusNum = Number(data.status);
                 const hasSeller = data.seller && data.seller !== ethers.ZeroAddress;
@@ -614,7 +654,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     }
 
     try {
-      const provider = new ethers.JsonRpcProvider(rpcUrl);
+      const provider = getRpcProvider(rpcUrl);
       const receipt = await provider.getTransactionReceipt(evmTxHash);
       if (!receipt || !receipt.logs?.length) {
         if (canFallbackUpsert) {
@@ -742,7 +782,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       return res.status(503).json({ error: "HEDERA_RPC_URL not set" });
     }
     try {
-      const provider = new ethers.JsonRpcProvider(rpcUrl);
+      const provider = getRpcProvider(rpcUrl);
       const receipt = await provider.getTransactionReceipt(txHash);
       if (!receipt?.logs?.length) {
         if (await applyFallbackPrice()) {
@@ -834,7 +874,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         evmTxHash = mirrorData.hash;
       }
 
-      const provider = new ethers.JsonRpcProvider(rpcUrl);
+      const provider = getRpcProvider(rpcUrl);
       const receipt = await provider.getTransactionReceipt(evmTxHash);
       if (!receipt?.logs?.length) {
         return res.status(404).json({ error: "Transaction or logs not found" });
@@ -926,7 +966,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       return res.status(503).json({ error: "HEDERA_RPC_URL not set" });
     }
     try {
-      const provider = new ethers.JsonRpcProvider(rpcUrl);
+      const provider = getRpcProvider(rpcUrl);
       const receipt = await provider.getTransactionReceipt(txHash);
       if (!receipt?.logs?.length) {
         if (await applyFallbackPurchaseStatus()) {
@@ -1007,7 +1047,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     }
 
     try {
-      const provider = new ethers.JsonRpcProvider(rpcUrl);
+      const provider = getRpcProvider(rpcUrl);
       const contract = new ethers.Contract(escrowAddr, ESCROW_ABI_VIEW, provider);
       const data = await contract.escrows(listingIdToBytes32(normalizedId));
       const [buyer, , , , , stateNum] = data;
@@ -1083,7 +1123,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     const rpcUrl = process.env.HEDERA_RPC_URL;
     if (txHashStr && rpcUrl) {
       try {
-        const provider = new ethers.JsonRpcProvider(rpcUrl);
+        const provider = getRpcProvider(rpcUrl);
         const receipt = await provider.getTransactionReceipt(txHashStr);
         if (receipt?.logs?.length) {
           for (const logEntry of receipt.logs) {
@@ -1293,7 +1333,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       return res.status(503).json({ error: "HEDERA_RPC_URL not set" });
     }
     try {
-      const provider = new ethers.JsonRpcProvider(rpcUrl);
+      const provider = getRpcProvider(rpcUrl);
       const receipt = await provider.getTransactionReceipt(txHash);
       if (!receipt?.logs?.length) {
         return res.status(404).json({ error: "Transaction or logs not found" });
@@ -1370,8 +1410,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       const rpcUrl = process.env.HEDERA_RPC_URL;
       if (isUsableContractAddress(marketplaceAddr) && rpcUrl) {
         try {
-          const provider = new ethers.JsonRpcProvider(rpcUrl);
-          const data = await readMarketplaceListingCompat(provider, marketplaceAddr, id);
+          const data = await readListingViewCached(rpcUrl, marketplaceAddr, id);
           const priceStr = data.price.toString();
           const statusNum = Number(data.status);
           const hasSeller = data.seller && data.seller !== ethers.ZeroAddress;
@@ -1571,7 +1610,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     try {
       const rawId = req.params.listingId ?? "";
       const listingIdBytes32 = listingIdToBytes32(rawId);
-      const provider = new ethers.JsonRpcProvider(rpcUrl);
+      const provider = getRpcProvider(rpcUrl);
       const contract = new ethers.Contract(escrowAddr, ESCROW_ABI_VIEW, provider);
       const data = await contract.escrows(listingIdBytes32);
       const [buyer, seller, amount, createdAt, timeoutAt, stateNum] = data;
