@@ -18,17 +18,10 @@ import { useHashpackWallet } from "../lib/hashpackWallet";
 import { profileAvatarUrl, profileDisplayName, useProfile } from "../lib/profiles";
 import { getApiUrl } from "../lib/apiUrl";
 import { formatPriceForDisplay } from "../lib/formatPrice";
+import { ProfileContent } from "./ProfileContent";
+import DashboardPage from "../app/dashboard/page";
 
 type View = "menu" | "profile" | "hashpop" | "purchases";
-
-type Stats = {
-  reputation?: number;
-  ratingAverage?: number | null;
-  ratingCount?: number;
-  totalSales?: number;
-  successful?: number;
-  activeListings?: number;
-};
 
 type PurchaseRow = {
   id: string;
@@ -46,14 +39,12 @@ type PurchaseRow = {
  * away, so it stays a self-contained popup.
  */
 export function ProfileCardSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { address, accountId, disconnect, balanceTinybar } = useHashpackWallet();
+  const { address, accountId, disconnect } = useHashpackWallet();
   const profile = useProfile(address ?? accountId ?? null);
   const [mounted, setMounted] = useState(false);
   const [shown, setShown] = useState(false);
   const [view, setView] = useState<View>("menu");
 
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [bio, setBio] = useState<string | null>(null);
   const [purchases, setPurchases] = useState<PurchaseRow[] | null>(null);
 
   useEffect(() => setMounted(true), []);
@@ -81,23 +72,6 @@ export function ProfileCardSheet({ open, onClose }: { open: boolean; onClose: ()
 
   const apiAddr = (address ?? accountId ?? "").toString();
 
-  const loadStats = useCallback(async () => {
-    if (!apiAddr) return;
-    try {
-      const [sRes, pRes] = await Promise.all([
-        fetch(`${getApiUrl()}/api/user/${encodeURIComponent(apiAddr)}`),
-        fetch(`${getApiUrl()}/api/user/${encodeURIComponent(apiAddr)}/profile`),
-      ]);
-      if (sRes.ok) setStats(await sRes.json());
-      if (pRes.ok) {
-        const p = (await pRes.json()) as { bio?: string | null };
-        setBio(p.bio ?? null);
-      }
-    } catch {
-      // best-effort
-    }
-  }, [apiAddr]);
-
   const loadPurchases = useCallback(async () => {
     if (!apiAddr) return;
     try {
@@ -116,9 +90,8 @@ export function ProfileCardSheet({ open, onClose }: { open: boolean; onClose: ()
   // Lazy-load data when entering a sub-view.
   useEffect(() => {
     if (!open) return;
-    if ((view === "profile" || view === "hashpop") && stats === null) void loadStats();
     if (view === "purchases" && purchases === null) void loadPurchases();
-  }, [open, view, stats, purchases, loadStats, loadPurchases]);
+  }, [open, view, purchases, loadPurchases]);
 
   if (!mounted || !open) return null;
 
@@ -131,7 +104,6 @@ export function ProfileCardSheet({ open, onClose }: { open: boolean; onClose: ()
       ? `/profile/${encodeURIComponent(accountId)}`
       : "/dashboard";
   const hasRating = profile && profile.ratingCount > 0 && profile.ratingAverage != null;
-  const balanceHbar = balanceTinybar != null ? Number(balanceTinybar) / 1e8 : null;
 
   const titles: Record<View, string> = {
     menu: "",
@@ -139,13 +111,6 @@ export function ProfileCardSheet({ open, onClose }: { open: boolean; onClose: ()
     hashpop: "My Hashpop",
     purchases: "Purchases",
   };
-
-  const Stat = ({ label, value }: { label: string; value: string }) => (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-      <div className="text-[10px] uppercase tracking-wide text-silver/70">{label}</div>
-      <div className="mt-1 text-lg font-bold text-white">{value}</div>
-    </div>
-  );
 
   const FullPageLink = ({ href, label }: { href: string; label: string }) => (
     <Link
@@ -172,9 +137,13 @@ export function ProfileCardSheet({ open, onClose }: { open: boolean; onClose: ()
         onClick={onClose}
       />
       <div
-        className={`relative flex w-full max-w-md flex-col rounded-t-3xl border border-white/10 bg-[#12161f] shadow-[0_-12px_40px_rgba(0,0,0,0.5)] transition-all duration-300 ease-out md:rounded-3xl ${
-          shown ? "translate-y-0 opacity-100" : "translate-y-full opacity-0 md:translate-y-4"
-        }`}
+        className={`relative flex w-full flex-col rounded-t-3xl border border-white/10 bg-[#12161f] shadow-[0_-12px_40px_rgba(0,0,0,0.5)] transition-all duration-300 ease-out md:rounded-3xl ${
+          view === "hashpop"
+            ? "max-w-6xl md:h-[85vh]"
+            : view === "profile"
+              ? "max-w-2xl"
+              : "max-w-md"
+        } ${shown ? "translate-y-0 opacity-100" : "translate-y-full opacity-0 md:translate-y-4"}`}
         style={{ maxHeight: "85dvh" }}
       >
         {/* Header */}
@@ -286,72 +255,17 @@ export function ProfileCardSheet({ open, onClose }: { open: boolean; onClose: ()
             </>
           )}
 
-          {view === "profile" && (
-            <div className="space-y-4 pb-2">
-              <div className="flex items-center gap-3">
-                {avatar ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={avatar}
-                    alt=""
-                    className="h-16 w-16 shrink-0 rounded-full border border-white/10 object-cover"
-                  />
-                ) : (
-                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-silver/60">
-                    <User size={28} />
-                  </div>
-                )}
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 text-lg font-bold text-white">
-                    <span className="truncate">{name ?? "Hashpop trader"}</span>
-                    {profile?.kycVerified && (
-                      <BadgeCheck size={16} className="shrink-0 text-[#00ffa3]" />
-                    )}
-                  </div>
-                  <div className="truncate font-mono text-xs text-silver">{acct}</div>
-                  <FullPageLink href={profileHref} label="Open full profile" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <Stat label="Reputation" value={String(stats?.reputation ?? 0)} />
-                <Stat
-                  label="Avg rating"
-                  value={
-                    stats?.ratingAverage != null ? Number(stats.ratingAverage).toFixed(1) : "N/A"
-                  }
-                />
-                <Stat label="Ratings" value={String(stats?.ratingCount ?? 0)} />
-                <Stat label="Total sales" value={String(stats?.totalSales ?? 0)} />
-              </div>
-              {bio && (
-                <div>
-                  <div className="text-[10px] uppercase tracking-wide text-silver/70">Bio</div>
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-white">{bio}</p>
-                </div>
-              )}
+          {/* Full profile rendered in-modal. */}
+          {view === "profile" && apiAddr && (
+            <div className="-mx-5 pb-2">
+              <ProfileContent address={apiAddr} />
             </div>
           )}
 
+          {/* Full dashboard rendered in-modal. */}
           {view === "hashpop" && (
-            <div className="space-y-4 pb-2">
-              <div className="grid grid-cols-2 gap-2">
-                <Stat
-                  label="Wallet"
-                  value={balanceHbar != null ? `${Math.round(balanceHbar).toLocaleString()} ℏ` : "—"}
-                />
-                <Stat
-                  label="Trades"
-                  value={String(stats?.totalSales ?? 0)}
-                />
-                <Stat label="Active listings" value={String(stats?.activeListings ?? 0)} />
-                <Stat
-                  label="Avg rating"
-                  value={
-                    stats?.ratingAverage != null ? Number(stats.ratingAverage).toFixed(1) : "N/A"
-                  }
-                />
-              </div>
-              <FullPageLink href="/dashboard" label="Open dashboard" />
+            <div className="-mx-5 pb-2">
+              <DashboardPage />
             </div>
           )}
 

@@ -118,6 +118,89 @@ function CreatePageContent() {
 
   const duplicateId = searchParams.get("duplicate");
 
+  // Local listing draft — text fields persist to localStorage so a listing in
+  // progress survives navigation/refresh. Photos can't be persisted (browser
+  // File objects don't survive reloads) and must be re-added.
+  const DRAFT_KEY = "hashpop.listing.draft.v1";
+  const [draftRestored, setDraftRestored] = useState(false);
+  const [draftSaved, setDraftSaved] = useState(false);
+
+  useEffect(() => {
+    if (duplicateId) return;
+    try {
+      const raw = window.localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const d = JSON.parse(raw) as Record<string, unknown>;
+      if (typeof d.title === "string") setTitle(d.title);
+      if (typeof d.subtitle === "string") setSubtitle(d.subtitle);
+      if (typeof d.description === "string") setDescription(d.description);
+      if (typeof d.category === "string") setCategory(d.category);
+      if (typeof d.condition === "string") setCondition(d.condition);
+      if (typeof d.yearOfProduction === "string") setYearOfProduction(d.yearOfProduction);
+      if (typeof d.price === "string") setPrice(d.price);
+      if (typeof d.requireEscrow === "boolean") setRequireEscrow(d.requireEscrow);
+      if (d.location && typeof d.location === "object") {
+        setLocation(d.location as LocationValue);
+      }
+      setDraftRestored(true);
+    } catch {
+      // ignore malformed drafts
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [duplicateId]);
+
+  const saveDraft = () => {
+    try {
+      window.localStorage.setItem(
+        DRAFT_KEY,
+        JSON.stringify({
+          title,
+          subtitle,
+          description,
+          category,
+          condition,
+          yearOfProduction,
+          price,
+          requireEscrow,
+          location,
+          savedAt: Date.now(),
+        }),
+      );
+      setDraftSaved(true);
+      setTimeout(() => setDraftSaved(false), 2000);
+    } catch {
+      // ignore storage errors
+    }
+  };
+
+  const discardDraft = () => {
+    try {
+      window.localStorage.removeItem(DRAFT_KEY);
+    } catch {
+      // ignore
+    }
+    setDraftRestored(false);
+    setTitle("");
+    setSubtitle("");
+    setDescription("");
+    setCategory("");
+    setCondition("");
+    setYearOfProduction("");
+    setPrice("");
+    setRequireEscrow(false);
+    setLocation({ city: null, lat: null, lng: null });
+  };
+
+  // A published listing consumes the draft.
+  useEffect(() => {
+    if (!listingSuccess) return;
+    try {
+      window.localStorage.removeItem(DRAFT_KEY);
+    } catch {
+      // ignore
+    }
+  }, [listingSuccess]);
+
   useEffect(() => {
     if (!duplicateId) return;
     fetch(`${getApiUrl()}/api/listing/${encodeURIComponent(duplicateId)}`)
@@ -383,6 +466,19 @@ function CreatePageContent() {
         {duplicateId && (
           <p className="text-sm text-chrome bg-white/5 rounded-lg px-3 py-2 border border-white/10">
             Duplicating listing. Details are prefilled—review and click Create listing when ready.
+          </p>
+        )}
+
+        {draftRestored && !duplicateId && (
+          <p className="flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-chrome">
+            Draft restored — photos need re-adding.
+            <button
+              type="button"
+              onClick={discardDraft}
+              className="text-silver underline underline-offset-2 hover:text-rose-300"
+            >
+              Discard draft
+            </button>
           </p>
         )}
 
@@ -745,6 +841,16 @@ function CreatePageContent() {
             >
               {isPending ? "Confirm in wallet…" : "Publish listing →"}
             </button>
+            <button
+              type="button"
+              onClick={saveDraft}
+              className="w-full rounded-lg border border-white/15 bg-white/5 px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-300 hover:bg-white/10"
+            >
+              {draftSaved ? "Draft saved ✓" : "Save draft"}
+            </button>
+            <p className="text-center text-[10px] text-silver/60">
+              Drafts save your details on this device — photos aren&apos;t included.
+            </p>
             {triedSubmit && !isValid && (
               <p className="text-xs text-rose-300">
                 {Object.values(validation).filter(Boolean).length} requirement

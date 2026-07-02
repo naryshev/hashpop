@@ -1,7 +1,7 @@
 "use client";
 import { listingHref } from "../../lib/listingUrl";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Fuse from "fuse.js";
@@ -215,7 +215,22 @@ export default function MarketplacePageClient({
   const searchParams = useSearchParams();
   const [searchInput, setSearchInput] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
+  const [viewMenuOpen, setViewMenuOpen] = useState(false);
   const [profileCardOpen, setProfileCardOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+
+  // "F" focuses the top-bar search (unless the user is already typing).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== "f" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const tag = (document.activeElement?.tagName ?? "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      e.preventDefault();
+      searchInputRef.current?.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   const [filterMinPrice, setFilterMinPrice] = useState("");
   const [filterMaxPrice, setFilterMaxPrice] = useState("");
   const [filterPostedWithin, setFilterPostedWithin] = useState("");
@@ -559,21 +574,42 @@ export default function MarketplacePageClient({
   // (no avatar) with a carat that slides up the profile card sheet.
   const walletLabel = accountId ?? (address ? `${address.slice(0, 6)}…${address.slice(-4)}` : null);
 
-  // Compact desktop search bubble — used to the right of the view-mode
-  // pills since the global top-bar no longer hosts the search input.
-  const desktopInlineSearch = (
-    <form onSubmit={submitSearch}>
-      <div className="flex items-center gap-1.5 rounded-full border border-[#00ffa3]/50 bg-[#00ffa3]/[0.08] px-3 py-1.5 shadow-[0_0_14px_rgba(0,255,163,0.12),inset_0_0_8px_rgba(0,255,163,0.04)]">
-        <SearchIcon size={14} className="shrink-0 text-[#00ffa3]" />
-        <input
-          type="text"
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          placeholder="Search listings…"
-          className="w-40 bg-transparent text-sm text-white placeholder:text-[#00ffa3]/40 focus:outline-none"
-        />
+  // Top-bar search — rectangular rounded "Find…" field with an F shortcut
+  // hint, hosted in the global top bar's center slot next to the logo/nav.
+  const topBarSearch = (
+    <div className="flex items-center gap-2">
+      <form onSubmit={submitSearch}>
+        <div className="flex w-80 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.06] px-3 py-1.5 transition-colors duration-300 focus-within:border-[#00ffa3]/40">
+          <SearchIcon size={14} className="shrink-0 text-silver" />
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Find..."
+            className="flex-1 bg-transparent text-sm text-white placeholder:text-silver/50 focus:outline-none"
+          />
+          <kbd className="rounded border border-white/15 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-silver/70">
+            F
+          </kbd>
+        </div>
+      </form>
+      <div className="relative">
+        <button
+          type="button"
+          onClick={openFilterPanel}
+          aria-label="Filters & sort"
+          className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border transition-colors duration-300 ${
+            filterOpen || hasActiveFilter
+              ? "border-[#00ffa3]/50 bg-[#00ffa3]/10 text-[#00ffa3]"
+              : "border-white/10 bg-white/5 text-silver hover:text-white"
+          }`}
+        >
+          <SlidersHorizontal size={14} />
+        </button>
+        {filterOpen && renderFilterSortPanel()}
       </div>
-    </form>
+    </div>
   );
 
   const actionsCluster = (
@@ -582,9 +618,59 @@ export default function MarketplacePageClient({
     </Link>
   );
 
+  // View-mode dropdown (Editorial / Feed / Grid) — triggered by a carat next
+  // to the section title, replacing the old pill row.
+  const viewDropdown = (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setViewMenuOpen((o) => !o)}
+        aria-label="Change view"
+        aria-expanded={viewMenuOpen}
+        className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-silver transition-colors duration-300 hover:bg-white/5 hover:text-white"
+      >
+        {viewMode === "editorial" ? "Editorial" : viewMode === "feed" ? "Feed" : "Grid"}
+        <ChevronDown
+          size={13}
+          className={`transition-transform duration-300 ${viewMenuOpen ? "rotate-180" : ""}`}
+        />
+      </button>
+      {viewMenuOpen && (
+        <div className="absolute left-0 top-full z-50 mt-1 w-36 rounded-xl border border-white/10 bg-[#0a0a0a] p-1.5 shadow-2xl">
+          {(
+            [
+              { id: "editorial", label: "Editorial" },
+              { id: "feed", label: "Feed" },
+              { id: "grid", label: "Grid" },
+            ] as { id: ViewMode; label: string }[]
+          ).map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              onClick={() => {
+                setViewMenuOpen(false);
+                setParam("view", v.id === "editorial" ? null : v.id);
+              }}
+              className={`block w-full rounded-lg px-3 py-1.5 text-left text-xs transition-colors duration-300 ${
+                viewMode === v.id
+                  ? "bg-[#00ffa3]/10 text-[#00ffa3]"
+                  : "text-white hover:bg-white/5"
+              }`}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <main className="min-h-screen">
       <TopBarSlot name="title">{headerCluster}</TopBarSlot>
+      <TopBarSlot name="center">
+        <div className="hidden md:block">{topBarSearch}</div>
+      </TopBarSlot>
       <TopBarSlot name="actions">{actionsCluster}</TopBarSlot>
       <div className="px-3 py-4 sm:px-4">
         {/* Mobile-only top section: location chip, watchlist/alerts icons,
@@ -862,55 +948,16 @@ export default function MarketplacePageClient({
                 </Link>
               ))}
             </div>
-            <div className="hidden sm:flex items-center justify-between gap-3 mb-4">
-              <div className="flex items-center gap-2">
-                {(
-                  [
-                    { id: "editorial", label: "Editorial" },
-                    { id: "feed", label: "Feed" },
-                    { id: "grid", label: "Grid" },
-                  ] as { id: ViewMode; label: string }[]
-                ).map((v) => {
-                  const active = viewMode === v.id;
-                  return (
-                    <button
-                      key={v.id}
-                      type="button"
-                      onClick={() => setParam("view", v.id === "editorial" ? null : v.id)}
-                      className={`rounded-full px-3 py-1 text-xs font-medium transition-colors border ${
-                        active
-                          ? "border-[#00ffa3]/40 bg-[#00ffa3]/10 text-[#00ffa3]"
-                          : "border-white/10 text-silver hover:text-white hover:border-white/20"
-                      }`}
-                    >
-                      {v.label}
-                    </button>
-                  );
-                })}
-                <span className="text-xs text-silver/60 ml-2">
+            {viewMode !== "editorial" && (
+              <div className="hidden sm:flex items-center gap-2 mb-3">
+                <h3 className="text-lg font-bold tracking-tight text-white">Recently listed</h3>
+                {viewDropdown}
+                <span className="ml-1 text-xs text-silver/60">
                   {filteredItems.length.toLocaleString()} result
                   {filteredItems.length === 1 ? "" : "s"}
                 </span>
               </div>
-              <div className="flex items-center gap-2">
-                {desktopInlineSearch}
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={openFilterPanel}
-                    aria-label="Filters & sort"
-                    className={`inline-flex h-9 w-9 items-center justify-center rounded-full border transition-colors ${
-                      filterOpen || hasActiveFilter
-                        ? "border-[#00ffa3]/50 bg-[#00ffa3]/10 text-[#00ffa3]"
-                        : "border-white/10 bg-white/5 text-silver hover:text-white"
-                    }`}
-                  >
-                    <SlidersHorizontal size={14} />
-                  </button>
-                  {filterOpen && renderFilterSortPanel()}
-                </div>
-              </div>
-            </div>
+            )}
 
             {viewMode === "grid" && (
               <div className="hidden sm:grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
@@ -1100,8 +1147,11 @@ export default function MarketplacePageClient({
                         </Link>
                       )}
                       <div>
-                        <div className="flex items-baseline justify-between mb-3">
-                          <h3 className="text-lg font-bold tracking-tight">Recently listed</h3>
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-lg font-bold tracking-tight">Recently listed</h3>
+                            {viewDropdown}
+                          </div>
                           <span className="text-xs text-silver/60">
                             {rest.length.toLocaleString()} more
                           </span>

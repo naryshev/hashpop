@@ -53,6 +53,14 @@ type ListingPreview = {
 
 // Per-conversation status pill shown on inbox rows, derived from the listing's
 // on-chain status + delivery timestamps.
+type MsgTab = "buying" | "selling" | "direct" | "offers";
+const MSG_TABS: { key: MsgTab; label: string }[] = [
+  { key: "buying", label: "Buying" },
+  { key: "selling", label: "Selling" },
+  { key: "direct", label: "Direct" },
+  { key: "offers", label: "Offers" },
+];
+
 type StateKey = "PAID" | "SHIPPED" | "DELIVERED" | "RELEASED" | "DISPUTED" | "AWAITING";
 const STATE_STYLE: Record<StateKey, { bg: string; text: string; label: string }> = {
   PAID: { bg: "bg-chrome", text: "text-black", label: "PAID" },
@@ -227,6 +235,7 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
   const [replyBody, setReplyBody] = useState("");
   const [sending, setSending] = useState(false);
   const [listingPreviews, setListingPreviews] = useState<Record<string, ListingPreview>>({});
+  const [msgTab, setMsgTab] = useState<MsgTab>("buying");
   // keypair is used only to opportunistically decrypt legacy encrypted
   // history if a key was already derived; new messages are plaintext.
   const { keypair } = useEncryptionKey();
@@ -505,20 +514,57 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
     return m.body;
   };
 
-  // Split into listing-bound chats vs direct messages — those are the only
-  // two flavours of conversation now. Order each section by most-recent
-  // activity so live threads sit at the top.
+  // Bucket conversations into Buying / Selling / Direct / Offers, each sorted
+  // by most-recent activity. Offer threads are detected from the preview text
+  // the offer flow writes; buying vs selling comes from whether the connected
+  // wallet is the listing's seller.
   const byRecency = (a: InboxConversation, b: InboxConversation) =>
     new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime();
-  const listingConvs = useMemo(
-    () => conversations.filter((c) => !!c.listingId).sort(byRecency),
-    [conversations],
-  );
-  const directConvs = useMemo(
-    () => conversations.filter((c) => !c.listingId).sort(byRecency),
-    [conversations],
-  );
-  const hasConversations = listingConvs.length + directConvs.length > 0;
+  const buckets = useMemo(() => {
+    const myAddr = (address ?? "").toLowerCase();
+    const b: Record<MsgTab, InboxConversation[]> = {
+      buying: [],
+      selling: [],
+      direct: [],
+      offers: [],
+    };
+    for (const c of conversations) {
+      if (/\boffer\b/i.test(c.preview ?? "")) {
+        b.offers.push(c);
+        continue;
+      }
+      if (!c.listingId) {
+        b.direct.push(c);
+        continue;
+      }
+      const l = listingPreviews[c.listingId];
+      if (l && myAddr && l.seller?.toLowerCase() === myAddr) b.selling.push(c);
+      else b.buying.push(c);
+    }
+    (Object.keys(b) as MsgTab[]).forEach((k) => b[k].sort(byRecency));
+    return b;
+  }, [conversations, listingPreviews, address]);
+  const hasConversations = conversations.length > 0;
+
+  // Custom scroll indicator for the conversation list — the native scrollbar
+  // is hidden and replaced with a gradient pill that slides with scroll.
+  const listScrollRef = useRef<HTMLDivElement | null>(null);
+  const [scrollThumb, setScrollThumb] = useState<{ top: number; height: number } | null>(null);
+  const updateScrollThumb = useCallback(() => {
+    const el = listScrollRef.current;
+    if (!el) return;
+    const { scrollTop, scrollHeight, clientHeight } = el;
+    if (scrollHeight <= clientHeight + 4) {
+      setScrollThumb(null);
+      return;
+    }
+    const height = Math.max(36, (clientHeight * clientHeight) / scrollHeight);
+    const top = (scrollTop / (scrollHeight - clientHeight)) * (clientHeight - height);
+    setScrollThumb({ top, height });
+  }, []);
+  useEffect(() => {
+    updateScrollThumb();
+  }, [msgTab, conversations, updateScrollThumb]);
 
   const selectedListing = selectedThread?.listingId
     ? listingPreviews[selectedThread.listingId]
@@ -648,37 +694,72 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
                 selectedThread ? "hidden lg:flex" : "flex"
               }`}
             >
-              <div className="flex-1 overflow-y-auto py-2">
-                {inboxLoading ? (
-                  <p className="px-4 py-3 text-silver text-sm">Loading…</p>
-                ) : !hasConversations ? (
-                  <p className="px-4 py-3 text-silver text-sm">
-                    No conversations yet. Message a seller from a listing or their profile to start
-                    a chat.
-                  </p>
-                ) : (
-                  <>
-                    {listingConvs.length > 0 && (
-                      <section>
-                        <h2 className="sticky top-0 z-10 bg-[#0e1422]/95 px-4 pt-1 pb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-silver backdrop-blur">
-                          Listings
-                        </h2>
-                        <ul className="space-y-1.5 px-2">
-                          {listingConvs.map((c) => renderConversationRow(c))}
-                        </ul>
-                      </section>
-                    )}
-                    {directConvs.length > 0 && (
-                      <section className={listingConvs.length > 0 ? "mt-4" : ""}>
-                        <h2 className="sticky top-0 z-10 bg-[#0e1422]/95 px-4 pt-1 pb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-silver backdrop-blur">
-                          Direct messages
-                        </h2>
-                        <ul className="space-y-1.5 px-2">
-                          {directConvs.map((c) => renderConversationRow(c))}
-                        </ul>
-                      </section>
-                    )}
-                  </>
+              <div className="relative min-h-0 flex-1">
+                <div
+                  ref={listScrollRef}
+                  onScroll={updateScrollThumb}
+                  className="scrollbar-none h-full overflow-y-auto pb-2"
+                >
+                  {/* Message-type pills — flush to the top so nothing peeks
+                      through above them while scrolling. */}
+                  <div className="sticky top-0 z-10 flex gap-1.5 border-b border-white/5 bg-[#0e1422] px-2 py-2">
+                    {MSG_TABS.map((t) => {
+                      const isActive = msgTab === t.key;
+                      const count = buckets[t.key].length;
+                      return (
+                        <button
+                          key={t.key}
+                          type="button"
+                          onClick={() => setMsgTab(t.key)}
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors duration-300 ${
+                            isActive
+                              ? "bg-[#00ffa3]/10 text-[#00ffa3]"
+                              : "text-silver hover:bg-white/5 hover:text-white"
+                          }`}
+                        >
+                          {t.label}
+                          {count > 0 && (
+                            <span
+                              className={`font-mono text-[10px] ${isActive ? "text-[#00ffa3]/80" : "text-silver/60"}`}
+                            >
+                              {count}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {inboxLoading ? (
+                    <p className="px-4 py-3 text-silver text-sm">Loading…</p>
+                  ) : !hasConversations ? (
+                    <p className="px-4 py-3 text-silver text-sm">
+                      No conversations yet. Message a seller from a listing or their profile to
+                      start a chat.
+                    </p>
+                  ) : buckets[msgTab].length === 0 ? (
+                    <p className="px-4 py-3 text-silver text-sm">
+                      {msgTab === "buying"
+                        ? "No buying conversations yet."
+                        : msgTab === "selling"
+                          ? "No selling conversations yet."
+                          : msgTab === "direct"
+                            ? "No direct messages yet."
+                            : "No offer messages yet."}
+                    </p>
+                  ) : (
+                    <ul className="space-y-1.5 px-2 pt-2">
+                      {buckets[msgTab].map((c) => renderConversationRow(c))}
+                    </ul>
+                  )}
+                </div>
+                {/* Stylized scroll pill (replaces the native scrollbar). */}
+                {scrollThumb && (
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute right-1 w-1 rounded-full bg-gradient-to-b from-[#00ffa3]/70 to-[#00e5ff]/70 shadow-[0_0_6px_rgba(0,255,163,0.35)]"
+                    style={{ top: scrollThumb.top, height: scrollThumb.height }}
+                  />
                 )}
               </div>
             </aside>

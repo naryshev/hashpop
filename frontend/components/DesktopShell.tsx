@@ -150,7 +150,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
       {/* Top bar — desktop only. Sticky with a blurred backdrop so page
           content scrolls beneath it seamlessly. */}
       <header className="sticky top-0 z-20 hidden h-14 shrink-0 items-center gap-3 border-b border-white/5 bg-[#0b111b]/90 px-3 backdrop-blur-xl md:flex">
-        {/* Logo + horizontal nav strip (replaces the old left rail). */}
+        {/* Logo, then the page's search (center slot), then the nav strip. */}
         <Link
           href="/marketplace"
           className="flex h-10 w-10 shrink-0 items-center justify-center"
@@ -160,6 +160,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/hashpop-cart-3d.PNG" alt="" className="h-7 w-auto object-contain" />
         </Link>
+        <div ref={centerSlotRef} className="flex items-center" data-topbar-slot="center" />
         <nav className="flex items-center gap-0.5" aria-label="Primary navigation">
           {items.map((item) => {
             const active =
@@ -179,19 +180,17 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        {/* Title region. The slot host stays empty so portal children don't
-            coexist with the fallback. */}
-        <div className="ml-2 flex min-w-0 items-center gap-3 text-base font-semibold tracking-tight text-white">
+        {/* Page context label — a hairline divider + muted title anchors it
+            to the nav instead of floating loose in the bar. */}
+        <div className="flex min-w-0 items-center gap-3">
+          <span aria-hidden className="h-5 w-px shrink-0 bg-white/10" />
           <div ref={titleSlotRef} className="flex min-w-0 items-center" />
-          {!titleFilled && fallbackTitle && <span>{fallbackTitle}</span>}
+          {!titleFilled && fallbackTitle && (
+            <span className="truncate text-sm font-medium text-silver">{fallbackTitle}</span>
+          )}
         </div>
 
-        {/* Center slot — typically a search input + filter dropdown. */}
-        <div
-          ref={centerSlotRef}
-          className="flex flex-1 items-center justify-center"
-          data-topbar-slot="center"
-        />
+        <div className="flex-1" />
 
         {/* Right cluster: page actions slot, alerts, account chip. */}
         <div className="flex items-center gap-2">
@@ -232,9 +231,11 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
           the floating BottomNav; the document itself scrolls. */}
       <main className="flex min-h-[100dvh] flex-1 flex-col pb-24 md:min-h-0 md:pb-0">
         {/* Content takes the available height so the footer (marketplace
-            only) stays pinned to the bottom. Every other route is
-            app-like — no footer, no extra scroll. */}
-        <div className="flex-1">{children}</div>
+            only) stays pinned to the bottom. Keyed on pathname so each route
+            change eases in gently instead of snapping. */}
+        <div key={pathname} className="flex-1 animate-[fadeSlideUp_0.5s_ease-out]">
+          {children}
+        </div>
         {showFooter && <Footer />}
       </main>
 
