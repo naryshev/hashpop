@@ -168,6 +168,19 @@ type EscrowView = {
 const escrowViewCache = new Map<string, { at: number; view: EscrowView }>();
 const ESCROW_VIEW_TTL_MS = 10_000;
 
+// Whole-response cache for GET /listings. Invalidated by listing mutations so
+// new/updated listings appear immediately.
+let listingsResponseCache: { at: number; payload: unknown } | null = null;
+const LISTINGS_CACHE_TTL_MS = 10_000;
+function invalidateListingsCache(): void {
+  listingsResponseCache = null;
+}
+
+// Failed reads are negative-cached briefly so a slow/rate-limited relay
+// doesn't re-stall every request for the full timeout window.
+const chainViewErrorAt = new Map<string, number>();
+const CHAIN_VIEW_ERROR_TTL_MS = 15_000;
+
 async function readListingViewCached(
   rpcUrl: string,
   marketplaceAddr: string,
@@ -175,12 +188,22 @@ async function readListingViewCached(
 ): Promise<MarketplaceListingView> {
   const hit = chainViewCache.get(listingId);
   if (hit && Date.now() - hit.at < CHAIN_VIEW_TTL_MS) return hit.view;
-  const view = await withTimeout(
-    readMarketplaceListingCompat(getRpcProvider(rpcUrl), marketplaceAddr, listingId),
-    2500,
-  );
-  chainViewCache.set(listingId, { at: Date.now(), view });
-  return view;
+  const failedAt = chainViewErrorAt.get(listingId);
+  if (failedAt && Date.now() - failedAt < CHAIN_VIEW_ERROR_TTL_MS) {
+    throw new Error("rpc unavailable (cached)");
+  }
+  try {
+    const view = await withTimeout(
+      readMarketplaceListingCompat(getRpcProvider(rpcUrl), marketplaceAddr, listingId),
+      2500,
+    );
+    chainViewCache.set(listingId, { at: Date.now(), view });
+    chainViewErrorAt.delete(listingId);
+    return view;
+  } catch (e) {
+    chainViewErrorAt.set(listingId, Date.now());
+    throw e;
+  }
 }
 
 async function readMarketplaceListingCompat(
@@ -346,6 +369,12 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
 
   router.get("/listings", async (req, res) => {
     try {
+      // Whole-response micro-cache: the marketplace page (and its SSR pass)
+      // hits this on every load/refresh. A short TTL makes repeat loads
+      // instant while staying fresh enough for a marketplace feed.
+      if (listingsResponseCache && Date.now() - listingsResponseCache.at < LISTINGS_CACHE_TTL_MS) {
+        return res.json(listingsResponseCache.payload);
+      }
       // Only surface listings whose create transaction has been confirmed
       // on-chain. PENDING / unconfirmed listings stay out of the public
       // marketplace so buyers don't see items that may never actually appear.
@@ -413,7 +442,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           log.warn({ err: e }, "Could not read on-chain listing prices for /listings");
         }
       }
-      res.json({
+      const payload = {
         listings: listings.map((l) => ({
           ...l,
           imageUrl: rewriteMediaUrlForClient(l.imageUrl),
@@ -427,7 +456,9 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           mediaUrls: rewriteMediaUrlsForClient((a as any).mediaUrls) ?? (a as any).mediaUrls,
           reservePrice: toHbarForClient(a.reservePrice),
         })),
-      });
+      };
+      listingsResponseCache = { at: Date.now(), payload };
+      res.json(payload);
     } catch (err: unknown) {
       log.error({ err }, "Failed to fetch listings");
       const code =
@@ -459,6 +490,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
    * without waiting for the indexer (Mirror/RPC can be slow or limited on Hedera).
    */
   router.post("/sync-listing", async (req, res) => {
+    invalidateListingsCache();
     const {
       txHash,
       listingId,
@@ -745,6 +777,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
    * Sync a listing price update from tx so the latest on-chain price is reflected immediately.
    */
   router.post("/sync-price-update", async (req, res) => {
+    invalidateListingsCache();
     const { txHash, listingId, newPrice } = (req.body || {}) as {
       txHash?: string;
       listingId?: string;
@@ -851,6 +884,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
    * Sync a listing cancellation from tx so dashboard count updates immediately.
    */
   router.post("/sync-cancel", async (req, res) => {
+    invalidateListingsCache();
     const { txHash } = (req.body || {}) as { txHash?: string };
     if (!txHash || typeof txHash !== "string") {
       return res.status(400).json({ error: "txHash required" });
@@ -915,6 +949,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
    * Only works when onChainConfirmed is false and the caller is the seller.
    */
   router.post("/listing/:id/cancel-offchain", async (req, res) => {
+    invalidateListingsCache();
     const { id } = req.params;
     const { address, force } = (req.body || {}) as { address?: string; force?: boolean };
     const seller = address?.trim()?.toLowerCase();
@@ -944,6 +979,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
   });
 
   router.post("/sync-purchase", async (req, res) => {
+    invalidateListingsCache();
     const { txHash, listingId } = (req.body || {}) as { txHash?: string; listingId?: string };
     const fallbackListingId =
       typeof listingId === "string" && listingId.trim()
@@ -1046,6 +1082,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
    * Marks listing SOLD once escrow is COMPLETE.
    */
   router.post("/sync-escrow-complete", async (req, res) => {
+    invalidateListingsCache();
     const { listingId } = (req.body || {}) as { listingId?: string };
     const normalizedId =
       typeof listingId === "string" && listingId.trim()
@@ -1660,6 +1697,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
   });
 
   router.patch("/listing/:id", async (req, res) => {
+    invalidateListingsCache();
     try {
       const id = normalizeListingId(req.params.id ?? "");
       const {
@@ -2881,6 +2919,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
   // are preserved with listingId set to null so historical totals remain
   // intact. Used for moderation takedowns.
   router.delete("/admin/listing/:id", async (req, res) => {
+    invalidateListingsCache();
     const auth = verifyAdminToken(req);
     if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
     try {

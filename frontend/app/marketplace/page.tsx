@@ -18,8 +18,13 @@ async function loadInitialMarketplaceListings(): Promise<{
 }> {
   try {
     const [listingsRes, countsRes] = await Promise.all([
-      fetch(`${getApiUrl()}/api/listings`, { cache: "no-store" }),
-      fetch(`${getApiUrl()}/api/wishlist/counts`, { cache: "no-store" }),
+      // Bound the SSR fetch so a slow backend can't stall the whole page's
+      // TTFB — on timeout the client refetches after hydration instead.
+      fetch(`${getApiUrl()}/api/listings`, { cache: "no-store", signal: AbortSignal.timeout(3500) }),
+      fetch(`${getApiUrl()}/api/wishlist/counts`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(3500),
+      }),
     ]);
     if (!listingsRes.ok) {
       const body = await listingsRes.json().catch(() => ({}) as { error?: string });

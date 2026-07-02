@@ -14,6 +14,7 @@ import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { canonicalizeCategory } from "../../lib/categories";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
 import { useSignInModal } from "../../lib/signInModal";
+import { getApiUrl } from "../../lib/apiUrl";
 import { profileAvatarUrl, profileDisplayName, useProfile, useProfiles } from "../../lib/profiles";
 import { TopBarSlot } from "../../lib/topBar";
 import {
@@ -245,8 +246,33 @@ export default function MarketplacePageClient({
   const locationQuery = searchParams.get("location")?.trim() ?? "";
   const viewMode: ViewMode = parseViewMode(searchParams.get("view"));
   const sortMode: SortMode = parseSortMode(searchParams.get("sort"));
-  const items = initialItems;
-  const listingsError = initialError;
+  // Items start from the SSR payload but live in state so the client can
+  // recover when the server-side fetch timed out or failed (bounded TTFB),
+  // and so refreshes can revalidate without a full reload.
+  const [items, setItems] = useState<ListingItem[]>(initialItems);
+  const [listingsError, setListingsError] = useState<string | null>(initialError);
+  useEffect(() => {
+    if (initialItems.length > 0) return;
+    let cancelled = false;
+    fetch(`${getApiUrl()}/api/listings`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject(r)))
+      .then((data: { listings?: ListingItem[] }) => {
+        if (cancelled) return;
+        const list = (data.listings ?? []).map((l) => ({
+          ...l,
+          itemType: "listing" as const,
+        }));
+        if (list.length > 0) {
+          setItems(list);
+          setListingsError(null);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const usdRate = useHbarUsd();
   // Warm the profile cache for every seller in one batched request so cards
   // can render display names, avatars and ratings without per-card fetches.
