@@ -33,6 +33,14 @@ html {
   background: transparent;
 }
 
+/* Contain Leaflet's internal z-indexes (panes 200-700, controls 1000) inside
+   the map's own stacking context so maps can never paint above overlays
+   (sign-in modal, profile sheet, offer/rate/dispute dialogs, etc.). */
+.leaflet-container {
+  z-index: 0;
+  isolation: isolate;
+}
+
 :root {
   --bg: #0b111b;
   --text: #edf2ff;

@@ -145,6 +145,7 @@ export default function ListingPage() {
   const [loading, setLoading] = useState(true);
   const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
   const [galleryOpen, setGalleryOpen] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editSubtitle, setEditSubtitle] = useState("");
@@ -1267,10 +1268,31 @@ export default function ListingPage() {
                       </button>
                       <button
                         type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const url = window.location.href;
+                          const doCopy = () =>
+                            navigator.clipboard
+                              .writeText(url)
+                              .then(() => {
+                                setShareCopied(true);
+                                setTimeout(() => setShareCopied(false), 1800);
+                              })
+                              .catch(() => {});
+                          if (navigator.share) {
+                            navigator
+                              .share({ title: displayTitle, url })
+                              .catch(() => doCopy());
+                          } else {
+                            void doCopy();
+                          }
+                        }}
                         className="flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
                         aria-label="Share"
+                        title={shareCopied ? "Link copied!" : "Share"}
                       >
-                        ⎘
+                        {shareCopied ? "✓" : "⎘"}
                       </button>
                     </div>
                     <button
