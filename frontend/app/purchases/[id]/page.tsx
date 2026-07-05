@@ -329,6 +329,12 @@ export default function PurchaseDetailPage() {
             onMarkShipped={onMarkShipped}
             onRequestRelease={() => setConfirmOpen(true)}
             releaseHref={getTransactionExplorerUrl(releaseHash, chainId)}
+            onMessageSeller={() =>
+              router.push(
+                `/messages?openThread=${encodeURIComponent(listing.seller || "")}&listingId=${encodeURIComponent(id)}`,
+              )
+            }
+            onUpdateTracking={() => router.push(`/listing/${encodeURIComponent(id)}`)}
           />
 
           {errorMessage && (
@@ -663,6 +669,8 @@ function Actions({
   onMarkShipped,
   onRequestRelease,
   releaseHref,
+  onMessageSeller,
+  onUpdateTracking,
 }: {
   state: OrderState;
   role: OrderRole;
@@ -672,12 +680,30 @@ function Actions({
   onMarkShipped: () => void;
   onRequestRelease: () => void;
   releaseHref: string | null;
+  onMessageSeller: () => void;
+  onUpdateTracking: () => void;
 }) {
   if (!isParty) return null;
   const isBuyer = role === "buyer";
 
+  // Non-interactive status label (previously rendered as a dead button).
+  const StatusNote = ({ children }: { children: React.ReactNode }) => (
+    <div
+      style={{
+        padding: "10px 14px",
+        borderRadius: 12,
+        border: "1px solid rgba(255,255,255,0.08)",
+        fontSize: 12,
+        color: "#a9b0bf",
+        textAlign: "center",
+      }}
+    >
+      {children}
+    </div>
+  );
+
   if (state === "paid") {
-    if (isBuyer) return <Btn variant="ghost">Message seller</Btn>;
+    if (isBuyer) return <Btn variant="ghost" onClick={onMessageSeller}>Message seller</Btn>;
     return (
       <Btn onClick={onMarkShipped} disabled={shipPending}>
         {shipPending ? "Submitting…" : "Mark shipped"}
@@ -688,11 +714,11 @@ function Actions({
     if (isBuyer) {
       return (
         <>
-          <Btn variant="ghost">Message seller</Btn>
+          <Btn variant="ghost" onClick={onMessageSeller}>Message seller</Btn>
         </>
       );
     }
-    return <Btn variant="ghost">Update tracking</Btn>;
+    return <Btn variant="ghost" onClick={onUpdateTracking}>Update tracking</Btn>;
   }
   if (state === "delivered") {
     if (isBuyer) {
@@ -702,7 +728,7 @@ function Actions({
         </Btn>
       );
     }
-    return <Btn variant="ghost">Waiting on buyer release</Btn>;
+    return <StatusNote>Waiting on buyer release</StatusNote>;
   }
   if (state === "released") {
     if (releaseHref) {
@@ -717,7 +743,7 @@ function Actions({
         </Btn>
       );
     }
-    return <Btn variant="ghost">Trade complete</Btn>;
+    return <StatusNote>Trade complete</StatusNote>;
   }
   return null;
 }

@@ -7,9 +7,11 @@ import {
   ArrowUpRight,
   BadgeCheck,
   ChevronLeft,
+  Info,
   LayoutDashboard,
   LogOut,
   Receipt,
+  Tag,
   User,
   UserCircle,
   X,
@@ -237,6 +239,20 @@ export function ProfileCardSheet({ open, onClose }: { open: boolean; onClose: ()
                 >
                   <Receipt size={18} className="text-silver" /> Purchases
                 </button>
+                <Link
+                  href="/offers"
+                  onClick={onClose}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-white transition-colors hover:bg-white/5"
+                >
+                  <Tag size={18} className="text-silver" /> Offers
+                </Link>
+                <Link
+                  href="/help"
+                  onClick={onClose}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-white transition-colors hover:bg-white/5"
+                >
+                  <Info size={18} className="text-silver" /> Help &amp; support
+                </Link>
               </div>
 
               <div className="my-3 border-t border-white/10" />
