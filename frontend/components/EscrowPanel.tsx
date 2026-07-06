@@ -52,6 +52,36 @@ function TrackingLink({
   );
 }
 
+type ShipToAddress = {
+  name: string;
+  line1: string;
+  line2?: string | null;
+  city: string;
+  region?: string | null;
+  postalCode: string;
+  country: string;
+  phone?: string | null;
+};
+
+/** Seller-facing delivery address block — collected from the buyer at checkout. */
+function ShipToBlock({ address }: { address: ShipToAddress }) {
+  return (
+    <div className="rounded-glass border border-white/10 bg-white/5 px-3 py-2.5">
+      <p className="mb-1 text-[10px] uppercase tracking-wider text-white/40">Ship to</p>
+      <p className="text-sm font-medium text-white">{address.name}</p>
+      <p className="text-xs text-silver">
+        {address.line1}
+        {address.line2 ? `, ${address.line2}` : ""}
+      </p>
+      <p className="text-xs text-silver">
+        {address.city}
+        {address.region ? `, ${address.region}` : ""} {address.postalCode}, {address.country}
+      </p>
+      {address.phone && <p className="text-xs text-silver/70">☎ {address.phone}</p>}
+    </div>
+  );
+}
+
 function toBytes32(listingId: string): `0x${string}` {
   if (listingId.startsWith("0x") && listingId.length === 66) return listingId as `0x${string}`;
   const hex = Array.from(new TextEncoder().encode(listingId))
@@ -161,6 +191,22 @@ export function EscrowPanel({
   const isSeller =
     address && sellerAddress && address.toLowerCase() === sellerAddress.toLowerCase();
   const isBuyer = address && escrow && address.toLowerCase() === escrow.buyer.toLowerCase();
+
+  // The buyer's delivery address (collected before payment) — shown to the
+  // seller so they know where to ship.
+  const [shipTo, setShipTo] = useState<ShipToAddress | null>(null);
+  useEffect(() => {
+    if (!isSeller || !escrow || !address) {
+      setShipTo(null);
+      return;
+    }
+    fetch(
+      `${getApiUrl()}/api/listing/${encodeURIComponent(listingId)}/shipping-address?requester=${encodeURIComponent(address)}`,
+    )
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { address?: ShipToAddress } | null) => setShipTo(data?.address ?? null))
+      .catch(() => setShipTo(null));
+  }, [isSeller, escrow, address, listingId]);
 
   const saveTracking = async (): Promise<boolean> => {
     setTrackingSaving(true);
@@ -334,6 +380,7 @@ export function EscrowPanel({
             flow — no wallet transaction. */}
         {awaitingShipment && isSeller && !escrow.disputed && (
           <div className="space-y-3">
+            {shipTo && <ShipToBlock address={shipTo} />}
             {requireEscrow && (
               <div className="space-y-2">
                 <input
@@ -407,8 +454,13 @@ export function EscrowPanel({
         )}
 
         {/* Seller waiting on release. */}
-        {phase === "shipped" && isSeller && trackingNumber && (
-          <TrackingLink trackingNumber={trackingNumber} trackingCarrier={trackingCarrier} />
+        {phase === "shipped" && isSeller && (
+          <div className="space-y-2">
+            {shipTo && <ShipToBlock address={shipTo} />}
+            {trackingNumber && (
+              <TrackingLink trackingNumber={trackingNumber} trackingCarrier={trackingCarrier} />
+            )}
+          </div>
         )}
 
         {/* Final states get a quiet confirmation row. */}

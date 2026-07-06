@@ -56,6 +56,17 @@ function toBytes32(listingId: string): `0x${string}` {
   return `0x${hex.padEnd(64, "0").slice(0, 64)}` as `0x${string}`;
 }
 
+type ShipToAddress = {
+  name: string;
+  line1: string;
+  line2?: string | null;
+  city: string;
+  region?: string | null;
+  postalCode: string;
+  country: string;
+  phone?: string | null;
+};
+
 const PHASE_BADGE: Record<OrderPhase, { c: string; fg: string; label: string }> = {
   paid: { c: HP.chrome, fg: "#000", label: "PAID" },
   shipped: { c: HP.amber, fg: "#000", label: "SHIPPED" },
@@ -80,6 +91,7 @@ export default function PurchaseDetailPage() {
 
   const [listing, setListing] = useState<Listing | null>(null);
   const [escrow, setEscrow] = useState<EscrowView | null>(null);
+  const [shipTo, setShipTo] = useState<ShipToAddress | null>(null);
   const [loading, setLoading] = useState(true);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [txSheetId, setTxSheetId] = useState<string | null>(null);
@@ -121,6 +133,21 @@ export default function PurchaseDetailPage() {
   useEffect(() => {
     refetch();
   }, [refetch]);
+
+  // Delivery address collected at checkout — the buyer sees their own, the
+  // seller sees the buyer's.
+  useEffect(() => {
+    if (!id || !address) {
+      setShipTo(null);
+      return;
+    }
+    fetch(
+      `${getApiUrl()}/api/listing/${encodeURIComponent(id)}/shipping-address?requester=${encodeURIComponent(address)}`,
+    )
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { address?: ShipToAddress } | null) => setShipTo(data?.address ?? null))
+      .catch(() => setShipTo(null));
+  }, [id, address]);
 
   // After a successful on-chain write, refetch escrow state so the stepper advances.
   useEffect(() => {
@@ -294,6 +321,7 @@ export default function PurchaseDetailPage() {
           <StatusBlock
             phase={phase}
             buyer={buyerLower}
+            shipTo={shipTo}
             tracking={listing.trackingNumber}
             carrier={listing.trackingCarrier}
             releasedTxHash={releaseHash}
@@ -464,6 +492,7 @@ function NavBar({
 function StatusBlock({
   phase,
   buyer,
+  shipTo,
   tracking,
   carrier,
   releasedTxHash,
@@ -473,6 +502,7 @@ function StatusBlock({
 }: {
   phase: OrderPhase;
   buyer: string;
+  shipTo: ShipToAddress | null;
   tracking?: string | null;
   carrier?: string | null;
   releasedTxHash: string | null;
@@ -483,9 +513,23 @@ function StatusBlock({
   if (phase === "paid") {
     return (
       <Row label="Shipping to">
-        <div style={{ color: HP.fg, fontFamily: "ui-monospace,Menlo,monospace", fontSize: 12 }}>
-          {buyer || "—"}
-        </div>
+        {shipTo ? (
+          <div style={{ fontSize: 12, color: HP.fg, lineHeight: 1.5 }}>
+            <div style={{ fontWeight: 600 }}>{shipTo.name}</div>
+            <div style={{ color: HP.muted }}>
+              {shipTo.line1}
+              {shipTo.line2 ? `, ${shipTo.line2}` : ""}
+            </div>
+            <div style={{ color: HP.muted }}>
+              {shipTo.city}
+              {shipTo.region ? `, ${shipTo.region}` : ""} {shipTo.postalCode}, {shipTo.country}
+            </div>
+          </div>
+        ) : (
+          <div style={{ color: HP.fg, fontFamily: "ui-monospace,Menlo,monospace", fontSize: 12 }}>
+            {buyer || "—"}
+          </div>
+        )}
         <div style={{ fontSize: 11, color: HP.muted, marginTop: 2 }}>
           Seller will add tracking when shipped.
         </div>

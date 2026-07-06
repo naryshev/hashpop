@@ -1665,6 +1665,96 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
   });
 
   /**
+   * POST /api/listing/:id/shipping-address — buyer saves their delivery
+   * address before paying. The purchase UI requires this to succeed before it
+   * lets the buyer sign the transaction, so the seller always has somewhere
+   * to ship. Upserts per (listing, buyer).
+   */
+  router.post("/listing/:id/shipping-address", async (req, res) => {
+    try {
+      const id = normalizeListingId(req.params.id ?? "");
+      const body = (req.body || {}) as Record<string, unknown>;
+      const buyer = normalizeWalletAddress(body.buyerAddress as string | undefined);
+      if (!buyer) return res.status(400).json({ error: "buyerAddress is required" });
+
+      const listing = await prisma.listing.findUnique({ where: { id } });
+      if (!listing) return res.status(404).json({ error: "Listing not found" });
+      if (listing.seller.toLowerCase() === buyer) {
+        return res.status(400).json({ error: "You can't buy your own listing." });
+      }
+
+      const field = (key: string, max: number) =>
+        String((body[key] as string | undefined) ?? "")
+          .trim()
+          .slice(0, max);
+      const name = field("name", 120);
+      const line1 = field("line1", 200);
+      const line2 = field("line2", 200) || null;
+      const city = field("city", 120);
+      const region = field("region", 120) || null;
+      const postalCode = field("postalCode", 20);
+      const country = field("country", 2).toUpperCase();
+      const phone = field("phone", 30) || null;
+
+      if (name.length < 2) return res.status(400).json({ error: "Full name is required." });
+      if (line1.length < 4)
+        return res.status(400).json({ error: "Street address is required." });
+      if (city.length < 2) return res.status(400).json({ error: "City is required." });
+      if (postalCode.length < 3)
+        return res.status(400).json({ error: "Postal / ZIP code is required." });
+      if (!/^[A-Z]{2}$/.test(country))
+        return res.status(400).json({ error: "Country must be a 2-letter code." });
+
+      const data = { name, line1, line2, city, region, postalCode, country, phone };
+      const saved = await prisma.shippingAddress.upsert({
+        where: { listingId_buyer: { listingId: id, buyer } },
+        create: { listingId: id, buyer, ...data },
+        update: data,
+      });
+      return res.json({ ok: true, id: saved.id });
+    } catch (err) {
+      log.error({ err }, "Failed to save shipping address");
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  /**
+   * GET /api/listing/:id/shipping-address?requester=… — a buyer reads back
+   * their own saved address; the seller reads the address of the actual
+   * buyer (once one exists) so they know where to ship. Nobody else sees it.
+   */
+  router.get("/listing/:id/shipping-address", async (req, res) => {
+    try {
+      const id = normalizeListingId(req.params.id ?? "");
+      const requester = normalizeWalletAddress(String(req.query.requester ?? ""));
+      if (!requester) return res.status(400).json({ error: "requester is required" });
+
+      const listing = await prisma.listing.findUnique({ where: { id } });
+      if (!listing) return res.status(404).json({ error: "Listing not found" });
+
+      const isSeller = listing.seller.toLowerCase() === requester;
+      let buyer = requester;
+      if (isSeller) {
+        const listingBuyer = (listing.buyer || "").toLowerCase();
+        if (!listingBuyer) return res.status(404).json({ error: "No buyer yet" });
+        buyer = listingBuyer;
+      }
+
+      const address = await prisma.shippingAddress.findUnique({
+        where: { listingId_buyer: { listingId: id, buyer } },
+      });
+      if (!address) return res.status(404).json({ error: "No shipping address on file" });
+      const { name, line1, line2, city, region, postalCode, country, phone } = address;
+      return res.json({
+        address: { name, line1, line2, city, region, postalCode, country, phone },
+      });
+    } catch (err) {
+      log.error({ err }, "Failed to fetch shipping address");
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  /**
    * GET /api/escrow/:listingId — read escrow state from chain (buyer, seller, amount, state, timeoutAt).
    * State: 0 = AWAITING_SHIPMENT, 1 = AWAITING_CONFIRMATION, 2 = COMPLETE.
    * Returns 404 if no escrow (buyer is zero).
