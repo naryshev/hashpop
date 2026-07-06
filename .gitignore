@@ -45,3 +45,6 @@ backend/.indexer-state.json
 
 # Docker
 docker-compose.override.yml
+
+# Claude Code local worktrees (accidentally committed once as a gitlink)
+.claude/worktrees/

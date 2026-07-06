@@ -642,6 +642,7 @@ export default function DashboardPage() {
                           {/* Thumbnail */}
                           <div className="relative aspect-[4/3] w-full bg-white/5 overflow-hidden">
                             {thumb ? (
+                              // eslint-disable-next-line @next/next/no-img-element
                               <img
                                 src={thumb}
                                 alt={row.title || ""}
