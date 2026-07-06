@@ -57,13 +57,16 @@ function validate(f: ShippingAddressFields): string | null {
 export function ShippingAddressModal({
   open,
   listingId,
+  listingIds,
   buyerAddress,
   ctaLabel = "Save & continue to payment",
   onConfirmed,
   onClose,
 }: {
   open: boolean;
-  listingId: string;
+  listingId?: string;
+  /** Cart checkout: save the same address against every listing being bought. */
+  listingIds?: string[];
   buyerAddress: string;
   ctaLabel?: string;
   onConfirmed: () => void;
@@ -109,27 +112,32 @@ export function ShippingAddressModal({
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch(
-        `${getApiUrl()}/api/listing/${encodeURIComponent(listingId)}/shipping-address`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            buyerAddress,
-            name: fields.name.trim(),
-            line1: fields.line1.trim(),
-            line2: fields.line2.trim() || undefined,
-            city: fields.city.trim(),
-            region: fields.region.trim() || undefined,
-            postalCode: fields.postalCode.trim(),
-            country: fields.country.trim().toUpperCase(),
-            phone: fields.phone.trim() || undefined,
-          }),
-        },
-      );
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error || "Failed to save shipping address.");
+      const targets = listingIds?.length ? listingIds : listingId ? [listingId] : [];
+      if (targets.length === 0) throw new Error("Nothing to ship.");
+      const payload = {
+        buyerAddress,
+        name: fields.name.trim(),
+        line1: fields.line1.trim(),
+        line2: fields.line2.trim() || undefined,
+        city: fields.city.trim(),
+        region: fields.region.trim() || undefined,
+        postalCode: fields.postalCode.trim(),
+        country: fields.country.trim().toUpperCase(),
+        phone: fields.phone.trim() || undefined,
+      };
+      for (const id of targets) {
+        const res = await fetch(
+          `${getApiUrl()}/api/listing/${encodeURIComponent(id)}/shipping-address`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          },
+        );
+        if (!res.ok) {
+          const body = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(body.error || "Failed to save shipping address.");
+        }
       }
       try {
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify(fields));

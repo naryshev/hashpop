@@ -14,7 +14,9 @@ import {
   Bell,
   Wallet,
   LayoutGrid,
+  ShoppingCart,
 } from "lucide-react";
+import { useCart } from "../lib/cart";
 import { useHashpackWallet } from "../lib/hashpackWallet";
 import { useSignInModal } from "../lib/signInModal";
 import { useTopBarSlotFilled, useTopBarSlotRef } from "../lib/topBar";
@@ -100,6 +102,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { isConnected, accountId, address } = useHashpackWallet();
   const { openSignIn } = useSignInModal();
+  const { count: cartCount } = useCart();
   const [profileOpen, setProfileOpen] = useState(false);
   const [messagesOpen, setMessagesOpen] = useState(false);
 
@@ -195,6 +198,18 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
         {/* Right cluster: page actions slot, alerts, account chip. */}
         <div className="flex items-center gap-2">
           <div ref={actionsSlotRef} className="flex items-center gap-2" data-topbar-slot="actions" />
+          <Link
+            href="/cart"
+            className="relative flex h-9 w-9 items-center justify-center rounded-glass text-neutral-300 hover:bg-white/5 hover:text-white"
+            aria-label="Cart"
+          >
+            <ShoppingCart className="h-4 w-4" />
+            {cartCount > 0 && (
+              <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#00ffa3] px-1 text-[9px] font-bold text-black">
+                {cartCount > 9 ? "9+" : cartCount}
+              </span>
+            )}
+          </Link>
           <Link
             href="/activity"
             className="flex h-9 w-9 items-center justify-center rounded-glass text-neutral-300 hover:bg-white/5 hover:text-white"

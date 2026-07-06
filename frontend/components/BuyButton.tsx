@@ -17,6 +17,8 @@ import { getTransactionExplorerUrl } from "../lib/explorer";
 import { OfferModal } from "./OfferModal";
 import { ShippingAddressModal } from "./ShippingAddressModal";
 import { useSignInModal } from "../lib/signInModal";
+import { useCart } from "../lib/cart";
+import { useRouter } from "next/navigation";
 
 export function BuyButton({
   listingId,
@@ -109,6 +111,9 @@ export function BuyButton({
   // after the address is confirmed.
   const [shippingGate, setShippingGate] = useState<null | "buy" | "offer">(null);
   const { openSignIn } = useSignInModal();
+  const cart = useCart();
+  const router = useRouter();
+  const inCart = cart.has(listingId);
 
   useEffect(() => {
     if (!errorMessage && !isSuccess) return;
@@ -207,6 +212,25 @@ export function BuyButton({
         className="w-full bg-white text-black font-bold uppercase tracking-widest py-4 text-sm hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       >
         {isPending ? "Confirm in wallet\u2026" : "Purchase"}
+      </button>
+
+      {/* ADD TO CART */}
+      <button
+        type="button"
+        onClick={() => {
+          if (inCart) {
+            router.push("/cart");
+          } else {
+            cart.add(listingId);
+          }
+        }}
+        className={`w-full font-bold uppercase tracking-widest py-3.5 text-sm border transition-colors ${
+          inCart
+            ? "border-[#00ffa3]/50 text-[#00ffa3] hover:bg-[#00ffa3]/10"
+            : "bg-transparent text-white border-white/40 hover:border-white hover:bg-white/5"
+        }`}
+      >
+        {inCart ? "✓ In cart — view cart" : "Add to cart"}
       </button>
 
       {/* OFFER */}
