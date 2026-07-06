@@ -85,11 +85,20 @@ const MARKETPLACE_LISTINGS_ABI = [
   "function listings(bytes32) view returns (address seller, uint256 price, uint256 createdAt, uint8 status, bytes32 escrowId, bool requireEscrow)",
 ];
 
+// How long a listing may stay unconfirmed before the reconciler treats it as
+// dead and deletes it. Long enough to ride out slow relays and missed mirror
+// events (the reconciler itself confirms those), short enough that phantom
+// listings don't linger in the database.
+const UNCONFIRMED_PURGE_AGE_MS = 30 * 60 * 1000;
+
 /**
  * Reconcile DB listings that are marked as LISTED but not yet confirmed on-chain.
- * For each, reads the contract directly. If the contract knows the listing (status > NONE),
- * set onChainConfirmed=true and correct the price. This fixes listings that were created
- * before the sync fixes landed, or where the mirror event was missed.
+ * For each, reads the contract directly:
+ *   - contract knows the listing (status > NONE) → set onChainConfirmed=true
+ *     and correct the price (fixes missed mirror events);
+ *   - contract says NONE and the listing is older than the purge window →
+ *     the creation tx never landed, so delete the row (and its offers /
+ *     wishlist entries) rather than keep a phantom listing around.
  */
 async function reconcileUnconfirmedListings(
   marketplaceAddress: string,
@@ -101,7 +110,7 @@ async function reconcileUnconfirmedListings(
 
   const unconfirmed = await prisma.listing.findMany({
     where: { onChainConfirmed: false, status: "LISTED" },
-    select: { id: true, price: true },
+    select: { id: true, price: true, createdAt: true },
     take: RECONCILE_BATCH,
     orderBy: { createdAt: "asc" },
   });
@@ -111,16 +120,40 @@ async function reconcileUnconfirmedListings(
   const provider = new ethers.JsonRpcProvider(rpcUrl);
   const iface = new ethers.Interface(MARKETPLACE_LISTINGS_ABI);
   let confirmed = 0;
+  let purged = 0;
 
   for (const listing of unconfirmed) {
     try {
       const calldata = iface.encodeFunctionData("listings", [listing.id]);
       const raw = await provider.call({ to: marketplaceAddress, data: calldata });
-      if (!raw || raw === "0x") continue;
+      if (!raw || raw === "0x") continue; // ambiguous read — never delete on ambiguity
 
       const decoded = iface.decodeFunctionResult("listings", raw);
       const status = Number(decoded[3] ?? 0);
-      if (status === 0) continue; // NONE — listing genuinely does not exist on-chain
+      if (status === 0) {
+        // NONE — the contract definitively does not know this listing. Give
+        // fresh listings a grace window (creation tx may still be syncing),
+        // then purge.
+        const age = Date.now() - new Date(listing.createdAt).getTime();
+        if (age < UNCONFIRMED_PURGE_AGE_MS) continue;
+        try {
+          await prisma.$transaction([
+            prisma.offer.deleteMany({ where: { listingId: listing.id } }),
+            prisma.wishlistItem.deleteMany({ where: { itemId: listing.id } }),
+            prisma.shippingAddress.deleteMany({ where: { listingId: listing.id } }),
+            prisma.listing.delete({ where: { id: listing.id } }),
+          ]);
+          purged++;
+          log.info(
+            { listingId: listing.id, ageMinutes: Math.round(age / 60_000) },
+            "Reconciler purged listing never confirmed on-chain",
+          );
+        } catch (err) {
+          // e.g. a Sale row references it — leave it for manual review.
+          log.warn({ err, listingId: listing.id }, "Reconciler: could not purge listing");
+        }
+        continue;
+      }
 
       const onChainPrice = BigInt(decoded[1]?.toString?.() ?? "0");
       const priceHbar = chainAmountToHbar(onChainPrice);
@@ -142,8 +175,11 @@ async function reconcileUnconfirmedListings(
     }
   }
 
-  if (confirmed > 0) {
-    log.info({ confirmed, total: unconfirmed.length }, "Reconciler: confirmed listings on-chain");
+  if (confirmed > 0 || purged > 0) {
+    log.info(
+      { confirmed, purged, total: unconfirmed.length },
+      "Reconciler: processed unconfirmed listings",
+    );
   }
 }
 

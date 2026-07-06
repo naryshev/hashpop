@@ -55,42 +55,6 @@ function normalizeListingStatus(status?: string): string {
     .toUpperCase();
 }
 
-function getStatusBadge(
-  status?: string,
-  onChainConfirmed?: boolean,
-): { label: string; className: string; pulseDot?: boolean } {
-  const normalized = normalizeListingStatus(status);
-  if (normalized === "LISTED") {
-    if (onChainConfirmed === false) {
-      return {
-        label: "PENDING",
-        className: "bg-amber-400 border-amber-300 text-black",
-      };
-    }
-    return {
-      label: "ACTIVE",
-      className: "bg-[#00ffa3] border-[#00ffa3] text-black",
-      pulseDot: true,
-    };
-  }
-  if (normalized === "LOCKED") {
-    return {
-      label: "LOCKED",
-      className: "bg-orange-400 border-orange-300 text-black",
-    };
-  }
-  if (normalized === "CANCELLED") {
-    return {
-      label: "CANCELLED",
-      className: "bg-zinc-600 border-zinc-500 text-white",
-    };
-  }
-  return {
-    label: "SOLD",
-    className: "bg-rose-500 border-rose-400 text-white",
-  };
-}
-
 function formatSellerDisplay(seller?: string): string {
   if (!seller) return "";
   if (/^\d+\.\d+\.\d+$/.test(seller)) return seller;
@@ -929,14 +893,6 @@ export default function MarketplacePageClient({
                       cardSize
                       compactHeight="160px"
                     />
-                    <span
-                      className={`absolute top-2 left-2 rounded-full inline-flex items-center gap-1.5 border px-2 py-0.5 text-[10px] font-semibold ${getStatusBadge(item.status, item.onChainConfirmed).className}`}
-                    >
-                      {getStatusBadge(item.status, item.onChainConfirmed).pulseDot ? (
-                        <span className="inline-flex h-2 w-2 rounded-full bg-green-400 animate-pulse shadow-[0_0_0_0_rgba(74,222,128,0.7)]" />
-                      ) : null}
-                      {getStatusBadge(item.status, item.onChainConfirmed).label}
-                    </span>
                   </div>
                   <div className="p-3">
                     <h2 className="text-sm font-semibold text-white line-clamp-2 leading-tight">
@@ -1000,14 +956,6 @@ export default function MarketplacePageClient({
                       <div className="absolute top-2 right-2">
                         <WishlistButton itemId={item.id} itemType={item.itemType} compact />
                       </div>
-                      <span
-                        className={`absolute top-2 left-2 rounded-full inline-flex items-center gap-1.5 border px-2 py-0.5 text-[10px] font-semibold ${getStatusBadge(item.status, item.onChainConfirmed).className}`}
-                      >
-                        {getStatusBadge(item.status, item.onChainConfirmed).pulseDot ? (
-                          <span className="inline-flex h-2 w-2 rounded-full bg-green-400 animate-pulse shadow-[0_0_0_0_rgba(74,222,128,0.7)]" />
-                        ) : null}
-                        {getStatusBadge(item.status, item.onChainConfirmed).label}
-                      </span>
                     </div>
                     <div className="p-4">
                       <h2 className="text-base font-semibold text-white line-clamp-2 leading-snug">
@@ -1045,7 +993,6 @@ export default function MarketplacePageClient({
             {viewMode === "feed" && (
               <div className="hidden sm:block divide-y divide-white/5 rounded-xl border border-white/10 bg-white/[0.02]">
                 {filteredItems.map((item) => {
-                  const badge = getStatusBadge(item.status, item.onChainConfirmed);
                   return (
                     <Link
                       key={`${item.itemType}-${item.id}`}
@@ -1079,14 +1026,6 @@ export default function MarketplacePageClient({
                           )}
                           {item.seller && <SellerInline seller={item.seller} size={14} />}
                           <SellerRating seller={item.seller} />
-                          <span
-                            className={`rounded-full inline-flex items-center gap-1.5 border px-2 py-0.5 text-[9px] font-semibold ${badge.className}`}
-                          >
-                            {badge.pulseDot ? (
-                              <span className="inline-flex h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
-                            ) : null}
-                            {badge.label}
-                          </span>
                         </div>
                       </div>
                       <div>
@@ -1180,7 +1119,6 @@ export default function MarketplacePageClient({
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6 gap-4 auto-rows-[120px]">
                           {rest.map((item, i) => {
                             const tall = i % 5 === 1 || i % 5 === 4;
-                            const badge = getStatusBadge(item.status, item.onChainConfirmed);
                             return (
                               <Link
                                 key={`${item.itemType}-${item.id}`}
@@ -1199,14 +1137,6 @@ export default function MarketplacePageClient({
                                   compactHeight={tall ? "256px" : "120px"}
                                 />
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
-                                <span
-                                  className={`absolute top-2 left-2 rounded-full inline-flex items-center gap-1.5 border px-2 py-0.5 text-[9px] font-semibold ${badge.className}`}
-                                >
-                                  {badge.pulseDot ? (
-                                    <span className="inline-flex h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
-                                  ) : null}
-                                  {badge.label}
-                                </span>
                                 <div className="absolute left-3 right-3 bottom-2 text-white">
                                   <div className="text-xs font-semibold line-clamp-1">
                                     {item.title || formatListingId(item.id) || "Untitled"}
