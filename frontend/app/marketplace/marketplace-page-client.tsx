@@ -27,14 +27,12 @@ import {
   LayoutGrid,
   Palette,
   Search as SearchIcon,
-  ShoppingCart,
   SlidersHorizontal,
   Smartphone,
   Sofa,
   Watch,
 } from "lucide-react";
 import { ProfileCardSheet } from "../../components/ProfileCardSheet";
-import { useCart } from "../../lib/cart";
 
 function formatListingId(id: string): string {
   if (!id || !id.startsWith("0x") || id.length !== 66) return id;
@@ -177,7 +175,6 @@ export default function MarketplacePageClient({
 }) {
   const { isConnected, address, accountId } = useHashpackWallet();
   const { openSignIn } = useSignInModal();
-  const { count: cartCount } = useCart();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [searchInput, setSearchInput] = useState("");
@@ -687,18 +684,6 @@ export default function MarketplacePageClient({
               </button>
             )}
             <div className="flex items-center gap-1">
-              <Link
-                href="/cart"
-                aria-label="Cart"
-                className="relative rounded-full p-2 text-silver hover:text-white"
-              >
-                <ShoppingCart size={18} />
-                {cartCount > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#00ffa3] px-1 text-[9px] font-bold text-black">
-                    {cartCount > 9 ? "9+" : cartCount}
-                  </span>
-                )}
-              </Link>
               <Link
                 href="/activity"
                 aria-label="Notifications"
