@@ -4,7 +4,6 @@ import { listingHref } from "../../../lib/listingUrl";
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { TransactionProgress } from "../../../components/TransactionProgress";
 import { getApiUrl } from "../../../lib/apiUrl";
 import { getTransactionExplorerUrl } from "../../../lib/explorer";
 import { activeHederaChain } from "../../../lib/hederaChains";
@@ -109,55 +108,17 @@ export default function PurchaseSuccessPage() {
           </div>
         )}
 
-        {/* Escrow progress */}
-        <div className="glass-card p-5 mb-4">
-          <p className="text-[10px] font-semibold text-white/40 uppercase tracking-widest mb-1">
-            Transaction Progress
-          </p>
-          <TransactionProgress escrowState="AWAITING_SHIPMENT" />
-        </div>
-
-        {/* What happens next */}
+        {/* What happens next — escrow settles itself; nothing is required of the buyer. */}
         <div className="glass-card p-5 mb-5">
-          <p className="text-[10px] font-semibold text-white/40 uppercase tracking-widest mb-4">
+          <p className="text-[10px] font-semibold text-white/40 uppercase tracking-widest mb-2">
             What happens next
           </p>
-          <div className="space-y-4">
-            <div className="flex gap-3 items-start">
-              <span className="w-5 h-5 flex-shrink-0 flex items-center justify-center text-xs font-bold text-[#00ffa3] border border-[#00ffa3]/40 bg-[#00ffa3]/10">
-                ✓
-              </span>
-              <div>
-                <p className="text-white text-sm font-medium">Payment secured in escrow</p>
-                <p className="text-silver text-xs mt-0.5">
-                  Your funds are locked on-chain. Neither party can access them yet.
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-3 items-start">
-              <span className="w-5 h-5 flex-shrink-0 flex items-center justify-center text-xs font-bold text-white/30 border border-white/10 bg-white/5">
-                2
-              </span>
-              <div>
-                <p className="text-white/60 text-sm font-medium">Seller ships the item</p>
-                <p className="text-silver/60 text-xs mt-0.5">
-                  The seller provides tracking info and confirms shipment on-chain.
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-3 items-start">
-              <span className="w-5 h-5 flex-shrink-0 flex items-center justify-center text-xs font-bold text-white/30 border border-white/10 bg-white/5">
-                3
-              </span>
-              <div>
-                <p className="text-white/60 text-sm font-medium">You confirm receipt</p>
-                <p className="text-silver/60 text-xs mt-0.5">
-                  Once you&apos;ve received the item, confirm it on the listing page. Funds are
-                  released to the seller automatically.
-                </p>
-              </div>
-            </div>
-          </div>
+          <p className="text-sm text-silver leading-relaxed">
+            <span className="font-semibold text-white">Your payment is secured in escrow.</span>{" "}
+            The seller has a week to ship — if they don&apos;t, you&apos;re refunded
+            automatically. Once shipped, the seller is paid after a short window unless you
+            report a problem. You never need to do anything unless something goes wrong.
+          </p>
         </div>
 
         {/* TX hash */}

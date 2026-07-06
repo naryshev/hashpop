@@ -118,6 +118,13 @@ function isReportRateLimited(key: string): boolean {
 const ESCROW_ABI_VIEW = [
   "function escrows(bytes32) view returns (address buyer, address seller, uint256 amount, uint256 createdAt, uint256 timeoutAt, uint8 state)",
 ];
+const ESCROW_V2_ABI_VIEW = [
+  "function escrows(bytes32) view returns (address buyer, address seller, uint256 amount, uint256 createdAt, uint256 shipDeadline, uint256 shippedAt, uint8 state, bool disputed)",
+  "function autoReleaseWindow() view returns (uint256)",
+];
+const IS_ESCROW_V2 = process.env.ESCROW_V2 === "true";
+// EscrowV2.autoReleaseWindow, cached once — only changes via an admin tx.
+let escrowV2AutoReleaseWindow: number | null = null;
 const MARKETPLACE_LISTINGS_VIEW_V2 =
   "function listings(bytes32) view returns (address seller, uint256 price, uint256 createdAt, uint8 status, bytes32 escrowId, bool requireEscrow)";
 const MARKETPLACE_LISTINGS_VIEW_V1 =
@@ -162,8 +169,14 @@ type EscrowView = {
   seller: string;
   amount: string;
   createdAt: number;
+  // Operative deadline for the current state: v1 = contract timeoutAt; v2 =
+  // shipDeadline while AWAITING_SHIPMENT, shippedAt + autoReleaseWindow once
+  // SHIPPED, 0 when final.
   timeoutAt: number;
   state: string;
+  v2?: boolean;
+  shippedAt?: number;
+  disputed?: boolean;
 } | null;
 const escrowViewCache = new Map<string, { at: number; view: EscrowView }>();
 const ESCROW_VIEW_TTL_MS = 10_000;
@@ -1098,9 +1111,14 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
 
     try {
       const provider = getRpcProvider(rpcUrl);
-      const contract = new ethers.Contract(escrowAddr, ESCROW_ABI_VIEW, provider);
+      const contract = new ethers.Contract(
+        escrowAddr,
+        IS_ESCROW_V2 ? ESCROW_V2_ABI_VIEW : ESCROW_ABI_VIEW,
+        provider,
+      );
       const data = await contract.escrows(listingIdToBytes32(normalizedId));
-      const [buyer, , , , , stateNum] = data;
+      const buyer = data[0];
+      const stateNum = IS_ESCROW_V2 ? data[6] : data[5];
       const isComplete = Number(stateNum) === 2;
       if (!isComplete) {
         return res.status(409).json({ error: "Escrow is not complete yet" });
@@ -1668,21 +1686,56 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       let view = cached && Date.now() - cached.at < ESCROW_VIEW_TTL_MS ? cached.view : undefined;
       if (view === undefined) {
         const provider = getRpcProvider(rpcUrl);
-        const contract = new ethers.Contract(escrowAddr, ESCROW_ABI_VIEW, provider);
-        const data = await withTimeout(contract.escrows(listingIdBytes32), 2500);
-        const [buyer, seller, amount, createdAt, timeoutAt, stateNum] = data;
-        if (!buyer || buyer === ethers.ZeroAddress) {
-          view = null;
+        if (IS_ESCROW_V2) {
+          const contract = new ethers.Contract(escrowAddr, ESCROW_V2_ABI_VIEW, provider);
+          const data = await withTimeout(contract.escrows(listingIdBytes32), 2500);
+          const [buyer, seller, amount, createdAt, shipDeadline, shippedAt, stateNum, disputed] =
+            data;
+          if (!buyer || buyer === ethers.ZeroAddress) {
+            view = null;
+          } else {
+            if (escrowV2AutoReleaseWindow === null) {
+              escrowV2AutoReleaseWindow = Number(
+                await withTimeout(contract.autoReleaseWindow(), 2500),
+              );
+            }
+            const stateNames = ["AWAITING_SHIPMENT", "SHIPPED", "COMPLETE", "REFUNDED"];
+            const state = Number(stateNum);
+            const timeoutAt =
+              state === 0
+                ? Number(shipDeadline)
+                : state === 1
+                  ? Number(shippedAt) + escrowV2AutoReleaseWindow
+                  : 0;
+            view = {
+              buyer: buyer.toLowerCase(),
+              seller: seller.toLowerCase(),
+              amount: amount.toString(),
+              createdAt: Number(createdAt),
+              timeoutAt,
+              state: stateNames[state] ?? "UNKNOWN",
+              v2: true,
+              shippedAt: Number(shippedAt),
+              disputed: Boolean(disputed),
+            };
+          }
         } else {
-          const stateNames = ["AWAITING_SHIPMENT", "AWAITING_CONFIRMATION", "COMPLETE"];
-          view = {
-            buyer: buyer.toLowerCase(),
-            seller: seller.toLowerCase(),
-            amount: amount.toString(),
-            createdAt: Number(createdAt),
-            timeoutAt: Number(timeoutAt),
-            state: stateNames[Number(stateNum)] ?? "UNKNOWN",
-          };
+          const contract = new ethers.Contract(escrowAddr, ESCROW_ABI_VIEW, provider);
+          const data = await withTimeout(contract.escrows(listingIdBytes32), 2500);
+          const [buyer, seller, amount, createdAt, timeoutAt, stateNum] = data;
+          if (!buyer || buyer === ethers.ZeroAddress) {
+            view = null;
+          } else {
+            const stateNames = ["AWAITING_SHIPMENT", "AWAITING_CONFIRMATION", "COMPLETE"];
+            view = {
+              buyer: buyer.toLowerCase(),
+              seller: seller.toLowerCase(),
+              amount: amount.toString(),
+              createdAt: Number(createdAt),
+              timeoutAt: Number(timeoutAt),
+              state: stateNames[Number(stateNum)] ?? "UNKNOWN",
+            };
+          }
         }
         escrowViewCache.set(listingIdBytes32, { at: Date.now(), view });
       }

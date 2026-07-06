@@ -8,6 +8,7 @@ import pg from "pg";
 import { PrismaClient } from "./generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { startIndexer } from "./indexer";
+import { startSettlementEngine } from "./settlement";
 import { apiRouter } from "./api";
 import { relayRouter } from "./relay";
 
@@ -111,4 +112,9 @@ try {
 app.listen(port, () => {
   log.info({ port }, "Backend server started");
   startIndexer(prisma, log).catch((err) => log.error({ err }, "Indexer failed"));
+  try {
+    startSettlementEngine(prisma, log);
+  } catch (err) {
+    log.error({ err }, "Settlement engine failed to start");
+  }
 });

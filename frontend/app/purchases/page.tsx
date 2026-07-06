@@ -8,13 +8,18 @@ import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { formatPriceForDisplay } from "../../lib/formatPrice";
 import { formatListingDate } from "../../lib/formatDate";
-import { TransactionProgress } from "../../components/TransactionProgress";
 import { getApiUrl } from "../../lib/apiUrl";
 import { AddressDisplay } from "../../components/AddressDisplay";
 import { ConnectWalletButton } from "../../components/ConnectWalletButton";
 import { RateCounterpartyModal } from "../../components/RateCounterpartyModal";
 import { OpenDisputeModal } from "../../components/OpenDisputeModal";
 import { carrierTrackingUrl } from "../../lib/trackingUrl";
+import {
+  EscrowView,
+  orderStatusLine,
+  phaseFor,
+  type OrderPhase,
+} from "../../lib/orderStatus";
 
 type PurchaseRow = {
   id: string;
@@ -41,98 +46,49 @@ type PurchaseRow = {
   auction?: { id: string; title?: string | null; status?: string; imageUrl?: string | null } | null;
 };
 
-type EscrowState = "AWAITING_SHIPMENT" | "AWAITING_CONFIRMATION" | "COMPLETE" | "REFUNDED";
-
 type Tab = "bought" | "sold";
 
-function escrowFromListingStatus(status?: string): EscrowState {
+function phaseFromListingStatus(status?: string): OrderPhase {
   const s = (status || "").toUpperCase();
-  if (s === "LOCKED") return "AWAITING_SHIPMENT";
-  if (s === "SHIPPED") return "AWAITING_CONFIRMATION";
-  return "COMPLETE";
+  if (s === "LOCKED") return "paid";
+  if (s === "SHIPPED") return "shipped";
+  if (s === "REFUNDED") return "refunded";
+  return "complete";
 }
 
 type Step = {
-  state: EscrowState;
+  phase: OrderPhase;
   isEscrow: boolean;
-  /** Short, role-aware status sentence. */
-  headline: string;
-  /** Longer description of what's happening or what to do. */
+  /** Single status line, e.g. "Paid · seller has until Jul 13 to ship". */
+  label: string;
   detail: string;
   /** Optional CTA button. */
   cta?: { label: string; href: string };
-  /** Pill color for the status badge. */
-  tone: "complete" | "active" | "waiting" | "neutral";
+  tone: "complete" | "active" | "waiting" | "refunded" | "disputed";
 };
 
-function describeStep(row: PurchaseRow, state: EscrowState): Step {
+function describeStep(row: PurchaseRow, view: EscrowView | null | undefined): Step {
   const isBuyer = row.role === "buyer";
   const isEscrow = !!row.listing?.requireEscrow;
+  const phase = view
+    ? phaseFor(view.state, view.disputed)
+    : phaseFromListingStatus(row.listing?.status);
   const ctaHref = row.listingId
     ? `/purchases/${encodeListingIdForUrl(row.listingId)}`
     : "/marketplace";
-  const tracking = row.listing?.trackingNumber
-    ? `${row.listing.trackingCarrier ?? "Carrier"} ${row.listing.trackingNumber}`
-    : null;
 
-  // Direct sale (no escrow) — settled the moment payment cleared.
-  if (!isEscrow && state === "COMPLETE") {
-    return {
-      state,
-      isEscrow: false,
-      headline: isBuyer ? "Purchase complete" : "Sale complete",
-      detail: isBuyer
-        ? "Payment was sent directly to the seller. No escrow on this sale."
-        : "Buyer paid directly. No escrow on this sale.",
-      tone: "complete",
-    };
-  }
-
-  if (state === "COMPLETE") {
-    return {
-      state,
-      isEscrow: true,
-      headline: isBuyer ? "Purchase complete" : "Sale complete",
-      detail: isBuyer
-        ? "Payment was released from escrow to the seller. You confirmed receipt."
-        : "Funds released to you. The buyer confirmed receipt.",
-      tone: "complete",
-    };
-  }
-
-  if (state === "AWAITING_SHIPMENT") {
-    return {
-      state,
-      isEscrow: true,
-      headline: isBuyer ? "Waiting on seller to ship" : "Action needed: ship the item",
-      detail: isBuyer
-        ? "Your payment is locked in escrow. The seller has 7 days from purchase to ship and add tracking, or escrow auto-refunds."
-        : "Buyer paid into escrow. Add a tracking number on the listing and confirm shipment to keep the timer from running out.",
-      cta: isBuyer ? undefined : { label: "Add tracking", href: ctaHref },
-      tone: isBuyer ? "waiting" : "active",
-    };
-  }
-
-  if (state === "AWAITING_CONFIRMATION") {
-    return {
-      state,
-      isEscrow: true,
-      headline: isBuyer ? "Action needed: confirm receipt" : "Waiting on buyer confirmation",
-      detail: isBuyer
-        ? `Seller confirmed shipment${tracking ? ` (${tracking})` : ""}. Once the item arrives, click "Confirm receipt" on the listing to release payment. Escrow auto-releases after the timeout if you take no action.`
-        : `You marked the item as shipped${tracking ? ` (${tracking})` : ""}. Funds release once the buyer confirms — or automatically after the escrow timeout.`,
-      cta: isBuyer ? { label: "Confirm receipt", href: ctaHref } : undefined,
-      tone: isBuyer ? "active" : "waiting",
-    };
-  }
-
-  return {
-    state,
+  const status = orderStatusLine({
+    phase,
+    role: isBuyer ? "buyer" : "seller",
+    timeoutAt: view?.timeoutAt,
     isEscrow,
-    headline: "In progress",
-    detail: "Waiting on the next step.",
-    tone: "neutral",
-  };
+  });
+
+  let cta: Step["cta"];
+  if (phase === "paid" && !isBuyer) cta = { label: "Add tracking", href: ctaHref };
+  if (phase === "shipped" && isBuyer) cta = { label: "View order", href: ctaHref };
+
+  return { phase, isEscrow, label: status.label, detail: status.detail, cta, tone: status.tone };
 }
 
 function StepBadge({ tone, children }: { tone: Step["tone"]; children: React.ReactNode }) {
@@ -140,7 +96,8 @@ function StepBadge({ tone, children }: { tone: Step["tone"]; children: React.Rea
     complete: "border-emerald-400/40 bg-emerald-400/10 text-emerald-300",
     active: "border-blue-400/40 bg-blue-400/10 text-blue-300",
     waiting: "border-amber-400/40 bg-amber-400/10 text-amber-200",
-    neutral: "border-white/15 bg-white/5 text-silver",
+    refunded: "border-rose-400/40 bg-rose-400/10 text-rose-200",
+    disputed: "border-rose-400/40 bg-rose-400/10 text-rose-300",
   };
   return (
     <span
@@ -156,7 +113,7 @@ export default function PurchasesPage() {
   const usdRate = useHbarUsd();
   const [items, setItems] = useState<PurchaseRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [escrowStates, setEscrowStates] = useState<Record<string, EscrowState>>({});
+  const [escrowViews, setEscrowViews] = useState<Record<string, EscrowView>>({});
   const [tab, setTab] = useState<Tab>("bought");
   const [ratedSales, setRatedSales] = useState<Set<string>>(new Set());
   const [rating, setRating] = useState<{
@@ -218,13 +175,13 @@ export default function PurchasesPage() {
           .then((data) => ({ lid, data })),
       ),
     ).then((results) => {
-      const next: Record<string, EscrowState> = {};
+      const next: Record<string, EscrowView> = {};
       for (const r of results) {
         if (r.status === "fulfilled" && r.value?.data?.state) {
-          next[r.value.lid] = r.value.data.state as EscrowState;
+          next[r.value.lid] = r.value.data as EscrowView;
         }
       }
-      setEscrowStates(next);
+      setEscrowViews(next);
     });
   }, [items]);
 
@@ -236,16 +193,15 @@ export default function PurchasesPage() {
   const list = tab === "bought" ? bought : sold;
 
   const stepFor = (row: PurchaseRow): Step => {
-    const onChain = row.listingId ? escrowStates[row.listingId] : undefined;
-    const state = onChain ?? escrowFromListingStatus(row.listing?.status);
-    return describeStep(row, state);
+    const view = row.listingId ? escrowViews[row.listingId] : undefined;
+    return describeStep(row, view);
   };
 
   return (
     <main className="min-h-screen">
       <div className="mx-auto max-w-4xl space-y-6 px-4 py-6 sm:px-6">
         <p className="text-xs text-silver/70">
-          Track your buys and sales through every escrow step.
+          Buys and sales at a glance — escrow settles itself on the dates shown.
         </p>
 
         {!address ? (
@@ -333,7 +289,7 @@ export default function PurchasesPage() {
                   const canDispute =
                     step.isEscrow &&
                     !disputed &&
-                    step.state === "AWAITING_CONFIRMATION" &&
+                    (step.phase === "paid" || step.phase === "shipped") &&
                     !!row.listingId;
                   // Per-order detail screen (matches Mobile Order & Escrow design handoff).
                   const detailHref = row.listingId
@@ -371,15 +327,9 @@ export default function PurchasesPage() {
                               {title}
                             </Link>
                             <StepBadge tone={step.tone}>
-                              {step.state === "COMPLETE"
-                                ? step.isEscrow
-                                  ? "Complete"
-                                  : "Direct sale"
-                                : step.state === "AWAITING_SHIPMENT"
-                                  ? "Awaiting shipment"
-                                  : step.state === "AWAITING_CONFIRMATION"
-                                    ? "Awaiting confirmation"
-                                    : "In progress"}
+                              {step.phase === "complete" && !step.isEscrow
+                                ? "Direct sale"
+                                : step.label}
                             </StepBadge>
                           </div>
                           <p className="mt-0.5 text-xs text-silver/70">
@@ -397,44 +347,33 @@ export default function PurchasesPage() {
                         </div>
                       </div>
 
-                      {/* Step description + CTA */}
-                      <div
-                        className={`mt-3 rounded-lg border px-3 py-2 ${
-                          step.tone === "active"
-                            ? "border-blue-400/40 bg-blue-400/5"
-                            : step.tone === "waiting"
-                              ? "border-amber-400/30 bg-amber-400/5"
-                              : step.tone === "complete"
-                                ? "border-emerald-400/30 bg-emerald-400/5"
-                                : "border-white/10 bg-white/5"
-                        }`}
-                      >
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="min-w-0 flex-1">
-                            <p
-                              className={`text-sm font-semibold ${
-                                step.tone === "active"
-                                  ? "text-blue-200"
-                                  : step.tone === "waiting"
-                                    ? "text-amber-200"
-                                    : step.tone === "complete"
-                                      ? "text-emerald-200"
-                                      : "text-white"
-                              }`}
-                            >
-                              {step.headline}
-                            </p>
-                            <p className="mt-0.5 text-xs text-silver/80">{step.detail}</p>
-                          </div>
-                          {step.cta && !disputed && (
-                            <Link
-                              href={step.cta.href}
-                              className="shrink-0 rounded-glass border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/15"
-                            >
-                              {step.cta.label}
-                            </Link>
-                          )}
-                        </div>
+                      {/* Single status line + optional CTA — replaces the old stepper. */}
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                        <p className="min-w-0 flex-1 text-sm text-silver">
+                          <span
+                            className={`font-semibold ${
+                              step.tone === "active"
+                                ? "text-blue-200"
+                                : step.tone === "waiting"
+                                  ? "text-amber-200"
+                                  : step.tone === "complete"
+                                    ? "text-emerald-200"
+                                    : "text-rose-200"
+                            }`}
+                          >
+                            {step.label}
+                          </span>
+                          <span className="mx-1.5 text-white/30">·</span>
+                          {step.detail}
+                        </p>
+                        {step.cta && !disputed && (
+                          <Link
+                            href={step.cta.href}
+                            className="shrink-0 rounded-glass border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/15"
+                          >
+                            {step.cta.label}
+                          </Link>
+                        )}
                       </div>
 
                       {/* Tracking link — once a tracking number is on file, give
@@ -466,13 +405,6 @@ export default function PurchasesPage() {
                             </p>
                           );
                         })()}
-
-                      {/* Progress stepper — only for escrow-backed transactions. */}
-                      {step.isEscrow && (
-                        <div className="mt-2">
-                          <TransactionProgress escrowState={step.state} compact />
-                        </div>
-                      )}
 
                       {/* Dispute state — frozen banner, or an entry point to open one. */}
                       {disputed ? (
@@ -506,7 +438,7 @@ export default function PurchasesPage() {
 
                       {/* Rating prompt — once the transaction is complete, invite
                           the participant to rate their counterparty. */}
-                      {step.state === "COMPLETE" && (
+                      {step.phase === "complete" && (
                         <div className="mt-2 flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2">
                           <p className="text-xs text-silver">
                             {ratedSales.has(row.id)
