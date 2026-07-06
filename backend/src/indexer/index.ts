@@ -90,15 +90,51 @@ const MARKETPLACE_LISTINGS_ABI = [
 // events (the reconciler itself confirms those), short enough that phantom
 // listings don't linger in the database.
 const UNCONFIRMED_PURGE_AGE_MS = 30 * 60 * 1000;
+// Confirmed LISTED rows are re-verified in a slow rotation (a few per pass)
+// so listings pointing at a retired contract — e.g. testnet rows after the
+// mainnet switch — are purged too.
+const CONFIRMED_RECHECK_BATCH = 10;
+let confirmedRecheckCursor: Date | null = null;
+// A confirmed listing must read NONE on two separate passes before it is
+// deleted — one anomalous RPC response must never destroy a live listing.
+const confirmedNoneMisses = new Map<string, number>();
+
+/** Delete a phantom listing and its dependents. Returns false if blocked (e.g. Sale FK). */
+async function purgeListing(
+  prisma: PrismaClient,
+  log: Logger,
+  listingId: string,
+  reason: string,
+): Promise<boolean> {
+  try {
+    await prisma.$transaction([
+      prisma.offer.deleteMany({ where: { listingId } }),
+      prisma.wishlistItem.deleteMany({ where: { itemId: listingId } }),
+      prisma.shippingAddress.deleteMany({ where: { listingId } }),
+      prisma.listing.delete({ where: { id: listingId } }),
+    ]);
+    log.info({ listingId, reason }, "Reconciler purged listing not present on-chain");
+    return true;
+  } catch (err) {
+    // e.g. a Sale row references it — leave it for manual review.
+    log.warn({ err, listingId }, "Reconciler: could not purge listing");
+    return false;
+  }
+}
 
 /**
- * Reconcile DB listings that are marked as LISTED but not yet confirmed on-chain.
- * For each, reads the contract directly:
+ * Reconcile DB listings against the contract.
+ *
+ * Unconfirmed LISTED rows (every pass):
  *   - contract knows the listing (status > NONE) → set onChainConfirmed=true
  *     and correct the price (fixes missed mirror events);
- *   - contract says NONE and the listing is older than the purge window →
- *     the creation tx never landed, so delete the row (and its offers /
- *     wishlist entries) rather than keep a phantom listing around.
+ *   - contract says NONE past the grace window → the creation tx never
+ *     landed; delete the row and its offers / wishlist entries / address.
+ *
+ * Confirmed LISTED rows (slow rotation, CONFIRMED_RECHECK_BATCH per pass):
+ *   - re-verify they still exist on the configured contract; two consecutive
+ *     NONE reads → purge. This clears stale rows after a contract redeploy
+ *     or the testnet → mainnet switch.
  */
 async function reconcileUnconfirmedListings(
   marketplaceAddress: string,
@@ -115,10 +151,36 @@ async function reconcileUnconfirmedListings(
     orderBy: { createdAt: "asc" },
   });
 
-  if (unconfirmed.length === 0) return;
+  // Rotating window over confirmed rows, oldest-first, wrapping at the end.
+  let recheck = await prisma.listing.findMany({
+    where: {
+      onChainConfirmed: true,
+      status: "LISTED",
+      ...(confirmedRecheckCursor && { createdAt: { gt: confirmedRecheckCursor } }),
+    },
+    select: { id: true, createdAt: true },
+    take: CONFIRMED_RECHECK_BATCH,
+    orderBy: { createdAt: "asc" },
+  });
+  confirmedRecheckCursor =
+    recheck.length === CONFIRMED_RECHECK_BATCH
+      ? recheck[recheck.length - 1]!.createdAt
+      : null; // partial page — wrapped; restart from the oldest next pass
+
+  if (unconfirmed.length === 0 && recheck.length === 0) return;
 
   const provider = new ethers.JsonRpcProvider(rpcUrl);
   const iface = new ethers.Interface(MARKETPLACE_LISTINGS_ABI);
+
+  /** Reads the listing's on-chain status; null means the read was ambiguous. */
+  const readChainStatus = async (listingId: string): Promise<number | null> => {
+    const calldata = iface.encodeFunctionData("listings", [listingId]);
+    const raw = await provider.call({ to: marketplaceAddress, data: calldata });
+    if (!raw || raw === "0x") return null; // ambiguous read — never delete on ambiguity
+    const decoded = iface.decodeFunctionResult("listings", raw);
+    return Number(decoded[3] ?? 0);
+  };
+
   let confirmed = 0;
   let purged = 0;
 
@@ -126,7 +188,7 @@ async function reconcileUnconfirmedListings(
     try {
       const calldata = iface.encodeFunctionData("listings", [listing.id]);
       const raw = await provider.call({ to: marketplaceAddress, data: calldata });
-      if (!raw || raw === "0x") continue; // ambiguous read — never delete on ambiguity
+      if (!raw || raw === "0x") continue;
 
       const decoded = iface.decodeFunctionResult("listings", raw);
       const status = Number(decoded[3] ?? 0);
@@ -136,21 +198,8 @@ async function reconcileUnconfirmedListings(
         // then purge.
         const age = Date.now() - new Date(listing.createdAt).getTime();
         if (age < UNCONFIRMED_PURGE_AGE_MS) continue;
-        try {
-          await prisma.$transaction([
-            prisma.offer.deleteMany({ where: { listingId: listing.id } }),
-            prisma.wishlistItem.deleteMany({ where: { itemId: listing.id } }),
-            prisma.shippingAddress.deleteMany({ where: { listingId: listing.id } }),
-            prisma.listing.delete({ where: { id: listing.id } }),
-          ]);
+        if (await purgeListing(prisma, log, listing.id, "creation tx never confirmed")) {
           purged++;
-          log.info(
-            { listingId: listing.id, ageMinutes: Math.round(age / 60_000) },
-            "Reconciler purged listing never confirmed on-chain",
-          );
-        } catch (err) {
-          // e.g. a Sale row references it — leave it for manual review.
-          log.warn({ err, listingId: listing.id }, "Reconciler: could not purge listing");
         }
         continue;
       }
@@ -175,10 +224,32 @@ async function reconcileUnconfirmedListings(
     }
   }
 
+  for (const listing of recheck) {
+    try {
+      const status = await readChainStatus(listing.id);
+      if (status === null) continue;
+      if (status !== 0) {
+        confirmedNoneMisses.delete(listing.id);
+        continue;
+      }
+      const misses = (confirmedNoneMisses.get(listing.id) ?? 0) + 1;
+      if (misses < 2) {
+        confirmedNoneMisses.set(listing.id, misses);
+        continue;
+      }
+      confirmedNoneMisses.delete(listing.id);
+      if (await purgeListing(prisma, log, listing.id, "no longer on configured contract")) {
+        purged++;
+      }
+    } catch (err) {
+      log.warn({ err, listingId: listing.id }, "Reconciler: recheck read failed for listing");
+    }
+  }
+
   if (confirmed > 0 || purged > 0) {
     log.info(
-      { confirmed, purged, total: unconfirmed.length },
-      "Reconciler: processed unconfirmed listings",
+      { confirmed, purged, checked: unconfirmed.length + recheck.length },
+      "Reconciler: processed listings",
     );
   }
 }
