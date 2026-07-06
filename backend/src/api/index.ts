@@ -8,6 +8,7 @@ import { ethers } from "ethers";
 import { fetchMirrorEvents } from "../mirror";
 import { decodeEvents, EXPECTED_TOPIC0_ITEM_LISTED } from "../indexer/decoder";
 import { saveUpload } from "../storage";
+import { decryptJson, encryptJson, secretBoxConfigured } from "../lib/secretBox";
 
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB
 const MAX_MEDIA_SIZE = 15 * 1024 * 1024; // 15MB for video
@@ -1705,11 +1706,19 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       if (!/^[A-Z]{2}$/.test(country))
         return res.status(400).json({ error: "Country must be a 2-letter code." });
 
-      const data = { name, line1, line2, city, region, postalCode, country, phone };
+      // Fail closed: without an encryption key the address is rejected, so
+      // client PII never lands in the database in plaintext.
+      if (!secretBoxConfigured()) {
+        log.error("SHIPPING_ADDRESS_KEY not configured — refusing to store shipping address");
+        return res
+          .status(503)
+          .json({ error: "Checkout is temporarily unavailable. Please try again shortly." });
+      }
+      const payload = encryptJson({ name, line1, line2, city, region, postalCode, country, phone });
       const saved = await prisma.shippingAddress.upsert({
         where: { listingId_buyer: { listingId: id, buyer } },
-        create: { listingId: id, buyer, ...data },
-        update: data,
+        create: { listingId: id, buyer, payload },
+        update: { payload },
       });
       return res.json({ ok: true, id: saved.id });
     } catch (err) {
@@ -1740,10 +1749,19 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         buyer = listingBuyer;
       }
 
-      const address = await prisma.shippingAddress.findUnique({
+      const record = await prisma.shippingAddress.findUnique({
         where: { listingId_buyer: { listingId: id, buyer } },
       });
-      if (!address) return res.status(404).json({ error: "No shipping address on file" });
+      if (!record) return res.status(404).json({ error: "No shipping address on file" });
+      let address: Record<string, string | null>;
+      try {
+        address = decryptJson<Record<string, string | null>>(record.payload);
+      } catch (err) {
+        // Wrong/rotated key or corrupted row — treat as absent rather than 500
+        // so checkout can simply re-collect the address.
+        log.error({ err, listingId: id }, "Failed to decrypt shipping address");
+        return res.status(404).json({ error: "No shipping address on file" });
+      }
       const { name, line1, line2, city, region, postalCode, country, phone } = address;
       return res.json({
         address: { name, line1, line2, city, region, postalCode, country, phone },
