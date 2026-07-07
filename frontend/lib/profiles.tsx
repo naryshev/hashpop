@@ -122,15 +122,13 @@ export function useProfiles(addresses: (string | null | undefined)[]): Record<st
 }
 
 /**
- * Resolve the best display name for a profile, in order: HashPack wallet
- * username (it travels with the wallet across dapps) → Hashpop-set name →
- * null (caller falls back to the wallet address / account id).
+ * Display name = the HashPack wallet username, or nothing. Site-level custom
+ * usernames are intentionally not shown — identity is the wallet: HashPack
+ * name when set, Hedera account id (0.0.x) otherwise.
  */
 export function profileDisplayName(profile: PublicProfile | undefined): string | null {
   const hp = profile?.hashpackName?.trim();
-  if (hp) return hp;
-  const own = profile?.displayName?.trim();
-  return own ? own : null;
+  return hp ? hp : null;
 }
 
 /**
