@@ -1519,20 +1519,10 @@ export default function ListingPage() {
                     `/purchase-success/${encodeListingIdForUrl(id)}${txHash ? `?tx=${encodeURIComponent(txHash)}` : ""}`,
                   );
                 }}
-                onMessage={async () => {
+                onMessage={() => {
                   if (!walletConnected || !address || !item?.seller) return;
-                  try {
-                    await fetch(`${getApiUrl()}/api/messages`, {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        fromAddress: address,
-                        toAddress: item.seller,
-                        body: "Hi, I'm interested in this listing.",
-                        listingId: id,
-                      }),
-                    });
-                  } catch {}
+                  // Open the (possibly empty) thread — the user writes their
+                  // own first message; nothing is auto-sent.
                   router.push(
                     `/messages?openThread=${encodeURIComponent(item.seller)}&listingId=${encodeURIComponent(id)}`,
                   );

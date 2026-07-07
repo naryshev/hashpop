@@ -33,6 +33,7 @@ import {
   Watch,
 } from "lucide-react";
 import { ProfileCardSheet } from "../../components/ProfileCardSheet";
+import { useUnseenActivity } from "../../hooks/useUnseenActivity";
 
 function formatListingId(id: string): string {
   if (!id || !id.startsWith("0x") || id.length !== 66) return id;
@@ -175,6 +176,7 @@ export default function MarketplacePageClient({
 }) {
   const { isConnected, address, accountId } = useHashpackWallet();
   const { openSignIn } = useSignInModal();
+  const hasUnseen = useUnseenActivity();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [searchInput, setSearchInput] = useState("");
@@ -687,9 +689,12 @@ export default function MarketplacePageClient({
               <Link
                 href="/activity"
                 aria-label="Notifications"
-                className="rounded-full p-2 text-silver hover:text-white"
+                className="relative rounded-full p-2 text-silver hover:text-white"
               >
                 <Bell size={18} />
+                {hasUnseen && (
+                  <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[#00ffa3]" />
+                )}
               </Link>
             </div>
           </div>
