@@ -53,7 +53,7 @@ export function BootSplash() {
   return (
     <div
       aria-hidden
-      className={`fixed inset-0 z-[200] flex flex-col items-center justify-center bg-[#0b111b] transition-opacity duration-500 ease-out ${
+      className={`hp-splash-overlay fixed inset-0 z-[200] flex flex-col items-center justify-center bg-[#0b111b] transition-opacity duration-500 ease-out ${
         hidden ? "pointer-events-none opacity-0" : "opacity-100"
       }`}
     >
@@ -67,6 +67,12 @@ export function BootSplash() {
         <div className="h-1 w-40 overflow-hidden rounded-full bg-white/10">
           <div className="hp-splash-bar h-full w-1/3 rounded-full bg-[linear-gradient(90deg,transparent,#00ffa3,#00e5ff,transparent)]" />
         </div>
+        {/* Filled by the boot error catcher in layout.tsx when a fatal error
+            hits before/at hydration — makes webview failures screenshotable. */}
+        <pre
+          id="hp-boot-error"
+          className="hidden max-h-40 max-w-[85vw] overflow-auto whitespace-pre-wrap break-words rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300"
+        />
       </div>
     </div>
   );
