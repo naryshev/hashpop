@@ -2814,30 +2814,35 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         signal: AbortSignal.timeout(7000),
       });
       if (!r.ok) return out;
+      type HashPackProfile = {
+        accountId?: string;
+        // Older/documented shape.
+        name?: { name?: string } | string | null;
+        picture?: { thumbnail?: string } | string | null;
+        // Live mainnet shape (2026): username.name + profilePicture.thumbUrl.
+        username?: { name?: string | null } | null;
+        profilePicture?: { thumbUrl?: string | null } | string | null;
+      };
       const data = (await r.json()) as
-        | {
-            profiles?: Array<{
-              accountId?: string;
-              name?: { name?: string } | string | null;
-              picture?: { thumbnail?: string } | string | null;
-            }>;
-          }
-        | Array<{
-            accountId?: string;
-            name?: { name?: string } | string | null;
-            picture?: { thumbnail?: string } | string | null;
-          }>;
+        | { profiles?: HashPackProfile[] }
+        | HashPackProfile[];
       const list = Array.isArray(data) ? data : (data?.profiles ?? []);
       for (const p of list) {
         if (!p?.accountId) continue;
         const nameRaw =
-          typeof p.name === "string" ? p.name : (p.name && typeof p.name === "object" ? p.name.name : null);
+          typeof p.name === "string"
+            ? p.name
+            : (p.name && typeof p.name === "object" ? p.name.name : null) ??
+              (p.username && typeof p.username === "object" ? p.username.name : null);
         const pictureRaw =
           typeof p.picture === "string"
             ? p.picture
-            : p.picture && typeof p.picture === "object"
-              ? p.picture.thumbnail
-              : null;
+            : (p.picture && typeof p.picture === "object" ? p.picture.thumbnail : null) ??
+              (typeof p.profilePicture === "string"
+                ? p.profilePicture
+                : p.profilePicture && typeof p.profilePicture === "object"
+                  ? p.profilePicture.thumbUrl
+                  : null);
         out.set(p.accountId, {
           name: typeof nameRaw === "string" && nameRaw.trim() ? nameRaw.trim() : null,
           avatarUrl: typeof pictureRaw === "string" && pictureRaw.trim() ? pictureRaw.trim() : null,
