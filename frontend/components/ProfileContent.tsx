@@ -160,7 +160,10 @@ export function ProfileContent({
   const fallbackName = profileDisplayName(publicProfile);
   const stagedAvatar = editing ? draft?.avatarUrl?.trim() || null : profile?.avatarUrl?.trim() || null;
   const avatarUrl = stagedAvatar ?? fallbackAvatar;
-  const headerName = profile?.displayName?.trim() || fallbackName || "Profile";
+  // Heading = HashPack wallet username, else the account id. The grey
+  // subline always shows the account id, so it's only rendered when the
+  // heading is a name (otherwise it would duplicate).
+  const headerName = publicProfile?.hashpackName?.trim() || fallbackName || null;
   const isVerified = profile?.kyc?.status === "VERIFIED";
 
   return (
@@ -182,14 +185,18 @@ export function ProfileContent({
             )}
             <div className="min-w-0">
               <h1 className="flex items-center gap-1.5 truncate text-xl sm:text-2xl font-bold text-white">
-                {headerName}
+                {headerName ?? (
+                  <AddressDisplay address={address} showVerified={false} preferName={false} />
+                )}
                 {isVerified && (
                   <BadgeCheck size={20} className="text-[#00ffa3]" aria-label="KYC verified" />
                 )}
               </h1>
-              <p className="mt-1 text-sm text-silver">
-                <AddressDisplay address={address} showVerified={false} />
-              </p>
+              {headerName && (
+                <p className="mt-1 text-sm text-silver">
+                  <AddressDisplay address={address} showVerified={false} preferName={false} />
+                </p>
+              )}
             </div>
           </div>
           {isSelf ? (
@@ -280,12 +287,9 @@ export function ProfileContent({
           {!editing ? (
             <>
               <div>
-                <p className="text-xs uppercase tracking-wide text-silver">Display name</p>
+                <p className="text-xs uppercase tracking-wide text-silver">Username</p>
                 <p className="text-white mt-0.5">
-                  {profile?.displayName?.trim() ||
-                    (publicProfile?.hashpackName?.trim()
-                      ? `${publicProfile.hashpackName} (from HashPack)`
-                      : "—")}
+                  {publicProfile?.hashpackName?.trim() || "— set one in your HashPack wallet"}
                 </p>
               </div>
               <div>
@@ -333,22 +337,15 @@ export function ProfileContent({
                   </div>
                 </div>
               </div>
-              <label className="block">
-                <span className="text-xs uppercase tracking-wide text-silver">Display name</span>
-                <input
-                  className="mt-1 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
-                  value={draft?.displayName ?? ""}
-                  onChange={(e) => setDraft((d) => (d ? { ...d, displayName: e.target.value } : d))}
-                  placeholder={publicProfile?.hashpackName ?? "Your name"}
-                  maxLength={80}
-                />
-                {publicProfile?.hashpackName && (
-                  <span className="mt-1 block text-[11px] text-silver/70">
-                    Leave blank to use your HashPack username
-                    (<span className="text-chrome">{publicProfile.hashpackName}</span>).
-                  </span>
-                )}
-              </label>
+              <div>
+                <span className="text-xs uppercase tracking-wide text-silver">Username</span>
+                <p className="mt-1 text-sm text-white">
+                  {publicProfile?.hashpackName?.trim() || "—"}
+                </p>
+                <span className="mt-1 block text-[11px] text-silver/70">
+                  Usernames come from your HashPack wallet profile and can&apos;t be edited here.
+                </span>
+              </div>
               <label className="block">
                 <span className="text-xs uppercase tracking-wide text-silver">Bio</span>
                 <textarea

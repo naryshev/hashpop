@@ -61,13 +61,13 @@ export function OnboardingChecklist({
   // anyone who dismissed it never see it.
   if (!hydrated || dismissed || hasTrades || hasListings) return null;
 
-  const profileDone = !!profile?.displayName?.trim();
+  const profileDone = !!profile?.hashpackName?.trim() || !!profile?.avatarUrl?.trim();
 
   const steps = [
     {
       done: profileDone,
       label: "Complete your profile",
-      hint: "Add a display name and avatar so buyers see who they're dealing with.",
+      hint: "Set a username in HashPack and add an avatar so buyers see who they're dealing with.",
       href: `/profile/${encodeURIComponent(address)}`,
       cta: "Edit profile",
     },
