@@ -111,6 +111,20 @@ body {
   animation: hp-splash-sweep 1.15s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
+/* Dead-man switch: if JavaScript never runs (some in-app dapp browsers), the
+   splash still fades out after 5s and reveals the server-rendered page.
+   Animations override normal declarations, so this wins over the opacity
+   classes; when JS is alive it unmounts the splash long before 5s. */
+@keyframes hp-splash-autofade {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+.hp-splash-overlay {
+  animation: hp-splash-autofade 0.5s ease-out 5s forwards;
+}
+
 /* Used by the order/escrow detail screen for pending tx pills. */
 @keyframes hp-pulse {
   0%,

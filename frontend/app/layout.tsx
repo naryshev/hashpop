@@ -40,10 +40,32 @@ export const viewport: Viewport = {
   themeColor: "#0b111b",
 };
 
+// Runs before hydration: surfaces fatal boot errors on the splash so failures
+// in webviews without devtools (e.g. wallet dapp browsers) are screenshotable.
+const BOOT_ERROR_CATCHER = `
+(function () {
+  function show(msg) {
+    try {
+      var el = document.getElementById("hp-boot-error");
+      if (!el) return;
+      el.textContent = String(msg || "Unknown boot error").slice(0, 600);
+      el.classList.remove("hidden");
+    } catch (e) {}
+  }
+  window.addEventListener("error", function (e) {
+    show(e && (e.message || (e.error && e.error.message)));
+  });
+  window.addEventListener("unhandledrejection", function (e) {
+    show(e && e.reason && (e.reason.message || e.reason));
+  });
+})();
+`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body suppressHydrationWarning>
+        <script dangerouslySetInnerHTML={{ __html: BOOT_ERROR_CATCHER }} />
         <BootSplash />
         <ClientProviders>{children}</ClientProviders>
         <SpeedInsights />
