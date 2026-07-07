@@ -17,6 +17,7 @@ import {
   ShoppingCart,
 } from "lucide-react";
 import { useCart } from "../lib/cart";
+import { useUnseenActivity } from "../hooks/useUnseenActivity";
 import { useHashpackWallet } from "../lib/hashpackWallet";
 import { useSignInModal } from "../lib/signInModal";
 import { useTopBarSlotFilled, useTopBarSlotRef } from "../lib/topBar";
@@ -103,6 +104,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
   const { isConnected, accountId, address } = useHashpackWallet();
   const { openSignIn } = useSignInModal();
   const { count: cartCount } = useCart();
+  const hasUnseen = useUnseenActivity();
   const [profileOpen, setProfileOpen] = useState(false);
   const [messagesOpen, setMessagesOpen] = useState(false);
 
@@ -212,10 +214,13 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
           </Link>
           <Link
             href="/activity"
-            className="flex h-9 w-9 items-center justify-center rounded-glass text-neutral-300 hover:bg-white/5 hover:text-white"
+            className="relative flex h-9 w-9 items-center justify-center rounded-glass text-neutral-300 hover:bg-white/5 hover:text-white"
             aria-label="Activity"
           >
             <Bell className="h-4 w-4" />
+            {hasUnseen && (
+              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[#00ffa3]" />
+            )}
           </Link>
           {effectiveConnected ? (
             <button

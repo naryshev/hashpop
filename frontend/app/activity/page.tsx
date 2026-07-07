@@ -8,6 +8,7 @@ import { useHashpackWallet } from "@/lib/hashpackWallet";
 import { getApiUrl } from "@/lib/apiUrl";
 import { formatPriceForDisplay } from "@/lib/formatPrice";
 import { listingHref } from "@/lib/listingUrl";
+import { markActivitySeen } from "@/hooks/useUnseenActivity";
 
 type Kind = "sale" | "purchase" | "offer" | "message" | "review";
 
@@ -120,6 +121,11 @@ export default function ActivityPage() {
     message: true,
     review: true,
   });
+
+  // Opening Activity clears the "new activity" dot on the bells.
+  useEffect(() => {
+    markActivitySeen();
+  }, []);
 
   useEffect(() => {
     if (!userKey) {

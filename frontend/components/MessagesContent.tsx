@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { AddressDisplay } from "./AddressDisplay";
 import { useHashpackWallet } from "../lib/hashpackWallet";
 import { getApiUrl } from "../lib/apiUrl";
+import { markActivitySeen } from "../hooks/useUnseenActivity";
 import { useEncryptionKey } from "../lib/useEncryptionKey";
 import { decryptMessage } from "../lib/chatEncryption";
 import { profileDisplayName, useProfile } from "../lib/profiles";
@@ -224,6 +225,11 @@ function StatePill({ stateKey, size = "sm" }: { stateKey: StateKey; size?: "sm" 
 export function MessagesPageContent({ embedded = false }: { embedded?: boolean } = {}) {
   const { address } = useHashpackWallet();
   const searchParams = useSearchParams();
+
+  // Reading messages clears the "new activity" dot on the bells.
+  useEffect(() => {
+    markActivitySeen();
+  }, []);
   const [conversations, setConversations] = useState<InboxConversation[]>([]);
   const [inboxLoading, setInboxLoading] = useState(false);
   const [selectedThread, setSelectedThread] = useState<{ other: string; listingId: string } | null>(

@@ -200,7 +200,7 @@ export function ProfileCardSheet({ open, onClose }: { open: boolean; onClose: ()
                 )}
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 text-base font-bold text-white">
-                    <span className="truncate">{name ?? "Hashpop trader"}</span>
+                    <span className="truncate">{name ?? acct}</span>
                     {profile?.kycVerified && (
                       <BadgeCheck size={15} className="shrink-0 text-[#00ffa3]" aria-label="Verified" />
                     )}

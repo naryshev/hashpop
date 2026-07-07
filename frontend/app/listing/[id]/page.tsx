@@ -55,7 +55,11 @@ function SellerProfileMeta({ seller }: { seller: string }) {
       )}
       <div className="min-w-0">
         <div className="flex items-center gap-1.5 text-sm font-semibold text-white group-hover:text-chrome">
-          <span className="truncate">{name ?? "Hashpop seller"}</span>
+          <span className="truncate">
+            {name ?? (
+              <AddressDisplay address={seller} showVerified={false} preferName={false} />
+            )}
+          </span>
           {profile?.kycVerified && (
             <BadgeCheck size={13} className="shrink-0 text-[#00ffa3]" aria-label="KYC verified" />
           )}
@@ -68,9 +72,11 @@ function SellerProfileMeta({ seller }: { seller: string }) {
             <span className="text-[11px] font-normal text-silver/50">No ratings yet</span>
           )}
         </div>
+        {/* Subheading: always the 0.0.x account id, never the name or 0x. */}
         <AddressDisplay
           address={seller}
           showVerified={false}
+          preferName={false}
           className="block truncate font-mono text-[11px] text-silver/70"
         />
       </div>
@@ -1513,20 +1519,10 @@ export default function ListingPage() {
                     `/purchase-success/${encodeListingIdForUrl(id)}${txHash ? `?tx=${encodeURIComponent(txHash)}` : ""}`,
                   );
                 }}
-                onMessage={async () => {
+                onMessage={() => {
                   if (!walletConnected || !address || !item?.seller) return;
-                  try {
-                    await fetch(`${getApiUrl()}/api/messages`, {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        fromAddress: address,
-                        toAddress: item.seller,
-                        body: "Hi, I'm interested in this listing.",
-                        listingId: id,
-                      }),
-                    });
-                  } catch {}
+                  // Open the (possibly empty) thread — the user writes their
+                  // own first message; nothing is auto-sent.
                   router.push(
                     `/messages?openThread=${encodeURIComponent(item.seller)}&listingId=${encodeURIComponent(id)}`,
                   );
