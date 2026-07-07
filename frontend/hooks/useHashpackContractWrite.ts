@@ -210,18 +210,27 @@ export function useHashpackContractWrite() {
               (network === "mainnet" ? sdk.Client.forMainnet() : sdk.Client.forTestnet());
             let receipt: any;
             if (typeof (hashconnect as any).sendTransaction === "function") {
-              // Primary path: hashconnect.sendTransaction. Internally it sets
-              // node account ids and freezes the still-mutable transaction
-              // itself, then HashPack signs AND submits to consensus nodes and
-              // returns the receipt. Two failure modes this avoids at once:
-              //   • browser-side execute() speaks gRPC-web to
-              //     nodeXX.swirldslabs.com, whose mainnet proxies reject
-              //     browser CORS (GrpcServiceError GRPC_WEB after 10 retries);
-              //   • any local freeze / freezeWithSigner leaves a frozen
-              //     payload that later population attempts mutate ("payload
-              //     immutable" / "list is locked").
-              // Works for payable and non-payable calls alike — the payable
-              // amount is serialized with the transaction bytes.
+              // Primary path: freeze locally with exactly ONE node (the
+              // discipline that always worked), then hand the FROZEN payload
+              // to hashconnect.sendTransaction so HashPack signs AND submits.
+              //
+              // Both halves matter:
+              //   • Passing an unfrozen tx lets hashconnect populate it via
+              //     its internal signer, which re-sets node ids mid-flight and
+              //     trips the SDK's "list is locked" guard. A frozen tx takes
+              //     hashconnect's isFrozen branch: straight to bytes → wallet,
+              //     nothing mutates.
+              //   • Wallet-side submission means the browser never speaks
+              //     gRPC-web to nodeXX.swirldslabs.com, whose mainnet proxies
+              //     reject browser CORS (GrpcServiceError GRPC_WEB).
+              // Payable amounts are serialized with the frozen bytes.
+              if (typeof (tx as any).setNodeAccountIds === "function") {
+                const singleNode = pickSingleNodeAccountId(sdk, freezeClient, network);
+                (tx as any).setNodeAccountIds([singleNode]);
+              }
+              if (typeof (tx as any).isFrozen === "function" && !(tx as any).isFrozen()) {
+                tx.freezeWith(freezeClient);
+              }
               showConfirmPrompt();
               walletPrompted = true;
               receipt = await (hashconnect as any).sendTransaction(accountObj as any, tx as any);
@@ -367,6 +376,9 @@ export function useHashpackContractWrite() {
           } catch (e) {
             const err = e instanceof Error ? e : new Error(String(e));
             lastError = err;
+            // Surface the untranslated error — user-facing messages are
+            // remapped, which makes remote debugging impossible without this.
+            console.error("[hashpop] wallet tx raw error:", err);
             // Never retry once the wallet has been prompted — showing HashPack multiple
             // times in a row is disorienting and typically means the tx was rejected or
             // the network is unreachable (retrying won't help).
