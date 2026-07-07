@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Map as MapIcon, MessageSquare, Plus, ShoppingCart, Store } from "lucide-react";
@@ -24,6 +24,15 @@ export function BottomNav() {
   const pathname = usePathname();
   const { count: cartCount } = useCart();
   const [mapOpen, setMapOpen] = useState(false);
+
+  // Full-screen surfaces (an open message thread) hide the bar entirely —
+  // their own back button is the only navigation.
+  const [immersive, setImmersive] = useState(false);
+  useEffect(() => {
+    const onImmersive = (e: Event) => setImmersive(!!(e as CustomEvent).detail);
+    window.addEventListener("hashpop:immersive", onImmersive);
+    return () => window.removeEventListener("hashpop:immersive", onImmersive);
+  }, []);
 
   const leftItems: NavItem[] = [
     {
@@ -58,6 +67,8 @@ export function BottomNav() {
       </Link>
     );
   };
+
+  if (immersive) return null;
 
   return (
     <nav
