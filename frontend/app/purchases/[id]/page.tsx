@@ -20,10 +20,16 @@ import { Btn } from "@/components/order/Btn";
 import { ItemRow } from "@/components/order/ItemRow";
 import { Pill } from "@/components/order/Pill";
 import { ReleaseConfirmModal } from "@/components/order/ReleaseConfirmModal";
-import { Stepper } from "@/components/order/Stepper";
 import { TxDetailSheet } from "@/components/order/TxDetailSheet";
 import { TxPill } from "@/components/order/TxPill";
-import { HP, OrderRole, OrderState, STATE_BADGE, STATE_LABEL } from "@/components/order/tokens";
+import { HP, OrderRole } from "@/components/order/tokens";
+import {
+  ESCROW_V2,
+  EscrowView,
+  orderStatusLine,
+  phaseFor,
+  type OrderPhase,
+} from "@/lib/orderStatus";
 
 type Listing = {
   id: string;
@@ -42,17 +48,6 @@ type Listing = {
   txHash?: string | null;
 };
 
-type EscrowState = "AWAITING_SHIPMENT" | "AWAITING_CONFIRMATION" | "COMPLETE" | "REFUNDED";
-
-type Escrow = {
-  buyer: string;
-  seller: string;
-  amount: string;
-  createdAt: number;
-  timeoutAt: number;
-  state: EscrowState;
-};
-
 function toBytes32(listingId: string): `0x${string}` {
   if (listingId.startsWith("0x") && listingId.length === 66) return listingId as `0x${string}`;
   const hex = Array.from(new TextEncoder().encode(listingId))
@@ -61,14 +56,24 @@ function toBytes32(listingId: string): `0x${string}` {
   return `0x${hex.padEnd(64, "0").slice(0, 64)}` as `0x${string}`;
 }
 
-// Contract has 3 escrow states; the design has 5. Disputed is not supported on-chain
-// so we omit it. AWAITING_CONFIRMATION maps to "delivered" — that's the screen where
-// the buyer's release CTA appears in the design.
-function mapEscrowState(s: EscrowState | undefined): OrderState {
-  if (s === "COMPLETE") return "released";
-  if (s === "AWAITING_CONFIRMATION") return "delivered";
-  return "paid";
-}
+type ShipToAddress = {
+  name: string;
+  line1: string;
+  line2?: string | null;
+  city: string;
+  region?: string | null;
+  postalCode: string;
+  country: string;
+  phone?: string | null;
+};
+
+const PHASE_BADGE: Record<OrderPhase, { c: string; fg: string; label: string }> = {
+  paid: { c: HP.chrome, fg: "#000", label: "PAID" },
+  shipped: { c: HP.amber, fg: "#000", label: "SHIPPED" },
+  complete: { c: HP.chromeDeep, fg: "#fff", label: "COMPLETE" },
+  refunded: { c: HP.rose, fg: "#fff", label: "REFUNDED" },
+  disputed: { c: HP.rose, fg: "#fff", label: "ON HOLD" },
+};
 
 function shortAccount(addr: string | null | undefined): string {
   if (!addr) return "";
@@ -85,7 +90,8 @@ export default function PurchaseDetailPage() {
   const chainId = activeHederaChain.id;
 
   const [listing, setListing] = useState<Listing | null>(null);
-  const [escrow, setEscrow] = useState<Escrow | null>(null);
+  const [escrow, setEscrow] = useState<EscrowView | null>(null);
+  const [shipTo, setShipTo] = useState<ShipToAddress | null>(null);
   const [loading, setLoading] = useState(true);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [txSheetId, setTxSheetId] = useState<string | null>(null);
@@ -119,7 +125,7 @@ export default function PurchaseDetailPage() {
     ])
       .then(([l, e]) => {
         setListing(l);
-        setEscrow(e as Escrow | null);
+        setEscrow(e as EscrowView | null);
       })
       .finally(() => setLoading(false));
   }, [id]);
@@ -127,6 +133,21 @@ export default function PurchaseDetailPage() {
   useEffect(() => {
     refetch();
   }, [refetch]);
+
+  // Delivery address collected at checkout — the buyer sees their own, the
+  // seller sees the buyer's.
+  useEffect(() => {
+    if (!id || !address) {
+      setShipTo(null);
+      return;
+    }
+    fetch(
+      `${getApiUrl()}/api/listing/${encodeURIComponent(id)}/shipping-address?requester=${encodeURIComponent(address)}`,
+    )
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { address?: ShipToAddress } | null) => setShipTo(data?.address ?? null))
+      .catch(() => setShipTo(null));
+  }, [id, address]);
 
   // After a successful on-chain write, refetch escrow state so the stepper advances.
   useEffect(() => {
@@ -172,8 +193,14 @@ export default function PurchaseDetailPage() {
   const isBuyer = role === "buyer";
   const isParty = me === sellerLower || me === buyerLower;
 
-  const state: OrderState = mapEscrowState(escrow?.state);
-  const badge = STATE_BADGE[state];
+  const phase: OrderPhase = phaseFor(escrow?.state, escrow?.disputed);
+  const badge = PHASE_BADGE[phase];
+  const status = orderStatusLine({
+    phase,
+    role,
+    timeoutAt: escrow?.timeoutAt,
+    isEscrow: listing.requireEscrow !== false,
+  });
 
   // Amounts. Escrow's `amount` is the on-chain stored amount (tinybar or wei).
   // Fall back to the listing price for the not-yet-funded edge case.
@@ -192,12 +219,12 @@ export default function PurchaseDetailPage() {
   const media = getListingMediaUrls(listing);
   const thumb = media[0] ?? null;
 
-  // Tx for the on-chain pill: payment tx for paid; in-session hash for delivered/released.
+  // Tx for the on-chain pill: payment tx for paid; in-session hash afterwards.
   const stepTxHash =
-    state === "released"
-      ? releaseHash ?? null
-      : state === "delivered"
-        ? shipHash ?? null
+    phase === "complete"
+      ? releaseHash ?? listing.txHash ?? null
+      : phase === "shipped"
+        ? shipHash ?? listing.txHash ?? null
         : listing.txHash ?? null;
   const stepTxHref = getTransactionExplorerUrl(stepTxHash, chainId);
 
@@ -228,7 +255,6 @@ export default function PurchaseDetailPage() {
     setConfirmOpen(false);
   };
 
-  const bodyCopy = bodyFor(state, role);
   const sellerLabel = listing.seller ? shortAccount(listing.seller) : "seller";
 
   return (
@@ -255,8 +281,6 @@ export default function PurchaseDetailPage() {
             gap: 14,
           }}
         >
-          <Stepper state={state} />
-
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6, flexWrap: "wrap" }}>
             <Pill c={badge.c} fg={badge.fg}>
               {badge.label}
@@ -279,10 +303,10 @@ export default function PurchaseDetailPage() {
                 letterSpacing: "-0.01em",
               }}
             >
-              {STATE_LABEL[state]}
+              {status.label}
             </div>
             <div style={{ fontSize: 13, color: HP.muted, marginTop: 4, lineHeight: 1.5 }}>
-              {bodyCopy}
+              {status.detail}
             </div>
           </div>
 
@@ -295,8 +319,9 @@ export default function PurchaseDetailPage() {
           />
 
           <StatusBlock
-            state={state}
+            phase={phase}
             buyer={buyerLower}
+            shipTo={shipTo}
             tracking={listing.trackingNumber}
             carrier={listing.trackingCarrier}
             releasedTxHash={releaseHash}
@@ -321,7 +346,7 @@ export default function PurchaseDetailPage() {
           )}
 
           <Actions
-            state={state}
+            phase={phase}
             role={role}
             isParty={isParty}
             shipPending={shipPending}
@@ -329,6 +354,12 @@ export default function PurchaseDetailPage() {
             onMarkShipped={onMarkShipped}
             onRequestRelease={() => setConfirmOpen(true)}
             releaseHref={getTransactionExplorerUrl(releaseHash, chainId)}
+            onMessageSeller={() =>
+              router.push(
+                `/messages?openThread=${encodeURIComponent(listing.seller || "")}&listingId=${encodeURIComponent(id)}`,
+              )
+            }
+            onUpdateTracking={() => router.push(`/listing/${encodeURIComponent(id)}`)}
           />
 
           {errorMessage && (
@@ -456,36 +487,12 @@ function NavBar({
   );
 }
 
-// ─── Copy ───────────────────────────────────────────────────────────────────
-
-function bodyFor(state: OrderState, role: OrderRole): string {
-  if (role === "buyer") {
-    return (
-      {
-        paid: "Your payment is locked in the escrow contract. The seller has been notified to ship.",
-        shipped: "Marked shipped — tracking attached. Tap to release once it arrives and you've inspected it.",
-        delivered: "Take a moment to inspect. Once you tap Release, the seller is paid.",
-        released: "All done. The funds are with the seller and the trade is sealed on-chain.",
-        disputed: "Escrow is paused. Add evidence and an arbiter will decide within 24h.",
-      } as Record<OrderState, string>
-    )[state];
-  }
-  return (
-    {
-      paid: "The buyer has funded escrow. Ship the item and confirm on-chain when you do.",
-      shipped: "Tracking submitted. The buyer will release funds after they inspect the item.",
-      delivered: "Carrier confirms delivery. Funds release when the buyer taps to confirm.",
-      released: "Funds settled to your wallet. Trade is closed.",
-      disputed: "The buyer has opened a dispute. Reply with proof of shipment and condition.",
-    } as Record<OrderState, string>
-  )[state];
-}
-
 // ─── Status block ───────────────────────────────────────────────────────────
 
 function StatusBlock({
-  state,
+  phase,
   buyer,
+  shipTo,
   tracking,
   carrier,
   releasedTxHash,
@@ -493,8 +500,9 @@ function StatusBlock({
   sellerLabel,
   hbar,
 }: {
-  state: OrderState;
+  phase: OrderPhase;
   buyer: string;
+  shipTo: ShipToAddress | null;
   tracking?: string | null;
   carrier?: string | null;
   releasedTxHash: string | null;
@@ -502,12 +510,26 @@ function StatusBlock({
   sellerLabel: string;
   hbar: string;
 }) {
-  if (state === "paid") {
+  if (phase === "paid") {
     return (
       <Row label="Shipping to">
-        <div style={{ color: HP.fg, fontFamily: "ui-monospace,Menlo,monospace", fontSize: 12 }}>
-          {buyer || "—"}
-        </div>
+        {shipTo ? (
+          <div style={{ fontSize: 12, color: HP.fg, lineHeight: 1.5 }}>
+            <div style={{ fontWeight: 600 }}>{shipTo.name}</div>
+            <div style={{ color: HP.muted }}>
+              {shipTo.line1}
+              {shipTo.line2 ? `, ${shipTo.line2}` : ""}
+            </div>
+            <div style={{ color: HP.muted }}>
+              {shipTo.city}
+              {shipTo.region ? `, ${shipTo.region}` : ""} {shipTo.postalCode}, {shipTo.country}
+            </div>
+          </div>
+        ) : (
+          <div style={{ color: HP.fg, fontFamily: "ui-monospace,Menlo,monospace", fontSize: 12 }}>
+            {buyer || "—"}
+          </div>
+        )}
         <div style={{ fontSize: 11, color: HP.muted, marginTop: 2 }}>
           Seller will add tracking when shipped.
         </div>
@@ -515,7 +537,7 @@ function StatusBlock({
     );
   }
 
-  if (state === "shipped" || state === "delivered") {
+  if (phase === "shipped") {
     return (
       <div
         style={{
@@ -546,34 +568,32 @@ function StatusBlock({
             Tracking not provided. Reach out to the seller for an update.
           </div>
         )}
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 12 }}>
-          {[
-            { t: "Shipment confirmed by seller", done: true },
-            { t: "In transit", done: true },
-            { t: "Delivered", done: state === "delivered" },
-            { t: "Buyer confirms receipt", done: false },
-          ].map((e, i) => (
-            <div
-              key={i}
-              style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}
-            >
-              <span
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 9999,
-                  background: e.done ? HP.chrome : "rgba(255,255,255,0.15)",
-                }}
-              />
-              <span style={{ color: e.done ? HP.fg : HP.muted }}>{e.t}</span>
-            </div>
-          ))}
+      </div>
+    );
+  }
+
+  if (phase === "refunded") {
+    return (
+      <div
+        style={{
+          padding: 18,
+          borderRadius: 14,
+          textAlign: "center",
+          background: "linear-gradient(180deg,rgba(244,63,94,0.08),rgba(244,63,94,0.02))",
+          border: "1px solid rgba(244,63,94,0.3)",
+        }}
+      >
+        <div style={{ fontSize: 14, color: HP.fg, fontWeight: 600 }}>
+          {hbar} ℏ returned to the buyer
+        </div>
+        <div style={{ fontSize: 11, color: HP.muted, marginTop: 4 }}>
+          The escrow timed out before shipment, so the payment was refunded automatically.
         </div>
       </div>
     );
   }
 
-  if (state === "released") {
+  if (phase === "complete") {
     return (
       <div
         style={{
@@ -655,7 +675,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 // ─── Actions ────────────────────────────────────────────────────────────────
 
 function Actions({
-  state,
+  phase,
   role,
   isParty,
   shipPending,
@@ -663,8 +683,10 @@ function Actions({
   onMarkShipped,
   onRequestRelease,
   releaseHref,
+  onMessageSeller,
+  onUpdateTracking,
 }: {
-  state: OrderState;
+  phase: OrderPhase;
   role: OrderRole;
   isParty: boolean;
   shipPending: boolean;
@@ -672,39 +694,60 @@ function Actions({
   onMarkShipped: () => void;
   onRequestRelease: () => void;
   releaseHref: string | null;
+  onMessageSeller: () => void;
+  onUpdateTracking: () => void;
 }) {
   if (!isParty) return null;
   const isBuyer = role === "buyer";
 
-  if (state === "paid") {
-    if (isBuyer) return <Btn variant="ghost">Message seller</Btn>;
+  // Non-interactive status label (previously rendered as a dead button).
+  const StatusNote = ({ children }: { children: React.ReactNode }) => (
+    <div
+      style={{
+        padding: "10px 14px",
+        borderRadius: 12,
+        border: "1px solid rgba(255,255,255,0.08)",
+        fontSize: 12,
+        color: "#a9b0bf",
+        textAlign: "center",
+      }}
+    >
+      {children}
+    </div>
+  );
+
+  if (phase === "paid") {
+    if (isBuyer) return <Btn variant="ghost" onClick={onMessageSeller}>Message seller</Btn>;
+    // With EscrowV2 the seller never signs a transaction — entering tracking
+    // on the listing is the entire shipping flow.
+    if (ESCROW_V2) return <Btn onClick={onUpdateTracking}>Add tracking — mark shipped</Btn>;
     return (
       <Btn onClick={onMarkShipped} disabled={shipPending}>
         {shipPending ? "Submitting…" : "Mark shipped"}
       </Btn>
     );
   }
-  if (state === "shipped") {
+  if (phase === "shipped") {
     if (isBuyer) {
+      // Optional early release — escrow auto-releases on the shown date anyway.
       return (
         <>
-          <Btn variant="ghost">Message seller</Btn>
+          <Btn onClick={onRequestRelease} disabled={releasePending}>
+            {releasePending ? "Submitting…" : "Got it — release now"}
+          </Btn>
+          <Btn variant="ghost" onClick={onMessageSeller}>Message seller</Btn>
         </>
       );
     }
-    return <Btn variant="ghost">Update tracking</Btn>;
+    return <Btn variant="ghost" onClick={onUpdateTracking}>Update tracking</Btn>;
   }
-  if (state === "delivered") {
-    if (isBuyer) {
-      return (
-        <Btn onClick={onRequestRelease} disabled={releasePending}>
-          {releasePending ? "Submitting…" : "Release funds"}
-        </Btn>
-      );
-    }
-    return <Btn variant="ghost">Waiting on buyer release</Btn>;
+  if (phase === "disputed") {
+    return <StatusNote>Escrow is on hold while the dispute is reviewed.</StatusNote>;
   }
-  if (state === "released") {
+  if (phase === "refunded") {
+    return <StatusNote>Payment was returned to the buyer.</StatusNote>;
+  }
+  if (phase === "complete") {
     if (releaseHref) {
       return (
         <Btn
@@ -717,7 +760,7 @@ function Actions({
         </Btn>
       );
     }
-    return <Btn variant="ghost">Trade complete</Btn>;
+    return <StatusNote>Trade complete</StatusNote>;
   }
   return null;
 }

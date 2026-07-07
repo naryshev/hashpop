@@ -8,11 +8,17 @@ import { useHbarUsd } from "../hooks/useHbarUsd";
 import { getApiUrl } from "../lib/apiUrl";
 import { getTransactionErrorMessage } from "../lib/transactionError";
 import { AddressDisplay } from "./AddressDisplay";
-import { TransactionProgress } from "./TransactionProgress";
 import { useRobustContractWrite } from "../hooks/useRobustContractWrite";
 import { useHashpackWallet } from "../lib/hashpackWallet";
 import { activeHederaChain } from "../lib/hederaChains";
 import { CARRIERS, carrierTrackingUrl } from "../lib/trackingUrl";
+import {
+  ESCROW_V2,
+  EscrowView,
+  orderStatusLine,
+  phaseFor,
+  StatusLine,
+} from "../lib/orderStatus";
 
 /** Buyer-facing tracking line with a clickable link to the carrier's tracking page. */
 function TrackingLink({
@@ -46,6 +52,36 @@ function TrackingLink({
   );
 }
 
+type ShipToAddress = {
+  name: string;
+  line1: string;
+  line2?: string | null;
+  city: string;
+  region?: string | null;
+  postalCode: string;
+  country: string;
+  phone?: string | null;
+};
+
+/** Seller-facing delivery address block — collected from the buyer at checkout. */
+function ShipToBlock({ address }: { address: ShipToAddress }) {
+  return (
+    <div className="rounded-glass border border-white/10 bg-white/5 px-3 py-2.5">
+      <p className="mb-1 text-[10px] uppercase tracking-wider text-white/40">Ship to</p>
+      <p className="text-sm font-medium text-white">{address.name}</p>
+      <p className="text-xs text-silver">
+        {address.line1}
+        {address.line2 ? `, ${address.line2}` : ""}
+      </p>
+      <p className="text-xs text-silver">
+        {address.city}
+        {address.region ? `, ${address.region}` : ""} {address.postalCode}, {address.country}
+      </p>
+      {address.phone && <p className="text-xs text-silver/70">☎ {address.phone}</p>}
+    </div>
+  );
+}
+
 function toBytes32(listingId: string): `0x${string}` {
   if (listingId.startsWith("0x") && listingId.length === 66) return listingId as `0x${string}`;
   const hex = Array.from(new TextEncoder().encode(listingId))
@@ -54,16 +90,28 @@ function toBytes32(listingId: string): `0x${string}` {
   return `0x${hex.padEnd(64, "0").slice(0, 64)}` as `0x${string}`;
 }
 
-type EscrowState = "AWAITING_SHIPMENT" | "AWAITING_CONFIRMATION" | "COMPLETE" | "UNKNOWN";
-
-type EscrowData = {
-  buyer: string;
-  seller: string;
-  amount: string;
-  createdAt: number;
-  timeoutAt: number;
-  state: EscrowState;
+const TONE_CLASSES: Record<StatusLine["tone"], { dot: string; label: string }> = {
+  waiting: { dot: "bg-amber-300", label: "text-amber-200" },
+  active: { dot: "bg-blue-300", label: "text-blue-200" },
+  complete: { dot: "bg-emerald-400", label: "text-emerald-300" },
+  refunded: { dot: "bg-rose-300", label: "text-rose-200" },
+  disputed: { dot: "bg-rose-400", label: "text-rose-300" },
 };
+
+/** Single status line — "Paid · seller has until Jul 13 to ship". */
+function StatusLineRow({ status }: { status: StatusLine }) {
+  const tone = TONE_CLASSES[status.tone];
+  return (
+    <div className="flex items-start gap-2.5">
+      <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${tone.dot}`} />
+      <p className="text-sm leading-relaxed text-silver">
+        <span className={`font-semibold ${tone.label}`}>{status.label}</span>
+        <span className="mx-1.5 text-white/30">·</span>
+        {status.detail}
+      </p>
+    </div>
+  );
+}
 
 export function EscrowPanel({
   listingId,
@@ -82,13 +130,14 @@ export function EscrowPanel({
 }) {
   const { address } = useHashpackWallet();
   const chainId = activeHederaChain.id;
-  const [escrow, setEscrow] = useState<EscrowData | null>(null);
+  const [escrow, setEscrow] = useState<EscrowView | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [trackingInput, setTrackingInput] = useState(trackingNumber ?? "");
   const [carrierInput, setCarrierInput] = useState(trackingCarrier ?? "");
   const [trackingSaveError, setTrackingSaveError] = useState<string | null>(null);
   const [trackingSaving, setTrackingSaving] = useState(false);
+  const [trackingSaved, setTrackingSaved] = useState(false);
   const usdRate = useHbarUsd();
 
   const idBytes = useMemo(() => toBytes32(listingId), [listingId]);
@@ -105,8 +154,6 @@ export function EscrowPanel({
     error: receiptError,
     lastHash: receiptHash,
   } = useRobustContractWrite();
-  const shipConfirming = false;
-  const receiptConfirming = false;
   const shipSuccess = !!shipHash;
   const receiptSuccess = !!receiptHash;
 
@@ -123,7 +170,7 @@ export function EscrowPanel({
         if (r.status === 404) return null;
         throw new Error("Failed to load escrow");
       })
-      .then((data: EscrowData | null) => {
+      .then((data: EscrowView | null) => {
         setEscrow(data);
       })
       .catch((e) => {
@@ -145,36 +192,63 @@ export function EscrowPanel({
     address && sellerAddress && address.toLowerCase() === sellerAddress.toLowerCase();
   const isBuyer = address && escrow && address.toLowerCase() === escrow.buyer.toLowerCase();
 
+  // The buyer's delivery address (collected before payment) — shown to the
+  // seller so they know where to ship.
+  const [shipTo, setShipTo] = useState<ShipToAddress | null>(null);
+  useEffect(() => {
+    if (!isSeller || !escrow || !address) {
+      setShipTo(null);
+      return;
+    }
+    fetch(
+      `${getApiUrl()}/api/listing/${encodeURIComponent(listingId)}/shipping-address?requester=${encodeURIComponent(address)}`,
+    )
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { address?: ShipToAddress } | null) => setShipTo(data?.address ?? null))
+      .catch(() => setShipTo(null));
+  }, [isSeller, escrow, address, listingId]);
+
+  const saveTracking = async (): Promise<boolean> => {
+    setTrackingSaving(true);
+    setTrackingSaveError(null);
+    try {
+      const res = await fetch(`${getApiUrl()}/api/listing/${encodeURIComponent(listingId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sellerAddress: address,
+          trackingNumber: trackingInput.trim(),
+          trackingCarrier: carrierInput.trim() || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error || "Failed to save tracking details.");
+      }
+      setTrackingSaved(true);
+      onEscrowUpdated?.();
+      return true;
+    } catch (e) {
+      setTrackingSaveError(e instanceof Error ? e.message : "Failed to save tracking details.");
+      return false;
+    } finally {
+      setTrackingSaving(false);
+    }
+  };
+
   const confirmShipment = async () => {
     if (requireEscrow && !trackingInput.trim()) {
       setTrackingSaveError("Tracking number is required before marking as shipped.");
       return;
     }
     if (requireEscrow) {
-      setTrackingSaving(true);
-      setTrackingSaveError(null);
-      try {
-        const res = await fetch(`${getApiUrl()}/api/listing/${encodeURIComponent(listingId)}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sellerAddress: address,
-            trackingNumber: trackingInput.trim(),
-            trackingCarrier: carrierInput.trim() || undefined,
-          }),
-        });
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error(body?.error || "Failed to save tracking details.");
-        }
-        onEscrowUpdated?.();
-      } catch (e) {
-        setTrackingSaveError(e instanceof Error ? e.message : "Failed to save tracking details.");
-        setTrackingSaving(false);
-        return;
-      } finally {
-        setTrackingSaving(false);
-      }
+      const ok = await saveTracking();
+      if (!ok) return;
+    }
+    if (ESCROW_V2) {
+      // No wallet transaction: the settlement engine verifies the tracking
+      // number and records the shipment on-chain on the seller's behalf.
+      return;
     }
     await sendConfirmShipment({
       address: escrowAddress,
@@ -205,7 +279,7 @@ export function EscrowPanel({
   if (loading) {
     return (
       <div className="glass-card p-5 border border-white/10">
-        <p className="text-silver text-sm">Loading escrow status…</p>
+        <p className="text-silver text-sm">Loading order status…</p>
       </div>
     );
   }
@@ -222,34 +296,41 @@ export function EscrowPanel({
     return (
       <div className="glass-card border border-white/10 overflow-hidden">
         <div className="px-5 pt-5 pb-2">
-          <h3 className="text-lg font-semibold text-white">Escrow Transaction</h3>
-          <p className="text-xs text-silver mt-1">
-            Funds held by platform escrow until both parties fulfill their obligations.
-          </p>
+          <h3 className="text-lg font-semibold text-white">Order status</h3>
         </div>
-        <div className="px-5 pb-2">
-          <TransactionProgress escrowState="AWAITING_SHIPMENT" compact />
-        </div>
-        <div className="border-t border-white/[0.06] px-5 py-4 bg-white/[0.02] space-y-1">
-          <p className="text-sm font-medium text-white">Payment received — awaiting shipment</p>
-          <p className="text-xs text-silver">
-            {requireEscrow
-              ? "Your payment is secured on-chain. The escrow record is initializing — this can take a moment after purchase."
-              : "Escrow is active. The seller will confirm shipment and funds will be released once you confirm receipt."}
-          </p>
+        <div className="border-t border-white/[0.06] px-5 py-4 bg-white/[0.02]">
+          <StatusLineRow
+            status={{
+              label: "Paid",
+              detail:
+                "Your payment is secured on-chain. The escrow record is initializing — this can take a moment after purchase.",
+              tone: "waiting",
+            }}
+          />
         </div>
       </div>
     );
   }
 
-  const roleLabel = isSeller ? "Seller" : isBuyer ? "Buyer" : "Observer";
+  const role: "buyer" | "seller" | "observer" = isSeller
+    ? "seller"
+    : isBuyer
+      ? "buyer"
+      : "observer";
+  const phase = phaseFor(escrow.state, escrow.disputed);
+  const status = orderStatusLine({ phase, role, timeoutAt: escrow.timeoutAt, isEscrow: true });
+  const live = phase === "paid" || phase === "shipped";
+  const awaitingShipment = escrow.state === "AWAITING_SHIPMENT";
+  // v1's confirmReceipt only works after the seller confirms shipment; v2
+  // accepts it from any live state (local pickup with no tracking).
+  const buyerCanRelease = isBuyer && live && (ESCROW_V2 || phase === "shipped");
 
   return (
     <div className="glass-card border border-white/10 overflow-hidden">
       {/* Header */}
       <div className="px-5 pt-5 pb-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-white">Escrow Transaction</h3>
+          <h3 className="text-lg font-semibold text-white">Order status</h3>
           <span
             className={`text-xs font-medium px-2.5 py-1 rounded-full border ${
               isSeller
@@ -259,62 +340,47 @@ export function EscrowPanel({
                   : "bg-white/5 border-white/10 text-silver"
             }`}
           >
-            {roleLabel}
+            {role === "observer" ? "Observer" : role === "seller" ? "Seller" : "Buyer"}
           </span>
         </div>
-        <p className="text-xs text-silver mt-1">
-          Funds held by platform escrow until both parties fulfill their obligations.
-        </p>
       </div>
 
-      {/* Progress Bar */}
-      <div className="px-5">
-        <TransactionProgress escrowState={escrow.state} />
-      </div>
-
-      {/* Transaction Details */}
+      {/* The status line — replaces the old 4-step stepper. */}
       <div className="px-5 pb-4">
-        <div className="rounded-glass bg-white/[0.03] border border-white/[0.06] p-3 space-y-2">
-          <div className="grid grid-cols-3 gap-3 text-sm">
+        <StatusLineRow status={status} />
+      </div>
+
+      {/* Transaction details */}
+      <div className="px-5 pb-4">
+        <div className="rounded-glass bg-white/[0.03] border border-white/[0.06] p-3">
+          <div className="flex items-center justify-between gap-3 text-sm">
             <div>
               <p className="text-[10px] uppercase tracking-wider text-white/40 mb-0.5">Buyer</p>
               <AddressDisplay address={escrow.buyer} className="text-blue-300 text-xs" />
             </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-white/40 mb-0.5">Escrow</p>
-              <p className="text-emerald-300 text-xs font-medium">Platform</p>
-            </div>
-            <div>
+            <div className="text-right">
               <p className="text-[10px] uppercase tracking-wider text-white/40 mb-0.5">Seller</p>
               <AddressDisplay address={escrow.seller} className="text-amber-300 text-xs" />
             </div>
-          </div>
-          <div className="flex items-center justify-between pt-1 border-t border-white/[0.06]">
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-white/40">Amount in escrow</p>
-              <p className="text-chrome font-semibold text-sm">
-                {formatHbarWithUsd(formatContractAmountToHbar(escrow.amount), usdRate)}
-              </p>
-            </div>
             <div className="text-right">
-              <p className="text-[10px] uppercase tracking-wider text-white/40">Timeout</p>
-              <p className="text-silver text-xs">
-                {new Date(escrow.timeoutAt * 1000).toLocaleDateString()}
+              <p className="text-[10px] uppercase tracking-wider text-white/40 mb-0.5">
+                In escrow
+              </p>
+              <p className="text-chrome font-semibold text-xs">
+                {formatHbarWithUsd(formatContractAmountToHbar(escrow.amount), usdRate)}
               </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Action Area */}
-      <div className="border-t border-white/[0.06] px-5 py-4 bg-white/[0.02]">
-        {/* Seller: confirm shipment */}
-        {escrow.state === "AWAITING_SHIPMENT" && isSeller && (
+      {/* Action area */}
+      <div className="border-t border-white/[0.06] px-5 py-4 bg-white/[0.02] space-y-3">
+        {/* Seller: enter tracking. With EscrowV2 that's the entire shipping
+            flow — no wallet transaction. */}
+        {awaitingShipment && isSeller && !escrow.disputed && (
           <div className="space-y-3">
-            <p className="text-sm text-silver">
-              Provide proof of shipment or handoff to proceed. The buyer&apos;s payment will remain
-              in escrow until they confirm receipt.
-            </p>
+            {shipTo && <ShipToBlock address={shipTo} />}
             {requireEscrow && (
               <div className="space-y-2">
                 <input
@@ -337,94 +403,80 @@ export function EscrowPanel({
                 </datalist>
               </div>
             )}
-            <button
-              type="button"
-              onClick={() => void confirmShipment()}
-              disabled={
-                shipPending ||
-                shipConfirming ||
-                trackingSaving ||
-                (requireEscrow && !trackingInput.trim())
-              }
-              className="btn-frost-cta w-full disabled:opacity-60"
-            >
-              {shipPending || shipConfirming || trackingSaving
-                ? "Confirm in wallet…"
-                : "Confirm Shipment / Handoff"}
-            </button>
+            {ESCROW_V2 && trackingSaved ? (
+              <p className="text-sm text-emerald-300">
+                Tracking saved — the shipment will be recorded on-chain automatically.
+              </p>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void confirmShipment()}
+                disabled={shipPending || trackingSaving || (requireEscrow && !trackingInput.trim())}
+                className="btn-frost-cta w-full disabled:opacity-60"
+              >
+                {trackingSaving
+                  ? "Saving…"
+                  : shipPending
+                    ? "Confirm in wallet…"
+                    : ESCROW_V2
+                      ? "Mark as shipped"
+                      : "Confirm Shipment / Handoff"}
+              </button>
+            )}
             {trackingSaveError && <p className="text-xs text-rose-300">{trackingSaveError}</p>}
           </div>
         )}
 
-        {/* Buyer: confirm receipt */}
-        {escrow.state === "AWAITING_CONFIRMATION" && isBuyer && (
+        {/* Buyer: tracking + optional early release. */}
+        {isBuyer && live && (
           <div className="space-y-3">
-            <p className="text-sm text-silver">
-              The seller has shipped / handed off the item. Once you confirm receipt, funds will be
-              released from escrow to the seller&apos;s wallet.
-            </p>
             {trackingNumber && (
               <div className="rounded-glass bg-white/5 border border-white/10 px-3 py-2">
                 <TrackingLink trackingNumber={trackingNumber} trackingCarrier={trackingCarrier} />
               </div>
             )}
-            <button
-              type="button"
-              onClick={() => void confirmReceipt()}
-              disabled={receiptPending || receiptConfirming}
-              className="btn-frost-cta w-full disabled:opacity-60"
-            >
-              {receiptPending || receiptConfirming
-                ? "Confirm in wallet…"
-                : "Confirm Receipt — Release Payment"}
-            </button>
-          </div>
-        )}
-
-        {/* Waiting states */}
-        {escrow.state === "AWAITING_SHIPMENT" && isBuyer && (
-          <div className="space-y-2">
-            <p className="text-sm text-silver">
-              Your payment is secured in escrow. Waiting for the seller to provide proof of shipment
-              or handoff.
-            </p>
-            {trackingNumber && (
-              <TrackingLink trackingNumber={trackingNumber} trackingCarrier={trackingCarrier} />
+            {buyerCanRelease && (
+              <button
+                type="button"
+                onClick={() => void confirmReceipt()}
+                disabled={receiptPending}
+                className="btn-frost-cta w-full disabled:opacity-60"
+              >
+                {receiptPending ? "Confirm in wallet…" : "Got it — release now"}
+              </button>
+            )}
+            {ESCROW_V2 && buyerCanRelease && (
+              <p className="text-xs text-silver/70">
+                Optional — funds release automatically on the date above if you do nothing.
+              </p>
             )}
           </div>
         )}
-        {escrow.state === "AWAITING_CONFIRMATION" && isSeller && (
+
+        {/* Seller waiting on release. */}
+        {phase === "shipped" && isSeller && (
           <div className="space-y-2">
-            <p className="text-sm text-silver">
-              Shipment confirmed. Waiting for the buyer to confirm receipt. Funds will be released
-              to your wallet once confirmed.
-            </p>
+            {shipTo && <ShipToBlock address={shipTo} />}
             {trackingNumber && (
               <TrackingLink trackingNumber={trackingNumber} trackingCarrier={trackingCarrier} />
             )}
           </div>
         )}
 
-        {/* Observer states */}
-        {escrow.state === "AWAITING_SHIPMENT" && !isSeller && !isBuyer && (
-          <p className="text-sm text-silver">Waiting for the seller to confirm shipment.</p>
+        {/* Final states get a quiet confirmation row. */}
+        {phase === "complete" && (
+          <p className="text-center text-sm font-medium text-emerald-400">
+            Funds released to the seller. Trade complete.
+          </p>
         )}
-        {escrow.state === "AWAITING_CONFIRMATION" && !isBuyer && !isSeller && (
-          <p className="text-sm text-silver">Waiting for the buyer to confirm receipt.</p>
-        )}
-
-        {/* Complete */}
-        {escrow.state === "COMPLETE" && (
-          <div className="text-center py-1">
-            <p className="text-emerald-400 font-medium">Transaction Complete</p>
-            <p className="text-xs text-silver mt-1">
-              Funds have been released from escrow to the seller&apos;s wallet.
-            </p>
-          </div>
+        {phase === "refunded" && (
+          <p className="text-center text-sm font-medium text-rose-300">
+            Escrow refunded — the buyer&apos;s payment was returned.
+          </p>
         )}
 
         {errorMessage && (
-          <div className="rounded-glass bg-red-500/10 border border-red-500/30 px-3 py-2 mt-3">
+          <div className="rounded-glass bg-red-500/10 border border-red-500/30 px-3 py-2">
             <p className="text-sm text-red-400">{errorMessage}</p>
           </div>
         )}

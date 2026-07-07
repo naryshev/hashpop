@@ -154,6 +154,20 @@ model WishlistItem {
   @@index([userAddress])
 }
 
+model ShippingAddress {
+  id        String   @id @default(cuid())
+  listingId String
+  buyer     String
+  // AES-256-GCM encrypted JSON of the address fields (name, street, city,
+  // postal code, country, phone). Never stored in plaintext — a DB dump
+  // leaks nothing without SHIPPING_ADDRESS_KEY from the app environment.
+  payload   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([listingId, buyer])
+  @@index([listingId])
+}
+
 model Offer {
   id        String   @id @default(cuid())
   listingId String

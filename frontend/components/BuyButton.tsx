@@ -15,7 +15,10 @@ import { readListingCompat } from "../lib/marketplaceRead";
 import { getApiUrl } from "../lib/apiUrl";
 import { getTransactionExplorerUrl } from "../lib/explorer";
 import { OfferModal } from "./OfferModal";
+import { ShippingAddressModal } from "./ShippingAddressModal";
 import { useSignInModal } from "../lib/signInModal";
+import { useCart } from "../lib/cart";
+import { useRouter } from "next/navigation";
 
 export function BuyButton({
   listingId,
@@ -103,7 +106,14 @@ export function BuyButton({
   const explorerUrl = getTransactionExplorerUrl(lastTxId, chainId);
 
   const [offerModalOpen, setOfferModalOpen] = useState(false);
+  // Payment is gated on a valid shipping address: the modal must save one to
+  // the backend before buy()/the offer form can run. "next" is what happens
+  // after the address is confirmed.
+  const [shippingGate, setShippingGate] = useState<null | "buy" | "offer">(null);
   const { openSignIn } = useSignInModal();
+  const cart = useCart();
+  const router = useRouter();
+  const inCart = cart.has(listingId);
 
   useEffect(() => {
     if (!errorMessage && !isSuccess) return;
@@ -196,12 +206,31 @@ export function BuyButton({
             openSignIn({ title: "Sign in to buy" });
             return;
           }
-          if (canBuy) void buy();
+          if (canBuy) setShippingGate("buy");
         }}
         disabled={!!address && !canBuy}
         className="w-full bg-white text-black font-bold uppercase tracking-widest py-4 text-sm hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       >
         {isPending ? "Confirm in wallet\u2026" : "Purchase"}
+      </button>
+
+      {/* ADD TO CART */}
+      <button
+        type="button"
+        onClick={() => {
+          if (inCart) {
+            router.push("/cart");
+          } else {
+            cart.add(listingId);
+          }
+        }}
+        className={`w-full font-bold uppercase tracking-widest py-3.5 text-sm border transition-colors ${
+          inCart
+            ? "border-[#00ffa3]/50 text-[#00ffa3] hover:bg-[#00ffa3]/10"
+            : "bg-transparent text-white border-white/40 hover:border-white hover:bg-white/5"
+        }`}
+      >
+        {inCart ? "✓ In cart — view cart" : "Add to cart"}
       </button>
 
       {/* OFFER */}
@@ -211,11 +240,12 @@ export function BuyButton({
           if (!address) {
             openSignIn({
               title: "Sign in to make an offer",
-              onConnected: () => setOfferModalOpen(true),
+              onConnected: () => setShippingGate("offer"),
             });
             return;
           }
-          setOfferModalOpen(true);
+          // Offers escrow funds up-front, so they need an address too.
+          setShippingGate("offer");
         }}
         className="w-full bg-transparent text-white font-bold uppercase tracking-widest py-3.5 text-sm border border-white/40 hover:border-white hover:bg-white/5 transition-colors"
       >
@@ -265,6 +295,22 @@ export function BuyButton({
           </a>
         </div>
       )}
+
+      <ShippingAddressModal
+        open={shippingGate !== null}
+        listingId={listingId}
+        buyerAddress={address ?? ""}
+        ctaLabel={
+          shippingGate === "offer" ? "Save & continue to offer" : "Save & continue to payment"
+        }
+        onConfirmed={() => {
+          const next = shippingGate;
+          setShippingGate(null);
+          if (next === "buy") void buy();
+          if (next === "offer") setOfferModalOpen(true);
+        }}
+        onClose={() => setShippingGate(null)}
+      />
 
       <OfferModal
         open={offerModalOpen}

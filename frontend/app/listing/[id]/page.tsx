@@ -7,7 +7,8 @@ import Link from "next/link";
 import { BuyButton } from "../../../components/BuyButton";
 import { EscrowPanel } from "../../../components/EscrowPanel";
 import { AddressDisplay } from "../../../components/AddressDisplay";
-import { useProfile } from "../../../lib/profiles";
+import { profileAvatarUrl, profileDisplayName, useProfile } from "../../../lib/profiles";
+import { BadgeCheck } from "lucide-react";
 import { formatContractAmountToHbar, formatPriceForDisplay } from "../../../lib/formatPrice";
 import { formatHbarWithUsd } from "../../../lib/hbarUsd";
 import { useHbarUsd } from "../../../hooks/useHbarUsd";
@@ -28,46 +29,50 @@ import { OffersPanel } from "../../../components/OffersPanel";
 
 import { getApiUrl } from "../../../lib/apiUrl";
 
-/** Seller avatar + display name + KYC badge + inline rating, shown on the listing detail. */
+/**
+ * Compact seller chip: avatar on the left, display name + Hedera account ID
+ * stacked on the right. Matches the HashPack PFP chip pattern shown in their
+ * profile docs. Inline KYC tick + rating sit next to the name.
+ */
 function SellerProfileMeta({ seller }: { seller: string }) {
   const profile = useProfile(seller);
-  const name = profile?.displayName?.trim();
+  const name = profileDisplayName(profile);
+  const avatar = profileAvatarUrl(profile);
   const hasRating = profile && profile.ratingCount > 0 && profile.ratingAverage != null;
   return (
     <Link
       href={`/profile/${encodeURIComponent(seller)}`}
-      className="group flex items-center gap-2.5 rounded-lg -mx-1 px-1 py-1 hover:bg-white/5 transition-colors"
+      className="group inline-flex max-w-full items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 transition-colors hover:bg-white/[0.07]"
       aria-label="View seller profile"
     >
-      {profile?.avatarUrl ? (
+      {avatar ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={profile.avatarUrl}
-          alt=""
-          className="h-9 w-9 shrink-0 rounded-full object-cover"
-        />
+        <img src={avatar} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
       ) : (
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs text-silver">
           {(name ?? seller).slice(0, 2).toUpperCase()}
         </div>
       )}
       <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm font-medium text-white group-hover:text-chrome">
+        <div className="flex items-center gap-1.5 text-sm font-semibold text-white group-hover:text-chrome">
           <span className="truncate">{name ?? "Hashpop seller"}</span>
           {profile?.kycVerified && (
-            <span className="rounded-full bg-[#00ffa3]/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#00ffa3]">
-              Verified
-            </span>
+            <BadgeCheck size={13} className="shrink-0 text-[#00ffa3]" aria-label="KYC verified" />
           )}
           {hasRating ? (
-            <span className="text-xs font-normal text-amber-300/90">
-              ★ {profile!.ratingAverage!.toFixed(1)}{" "}
-              <span className="text-silver/60">({profile!.ratingCount})</span>
+            <span className="text-[11px] font-normal text-amber-300/90">
+              ★ {profile!.ratingAverage!.toFixed(1)}
+              <span className="ml-0.5 text-silver/60">({profile!.ratingCount})</span>
             </span>
           ) : (
-            <span className="text-xs font-normal text-silver/50">No ratings yet</span>
+            <span className="text-[11px] font-normal text-silver/50">No ratings yet</span>
           )}
         </div>
+        <AddressDisplay
+          address={seller}
+          showVerified={false}
+          className="block truncate font-mono text-[11px] text-silver/70"
+        />
       </div>
     </Link>
   );
@@ -140,6 +145,7 @@ export default function ListingPage() {
   const [loading, setLoading] = useState(true);
   const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
   const [galleryOpen, setGalleryOpen] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editSubtitle, setEditSubtitle] = useState("");
@@ -247,16 +253,24 @@ export default function ListingPage() {
   const fetchListing = useCallback(
     (attempt = 0, clearFirst = true) => {
       if (!id) return;
+      // Retry transient failures (slow backend, RPC hiccups, fresh listings
+      // that haven't synced yet) before declaring the listing not found.
       const maxRetries = 4;
       const retryDelayMs = 1600;
       if (attempt === 0 && clearFirst) {
         setLoading(true);
         setListing(null);
       }
+      const retryOrGiveUp = () => {
+        if (attempt < maxRetries) {
+          setTimeout(() => fetchListing(attempt + 1, false), retryDelayMs);
+        } else {
+          setLoading(false);
+        }
+      };
       fetch(`${getApiUrl()}/api/listing/${encodeURIComponent(id)}`)
         .then((res) => {
           if (res.ok) return res.json().then((data: { listing: Listing }) => data.listing);
-          if (res.status === 404) return null;
           return Promise.reject(res);
         })
         .then((listingData) => {
@@ -265,9 +279,9 @@ export default function ListingPage() {
             setLoading(false);
             return;
           }
-          setLoading(false);
+          retryOrGiveUp();
         })
-        .catch(() => setLoading(false));
+        .catch(() => retryOrGiveUp());
     },
     [id],
   );
@@ -720,9 +734,132 @@ export default function ListingPage() {
     setSelectedMediaIndex((prev) => (prev + 1) % keptMediaUrls.length);
   };
 
+  // Title block + secondary blocks (want-to-sell, description, location)
+  // are rendered in two places so the page can put them in the desktop
+  // 2-column grid and reorder them on mobile (title above the photo;
+  // want-to-sell / description / location below the seller chip).
+  const titleBlockJsx = (
+    <div>
+      <nav className="mb-3 flex flex-wrap items-center gap-1 text-sm text-silver">
+        <Link href="/marketplace" className="hover:text-white">
+          Marketplace
+        </Link>
+        {categoryLabel && categoryLabel !== "Marketplace" && (
+          <>
+            <span>{">"}</span>
+            <span className="text-white">{categoryLabel}</span>
+          </>
+        )}
+      </nav>
+      <div className="flex flex-wrap items-start gap-2">
+        <h1 className="min-w-0 flex-1 text-2xl font-bold text-white">
+          {editing ? editTitle || displayTitle : displayTitle}
+        </h1>
+        {!isListed && !isUnconfirmed && (
+          <span className="mt-1 flex-shrink-0 border border-white/10 bg-white/10 px-2 py-0.5 text-xs font-medium text-silver">
+            Archived
+          </span>
+        )}
+      </div>
+      {displaySubtitle && (
+        <p className="mt-1 text-sm text-silver">
+          {editing ? editSubtitle : displaySubtitle}
+        </p>
+      )}
+      {attributesLine && (
+        <p className="mt-0.5 text-sm text-silver/70">
+          {editing
+            ? [editCondition, editYearOfProduction].filter(Boolean).join(" | ")
+            : attributesLine}
+        </p>
+      )}
+    </div>
+  );
+
+  const wantToSellJsx = (
+    <div className="flex flex-wrap gap-4 text-sm text-silver">
+      <span>Want to sell a similar item?</span>
+      <Link
+        href="/create"
+        className="text-chrome hover:text-white underline inline-flex items-center gap-1"
+      >
+        Create a listing now
+      </Link>
+      {!isSeller && (
+        <>
+          <span className="text-white/40">|</span>
+          <button
+            type="button"
+            onClick={() => {
+              setReportOpen(true);
+              setReportMessage(null);
+            }}
+            className="text-silver hover:text-rose-300 underline"
+          >
+            Report listing
+          </button>
+        </>
+      )}
+    </div>
+  );
+
+  const descriptionJsx =
+    listing?.description && !editing ? (
+      <div className="border-t border-white/10 pt-4">
+        <h3 className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-3">
+          Description
+        </h3>
+        <p className="text-silver text-sm whitespace-pre-wrap leading-relaxed">
+          {listing.description}
+        </p>
+        <div className="text-white/30 text-xs mt-4 pt-3 border-t border-white/5 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span>Listed: {formatListingDate(listing.createdAt)}</span>
+          <span>· {listing.status}</span>
+          {listing.txHash &&
+            (() => {
+              const url = getTransactionExplorerUrl(listing.txHash, chainId);
+              const short = `${listing.txHash.slice(0, 8)}…${listing.txHash.slice(-6)}`;
+              return (
+                <>
+                  <span aria-hidden>·</span>
+                  <span className="font-mono">tx {short}</span>
+                  {url && (
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-chrome hover:text-white underline"
+                    >
+                      View on HashScan
+                    </a>
+                  )}
+                </>
+              );
+            })()}
+        </div>
+      </div>
+    ) : null;
+
+  const locationJsx =
+    !editing &&
+    listing &&
+    typeof listing.locationLat === "number" &&
+    typeof listing.locationLng === "number" ? (
+      <div className="border-t border-white/10 pt-4">
+        <h3 className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-3">
+          Location
+        </h3>
+        <LocationMap
+          lat={listing.locationLat}
+          lng={listing.locationLng}
+          city={listing.city}
+        />
+      </div>
+    ) : null;
+
   return (
     <main className="min-h-screen overflow-x-hidden">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 relative overflow-x-hidden">
+      <div className="relative overflow-x-hidden px-3 py-4 sm:px-4">
         {cancelSuccess && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity duration-300 p-4">
             <div className="glass-card p-8 max-w-sm w-full text-center space-y-5">
@@ -1044,192 +1181,142 @@ export default function ListingPage() {
             </div>
           )}
 
-        {/* Title row — left column only, right side intentionally empty so image aligns with panel top */}
-        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-x-8 mb-4">
-          <div>
-            <nav className="flex items-center gap-1 text-sm text-silver flex-wrap mb-3">
-              <Link href="/marketplace" className="hover:text-white">
-                Marketplace
-              </Link>
-              {categoryLabel && categoryLabel !== "Marketplace" && (
-                <>
-                  <span>{">"}</span>
-                  <span className="text-white">{categoryLabel}</span>
-                </>
-              )}
-            </nav>
-            <div className="flex items-start gap-2 flex-wrap">
-              <h1 className="text-2xl font-bold text-white flex-1 min-w-0">
-                {editing ? editTitle || displayTitle : displayTitle}
-              </h1>
-              {!isListed && !isUnconfirmed && (
-                <span className="px-2 py-0.5 text-xs font-medium bg-white/10 text-silver border border-white/10 mt-1 flex-shrink-0">
-                  Archived
-                </span>
-              )}
-            </div>
-            {displaySubtitle && (
-              <p className="text-silver text-sm mt-1">{editing ? editSubtitle : displaySubtitle}</p>
-            )}
-            {attributesLine && (
-              <p className="text-silver/70 text-sm mt-0.5">
-                {editing
-                  ? [editCondition, editYearOfProduction].filter(Boolean).join(" | ")
-                  : attributesLine}
-              </p>
-            )}
-          </div>
-          {/* right side empty — right panel starts at image level below */}
-        </div>
+        {/* Mobile-only title block above the photo. On desktop the title
+            block lives at the top of the right column inside the grid. */}
+        <div className="lg:hidden mb-4">{titleBlockJsx}</div>
 
-        {/* Content grid — image left, action panels right */}
-        <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_400px]">
-          {/* Left: media gallery */}
+        {/* Content grid — image left, action panels right.
+            The breadcrumb + title block now lives at the top of the right
+            column instead of spanning above the image, so the listing detail
+            reads top-to-bottom in one column on the right while the media
+            gallery takes the full left side. */}
+        <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_420px]">
+          {/* Left: media gallery — vertical thumb strip on the left of a
+              large main image that fills more of the viewport. Thumbs are
+              hidden when the listing only has a single media item. */}
           <div className="min-w-0 space-y-4">
-            <div className="relative aspect-[4/3] max-h-[62vh] overflow-hidden rounded-glass-lg border border-white/10 bg-black">
-              {mainImageUrl ? (
-                <>
-                  {isVideoMedia(mainImageUrl) ? (
-                    <video
-                      src={mainImageUrl}
-                      className="h-full w-full object-contain"
-                      controls
-                      playsInline
-                      muted
-                    />
-                  ) : (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={mainImageUrl} alt="" className="h-full w-full object-contain" />
-                  )}
-                  <div className="absolute top-3 right-3 flex gap-2">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        toggleWishlist();
-                      }}
-                      className={`w-10 h-10 rounded-full flex items-center justify-center text-white ${inWishlist ? "bg-emerald-600/90" : "bg-black/60 hover:bg-black/80"}`}
-                      aria-label={inWishlist ? "In wishlist" : "Add to wishlist"}
-                      disabled={wishlistLoading}
+            <div className="flex gap-3">
+              {keptMediaUrls.length > 1 && (
+                <div className="flex w-20 shrink-0 flex-col gap-2 overflow-y-auto pb-1 max-h-[80vh]">
+                  {keptMediaUrls.map((url, i) => (
+                    <div
+                      key={url}
+                      role={editing ? undefined : "button"}
+                      tabIndex={editing ? undefined : 0}
+                      onClick={() => !editing && setSelectedMediaIndex(i)}
+                      onKeyDown={(e) =>
+                        !editing && (e.key === "Enter" || e.key === " ") && setSelectedMediaIndex(i)
+                      }
+                      className={`relative flex-shrink-0 h-20 w-20 cursor-pointer overflow-hidden rounded-glass border-2 transition-colors ${i === safeMediaIndex ? "border-chrome" : "border-white/20 hover:border-white/40"}`}
                     >
-                      {inWishlist ? "✓" : "♡"}
-                    </button>
-                    <button
-                      type="button"
-                      className="w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center text-white"
-                      aria-label="Share"
-                    >
-                      ⎘
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setGalleryOpen(true)}
-                    className="absolute inset-0 z-10 cursor-zoom-in"
-                    aria-label="Open media gallery"
-                  />
-                </>
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center text-silver">
-                  No image
+                      {isVideoMedia(url) ? (
+                        <video
+                          src={url}
+                          className="h-full w-full object-contain bg-black"
+                          muted
+                          playsInline
+                        />
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={url} alt="" className="h-full w-full object-contain bg-black" />
+                      )}
+                      {editing && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeExistingMedia(url);
+                          }}
+                          className="absolute right-0 top-0 flex h-6 w-6 items-center justify-center rounded-bl-lg bg-black/70 text-sm text-white hover:bg-rose-500"
+                          aria-label="Remove"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
-            </div>
-            {keptMediaUrls.length > 1 && (
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {keptMediaUrls.map((url, i) => (
-                  <div
-                    key={url}
-                    role={editing ? undefined : "button"}
-                    tabIndex={editing ? undefined : 0}
-                    onClick={() => !editing && setSelectedMediaIndex(i)}
-                    onKeyDown={(e) =>
-                      !editing && (e.key === "Enter" || e.key === " ") && setSelectedMediaIndex(i)
-                    }
-                    className={`relative flex-shrink-0 w-20 h-20 rounded-glass overflow-hidden border-2 transition-colors cursor-pointer ${i === safeMediaIndex ? "border-chrome" : "border-white/20 hover:border-white/40"}`}
-                  >
-                    {isVideoMedia(url) ? (
+              <div className="relative aspect-square max-h-[80vh] flex-1 overflow-hidden rounded-glass-lg border border-white/10 bg-black">
+                {mainImageUrl ? (
+                  <>
+                    {isVideoMedia(mainImageUrl) ? (
                       <video
-                        src={url}
-                        className="w-full h-full object-contain bg-black"
-                        muted
+                        src={mainImageUrl}
+                        className="h-full w-full object-contain"
+                        controls
                         playsInline
+                        muted
                       />
                     ) : (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={url} alt="" className="w-full h-full object-contain bg-black" />
+                      <img src={mainImageUrl} alt="" className="h-full w-full object-contain" />
                     )}
-                    {editing && (
+                    <div className="absolute top-3 right-3 flex gap-2">
                       <button
                         type="button"
                         onClick={(e) => {
+                          e.preventDefault();
                           e.stopPropagation();
-                          removeExistingMedia(url);
+                          toggleWishlist();
                         }}
-                        className="absolute top-0 right-0 w-6 h-6 flex items-center justify-center bg-black/70 text-white text-sm rounded-bl-lg hover:bg-rose-500"
-                        aria-label="Remove"
+                        className={`flex h-10 w-10 items-center justify-center rounded-full text-white ${inWishlist ? "bg-emerald-600/90" : "bg-black/60 hover:bg-black/80"}`}
+                        aria-label={inWishlist ? "In wishlist" : "Add to wishlist"}
+                        disabled={wishlistLoading}
                       >
-                        ×
+                        {inWishlist ? "✓" : "♡"}
                       </button>
-                    )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const url = window.location.href;
+                          const doCopy = () =>
+                            navigator.clipboard
+                              .writeText(url)
+                              .then(() => {
+                                setShareCopied(true);
+                                setTimeout(() => setShareCopied(false), 1800);
+                              })
+                              .catch(() => {});
+                          if (navigator.share) {
+                            navigator
+                              .share({ title: displayTitle, url })
+                              .catch(() => doCopy());
+                          } else {
+                            void doCopy();
+                          }
+                        }}
+                        className="flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+                        aria-label="Share"
+                        title={shareCopied ? "Link copied!" : "Share"}
+                      >
+                        {shareCopied ? "✓" : "⎘"}
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setGalleryOpen(true)}
+                      className="absolute inset-0 z-10 cursor-zoom-in"
+                      aria-label="Open media gallery"
+                    />
+                  </>
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center text-silver">
+                    No image
                   </div>
-                ))}
+                )}
               </div>
-            )}
-            <div className="flex flex-wrap gap-4 text-sm text-silver">
-              <span>Want to sell a similar item?</span>
-              <Link
-                href="/create"
-                className="text-chrome hover:text-white underline inline-flex items-center gap-1"
-              >
-                Create a listing now
-              </Link>
-              {!isSeller && (
-                <>
-                  <span className="text-white/40">|</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setReportOpen(true);
-                      setReportMessage(null);
-                    }}
-                    className="text-silver hover:text-rose-300 underline"
-                  >
-                    Report listing
-                  </button>
-                </>
-              )}
             </div>
-            {/* Description — shown inline under image gallery when not editing */}
-            {listing?.description && !editing && (
-              <div className="border border-[#4a5e83]/40 bg-gradient-to-b from-[#121a29]/80 to-[#0f1522]/80 p-5">
-                <h3 className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-3">
-                  Description
-                </h3>
-                <p className="text-silver text-sm whitespace-pre-wrap leading-relaxed">
-                  {listing.description}
-                </p>
-                <p className="text-white/30 text-xs mt-4 pt-3 border-t border-white/5">
-                  Listed: {formatListingDate(listing.createdAt)} · {listing.status}
-                </p>
-              </div>
-            )}
-            {!editing &&
-              listing &&
-              typeof listing.locationLat === "number" &&
-              typeof listing.locationLng === "number" && (
-                <div className="border border-[#4a5e83]/40 bg-gradient-to-b from-[#121a29]/80 to-[#0f1522]/80 p-5">
-                  <h3 className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-3">
-                    Location
-                  </h3>
-                  <LocationMap
-                    lat={listing.locationLat}
-                    lng={listing.locationLng}
-                    city={listing.city}
-                  />
-                </div>
-              )}
+            {/* Desktop-only: want-to-sell + description + location live in
+                the left column under the photo on desktop. On mobile these
+                are rendered as a separate block below the grid so the buy
+                panel / shipping / seller surface immediately after the
+                photo. */}
+            <div className="hidden lg:block">{wantToSellJsx}</div>
+            <div className="hidden lg:block">{descriptionJsx}</div>
+            <div className="hidden lg:block">{locationJsx}</div>
             {isSeller && isSellerActiveListing && editing && (
               <div className="glass-card p-4 space-y-3">
                 <h3 className="text-white font-medium">Configure</h3>
@@ -1318,12 +1405,23 @@ export default function ListingPage() {
                   </div>
                 )}
                 <label className="block">
-                  <span className="text-xs text-silver">Add photos (optional), max 2MB each</span>
+                  <span className="text-xs text-silver">
+                    Add photos (optional) — max 10 per listing, 2MB each
+                  </span>
                   <input
                     type="file"
                     accept={ALLOWED_TYPES}
                     multiple
-                    onChange={(e) => setEditImageFiles(Array.from(e.target.files ?? []))}
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files ?? []);
+                      const room = Math.max(0, 10 - keptMediaUrls.length);
+                      if (files.length > room) {
+                        setEditError(`Listings are limited to 10 photos (${room} slot${room === 1 ? "" : "s"} left).`);
+                      } else {
+                        setEditError(null);
+                      }
+                      setEditImageFiles(files.slice(0, room));
+                    }}
                     className="input-frost mt-1 w-full text-silver text-sm file:text-xs"
                   />
                   {editImageFiles.length > 0 && (
@@ -1359,8 +1457,14 @@ export default function ListingPage() {
             )}
           </div>
 
-          {/* Right: price + buy/escrow panel */}
+          {/* Right: title + price + buy/escrow panel.
+              Title block + grey divider only show on desktop here; on mobile
+              the title is rendered above the photo and the buy panel sits
+              directly below the photo. */}
           <div className="min-w-0 space-y-4">
+            <div className="hidden lg:block">{titleBlockJsx}</div>
+            <div className="hidden lg:block border-t border-white/10" />
+
             {listing && priceMismatch && onChainPriceHbar && (
               <p className="text-sm text-amber-300/90 mt-1">
                 Listing price: <strong>{formatPriceForDisplay(listing.price)} HBAR</strong>.
@@ -1466,14 +1570,14 @@ export default function ListingPage() {
                 listing.buyer.toLowerCase() === address.toLowerCase()
               ) &&
               !(listing.status === "LOCKED" || isLockedOnChain) && (
-                <div className="glass-card p-4 rounded-glass border border-white/10">
+                <div className="border-t border-white/10 pt-4">
                   <p className="text-silver text-sm">
                     This listing is no longer available for purchase.
                   </p>
                 </div>
               )}
             {listing && (isListed || isUnconfirmed) && isSeller && (
-              <div className="glass-card p-4 rounded-glass border border-white/10 space-y-3">
+              <div className="space-y-3 border-t border-white/10 pt-4">
                 <div>
                   <p className="text-xs text-silver uppercase tracking-wider mb-1">
                     Your listing price
@@ -1507,54 +1611,58 @@ export default function ListingPage() {
                 </div>
               )}
 
-            {listing?.txHash && (
-              <div className="glass-card p-4 rounded-glass border border-white/10">
-                <h3 className="text-white font-medium mb-2">Transaction</h3>
-                <div className="text-sm text-silver space-y-1">
-                  <p className="font-mono text-xs text-silver/80 break-all">{listing.txHash}</p>
-                  {(() => {
-                    const url = getTransactionExplorerUrl(listing.txHash, chainId);
-                    return url ? (
-                      <a
-                        href={url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-chrome hover:text-white underline"
-                      >
-                        View on HashScan
-                      </a>
-                    ) : null;
-                  })()}
-                </div>
+            {listing && isListed && (
+              <div className="border-t border-white/10 pt-4">
+                <h3 className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-3">
+                  Shipping, returns &amp; payments
+                </h3>
+                <dl className="divide-y divide-white/5 text-sm">
+                  <div className="grid grid-cols-[110px_minmax(0,1fr)] gap-3 py-2">
+                    <dt className="text-silver/70">Shipping:</dt>
+                    <dd className="text-silver">
+                      {listing.requireEscrow
+                        ? "Seller ships once payment is locked in escrow."
+                        : "Buyer arranges with seller after payment."}
+                    </dd>
+                  </div>
+                  {listing.city && (
+                    <div className="grid grid-cols-[110px_minmax(0,1fr)] gap-3 py-2">
+                      <dt className="text-silver/70">Located in:</dt>
+                      <dd className="text-white">{listing.city}</dd>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-[110px_minmax(0,1fr)] gap-3 py-2">
+                    <dt className="text-silver/70">Returns:</dt>
+                    <dd className="text-silver">
+                      {listing.requireEscrow ? (
+                        <>
+                          Buyer-protected: escrow auto-refunds if the item isn&apos;t shipped or
+                          received.
+                        </>
+                      ) : (
+                        <>No returns — private sale.</>
+                      )}
+                    </dd>
+                  </div>
+                  <div className="grid grid-cols-[110px_minmax(0,1fr)] gap-3 py-2">
+                    <dt className="text-silver/70">Payments:</dt>
+                    <dd>
+                      <span className="inline-flex items-center gap-1.5 rounded-md border border-[#5b21b6]/40 bg-gradient-to-br from-[#5b21b6]/25 to-[#1e1b4b]/25 px-2.5 py-1 text-xs font-semibold text-white">
+                        <span aria-hidden className="text-[#a78bfa]">⚡</span>
+                        HashPack
+                        <span className="text-silver/60">· HBAR</span>
+                      </span>
+                    </dd>
+                  </div>
+                </dl>
               </div>
             )}
 
-            <div className="glass-card p-4 rounded-glass border border-white/10">
-              <h3 className="text-white font-medium mb-2">Security</h3>
-              <ul className="text-sm text-silver space-y-1">
-                <li className="flex items-center gap-2">✓ Payment via escrow</li>
-                {isUnconfirmed ? (
-                  <li className="flex items-center gap-2 text-amber-300/80">
-                    ✗ Ownership not yet confirmed on-chain
-                  </li>
-                ) : (
-                  <li className="flex items-center gap-2">✓ Ownership confirmed on-chain</li>
-                )}
-                <li className="flex items-center gap-2 text-rose-300/80">
-                  ✗ No legal obligation to accept returns for private sales
-                </li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="text-white font-medium mb-2">Seller</h3>
+            <div className="border-t border-white/10 pt-4">
+              <h3 className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-2">
+                Seller
+              </h3>
               <SellerProfileMeta seller={item!.seller} />
-              <Link
-                href={`/profile/${encodeURIComponent(item!.seller)}`}
-                className="mt-1 flex items-center gap-2 text-silver text-sm hover:text-white transition-colors"
-              >
-                <AddressDisplay address={item!.seller} className="text-chrome font-mono text-xs" />
-              </Link>
               {isSeller && isSellerActiveListing && !isLockedOnChain && !editing && (
                 <div className="flex gap-2 mt-2">
                   <button
@@ -1600,6 +1708,15 @@ export default function ListingPage() {
                 ))}
             </div>
           </div>
+        </div>
+
+        {/* Mobile-only: below the buy panel / shipping / seller, show the
+            location map first, then the description, then the want-to-sell
+            link. Desktop renders these inside the grid's left column. */}
+        <div className="mt-4 space-y-4 lg:hidden">
+          {locationJsx}
+          {descriptionJsx}
+          {wantToSellJsx}
         </div>
 
         {/* Chat thread — shown when user is buyer or seller of a purchased listing */}

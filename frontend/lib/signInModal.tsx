@@ -51,13 +51,17 @@ export function SignInModalProvider({ children }: { children: React.ReactNode })
     onConnectedRef.current = undefined;
   }, []);
 
-  // Lock body scroll while the modal is open.
+  // Lock page scroll while the modal is open (html + body — some browsers
+  // scroll the root element rather than body).
   useEffect(() => {
     if (!open) return;
-    const prev = document.body.style.overflow;
+    const prevBody = document.body.style.overflow;
+    const prevHtml = document.documentElement.style.overflow;
     document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
     return () => {
-      document.body.style.overflow = prev;
+      document.body.style.overflow = prevBody;
+      document.documentElement.style.overflow = prevHtml;
     };
   }, [open]);
 
@@ -105,7 +109,7 @@ export function SignInModalProvider({ children }: { children: React.ReactNode })
     open && portalTarget
       ? createPortal(
           <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+            className="fixed inset-0 z-[300] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
             role="dialog"
             aria-modal="true"
             aria-label="Sign in with HashPack"

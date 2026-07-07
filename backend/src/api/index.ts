@@ -1,6 +1,6 @@
 import path from "path";
 import fs from "fs";
-import { Router } from "express";
+import { Router, type Request as ExpressRequest } from "express";
 import multer from "multer";
 import { PrismaClient } from "../generated/prisma/client";
 import type { Logger } from "pino";
@@ -8,6 +8,7 @@ import { ethers } from "ethers";
 import { fetchMirrorEvents } from "../mirror";
 import { decodeEvents, EXPECTED_TOPIC0_ITEM_LISTED } from "../indexer/decoder";
 import { saveUpload } from "../storage";
+import { decryptJson, encryptJson, secretBoxConfigured } from "../lib/secretBox";
 
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB
 const MAX_MEDIA_SIZE = 15 * 1024 * 1024; // 15MB for video
@@ -118,6 +119,13 @@ function isReportRateLimited(key: string): boolean {
 const ESCROW_ABI_VIEW = [
   "function escrows(bytes32) view returns (address buyer, address seller, uint256 amount, uint256 createdAt, uint256 timeoutAt, uint8 state)",
 ];
+const ESCROW_V2_ABI_VIEW = [
+  "function escrows(bytes32) view returns (address buyer, address seller, uint256 amount, uint256 createdAt, uint256 shipDeadline, uint256 shippedAt, uint8 state, bool disputed)",
+  "function autoReleaseWindow() view returns (uint256)",
+];
+const IS_ESCROW_V2 = process.env.ESCROW_V2 === "true";
+// EscrowV2.autoReleaseWindow, cached once — only changes via an admin tx.
+let escrowV2AutoReleaseWindow: number | null = null;
 const MARKETPLACE_LISTINGS_VIEW_V2 =
   "function listings(bytes32) view returns (address seller, uint256 price, uint256 createdAt, uint8 status, bytes32 escrowId, bool requireEscrow)";
 const MARKETPLACE_LISTINGS_VIEW_V1 =
@@ -128,6 +136,89 @@ type MarketplaceListingView = {
   price: bigint;
   status: number;
 };
+
+// Shared JSON-RPC provider. Hedera's public relay is slow and rate-limited;
+// creating a provider per request forces an extra eth_chainId detection
+// round-trip in ethers v6 and multiplies load. staticNetwork skips detection.
+let sharedRpcProvider: ethers.JsonRpcProvider | null = null;
+let sharedRpcProviderUrl: string | null = null;
+function getRpcProvider(rpcUrl: string): ethers.JsonRpcProvider {
+  if (!sharedRpcProvider || sharedRpcProviderUrl !== rpcUrl) {
+    sharedRpcProvider = new ethers.JsonRpcProvider(rpcUrl, undefined, { staticNetwork: true });
+    sharedRpcProviderUrl = rpcUrl;
+  }
+  return sharedRpcProvider;
+}
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error("rpc timeout")), ms)),
+  ]);
+}
+
+// Short-lived cache of on-chain listing views so repeat page loads and the
+// /listings fan-out don't hammer the relay. On-chain data only changes on a
+// transaction, so 30s of staleness is invisible in practice.
+const chainViewCache = new Map<string, { at: number; view: MarketplaceListingView }>();
+const CHAIN_VIEW_TTL_MS = 30_000;
+
+// Escrow views change while an order is in flight, so cache them for a
+// shorter window (null = confirmed "no escrow").
+type EscrowView = {
+  buyer: string;
+  seller: string;
+  amount: string;
+  createdAt: number;
+  // Operative deadline for the current state: v1 = contract timeoutAt; v2 =
+  // shipDeadline while AWAITING_SHIPMENT, shippedAt + autoReleaseWindow once
+  // SHIPPED, 0 when final.
+  timeoutAt: number;
+  state: string;
+  v2?: boolean;
+  shippedAt?: number;
+  disputed?: boolean;
+} | null;
+const escrowViewCache = new Map<string, { at: number; view: EscrowView }>();
+const ESCROW_VIEW_TTL_MS = 10_000;
+
+// Whole-response cache for GET /listings. Invalidated by listing mutations so
+// new/updated listings appear immediately.
+let listingsResponseCache: { at: number; payload: unknown } | null = null;
+const LISTINGS_CACHE_TTL_MS = 10_000;
+function invalidateListingsCache(): void {
+  listingsResponseCache = null;
+}
+
+// Failed reads are negative-cached briefly so a slow/rate-limited relay
+// doesn't re-stall every request for the full timeout window.
+const chainViewErrorAt = new Map<string, number>();
+const CHAIN_VIEW_ERROR_TTL_MS = 15_000;
+
+async function readListingViewCached(
+  rpcUrl: string,
+  marketplaceAddr: string,
+  listingId: string,
+): Promise<MarketplaceListingView> {
+  const hit = chainViewCache.get(listingId);
+  if (hit && Date.now() - hit.at < CHAIN_VIEW_TTL_MS) return hit.view;
+  const failedAt = chainViewErrorAt.get(listingId);
+  if (failedAt && Date.now() - failedAt < CHAIN_VIEW_ERROR_TTL_MS) {
+    throw new Error("rpc unavailable (cached)");
+  }
+  try {
+    const view = await withTimeout(
+      readMarketplaceListingCompat(getRpcProvider(rpcUrl), marketplaceAddr, listingId),
+      2500,
+    );
+    chainViewCache.set(listingId, { at: Date.now(), view });
+    chainViewErrorAt.delete(listingId);
+    return view;
+  } catch (e) {
+    chainViewErrorAt.set(listingId, Date.now());
+    throw e;
+  }
+}
 
 async function readMarketplaceListingCompat(
   provider: ethers.JsonRpcProvider,
@@ -292,8 +383,17 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
 
   router.get("/listings", async (req, res) => {
     try {
+      // Whole-response micro-cache: the marketplace page (and its SSR pass)
+      // hits this on every load/refresh. A short TTL makes repeat loads
+      // instant while staying fresh enough for a marketplace feed.
+      if (listingsResponseCache && Date.now() - listingsResponseCache.at < LISTINGS_CACHE_TTL_MS) {
+        return res.json(listingsResponseCache.payload);
+      }
+      // Only surface listings whose create transaction has been confirmed
+      // on-chain. PENDING / unconfirmed listings stay out of the public
+      // marketplace so buyers don't see items that may never actually appear.
       const listings = await prisma.listing.findMany({
-        where: { status: "LISTED" },
+        where: { status: "LISTED", onChainConfirmed: true },
         orderBy: { createdAt: "desc" },
         take: 100,
       });
@@ -313,11 +413,10 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       const rpcUrl = process.env.HEDERA_RPC_URL;
       if (isUsableContractAddress(marketplaceAddr) && rpcUrl && listings.length > 0) {
         try {
-          const provider = new ethers.JsonRpcProvider(rpcUrl);
           const overrides = await Promise.all(
             listings.map(async (l) => {
               try {
-                const data = await readMarketplaceListingCompat(provider, marketplaceAddr, l.id);
+                const data = await readListingViewCached(rpcUrl, marketplaceAddr, l.id);
                 const priceStr = data.price.toString();
                 const statusNum = Number(data.status);
                 const hasSeller = data.seller && data.seller !== ethers.ZeroAddress;
@@ -357,7 +456,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           log.warn({ err: e }, "Could not read on-chain listing prices for /listings");
         }
       }
-      res.json({
+      const payload = {
         listings: listings.map((l) => ({
           ...l,
           imageUrl: rewriteMediaUrlForClient(l.imageUrl),
@@ -371,7 +470,9 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           mediaUrls: rewriteMediaUrlsForClient((a as any).mediaUrls) ?? (a as any).mediaUrls,
           reservePrice: toHbarForClient(a.reservePrice),
         })),
-      });
+      };
+      listingsResponseCache = { at: Date.now(), payload };
+      res.json(payload);
     } catch (err: unknown) {
       log.error({ err }, "Failed to fetch listings");
       const code =
@@ -403,6 +504,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
    * without waiting for the indexer (Mirror/RPC can be slow or limited on Hedera).
    */
   router.post("/sync-listing", async (req, res) => {
+    invalidateListingsCache();
     const {
       txHash,
       listingId,
@@ -611,7 +713,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     }
 
     try {
-      const provider = new ethers.JsonRpcProvider(rpcUrl);
+      const provider = getRpcProvider(rpcUrl);
       const receipt = await provider.getTransactionReceipt(evmTxHash);
       if (!receipt || !receipt.logs?.length) {
         if (canFallbackUpsert) {
@@ -689,6 +791,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
    * Sync a listing price update from tx so the latest on-chain price is reflected immediately.
    */
   router.post("/sync-price-update", async (req, res) => {
+    invalidateListingsCache();
     const { txHash, listingId, newPrice } = (req.body || {}) as {
       txHash?: string;
       listingId?: string;
@@ -739,7 +842,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       return res.status(503).json({ error: "HEDERA_RPC_URL not set" });
     }
     try {
-      const provider = new ethers.JsonRpcProvider(rpcUrl);
+      const provider = getRpcProvider(rpcUrl);
       const receipt = await provider.getTransactionReceipt(txHash);
       if (!receipt?.logs?.length) {
         if (await applyFallbackPrice()) {
@@ -795,6 +898,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
    * Sync a listing cancellation from tx so dashboard count updates immediately.
    */
   router.post("/sync-cancel", async (req, res) => {
+    invalidateListingsCache();
     const { txHash } = (req.body || {}) as { txHash?: string };
     if (!txHash || typeof txHash !== "string") {
       return res.status(400).json({ error: "txHash required" });
@@ -831,7 +935,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         evmTxHash = mirrorData.hash;
       }
 
-      const provider = new ethers.JsonRpcProvider(rpcUrl);
+      const provider = getRpcProvider(rpcUrl);
       const receipt = await provider.getTransactionReceipt(evmTxHash);
       if (!receipt?.logs?.length) {
         return res.status(404).json({ error: "Transaction or logs not found" });
@@ -859,6 +963,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
    * Only works when onChainConfirmed is false and the caller is the seller.
    */
   router.post("/listing/:id/cancel-offchain", async (req, res) => {
+    invalidateListingsCache();
     const { id } = req.params;
     const { address, force } = (req.body || {}) as { address?: string; force?: boolean };
     const seller = address?.trim()?.toLowerCase();
@@ -888,6 +993,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
   });
 
   router.post("/sync-purchase", async (req, res) => {
+    invalidateListingsCache();
     const { txHash, listingId } = (req.body || {}) as { txHash?: string; listingId?: string };
     const fallbackListingId =
       typeof listingId === "string" && listingId.trim()
@@ -923,7 +1029,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       return res.status(503).json({ error: "HEDERA_RPC_URL not set" });
     }
     try {
-      const provider = new ethers.JsonRpcProvider(rpcUrl);
+      const provider = getRpcProvider(rpcUrl);
       const receipt = await provider.getTransactionReceipt(txHash);
       if (!receipt?.logs?.length) {
         if (await applyFallbackPurchaseStatus()) {
@@ -990,6 +1096,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
    * Marks listing SOLD once escrow is COMPLETE.
    */
   router.post("/sync-escrow-complete", async (req, res) => {
+    invalidateListingsCache();
     const { listingId } = (req.body || {}) as { listingId?: string };
     const normalizedId =
       typeof listingId === "string" && listingId.trim()
@@ -1004,10 +1111,15 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     }
 
     try {
-      const provider = new ethers.JsonRpcProvider(rpcUrl);
-      const contract = new ethers.Contract(escrowAddr, ESCROW_ABI_VIEW, provider);
+      const provider = getRpcProvider(rpcUrl);
+      const contract = new ethers.Contract(
+        escrowAddr,
+        IS_ESCROW_V2 ? ESCROW_V2_ABI_VIEW : ESCROW_ABI_VIEW,
+        provider,
+      );
       const data = await contract.escrows(listingIdToBytes32(normalizedId));
-      const [buyer, , , , , stateNum] = data;
+      const buyer = data[0];
+      const stateNum = IS_ESCROW_V2 ? data[6] : data[5];
       const isComplete = Number(stateNum) === 2;
       if (!isComplete) {
         return res.status(409).json({ error: "Escrow is not complete yet" });
@@ -1080,7 +1192,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     const rpcUrl = process.env.HEDERA_RPC_URL;
     if (txHashStr && rpcUrl) {
       try {
-        const provider = new ethers.JsonRpcProvider(rpcUrl);
+        const provider = getRpcProvider(rpcUrl);
         const receipt = await provider.getTransactionReceipt(txHashStr);
         if (receipt?.logs?.length) {
           for (const logEntry of receipt.logs) {
@@ -1290,7 +1402,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       return res.status(503).json({ error: "HEDERA_RPC_URL not set" });
     }
     try {
-      const provider = new ethers.JsonRpcProvider(rpcUrl);
+      const provider = getRpcProvider(rpcUrl);
       const receipt = await provider.getTransactionReceipt(txHash);
       if (!receipt?.logs?.length) {
         return res.status(404).json({ error: "Transaction or logs not found" });
@@ -1367,8 +1479,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       const rpcUrl = process.env.HEDERA_RPC_URL;
       if (isUsableContractAddress(marketplaceAddr) && rpcUrl) {
         try {
-          const provider = new ethers.JsonRpcProvider(rpcUrl);
-          const data = await readMarketplaceListingCompat(provider, marketplaceAddr, id);
+          const data = await readListingViewCached(rpcUrl, marketplaceAddr, id);
           const priceStr = data.price.toString();
           const statusNum = Number(data.status);
           const hasSeller = data.seller && data.seller !== ethers.ZeroAddress;
@@ -1555,6 +1666,113 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
   });
 
   /**
+   * POST /api/listing/:id/shipping-address — buyer saves their delivery
+   * address before paying. The purchase UI requires this to succeed before it
+   * lets the buyer sign the transaction, so the seller always has somewhere
+   * to ship. Upserts per (listing, buyer).
+   */
+  router.post("/listing/:id/shipping-address", async (req, res) => {
+    try {
+      const id = normalizeListingId(req.params.id ?? "");
+      const body = (req.body || {}) as Record<string, unknown>;
+      const buyer = normalizeWalletAddress(body.buyerAddress as string | undefined);
+      if (!buyer) return res.status(400).json({ error: "buyerAddress is required" });
+
+      const listing = await prisma.listing.findUnique({ where: { id } });
+      if (!listing) return res.status(404).json({ error: "Listing not found" });
+      if (listing.seller.toLowerCase() === buyer) {
+        return res.status(400).json({ error: "You can't buy your own listing." });
+      }
+
+      const field = (key: string, max: number) =>
+        String((body[key] as string | undefined) ?? "")
+          .trim()
+          .slice(0, max);
+      const name = field("name", 120);
+      const line1 = field("line1", 200);
+      const line2 = field("line2", 200) || null;
+      const city = field("city", 120);
+      const region = field("region", 120) || null;
+      const postalCode = field("postalCode", 20);
+      const country = field("country", 2).toUpperCase();
+      const phone = field("phone", 30) || null;
+
+      if (name.length < 2) return res.status(400).json({ error: "Full name is required." });
+      if (line1.length < 4)
+        return res.status(400).json({ error: "Street address is required." });
+      if (city.length < 2) return res.status(400).json({ error: "City is required." });
+      if (postalCode.length < 3)
+        return res.status(400).json({ error: "Postal / ZIP code is required." });
+      if (!/^[A-Z]{2}$/.test(country))
+        return res.status(400).json({ error: "Country must be a 2-letter code." });
+
+      // Fail closed: without an encryption key the address is rejected, so
+      // client PII never lands in the database in plaintext.
+      if (!secretBoxConfigured()) {
+        log.error("SHIPPING_ADDRESS_KEY not configured — refusing to store shipping address");
+        return res
+          .status(503)
+          .json({ error: "Checkout is temporarily unavailable. Please try again shortly." });
+      }
+      const payload = encryptJson({ name, line1, line2, city, region, postalCode, country, phone });
+      const saved = await prisma.shippingAddress.upsert({
+        where: { listingId_buyer: { listingId: id, buyer } },
+        create: { listingId: id, buyer, payload },
+        update: { payload },
+      });
+      return res.json({ ok: true, id: saved.id });
+    } catch (err) {
+      log.error({ err }, "Failed to save shipping address");
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  /**
+   * GET /api/listing/:id/shipping-address?requester=… — a buyer reads back
+   * their own saved address; the seller reads the address of the actual
+   * buyer (once one exists) so they know where to ship. Nobody else sees it.
+   */
+  router.get("/listing/:id/shipping-address", async (req, res) => {
+    try {
+      const id = normalizeListingId(req.params.id ?? "");
+      const requester = normalizeWalletAddress(String(req.query.requester ?? ""));
+      if (!requester) return res.status(400).json({ error: "requester is required" });
+
+      const listing = await prisma.listing.findUnique({ where: { id } });
+      if (!listing) return res.status(404).json({ error: "Listing not found" });
+
+      const isSeller = listing.seller.toLowerCase() === requester;
+      let buyer = requester;
+      if (isSeller) {
+        const listingBuyer = (listing.buyer || "").toLowerCase();
+        if (!listingBuyer) return res.status(404).json({ error: "No buyer yet" });
+        buyer = listingBuyer;
+      }
+
+      const record = await prisma.shippingAddress.findUnique({
+        where: { listingId_buyer: { listingId: id, buyer } },
+      });
+      if (!record) return res.status(404).json({ error: "No shipping address on file" });
+      let address: Record<string, string | null>;
+      try {
+        address = decryptJson<Record<string, string | null>>(record.payload);
+      } catch (err) {
+        // Wrong/rotated key or corrupted row — treat as absent rather than 500
+        // so checkout can simply re-collect the address.
+        log.error({ err, listingId: id }, "Failed to decrypt shipping address");
+        return res.status(404).json({ error: "No shipping address on file" });
+      }
+      const { name, line1, line2, city, region, postalCode, country, phone } = address;
+      return res.json({
+        address: { name, line1, line2, city, region, postalCode, country, phone },
+      });
+    } catch (err) {
+      log.error({ err }, "Failed to fetch shipping address");
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  /**
    * GET /api/escrow/:listingId — read escrow state from chain (buyer, seller, amount, state, timeoutAt).
    * State: 0 = AWAITING_SHIPMENT, 1 = AWAITING_CONFIRMATION, 2 = COMPLETE.
    * Returns 404 if no escrow (buyer is zero).
@@ -1568,22 +1786,71 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     try {
       const rawId = req.params.listingId ?? "";
       const listingIdBytes32 = listingIdToBytes32(rawId);
-      const provider = new ethers.JsonRpcProvider(rpcUrl);
-      const contract = new ethers.Contract(escrowAddr, ESCROW_ABI_VIEW, provider);
-      const data = await contract.escrows(listingIdBytes32);
-      const [buyer, seller, amount, createdAt, timeoutAt, stateNum] = data;
-      if (!buyer || buyer === ethers.ZeroAddress) {
+
+      // Purchases/dashboard fan this endpoint out once per listing — cache
+      // the on-chain view briefly and bound the RPC read so a slow relay
+      // can't stall those pages.
+      const cached = escrowViewCache.get(listingIdBytes32);
+      let view = cached && Date.now() - cached.at < ESCROW_VIEW_TTL_MS ? cached.view : undefined;
+      if (view === undefined) {
+        const provider = getRpcProvider(rpcUrl);
+        if (IS_ESCROW_V2) {
+          const contract = new ethers.Contract(escrowAddr, ESCROW_V2_ABI_VIEW, provider);
+          const data = await withTimeout(contract.escrows(listingIdBytes32), 2500);
+          const [buyer, seller, amount, createdAt, shipDeadline, shippedAt, stateNum, disputed] =
+            data;
+          if (!buyer || buyer === ethers.ZeroAddress) {
+            view = null;
+          } else {
+            if (escrowV2AutoReleaseWindow === null) {
+              escrowV2AutoReleaseWindow = Number(
+                await withTimeout(contract.autoReleaseWindow(), 2500),
+              );
+            }
+            const stateNames = ["AWAITING_SHIPMENT", "SHIPPED", "COMPLETE", "REFUNDED"];
+            const state = Number(stateNum);
+            const timeoutAt =
+              state === 0
+                ? Number(shipDeadline)
+                : state === 1
+                  ? Number(shippedAt) + escrowV2AutoReleaseWindow
+                  : 0;
+            view = {
+              buyer: buyer.toLowerCase(),
+              seller: seller.toLowerCase(),
+              amount: amount.toString(),
+              createdAt: Number(createdAt),
+              timeoutAt,
+              state: stateNames[state] ?? "UNKNOWN",
+              v2: true,
+              shippedAt: Number(shippedAt),
+              disputed: Boolean(disputed),
+            };
+          }
+        } else {
+          const contract = new ethers.Contract(escrowAddr, ESCROW_ABI_VIEW, provider);
+          const data = await withTimeout(contract.escrows(listingIdBytes32), 2500);
+          const [buyer, seller, amount, createdAt, timeoutAt, stateNum] = data;
+          if (!buyer || buyer === ethers.ZeroAddress) {
+            view = null;
+          } else {
+            const stateNames = ["AWAITING_SHIPMENT", "AWAITING_CONFIRMATION", "COMPLETE"];
+            view = {
+              buyer: buyer.toLowerCase(),
+              seller: seller.toLowerCase(),
+              amount: amount.toString(),
+              createdAt: Number(createdAt),
+              timeoutAt: Number(timeoutAt),
+              state: stateNames[Number(stateNum)] ?? "UNKNOWN",
+            };
+          }
+        }
+        escrowViewCache.set(listingIdBytes32, { at: Date.now(), view });
+      }
+      if (view === null) {
         return res.status(404).json({ error: "No escrow for this listing" });
       }
-      const stateNames = ["AWAITING_SHIPMENT", "AWAITING_CONFIRMATION", "COMPLETE"];
-      res.json({
-        buyer: buyer.toLowerCase(),
-        seller: seller.toLowerCase(),
-        amount: amount.toString(),
-        createdAt: Number(createdAt),
-        timeoutAt: Number(timeoutAt),
-        state: stateNames[Number(stateNum)] ?? "UNKNOWN",
-      });
+      res.json(view);
     } catch (err) {
       log.error({ err }, "Failed to fetch escrow");
       res.status(500).json({ error: "Internal server error" });
@@ -1591,6 +1858,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
   });
 
   router.patch("/listing/:id", async (req, res) => {
+    invalidateListingsCache();
     try {
       const id = normalizeListingId(req.params.id ?? "");
       const {
@@ -2507,6 +2775,80 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     }
   });
 
+  // Resolve an address (EVM 0x or Hedera 0.0.x) to its Hedera account ID via
+  // the mirror node. Returns null if it can't be resolved.
+  async function resolveAccountId(address: string): Promise<string | null> {
+    if (/^0\.0\.\d+$/.test(address)) return address;
+    if (!/^0x[0-9a-f]{40}$/.test(address)) return null;
+    const mirrorUrl = process.env.MIRROR_URL || "https://testnet.mirrornode.hedera.com";
+    try {
+      const r = await fetch(`${mirrorUrl}/api/v1/accounts/${address}`, {
+        signal: AbortSignal.timeout(4000),
+      });
+      if (!r.ok) return null;
+      const data = (await r.json()) as { account?: string | number };
+      const id = data.account;
+      if (typeof id === "string" && /^0\.0\.\d+$/.test(id)) return id;
+      if (typeof id === "number") return `0.0.${id}`;
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  // Pull profile info (HNS-style username + PFP NFT thumbnail) from HashPack's
+  // public profile API for the given Hedera account IDs.
+  // POST https://api.hashpack.app/user-profile/get-multiple { accountIds, network }
+  async function fetchHashPackProfiles(
+    accountIds: string[],
+  ): Promise<Map<string, { name: string | null; avatarUrl: string | null }>> {
+    const out = new Map<string, { name: string | null; avatarUrl: string | null }>();
+    if (accountIds.length === 0) return out;
+    const mirrorUrl = process.env.MIRROR_URL || "https://testnet.mirrornode.hedera.com";
+    const network = mirrorUrl.includes("mainnet") ? "mainnet" : "testnet";
+    try {
+      const r = await fetch("https://api.hashpack.app/user-profile/get-multiple", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountIds, network }),
+        signal: AbortSignal.timeout(7000),
+      });
+      if (!r.ok) return out;
+      const data = (await r.json()) as
+        | {
+            profiles?: Array<{
+              accountId?: string;
+              name?: { name?: string } | string | null;
+              picture?: { thumbnail?: string } | string | null;
+            }>;
+          }
+        | Array<{
+            accountId?: string;
+            name?: { name?: string } | string | null;
+            picture?: { thumbnail?: string } | string | null;
+          }>;
+      const list = Array.isArray(data) ? data : (data?.profiles ?? []);
+      for (const p of list) {
+        if (!p?.accountId) continue;
+        const nameRaw =
+          typeof p.name === "string" ? p.name : (p.name && typeof p.name === "object" ? p.name.name : null);
+        const pictureRaw =
+          typeof p.picture === "string"
+            ? p.picture
+            : p.picture && typeof p.picture === "object"
+              ? p.picture.thumbnail
+              : null;
+        out.set(p.accountId, {
+          name: typeof nameRaw === "string" && nameRaw.trim() ? nameRaw.trim() : null,
+          avatarUrl: typeof pictureRaw === "string" && pictureRaw.trim() ? pictureRaw.trim() : null,
+        });
+      }
+    } catch {
+      // Network/timeout failures fall back to whatever Hashpop has on file.
+    }
+    return out;
+  }
+
   // Batch public-profile lookup used to render display names, avatars, KYC
   // badges and ratings on listing cards / detail pages without N round-trips.
   router.get("/users/profiles", async (req, res) => {
@@ -2522,7 +2864,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       ).slice(0, 100);
       if (addresses.length === 0) return res.json({ profiles: {} });
 
-      const [users, ratingGroups] = await Promise.all([
+      const [users, ratingGroups, accountIds] = await Promise.all([
         prisma.user.findMany({
           where: { address: { in: addresses } },
           select: {
@@ -2538,6 +2880,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           _avg: { score: true },
           _count: { _all: true },
         }),
+        Promise.all(addresses.map(resolveAccountId)),
       ]);
 
       const ratingByAddress = new Map(
@@ -2547,12 +2890,25 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         ]),
       );
 
+      const addressToAccount = new Map<string, string>();
+      const uniqueAccountIds: string[] = [];
+      addresses.forEach((a, i) => {
+        const id = accountIds[i];
+        if (id) {
+          addressToAccount.set(a, id);
+          if (!uniqueAccountIds.includes(id)) uniqueAccountIds.push(id);
+        }
+      });
+      const hashpackByAccount = await fetchHashPackProfiles(uniqueAccountIds);
+
       const profiles: Record<
         string,
         {
           address: string;
           displayName: string | null;
           avatarUrl: string | null;
+          hashpackName: string | null;
+          hashpackAvatarUrl: string | null;
           kycVerified: boolean;
           ratingAverage: number | null;
           ratingCount: number;
@@ -2561,10 +2917,14 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       for (const addr of addresses) {
         const u = users.find((x) => x.address === addr);
         const r = ratingByAddress.get(addr);
+        const accountId = addressToAccount.get(addr);
+        const hp = accountId ? hashpackByAccount.get(accountId) : undefined;
         profiles[addr] = {
           address: addr,
           displayName: u?.displayName ?? null,
           avatarUrl: u?.avatarUrl ?? null,
+          hashpackName: hp?.name ?? null,
+          hashpackAvatarUrl: hp?.avatarUrl ?? null,
           kycVerified: u?.kycStatus === "VERIFIED",
           ratingAverage: r?.average ?? null,
           ratingCount: r?.count ?? 0,
@@ -2574,6 +2934,174 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     } catch (err) {
       log.error({ err }, "Failed to fetch batch profiles");
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // /area51 admin portal
+  // ---------------------------------------------------------------------------
+  // Admin addresses are configured via the ADMIN_ADDRESSES env var (a
+  // comma-separated list of lowercased EVM addresses). To access the portal,
+  // an admin signs `hashpop.admin.session:<unix-ms>` with their wallet; the
+  // resulting token (base64-encoded JSON of {address, t, signature}) is sent
+  // in the `x-admin-token` header on every admin request and verified server
+  // side. Tokens are valid for 24h.
+
+  function isAdminAddress(addr: string | null | undefined): boolean {
+    if (!addr) return false;
+    const raw = process.env.ADMIN_ADDRESSES || "";
+    const set = new Set(
+      raw
+        .split(",")
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean),
+    );
+    return set.has(addr.toLowerCase());
+  }
+
+  function verifyAdminToken(
+    req: ExpressRequest,
+  ): { ok: true; address: string } | { ok: false; error: string; status: number } {
+    const raw = req.headers["x-admin-token"];
+    if (!raw || typeof raw !== "string") {
+      return { ok: false, error: "Missing admin token", status: 401 };
+    }
+    let parsed: { address?: unknown; t?: unknown; signature?: unknown };
+    try {
+      parsed = JSON.parse(Buffer.from(raw, "base64").toString("utf8"));
+    } catch {
+      return { ok: false, error: "Malformed admin token", status: 401 };
+    }
+    const { address, t, signature } = parsed;
+    if (typeof address !== "string" || typeof t !== "number" || typeof signature !== "string") {
+      return { ok: false, error: "Malformed admin token", status: 401 };
+    }
+    const ageMs = Date.now() - t;
+    if (ageMs < 0 || ageMs > 24 * 60 * 60 * 1000) {
+      return { ok: false, error: "Admin session expired", status: 401 };
+    }
+    const message = `hashpop.admin.session:${t}`;
+    let recovered: string;
+    try {
+      recovered = ethers.verifyMessage(message, signature).toLowerCase();
+    } catch {
+      return { ok: false, error: "Invalid admin signature", status: 401 };
+    }
+    const normalized = address.toLowerCase();
+    if (recovered !== normalized) {
+      return { ok: false, error: "Admin signature mismatch", status: 401 };
+    }
+    if (!isAdminAddress(normalized)) {
+      return { ok: false, error: "Not authorised", status: 403 };
+    }
+    return { ok: true, address: normalized };
+  }
+
+  // Tells the frontend whether the given address is in the admin allowlist.
+  // This is the only admin endpoint that doesn't require a signed session —
+  // it just answers "should this wallet see the sign-in screen?".
+  router.get("/admin/check", (req, res) => {
+    const address = String(req.query.address ?? "").trim().toLowerCase();
+    if (!address) return res.json({ isAdmin: false });
+    return res.json({ isAdmin: isAdminAddress(address) });
+  });
+
+  router.get("/admin/stats", async (req, res) => {
+    const auth = verifyAdminToken(req);
+    if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
+    try {
+      const [total, active, pending, sold, locked, salesCount, salesAgg, usersCount] =
+        await Promise.all([
+          prisma.listing.count(),
+          prisma.listing.count({ where: { status: "LISTED", onChainConfirmed: true } }),
+          prisma.listing.count({ where: { status: "LISTED", onChainConfirmed: false } }),
+          prisma.listing.count({ where: { status: "SOLD" } }),
+          prisma.listing.count({ where: { status: "LOCKED" } }),
+          prisma.sale.count(),
+          prisma.sale.findMany({ select: { amount: true } }),
+          prisma.user.count(),
+        ]);
+      const volumeTinybar = salesAgg.reduce((sum, s) => {
+        try {
+          return sum + BigInt(s.amount || "0");
+        } catch {
+          return sum;
+        }
+      }, 0n);
+      // 1 HBAR = 1e8 tinybar; report a string to avoid number precision loss.
+      const volumeHbar = (Number(volumeTinybar) / 1e8).toFixed(2);
+      return res.json({
+        listings: { total, active, pending, sold, locked },
+        sales: { count: salesCount, volumeHbar },
+        users: { count: usersCount },
+      });
+    } catch (err) {
+      log.error({ err }, "Admin: failed to compute stats");
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  router.get("/admin/listings", async (req, res) => {
+    const auth = verifyAdminToken(req);
+    if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
+    try {
+      const status = String(req.query.status ?? "").trim().toUpperCase();
+      const q = String(req.query.q ?? "").trim();
+      const where: Record<string, unknown> = {};
+      if (status) where.status = status;
+      if (q) {
+        where.OR = [
+          { id: { contains: q } },
+          { title: { contains: q, mode: "insensitive" } },
+          { seller: { contains: q.toLowerCase() } },
+          { buyer: { contains: q.toLowerCase() } },
+        ];
+      }
+      const listings = await prisma.listing.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        take: 500,
+      });
+      return res.json({
+        listings: listings.map((l) => ({
+          ...l,
+          imageUrl: rewriteMediaUrlForClient((l as any).imageUrl),
+          mediaUrls: rewriteMediaUrlsForClient((l as any).mediaUrls) ?? (l as any).mediaUrls,
+          price: toHbarForClient(l.price),
+        })),
+      });
+    } catch (err) {
+      log.error({ err }, "Admin: failed to list listings");
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Cascade-delete a listing along with its offers and wishlist entries; sales
+  // are preserved with listingId set to null so historical totals remain
+  // intact. Used for moderation takedowns.
+  router.delete("/admin/listing/:id", async (req, res) => {
+    invalidateListingsCache();
+    const auth = verifyAdminToken(req);
+    if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
+    try {
+      const rawId = req.params.id ?? "";
+      const id =
+        rawId.startsWith("0x") && rawId.length === 66
+          ? normalizeListingId(rawId)
+          : listingIdToBytes32(rawId);
+      const listing = await prisma.listing.findUnique({ where: { id } });
+      if (!listing) return res.status(404).json({ error: "Listing not found" });
+      await prisma.$transaction([
+        prisma.sale.updateMany({ where: { listingId: id }, data: { listingId: null } }),
+        prisma.offer.deleteMany({ where: { listingId: id } }),
+        prisma.wishlistItem.deleteMany({ where: { itemId: id, itemType: "listing" } }),
+        prisma.listing.delete({ where: { id } }),
+      ]);
+      log.info({ admin: auth.address, listingId: id }, "Admin removed listing");
+      return res.json({ ok: true });
+    } catch (err) {
+      log.error({ err }, "Admin: failed to delete listing");
+      return res.status(500).json({ error: "Internal server error" });
     }
   });
 

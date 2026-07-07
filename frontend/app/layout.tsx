@@ -1,5 +1,6 @@
 import "./globals.css";
 import { ClientProviders } from "../components/ClientProviders";
+import { BootSplash } from "../components/BootSplash";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
 import type { Metadata, Viewport } from "next";
@@ -43,6 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <body suppressHydrationWarning>
+        <BootSplash />
         <ClientProviders>{children}</ClientProviders>
         <SpeedInsights />
         <Analytics />

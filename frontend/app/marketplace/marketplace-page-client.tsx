@@ -1,7 +1,7 @@
 "use client";
 import { listingHref } from "../../lib/listingUrl";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Fuse from "fuse.js";
@@ -13,9 +13,26 @@ import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { canonicalizeCategory } from "../../lib/categories";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
-import { useProfile, useProfiles } from "../../lib/profiles";
+import { useSignInModal } from "../../lib/signInModal";
+import { getApiUrl } from "../../lib/apiUrl";
+import { profileAvatarUrl, profileDisplayName, useProfile, useProfiles } from "../../lib/profiles";
 import { TopBarSlot } from "../../lib/topBar";
-import { BadgeCheck } from "lucide-react";
+import {
+  BadgeCheck,
+  Bell,
+  Car,
+  ChevronDown,
+  Footprints,
+  Laptop,
+  LayoutGrid,
+  Palette,
+  Search as SearchIcon,
+  SlidersHorizontal,
+  Smartphone,
+  Sofa,
+  Watch,
+} from "lucide-react";
+import { ProfileCardSheet } from "../../components/ProfileCardSheet";
 
 function formatListingId(id: string): string {
   if (!id || !id.startsWith("0x") || id.length !== 66) return id;
@@ -35,42 +52,6 @@ function normalizeListingStatus(status?: string): string {
   return String(status || "")
     .trim()
     .toUpperCase();
-}
-
-function getStatusBadge(
-  status?: string,
-  onChainConfirmed?: boolean,
-): { label: string; className: string; pulseDot?: boolean } {
-  const normalized = normalizeListingStatus(status);
-  if (normalized === "LISTED") {
-    if (onChainConfirmed === false) {
-      return {
-        label: "PENDING",
-        className: "bg-amber-400 border-amber-300 text-black",
-      };
-    }
-    return {
-      label: "ACTIVE",
-      className: "bg-[#00ffa3] border-[#00ffa3] text-black",
-      pulseDot: true,
-    };
-  }
-  if (normalized === "LOCKED") {
-    return {
-      label: "LOCKED",
-      className: "bg-orange-400 border-orange-300 text-black",
-    };
-  }
-  if (normalized === "CANCELLED") {
-    return {
-      label: "CANCELLED",
-      className: "bg-zinc-600 border-zinc-500 text-white",
-    };
-  }
-  return {
-    label: "SOLD",
-    className: "bg-rose-500 border-rose-400 text-white",
-  };
 }
 
 function formatSellerDisplay(seller?: string): string {
@@ -99,8 +80,8 @@ type ViewMode = "grid" | "feed" | "editorial";
 type SortMode = "recent" | "price-asc" | "price-desc" | "trending";
 
 function parseViewMode(value: string | null): ViewMode {
-  if (value === "feed" || value === "editorial") return value;
-  return "grid";
+  if (value === "feed" || value === "grid") return value;
+  return "editorial";
 }
 
 function parseSortMode(value: string | null): SortMode {
@@ -129,13 +110,14 @@ function relativeTimeShort(iso?: string): string {
 function SellerInline({ seller, size = 16 }: { seller?: string; size?: number }) {
   const profile = useProfile(seller);
   if (!seller) return null;
-  const name = profile?.displayName?.trim();
+  const name = profileDisplayName(profile);
+  const avatar = profileAvatarUrl(profile);
   return (
     <span className="mt-1 flex items-center gap-1 truncate">
-      {profile?.avatarUrl ? (
+      {avatar ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={profile.avatarUrl}
+          src={avatar}
           alt=""
           className="shrink-0 rounded-full object-cover"
           style={{ width: size, height: size }}
@@ -177,6 +159,7 @@ export type ListingItem = {
   seller?: string;
   imageUrl?: string | null;
   mediaUrls?: string[];
+  city?: string | null;
   createdAt?: string;
   status?: string;
   onChainConfirmed?: boolean;
@@ -190,29 +173,81 @@ export default function MarketplacePageClient({
   initialItems: ListingItem[];
   initialError: string | null;
 }) {
-  const { isConnected } = useHashpackWallet();
+  const { isConnected, address, accountId } = useHashpackWallet();
+  const { openSignIn } = useSignInModal();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [searchInput, setSearchInput] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
+  const [viewMenuOpen, setViewMenuOpen] = useState(false);
+  const [profileCardOpen, setProfileCardOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+
+  // "F" focuses the top-bar search (unless the user is already typing).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== "f" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const tag = (document.activeElement?.tagName ?? "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      e.preventDefault();
+      searchInputRef.current?.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   const [filterMinPrice, setFilterMinPrice] = useState("");
   const [filterMaxPrice, setFilterMaxPrice] = useState("");
   const [filterPostedWithin, setFilterPostedWithin] = useState("");
   const [filterCondition, setFilterCondition] = useState("");
+  const [filterLocation, setFilterLocation] = useState("");
   const query = searchParams.get("q")?.trim() ?? "";
   const categoryQuery = canonicalizeCategory(searchParams.get("category")?.trim() ?? "");
   const minPriceQuery = searchParams.get("minPrice")?.trim() ?? "";
   const maxPriceQuery = searchParams.get("maxPrice")?.trim() ?? "";
   const postedWithinQuery = searchParams.get("postedWithin")?.trim() ?? "";
   const conditionQuery = searchParams.get("condition")?.trim() ?? "";
+  const locationQuery = searchParams.get("location")?.trim() ?? "";
   const viewMode: ViewMode = parseViewMode(searchParams.get("view"));
   const sortMode: SortMode = parseSortMode(searchParams.get("sort"));
-  const items = initialItems;
-  const listingsError = initialError;
+  // Items start from the SSR payload but live in state so the client can
+  // recover when the server-side fetch timed out or failed (bounded TTFB),
+  // and so refreshes can revalidate without a full reload.
+  const [items, setItems] = useState<ListingItem[]>(initialItems);
+  const [listingsError, setListingsError] = useState<string | null>(initialError);
+  useEffect(() => {
+    if (initialItems.length > 0) return;
+    let cancelled = false;
+    fetch(`${getApiUrl()}/api/listings`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject(r)))
+      .then((data: { listings?: ListingItem[] }) => {
+        if (cancelled) return;
+        const list = (data.listings ?? []).map((l) => ({
+          ...l,
+          itemType: "listing" as const,
+        }));
+        if (list.length > 0) {
+          setItems(list);
+          setListingsError(null);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const usdRate = useHbarUsd();
   // Warm the profile cache for every seller in one batched request so cards
   // can render display names, avatars and ratings without per-card fetches.
   useProfiles(items.map((i) => i.seller));
+
+  // Signal the boot splash that the marketplace (the default landing route)
+  // has mounted and its content is in the DOM, so the splash fades into a
+  // fully-rendered page rather than the empty Suspense fallback.
+  useEffect(() => {
+    (window as unknown as { __hashpopReady?: boolean }).__hashpopReady = true;
+    window.dispatchEvent(new Event("hashpop:ready"));
+  }, []);
 
   const setParam = (key: string, value: string | null) => {
     const p = new URLSearchParams(searchParams.toString());
@@ -290,6 +325,11 @@ export default function MarketplacePageClient({
       }
       if (conditionQuery && item.condition?.toLowerCase() !== conditionQuery.toLowerCase())
         return false;
+      if (
+        locationQuery &&
+        (item.city ?? "").trim().toLowerCase() !== locationQuery.toLowerCase()
+      )
+        return false;
       return true;
     });
 
@@ -312,6 +352,7 @@ export default function MarketplacePageClient({
     items,
     query,
     categoryQuery,
+    locationQuery,
     minPriceQuery,
     maxPriceQuery,
     postedWithinQuery,
@@ -340,167 +381,218 @@ export default function MarketplacePageClient({
     </div>
   );
 
-  const searchCluster = (
-    <div className="relative flex w-full max-w-md justify-center">
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          const q = searchInput.trim();
-          const p = new URLSearchParams(searchParams.toString());
-          if (q) p.set("q", q);
-          else p.delete("q");
-          router.push(p.toString() ? `/marketplace?${p.toString()}` : "/marketplace");
-          setSearchInput("");
-          setFilterOpen(false);
-        }}
-      >
-        <div className="flex items-center gap-1.5 rounded-full border border-[#00ffa3]/50 bg-[#00ffa3]/[0.08] px-3 py-1.5 shadow-[0_0_14px_rgba(0,255,163,0.12),inset_0_0_8px_rgba(0,255,163,0.04)]">
-          <svg
-            className="h-3.5 w-3.5 shrink-0 text-[#00ffa3]"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            aria-hidden
+  const submitSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = searchInput.trim();
+    const p = new URLSearchParams(searchParams.toString());
+    if (q) p.set("q", q);
+    else p.delete("q");
+    router.push(p.toString() ? `/marketplace?${p.toString()}` : "/marketplace");
+    setSearchInput("");
+    setFilterOpen(false);
+  };
+
+  const openFilterPanel = () => {
+    setFilterOpen((o) => !o);
+    setFilterMinPrice(minPriceQuery);
+    setFilterMaxPrice(maxPriceQuery);
+    setFilterPostedWithin(postedWithinQuery);
+    setFilterCondition(conditionQuery);
+    setFilterLocation(locationQuery);
+  };
+
+  const hasActiveFilter =
+    !!(minPriceQuery || maxPriceQuery || postedWithinQuery || conditionQuery || locationQuery || sortMode !== "recent");
+
+  // Distinct cities present in the current listing set, used to populate the
+  // location dropdown. Cap to 50 to keep the panel manageable.
+  const knownCities = useMemo(() => {
+    const set = new Set<string>();
+    for (const it of items) {
+      const c = it.city?.trim();
+      if (c) set.add(c);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b)).slice(0, 50);
+  }, [items]);
+
+  const renderFilterSortPanel = () => (
+    <div className="absolute right-0 top-full mt-2 w-72 rounded-xl border border-white/10 bg-[#0a0a0a] p-4 shadow-2xl z-50">
+      <p className="text-xs font-semibold uppercase tracking-widest text-silver">Sort</p>
+      <div className="mt-2 grid grid-cols-2 gap-1.5">
+        {(
+          [
+            { id: "recent", label: "Recent" },
+            { id: "trending", label: "Trending" },
+            { id: "price-asc", label: "Price ↑" },
+            { id: "price-desc", label: "Price ↓" },
+          ] as { id: SortMode; label: string }[]
+        ).map((s) => {
+          const active = sortMode === s.id;
+          return (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => setParam("sort", s.id === "recent" ? null : s.id)}
+              className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                active
+                  ? "border-[#00ffa3]/40 bg-[#00ffa3]/10 text-[#00ffa3]"
+                  : "border-white/10 text-silver hover:border-white/20 hover:text-white"
+              }`}
+            >
+              {s.label}
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-4 text-xs font-semibold uppercase tracking-widest text-silver">Filters</p>
+      <div className="mt-2 space-y-3">
+        <div>
+          <span className="mb-1 block text-xs text-silver/70">Location</span>
+          <select
+            value={filterLocation}
+            onChange={(e) => setFilterLocation(e.target.value)}
+            className="input-frost w-full py-1.5 text-sm"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M21 21l-4.35-4.35M16 10.5A5.5 5.5 0 115 10.5a5.5 5.5 0 0111 0z"
+            <option value="">All locations</option>
+            {knownCities.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <span className="mb-1 block text-xs text-silver/70">Price (HBAR)</span>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min="0"
+              step="any"
+              value={filterMinPrice}
+              onChange={(e) => setFilterMinPrice(e.target.value)}
+              placeholder="Min"
+              className="input-frost w-full py-1.5 text-sm"
             />
-          </svg>
-          <input
-            type="text"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search listings…"
-            className="w-36 bg-transparent text-sm text-white placeholder:text-[#00ffa3]/40 focus:outline-none"
-          />
-          {/* Filter toggle — replaces the second X */}
+            <span className="shrink-0 text-xs text-silver/40">to</span>
+            <input
+              type="number"
+              min="0"
+              step="any"
+              value={filterMaxPrice}
+              onChange={(e) => setFilterMaxPrice(e.target.value)}
+              placeholder="Max"
+              className="input-frost w-full py-1.5 text-sm"
+            />
+          </div>
+        </div>
+        <div>
+          <span className="mb-1 block text-xs text-silver/70">Date listed</span>
+          <select
+            value={filterPostedWithin}
+            onChange={(e) => setFilterPostedWithin(e.target.value)}
+            className="input-frost w-full py-1.5 text-sm"
+          >
+            <option value="">Any time</option>
+            <option value="1d">Last 24 hours</option>
+            <option value="1w">Last week</option>
+            <option value="1m">Last month</option>
+            <option value="3m">Last 3 months</option>
+            <option value="6m">Last 6 months</option>
+            <option value="1y">Last year</option>
+          </select>
+        </div>
+        <div>
+          <span className="mb-1 block text-xs text-silver/70">Condition</span>
+          <select
+            value={filterCondition}
+            onChange={(e) => setFilterCondition(e.target.value)}
+            className="input-frost w-full py-1.5 text-sm"
+          >
+            <option value="">Any condition</option>
+            <option value="Like new">Like new</option>
+            <option value="Used">Used</option>
+            <option value="Refurbished">Refurbished</option>
+            <option value="For parts or repair">For parts or repair</option>
+          </select>
+        </div>
+        <div className="flex gap-2 pt-1">
           <button
             type="button"
             onClick={() => {
-              setFilterOpen((o) => !o);
-              setFilterMinPrice(minPriceQuery);
-              setFilterMaxPrice(maxPriceQuery);
-              setFilterPostedWithin(postedWithinQuery);
-              setFilterCondition(conditionQuery);
+              const p = new URLSearchParams(searchParams.toString());
+              p.delete("minPrice");
+              p.delete("maxPrice");
+              p.delete("postedWithin");
+              p.delete("condition");
+              p.delete("location");
+              p.delete("sort");
+              setFilterOpen(false);
+              router.push(p.toString() ? `/marketplace?${p.toString()}` : "/marketplace");
             }}
-            aria-label="Filters"
-            className={`shrink-0 transition-colors ${filterOpen || minPriceQuery || maxPriceQuery || postedWithinQuery || conditionQuery ? "text-[#00ffa3]" : "text-[#00ffa3]/50 hover:text-[#00ffa3]"}`}
+            className="flex-1 rounded-lg border border-white/15 py-1.5 text-xs text-silver transition-colors hover:text-white"
           >
-            {/* sliders / funnel icon */}
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 4h18M7 12h10M11 20h2"
-              />
-            </svg>
+            Reset
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const p = new URLSearchParams(searchParams.toString());
+              if (filterMinPrice) p.set("minPrice", filterMinPrice);
+              else p.delete("minPrice");
+              if (filterMaxPrice) p.set("maxPrice", filterMaxPrice);
+              else p.delete("maxPrice");
+              if (filterPostedWithin) p.set("postedWithin", filterPostedWithin);
+              else p.delete("postedWithin");
+              if (filterCondition) p.set("condition", filterCondition);
+              else p.delete("condition");
+              if (filterLocation) p.set("location", filterLocation);
+              else p.delete("location");
+              setFilterOpen(false);
+              router.push(p.toString() ? `/marketplace?${p.toString()}` : "/marketplace");
+            }}
+            className="btn-frost-cta flex-1 py-1.5 text-xs"
+          >
+            Apply
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Wallet chip shown top-left of the mobile header — account number only
+  // (no avatar) with a carat that slides up the profile card sheet.
+  const walletLabel = accountId ?? (address ? `${address.slice(0, 6)}…${address.slice(-4)}` : null);
+
+  // Top-bar search — rectangular rounded "Find…" field with an F shortcut
+  // hint, hosted in the global top bar's center slot next to the logo/nav.
+  const topBarSearch = (
+    <div className="relative">
+      <form onSubmit={submitSearch}>
+        <div className="flex w-80 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.06] py-1 pl-3 pr-1 transition-colors duration-300 focus-within:border-[#00ffa3]/40">
+          <SearchIcon size={14} className="shrink-0 text-silver" />
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Find..."
+            className="flex-1 bg-transparent text-sm text-white placeholder:text-silver/50 focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={openFilterPanel}
+            aria-label="Filters & sort"
+            className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors duration-300 ${
+              filterOpen || hasActiveFilter
+                ? "bg-[#00ffa3]/10 text-[#00ffa3]"
+                : "text-silver hover:bg-white/10 hover:text-white"
+            }`}
+          >
+            <SlidersHorizontal size={14} />
           </button>
         </div>
       </form>
-      {/* Filter dropdown */}
-      {filterOpen && (
-        <div className="absolute right-0 top-full mt-2 w-72 rounded-xl border border-white/10 bg-[#0a0a0a] shadow-2xl p-4 z-50">
-          <p className="text-xs font-semibold tracking-widest text-silver uppercase mb-3">
-            Filters
-          </p>
-          <div className="space-y-3">
-            <div>
-              <span className="text-xs text-silver/70 mb-1 block">Price (HBAR)</span>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={filterMinPrice}
-                  onChange={(e) => setFilterMinPrice(e.target.value)}
-                  placeholder="Min"
-                  className="input-frost w-full text-sm py-1.5"
-                />
-                <span className="text-silver/40 text-xs shrink-0">to</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={filterMaxPrice}
-                  onChange={(e) => setFilterMaxPrice(e.target.value)}
-                  placeholder="Max"
-                  className="input-frost w-full text-sm py-1.5"
-                />
-              </div>
-            </div>
-            <div>
-              <span className="text-xs text-silver/70 mb-1 block">Date listed</span>
-              <select
-                value={filterPostedWithin}
-                onChange={(e) => setFilterPostedWithin(e.target.value)}
-                className="input-frost w-full text-sm py-1.5"
-              >
-                <option value="">Any time</option>
-                <option value="1d">Last 24 hours</option>
-                <option value="1w">Last week</option>
-                <option value="1m">Last month</option>
-                <option value="3m">Last 3 months</option>
-                <option value="6m">Last 6 months</option>
-                <option value="1y">Last year</option>
-              </select>
-            </div>
-            <div>
-              <span className="text-xs text-silver/70 mb-1 block">Condition</span>
-              <select
-                value={filterCondition}
-                onChange={(e) => setFilterCondition(e.target.value)}
-                className="input-frost w-full text-sm py-1.5"
-              >
-                <option value="">Any condition</option>
-                <option value="Like new">Like new</option>
-                <option value="Used">Used</option>
-                <option value="Refurbished">Refurbished</option>
-                <option value="For parts or repair">For parts or repair</option>
-              </select>
-            </div>
-            <div className="flex gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  const p = new URLSearchParams(searchParams.toString());
-                  p.delete("minPrice");
-                  p.delete("maxPrice");
-                  p.delete("postedWithin");
-                  p.delete("condition");
-                  setFilterOpen(false);
-                  router.push(p.toString() ? `/marketplace?${p.toString()}` : "/marketplace");
-                }}
-                className="flex-1 text-xs text-silver hover:text-white border border-white/15 rounded-lg py-1.5 transition-colors"
-              >
-                Reset
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const p = new URLSearchParams(searchParams.toString());
-                  if (filterMinPrice) p.set("minPrice", filterMinPrice);
-                  else p.delete("minPrice");
-                  if (filterMaxPrice) p.set("maxPrice", filterMaxPrice);
-                  else p.delete("maxPrice");
-                  if (filterPostedWithin) p.set("postedWithin", filterPostedWithin);
-                  else p.delete("postedWithin");
-                  if (filterCondition) p.set("condition", filterCondition);
-                  else p.delete("condition");
-                  setFilterOpen(false);
-                  router.push(p.toString() ? `/marketplace?${p.toString()}` : "/marketplace");
-                }}
-                className="flex-1 text-xs btn-frost-cta py-1.5"
-              >
-                Apply
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {filterOpen && renderFilterSortPanel()}
     </div>
   );
 
@@ -510,12 +602,180 @@ export default function MarketplacePageClient({
     </Link>
   );
 
+  // View-mode dropdown (Editorial / Feed / Grid) — triggered by a carat next
+  // to the section title, replacing the old pill row.
+  const viewDropdown = (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setViewMenuOpen((o) => !o)}
+        aria-label="Change view"
+        aria-expanded={viewMenuOpen}
+        className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-silver transition-colors duration-300 hover:bg-white/5 hover:text-white"
+      >
+        {viewMode === "editorial" ? "Editorial" : viewMode === "feed" ? "Feed" : "Grid"}
+        <ChevronDown
+          size={13}
+          className={`transition-transform duration-300 ${viewMenuOpen ? "rotate-180" : ""}`}
+        />
+      </button>
+      {viewMenuOpen && (
+        <div className="absolute left-0 top-full z-50 mt-1 w-36 rounded-xl border border-white/10 bg-[#0a0a0a] p-1.5 shadow-2xl">
+          {(
+            [
+              { id: "editorial", label: "Editorial" },
+              { id: "feed", label: "Feed" },
+              { id: "grid", label: "Grid" },
+            ] as { id: ViewMode; label: string }[]
+          ).map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              onClick={() => {
+                setViewMenuOpen(false);
+                setParam("view", v.id === "editorial" ? null : v.id);
+              }}
+              className={`block w-full rounded-lg px-3 py-1.5 text-left text-xs transition-colors duration-300 ${
+                viewMode === v.id
+                  ? "bg-[#00ffa3]/10 text-[#00ffa3]"
+                  : "text-white hover:bg-white/5"
+              }`}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <main className="min-h-screen">
       <TopBarSlot name="title">{headerCluster}</TopBarSlot>
-      <TopBarSlot name="center">{searchCluster}</TopBarSlot>
+      <TopBarSlot name="center">
+        <div className="hidden md:block">{topBarSearch}</div>
+      </TopBarSlot>
       <TopBarSlot name="actions">{actionsCluster}</TopBarSlot>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+      <div className="px-3 py-4 sm:px-4">
+        {/* Mobile-only top section: location chip, watchlist/alerts icons,
+            inline search + filter button, and a horizontal category carousel
+            matching the redesigned mobile marketplace. */}
+        <div className="sm:hidden mb-4 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            {walletLabel ? (
+              <button
+                type="button"
+                onClick={() => setProfileCardOpen(true)}
+                aria-label="Open profile"
+                className="-ml-2 flex items-center gap-1.5 rounded-full px-2 py-2 text-white"
+              >
+                <span className="font-mono text-sm font-semibold">{walletLabel}</span>
+                <ChevronDown size={14} className="text-silver" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => openSignIn()}
+                aria-label="Log in"
+                className="-ml-2 flex items-center gap-1.5 rounded-full px-2 py-2 text-white"
+              >
+                <span className="text-sm font-semibold">Login</span>
+                <ChevronDown size={14} className="text-silver" />
+              </button>
+            )}
+            <div className="flex items-center gap-1">
+              <Link
+                href="/activity"
+                aria-label="Notifications"
+                className="rounded-full p-2 text-silver hover:text-white"
+              >
+                <Bell size={18} />
+              </Link>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <form onSubmit={submitSearch} className="flex-1">
+              <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 focus-within:border-[#00ffa3]/40">
+                <SearchIcon size={14} className="text-silver" />
+                <input
+                  type="text"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  placeholder="What are you looking for?"
+                  className="flex-1 bg-transparent text-sm text-white placeholder:text-silver/50 focus:outline-none"
+                />
+              </div>
+            </form>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={openFilterPanel}
+                aria-label="Filters & sort"
+                className={`inline-flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
+                  filterOpen || hasActiveFilter
+                    ? "bg-[#00ffa3]/10 text-[#00ffa3]"
+                    : "bg-white/5 text-silver hover:text-white"
+                }`}
+              >
+                <SlidersHorizontal size={16} />
+              </button>
+              {filterOpen && renderFilterSortPanel()}
+            </div>
+          </div>
+          <div>
+            <div className="mb-1.5 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-white">Categories</h3>
+              <Link
+                href="/categories"
+                className="text-[11px] text-silver/70 hover:text-white"
+              >
+                See all
+              </Link>
+            </div>
+            <div className="-mx-1 flex gap-2 overflow-x-auto pb-1 px-1 scrollbar-none">
+              {(
+                [
+                  { label: "All", href: "/marketplace", icon: LayoutGrid },
+                  { label: "Watches", href: "/marketplace?category=Watches", icon: Watch },
+                  {
+                    label: "Phones",
+                    href: "/marketplace?category=Smartphones%20%26%20Phones",
+                    icon: Smartphone,
+                  },
+                  { label: "Cars", href: "/marketplace?category=Cars%20%26%20Trucks", icon: Car },
+                  { label: "Laptops", href: "/marketplace?category=Laptops", icon: Laptop },
+                  { label: "Furniture", href: "/marketplace?category=Furniture", icon: Sofa },
+                  { label: "Art", href: "/marketplace?category=Art%20%26%20Prints", icon: Palette },
+                  {
+                    label: "Sneakers",
+                    href: "/marketplace?category=Shoes%20%26%20Sneakers",
+                    icon: Footprints,
+                  },
+                ] as { label: string; href: string; icon: typeof LayoutGrid }[]
+              ).map((c) => {
+                const isActive =
+                  (c.label === "All" && !categoryQuery) ||
+                  decodeURIComponent(c.href.split("category=")[1] ?? "") === categoryQuery;
+                const Icon = c.icon;
+                return (
+                  <Link
+                    key={c.label}
+                    href={c.href}
+                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors ${
+                      isActive
+                        ? "border-[#00ffa3]/40 bg-[#00ffa3]/10 text-[#00ffa3]"
+                        : "border-white/10 bg-white/5 text-silver hover:text-white"
+                    }`}
+                  >
+                    <Icon size={14} />
+                    {c.label}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
         {(() => {
           const removeFilter = (keys: string[]) => {
             const p = new URLSearchParams(searchParams.toString());
@@ -552,6 +812,7 @@ export default function MarketplacePageClient({
             });
           }
           if (conditionQuery) pills.push({ label: conditionQuery, keys: ["condition"] });
+          if (locationQuery) pills.push({ label: `📍 ${locationQuery}`, keys: ["location"] });
 
           if (!pills.length) return null;
           return (
@@ -624,14 +885,6 @@ export default function MarketplacePageClient({
                       cardSize
                       compactHeight="160px"
                     />
-                    <span
-                      className={`absolute top-2 left-2 rounded-full inline-flex items-center gap-1.5 border px-2 py-0.5 text-[10px] font-semibold ${getStatusBadge(item.status, item.onChainConfirmed).className}`}
-                    >
-                      {getStatusBadge(item.status, item.onChainConfirmed).pulseDot ? (
-                        <span className="inline-flex h-2 w-2 rounded-full bg-green-400 animate-pulse shadow-[0_0_0_0_rgba(74,222,128,0.7)]" />
-                      ) : null}
-                      {getStatusBadge(item.status, item.onChainConfirmed).label}
-                    </span>
                   </div>
                   <div className="p-3">
                     <h2 className="text-sm font-semibold text-white line-clamp-2 leading-tight">
@@ -664,69 +917,19 @@ export default function MarketplacePageClient({
                 </Link>
               ))}
             </div>
-            <div className="hidden sm:flex items-center justify-between gap-3 mb-4">
-              <div className="flex items-center gap-2">
-                {(
-                  [
-                    { id: "grid", label: "Grid" },
-                    { id: "feed", label: "Feed" },
-                    { id: "editorial", label: "Editorial" },
-                  ] as { id: ViewMode; label: string }[]
-                ).map((v) => {
-                  const active = viewMode === v.id;
-                  return (
-                    <button
-                      key={v.id}
-                      type="button"
-                      onClick={() => setParam("view", v.id === "grid" ? null : v.id)}
-                      className={`rounded-full px-3 py-1 text-xs font-medium transition-colors border ${
-                        active
-                          ? "border-[#00ffa3]/40 bg-[#00ffa3]/10 text-[#00ffa3]"
-                          : "border-white/10 text-silver hover:text-white hover:border-white/20"
-                      }`}
-                    >
-                      {v.label}
-                    </button>
-                  );
-                })}
-                <span className="text-xs text-silver/60 ml-2">
+            {viewMode !== "editorial" && (
+              <div className="hidden sm:flex items-center gap-2 mb-3">
+                <h3 className="text-lg font-bold tracking-tight text-white">Recently listed</h3>
+                {viewDropdown}
+                <span className="ml-1 text-xs text-silver/60">
                   {filteredItems.length.toLocaleString()} result
                   {filteredItems.length === 1 ? "" : "s"}
                 </span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] uppercase tracking-widest text-silver/60">
-                  Sort
-                </span>
-                {(
-                  [
-                    { id: "recent", label: "Recent" },
-                    { id: "price-asc", label: "Price ↑" },
-                    { id: "price-desc", label: "Price ↓" },
-                    { id: "trending", label: "Trending" },
-                  ] as { id: SortMode; label: string }[]
-                ).map((s) => {
-                  const active = sortMode === s.id;
-                  return (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => setParam("sort", s.id === "recent" ? null : s.id)}
-                      className={`rounded-full px-3 py-1 text-xs transition-colors border ${
-                        active
-                          ? "border-[#00ffa3]/40 bg-[#00ffa3]/10 text-[#00ffa3]"
-                          : "border-white/10 text-silver hover:text-white hover:border-white/20"
-                      }`}
-                    >
-                      {s.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            )}
 
             {viewMode === "grid" && (
-              <div className="hidden sm:grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="hidden sm:grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                 {filteredItems.map((item) => (
                   <Link
                     key={`${item.itemType}-${item.id}`}
@@ -745,14 +948,6 @@ export default function MarketplacePageClient({
                       <div className="absolute top-2 right-2">
                         <WishlistButton itemId={item.id} itemType={item.itemType} compact />
                       </div>
-                      <span
-                        className={`absolute top-2 left-2 rounded-full inline-flex items-center gap-1.5 border px-2 py-0.5 text-[10px] font-semibold ${getStatusBadge(item.status, item.onChainConfirmed).className}`}
-                      >
-                        {getStatusBadge(item.status, item.onChainConfirmed).pulseDot ? (
-                          <span className="inline-flex h-2 w-2 rounded-full bg-green-400 animate-pulse shadow-[0_0_0_0_rgba(74,222,128,0.7)]" />
-                        ) : null}
-                        {getStatusBadge(item.status, item.onChainConfirmed).label}
-                      </span>
                     </div>
                     <div className="p-4">
                       <h2 className="text-base font-semibold text-white line-clamp-2 leading-snug">
@@ -790,7 +985,6 @@ export default function MarketplacePageClient({
             {viewMode === "feed" && (
               <div className="hidden sm:block divide-y divide-white/5 rounded-xl border border-white/10 bg-white/[0.02]">
                 {filteredItems.map((item) => {
-                  const badge = getStatusBadge(item.status, item.onChainConfirmed);
                   return (
                     <Link
                       key={`${item.itemType}-${item.id}`}
@@ -824,14 +1018,6 @@ export default function MarketplacePageClient({
                           )}
                           {item.seller && <SellerInline seller={item.seller} size={14} />}
                           <SellerRating seller={item.seller} />
-                          <span
-                            className={`rounded-full inline-flex items-center gap-1.5 border px-2 py-0.5 text-[9px] font-semibold ${badge.className}`}
-                          >
-                            {badge.pulseDot ? (
-                              <span className="inline-flex h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
-                            ) : null}
-                            {badge.label}
-                          </span>
                         </div>
                       </div>
                       <div>
@@ -913,16 +1099,18 @@ export default function MarketplacePageClient({
                         </Link>
                       )}
                       <div>
-                        <div className="flex items-baseline justify-between mb-3">
-                          <h3 className="text-lg font-bold tracking-tight">Recently listed</h3>
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-lg font-bold tracking-tight">Recently listed</h3>
+                            {viewDropdown}
+                          </div>
                           <span className="text-xs text-silver/60">
                             {rest.length.toLocaleString()} more
                           </span>
                         </div>
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 auto-rows-[120px]">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6 gap-4 auto-rows-[120px]">
                           {rest.map((item, i) => {
                             const tall = i % 5 === 1 || i % 5 === 4;
-                            const badge = getStatusBadge(item.status, item.onChainConfirmed);
                             return (
                               <Link
                                 key={`${item.itemType}-${item.id}`}
@@ -941,14 +1129,6 @@ export default function MarketplacePageClient({
                                   compactHeight={tall ? "256px" : "120px"}
                                 />
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
-                                <span
-                                  className={`absolute top-2 left-2 rounded-full inline-flex items-center gap-1.5 border px-2 py-0.5 text-[9px] font-semibold ${badge.className}`}
-                                >
-                                  {badge.pulseDot ? (
-                                    <span className="inline-flex h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
-                                  ) : null}
-                                  {badge.label}
-                                </span>
                                 <div className="absolute left-3 right-3 bottom-2 text-white">
                                   <div className="text-xs font-semibold line-clamp-1">
                                     {item.title || formatListingId(item.id) || "Untitled"}
@@ -975,6 +1155,7 @@ export default function MarketplacePageClient({
           </>
         )}
       </div>
+      <ProfileCardSheet open={profileCardOpen} onClose={() => setProfileCardOpen(false)} />
     </main>
   );
 }
