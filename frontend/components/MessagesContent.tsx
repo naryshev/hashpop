@@ -10,7 +10,7 @@ import { getApiUrl } from "../lib/apiUrl";
 import { markActivitySeen } from "../hooks/useUnseenActivity";
 import { useEncryptionKey } from "../lib/useEncryptionKey";
 import { decryptMessage } from "../lib/chatEncryption";
-import { profileDisplayName, useProfile } from "../lib/profiles";
+import { profileAvatarUrl, profileDisplayName, useProfile } from "../lib/profiles";
 
 type InboxConversation = {
   otherAddress: string;
@@ -156,20 +156,34 @@ function Avatar({
   size?: number;
   online?: boolean;
 }) {
+  // Real wallet identity first: HashPack profile picture (or a Hashpop-
+  // uploaded avatar); the gradient initial is only the no-avatar fallback.
+  const profile = useProfile(address);
+  const avatarUrl = profileAvatarUrl(profile);
   const [a, b] = paletteFor(address);
   return (
     <span className="relative inline-flex shrink-0">
-      <span
-        className="flex items-center justify-center rounded-full font-bold text-white"
-        style={{
-          width: size,
-          height: size,
-          background: `linear-gradient(135deg, ${a}, ${b})`,
-          fontSize: Math.round(size * 0.42),
-        }}
-      >
-        {initialFor(address)}
-      </span>
+      {avatarUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={avatarUrl}
+          alt=""
+          className="rounded-full border border-white/10 object-cover"
+          style={{ width: size, height: size }}
+        />
+      ) : (
+        <span
+          className="flex items-center justify-center rounded-full font-bold text-white"
+          style={{
+            width: size,
+            height: size,
+            background: `linear-gradient(135deg, ${a}, ${b})`,
+            fontSize: Math.round(size * 0.42),
+          }}
+        >
+          {initialFor(address)}
+        </span>
+      )}
       {online && (
         <span
           className="absolute bottom-0 right-0 rounded-full bg-chrome"
