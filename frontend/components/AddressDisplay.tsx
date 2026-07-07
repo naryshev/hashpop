@@ -22,10 +22,13 @@ export function AddressDisplay({
   address,
   className,
   showVerified = true,
+  preferName = true,
 }: {
   address: string;
   className?: string;
   showVerified?: boolean;
+  /** false = always render the account id / address, never the display name. */
+  preferName?: boolean;
 }) {
   const [accountId, setAccountId] = useState<string | null>(null);
   const profile = useProfile(address);
@@ -43,7 +46,7 @@ export function AddressDisplay({
       .catch(() => {});
   }, [address]);
 
-  const displayName = profileDisplayName(profile);
+  const displayName = preferName ? profileDisplayName(profile) : null;
   const fallback =
     accountId ??
     (address && address.startsWith("0x") && address.length === 42 ? truncateEvm(address) : address);

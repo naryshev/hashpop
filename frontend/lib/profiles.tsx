@@ -122,14 +122,15 @@ export function useProfiles(addresses: (string | null | undefined)[]): Record<st
 }
 
 /**
- * Resolve the best display name for a profile, in order: Hashpop-set name →
- * HashPack wallet username → null (caller falls back to wallet address / id).
+ * Resolve the best display name for a profile, in order: HashPack wallet
+ * username (it travels with the wallet across dapps) → Hashpop-set name →
+ * null (caller falls back to the wallet address / account id).
  */
 export function profileDisplayName(profile: PublicProfile | undefined): string | null {
-  const own = profile?.displayName?.trim();
-  if (own) return own;
   const hp = profile?.hashpackName?.trim();
-  return hp ? hp : null;
+  if (hp) return hp;
+  const own = profile?.displayName?.trim();
+  return own ? own : null;
 }
 
 /**

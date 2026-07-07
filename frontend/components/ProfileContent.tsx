@@ -160,7 +160,14 @@ export function ProfileContent({
   const fallbackName = profileDisplayName(publicProfile);
   const stagedAvatar = editing ? draft?.avatarUrl?.trim() || null : profile?.avatarUrl?.trim() || null;
   const avatarUrl = stagedAvatar ?? fallbackAvatar;
-  const headerName = profile?.displayName?.trim() || fallbackName || "Profile";
+  // Heading precedence: HashPack wallet username → name set on Hashpop →
+  // wallet address. The grey subline always shows the address, so it's only
+  // rendered when the heading is a name (otherwise it would duplicate).
+  const headerName =
+    publicProfile?.hashpackName?.trim() ||
+    profile?.displayName?.trim() ||
+    fallbackName ||
+    null;
   const isVerified = profile?.kyc?.status === "VERIFIED";
 
   return (
@@ -182,14 +189,18 @@ export function ProfileContent({
             )}
             <div className="min-w-0">
               <h1 className="flex items-center gap-1.5 truncate text-xl sm:text-2xl font-bold text-white">
-                {headerName}
+                {headerName ?? (
+                  <AddressDisplay address={address} showVerified={false} preferName={false} />
+                )}
                 {isVerified && (
                   <BadgeCheck size={20} className="text-[#00ffa3]" aria-label="KYC verified" />
                 )}
               </h1>
-              <p className="mt-1 text-sm text-silver">
-                <AddressDisplay address={address} showVerified={false} />
-              </p>
+              {headerName && (
+                <p className="mt-1 text-sm text-silver">
+                  <AddressDisplay address={address} showVerified={false} preferName={false} />
+                </p>
+              )}
             </div>
           </div>
           {isSelf ? (
