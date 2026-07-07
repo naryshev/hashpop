@@ -435,13 +435,28 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
 
   // Drive the thread card's height/offset directly from the visual viewport so
   // the composer rides the on-screen keyboard up and snaps back to the bottom
-  // when it closes (dvh units don't restore reliably on iOS). When the
-  // keyboard is closed we reserve room for the floating bottom nav; when it's
-  // open the chat fills the whole visible area above the keyboard.
-  const NAV_RESERVE_PX = 92;
-  const [threadViewport, setThreadViewport] = useState<{ top: number; height: number } | null>(
-    null,
-  );
+  // when it closes (dvh units don't restore reliably on iOS). The chat always
+  // fills the whole visible area — the floating bottom nav is hidden while a
+  // conversation is open — so the composer sits directly above the keyboard,
+  // iMessage-style.
+  const [threadViewport, setThreadViewport] = useState<{
+    top: number;
+    height: number;
+    keyboardOpen: boolean;
+  } | null>(null);
+  // Hide the floating bottom nav while a conversation is open on mobile —
+  // the thread is a full-screen surface and the back button is the only
+  // navigation.
+  useEffect(() => {
+    const open = !!selectedThread && !embedded;
+    window.dispatchEvent(new CustomEvent("hashpop:immersive", { detail: open }));
+    return () => {
+      if (open) {
+        window.dispatchEvent(new CustomEvent("hashpop:immersive", { detail: false }));
+      }
+    };
+  }, [selectedThread, embedded]);
+
   useEffect(() => {
     if (!selectedThread || typeof window === "undefined") {
       setThreadViewport(null);
@@ -458,8 +473,7 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
       // Keyboard up when the visual viewport is meaningfully shorter than the
       // full window (visualViewport shrinks for the keyboard by default).
       const keyboardOpen = window.innerHeight - vh - top > 100;
-      const height = keyboardOpen ? vh : Math.max(0, vh - NAV_RESERVE_PX);
-      setThreadViewport({ top, height });
+      setThreadViewport({ top, height: vh, keyboardOpen });
     };
     update();
     vv?.addEventListener("resize", update);
@@ -703,7 +717,16 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
             }`}
             style={
               threadViewport
-                ? { top: threadViewport.top, height: threadViewport.height }
+                ? {
+                    top: threadViewport.top,
+                    height: threadViewport.height,
+                    // Keyboard closed: keep the composer above the iOS home
+                    // indicator. Keyboard open: the viewport already ends at
+                    // the keyboard, so padding would leave a gap.
+                    paddingBottom: threadViewport.keyboardOpen
+                      ? 0
+                      : "env(safe-area-inset-bottom)",
+                  }
                 : undefined
             }
           >
