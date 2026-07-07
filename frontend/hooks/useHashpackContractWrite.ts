@@ -209,34 +209,23 @@ export function useHashpackContractWrite() {
               (signer && typeof signer.getClient === "function" ? signer.getClient() : null) ??
               (network === "mainnet" ? sdk.Client.forMainnet() : sdk.Client.forTestnet());
             let receipt: any;
-            if (
-              signer &&
-              typeof (tx as any).freezeWithSigner === "function" &&
-              typeof (tx as any).executeWithSigner === "function"
-            ) {
-              // Canonical HashConnect v3 path: freeze and execute THROUGH the
-              // wallet. HashPack submits the transaction to consensus nodes
-              // itself, so the browser never speaks gRPC-web to
-              // nodeXX.swirldslabs.com — mainnet's node proxies reject browser
-              // CORS (GrpcServiceError GRPC_WEB after 10 node retries).
-              // Works for payable and non-payable calls alike.
+            if (typeof (hashconnect as any).sendTransaction === "function") {
+              // Primary path: hashconnect.sendTransaction. Internally it sets
+              // node account ids and freezes the still-mutable transaction
+              // itself, then HashPack signs AND submits to consensus nodes and
+              // returns the receipt. Two failure modes this avoids at once:
+              //   • browser-side execute() speaks gRPC-web to
+              //     nodeXX.swirldslabs.com, whose mainnet proxies reject
+              //     browser CORS (GrpcServiceError GRPC_WEB after 10 retries);
+              //   • any local freeze / freezeWithSigner leaves a frozen
+              //     payload that later population attempts mutate ("payload
+              //     immutable" / "list is locked").
+              // Works for payable and non-payable calls alike — the payable
+              // amount is serialized with the transaction bytes.
               showConfirmPrompt();
               walletPrompted = true;
-              const frozen = await (tx as any).freezeWithSigner(signer);
-              const txResponse = await frozen.executeWithSigner(signer);
-              txId =
-                txResponse?.transactionId?.toString?.() ?? tx.transactionId?.toString?.() ?? txId;
-              // Receipt via the wallet when supported; 30s cap, then fall
-              // through to the mirror-node status check below.
-              receipt = await Promise.race([
-                (async () => {
-                  if (typeof txResponse?.getReceiptWithSigner === "function") {
-                    return txResponse.getReceiptWithSigner(signer);
-                  }
-                  return txResponse?.getReceipt?.(freezeClient) ?? null;
-                })(),
-                sleep(30_000).then(() => null),
-              ]).catch(() => null);
+              receipt = await (hashconnect as any).sendTransaction(accountObj as any, tx as any);
+              txId = tx.transactionId?.toString?.() ?? receipt?.transactionId?.toString?.() ?? txId;
             } else if (!isPayableRequest && signer && typeof signer.signTransaction === "function") {
               // Non-payable path: single node → freezeWith → signTransaction → execute.
               //
