@@ -62,16 +62,16 @@ export function useCreateListing(options?: UseCreateListingOptions) {
       );
     }
 
+    const requireEscrow = requireEscrowRef?.current ?? false;
     const txHash = await send({
       address: marketplaceAddress,
       abi: marketplaceAbi,
       functionName: "createListing",
-      args: [idBytes, parseUnits(price, 8)],
+      args: [idBytes, parseUnits(price, 8), requireEscrow],
     });
     const imageUrl = imageUrlRef?.current ?? undefined;
     const mediaUrls = mediaUrlsRef?.current ?? undefined;
     const title = titleRef?.current ?? undefined;
-    const requireEscrow = requireEscrowRef?.current ?? false;
     const subtitle = subtitleRef?.current ?? undefined;
     const description = descriptionRef?.current ?? undefined;
     const category = categoryRef?.current ?? undefined;

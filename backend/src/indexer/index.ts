@@ -92,8 +92,12 @@ const MARKETPLACE_LISTINGS_ABI = [
 const UNCONFIRMED_PURGE_AGE_MS = 30 * 60 * 1000;
 // Confirmed LISTED rows are re-verified in a slow rotation (a few per pass)
 // so listings pointing at a retired contract — e.g. testnet rows after the
-// mainnet switch — are purged too.
+// mainnet switch — are purged too. Fresh rows are exempt: sync-listing marks
+// them confirmed the moment the wallet returns a tx hash, and mirror-backed
+// eth_call can briefly read NONE right after creation — a new listing must
+// never be purged during normal propagation lag.
 const CONFIRMED_RECHECK_BATCH = 10;
+const CONFIRMED_RECHECK_MIN_AGE_MS = 15 * 60 * 1000;
 let confirmedRecheckCursor: Date | null = null;
 // A confirmed listing must read NONE on two separate passes before it is
 // deleted — one anomalous RPC response must never destroy a live listing.
@@ -152,11 +156,15 @@ async function reconcileUnconfirmedListings(
   });
 
   // Rotating window over confirmed rows, oldest-first, wrapping at the end.
+  const recheckCutoff = new Date(Date.now() - CONFIRMED_RECHECK_MIN_AGE_MS);
   let recheck = await prisma.listing.findMany({
     where: {
       onChainConfirmed: true,
       status: "LISTED",
-      ...(confirmedRecheckCursor && { createdAt: { gt: confirmedRecheckCursor } }),
+      createdAt: {
+        lt: recheckCutoff,
+        ...(confirmedRecheckCursor ? { gt: confirmedRecheckCursor } : {}),
+      },
     },
     select: { id: true, createdAt: true },
     take: CONFIRMED_RECHECK_BATCH,

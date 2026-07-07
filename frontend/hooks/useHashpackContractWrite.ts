@@ -209,7 +209,35 @@ export function useHashpackContractWrite() {
               (signer && typeof signer.getClient === "function" ? signer.getClient() : null) ??
               (network === "mainnet" ? sdk.Client.forMainnet() : sdk.Client.forTestnet());
             let receipt: any;
-            if (!isPayableRequest && signer && typeof signer.signTransaction === "function") {
+            if (
+              signer &&
+              typeof (tx as any).freezeWithSigner === "function" &&
+              typeof (tx as any).executeWithSigner === "function"
+            ) {
+              // Canonical HashConnect v3 path: freeze and execute THROUGH the
+              // wallet. HashPack submits the transaction to consensus nodes
+              // itself, so the browser never speaks gRPC-web to
+              // nodeXX.swirldslabs.com — mainnet's node proxies reject browser
+              // CORS (GrpcServiceError GRPC_WEB after 10 node retries).
+              // Works for payable and non-payable calls alike.
+              showConfirmPrompt();
+              walletPrompted = true;
+              const frozen = await (tx as any).freezeWithSigner(signer);
+              const txResponse = await frozen.executeWithSigner(signer);
+              txId =
+                txResponse?.transactionId?.toString?.() ?? tx.transactionId?.toString?.() ?? txId;
+              // Receipt via the wallet when supported; 30s cap, then fall
+              // through to the mirror-node status check below.
+              receipt = await Promise.race([
+                (async () => {
+                  if (typeof txResponse?.getReceiptWithSigner === "function") {
+                    return txResponse.getReceiptWithSigner(signer);
+                  }
+                  return txResponse?.getReceipt?.(freezeClient) ?? null;
+                })(),
+                sleep(30_000).then(() => null),
+              ]).catch(() => null);
+            } else if (!isPayableRequest && signer && typeof signer.signTransaction === "function") {
               // Non-payable path: single node → freezeWith → signTransaction → execute.
               //
               // Why not populateTransaction:
