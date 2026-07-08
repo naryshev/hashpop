@@ -10,6 +10,7 @@ import {
   Info,
   LayoutDashboard,
   LogOut,
+  PackageCheck,
   Receipt,
   Tag,
   User,
@@ -245,6 +246,13 @@ export function ProfileCardSheet({ open, onClose }: { open: boolean; onClose: ()
                   className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-white transition-colors hover:bg-white/5"
                 >
                   <Tag size={18} className="text-silver" /> Offers
+                </Link>
+                <Link
+                  href="/purchases?tab=sold"
+                  onClick={onClose}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-white transition-colors hover:bg-white/5"
+                >
+                  <PackageCheck size={18} className="text-silver" /> Sold items
                 </Link>
                 <Link
                   href="/help"

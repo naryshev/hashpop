@@ -115,6 +115,18 @@ export default function PurchasesPage() {
   const [loading, setLoading] = useState(true);
   const [escrowViews, setEscrowViews] = useState<Record<string, EscrowView>>({});
   const [tab, setTab] = useState<Tab>("bought");
+
+  // Deep-link support: /purchases?tab=sold opens on the Sold tab (used by the
+  // profile sheet's "Sold items" link and the desktop nav). Read from
+  // window.location on mount to avoid a Suspense boundary for useSearchParams.
+  useEffect(() => {
+    try {
+      const t = new URLSearchParams(window.location.search).get("tab");
+      if (t === "sold") setTab("sold");
+    } catch {
+      // ignore
+    }
+  }, []);
   const [ratedSales, setRatedSales] = useState<Set<string>>(new Set());
   const [rating, setRating] = useState<{
     saleId: string;
