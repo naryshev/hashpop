@@ -46,9 +46,13 @@ const BOOT_ERROR_CATCHER = `
 (function () {
   function show(msg) {
     try {
+      var text = String(msg || "Unknown boot error");
+      // Recoverable React hydration warnings (#418/#422/#423): React retries
+      // with client rendering and the app works — never show these to users.
+      if (/Minified React error #(418|422|423)/.test(text)) return;
       var el = document.getElementById("hp-boot-error");
       if (!el) return;
-      el.textContent = String(msg || "Unknown boot error").slice(0, 600);
+      el.textContent = text.slice(0, 600);
       el.classList.remove("hidden");
     } catch (e) {}
   }
