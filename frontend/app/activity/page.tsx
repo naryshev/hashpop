@@ -7,7 +7,7 @@ import { ConnectWalletButton } from "@/components/ConnectWalletButton";
 import { useHashpackWallet } from "@/lib/hashpackWallet";
 import { getApiUrl } from "@/lib/apiUrl";
 import { formatPriceForDisplay } from "@/lib/formatPrice";
-import { listingHref } from "@/lib/listingUrl";
+import { encodeListingIdForUrl, listingHref } from "@/lib/listingUrl";
 import { markActivitySeen } from "@/hooks/useUnseenActivity";
 
 type Kind = "sale" | "purchase" | "offer" | "message" | "review";
@@ -163,7 +163,7 @@ export default function ActivityPage() {
               title: isSeller ? `Sold "${title}"` : `Bought "${title}"`,
               subtitle: s.listing?.status ? `Order ${s.listing.status.toLowerCase()}` : undefined,
               counterparty: counterparty ?? undefined,
-              href: s.listingId ? `/purchases/${s.id}` : undefined,
+              href: s.listingId ? `/purchases/${encodeListingIdForUrl(s.listingId)}` : undefined,
               amountHbar: s.amount ? formatPriceForDisplay(s.amount) : undefined,
               status: s.listing?.status ?? undefined,
             });
@@ -175,7 +175,7 @@ export default function ActivityPage() {
                 when: shippedAt,
                 title: isSeller ? `Marked "${title}" as shipped` : `"${title}" shipped`,
                 counterparty: counterparty ?? undefined,
-                href: `/purchases/${s.id}`,
+                href: s.listingId ? `/purchases/${encodeListingIdForUrl(s.listingId)}` : undefined,
               });
             }
             const completedAt = parseDate(s.listing?.exchangeConfirmedAt ?? undefined);
@@ -186,7 +186,7 @@ export default function ActivityPage() {
                 when: completedAt,
                 title: isSeller ? `Escrow released for "${title}"` : `Received "${title}"`,
                 counterparty: counterparty ?? undefined,
-                href: `/purchases/${s.id}`,
+                href: s.listingId ? `/purchases/${encodeListingIdForUrl(s.listingId)}` : undefined,
               });
             }
           }

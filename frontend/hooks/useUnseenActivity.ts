@@ -5,10 +5,11 @@ import { getApiUrl } from "../lib/apiUrl";
 import { useHashpackWallet } from "../lib/hashpackWallet";
 
 /**
- * Lightweight "you have new messages" signal for the notification bells.
- * Polls the inbox and reports true when any conversation's last message is
- * inbound and newer than the last time the user opened Activity or Messages.
- * Seen-state lives in localStorage — no schema, no extra endpoints.
+ * Lightweight "you have new activity" signal for the notification bells.
+ * Polls the inbox and the user's sales/purchases and reports true when
+ * anything is newer than the last time the user opened Activity or Messages —
+ * an inbound message, an item they sold, or an item they bought. Seen-state
+ * lives in localStorage — no schema, no extra endpoints.
  */
 
 const SEEN_KEY = "hashpop.activity.seen.v1";
@@ -36,30 +37,51 @@ export function useUnseenActivity(): boolean {
     let stopped = false;
     const lower = address.toLowerCase();
 
+    const newerThanSeen = (iso: string | undefined, seen: number) => {
+      if (!iso) return false;
+      const t = new Date(iso).getTime();
+      return Number.isFinite(t) && t > seen;
+    };
+
     const check = async () => {
       try {
-        const res = await fetch(
-          `${getApiUrl()}/api/messages/inbox?address=${encodeURIComponent(address)}`,
-        );
-        if (!res.ok) return;
-        const data = (await res.json()) as {
-          conversations?: Array<{
-            lastMessage?: { fromAddress?: string; createdAt?: string } | null;
-          }>;
-        };
         let seen = 0;
         try {
           seen = Number(window.localStorage.getItem(SEEN_KEY) || 0);
         } catch {
           // ignore
         }
-        const has = (data.conversations ?? []).some((c) => {
-          const m = c.lastMessage;
-          if (!m?.createdAt) return false;
-          if ((m.fromAddress || "").toLowerCase() === lower) return false; // own reply
-          const t = new Date(m.createdAt).getTime();
-          return Number.isFinite(t) && t > seen;
-        });
+
+        const [msgRes, saleRes] = await Promise.allSettled([
+          fetch(`${getApiUrl()}/api/messages/inbox?address=${encodeURIComponent(address)}`),
+          fetch(`${getApiUrl()}/api/user/${encodeURIComponent(address)}/purchases`),
+        ]);
+
+        let has = false;
+
+        if (msgRes.status === "fulfilled" && msgRes.value.ok) {
+          const data = (await msgRes.value.json()) as {
+            conversations?: Array<{
+              lastMessage?: { fromAddress?: string; createdAt?: string } | null;
+            }>;
+          };
+          has = (data.conversations ?? []).some((c) => {
+            const m = c.lastMessage;
+            if (!m) return false;
+            if ((m.fromAddress || "").toLowerCase() === lower) return false; // own reply
+            return newerThanSeen(m.createdAt, seen);
+          });
+        }
+
+        // A sale (you're the seller) or purchase newer than last-seen also
+        // lights the bell — that's how the seller learns their item sold.
+        if (!has && saleRes.status === "fulfilled" && saleRes.value.ok) {
+          const data = (await saleRes.value.json()) as {
+            purchases?: Array<{ createdAt?: string }>;
+          };
+          has = (data.purchases ?? []).some((p) => newerThanSeen(p.createdAt, seen));
+        }
+
         if (!stopped) setUnseen(has);
       } catch {
         // network hiccup — keep current state

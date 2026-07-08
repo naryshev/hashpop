@@ -93,6 +93,13 @@ export default function PurchaseDetailPage() {
   const [escrow, setEscrow] = useState<EscrowView | null>(null);
   const [shipTo, setShipTo] = useState<ShipToAddress | null>(null);
   const [loading, setLoading] = useState(true);
+  // Inline tracking entry (seller, EscrowV2): saving tracking IS the shipping
+  // flow — the settlement engine records the shipment on-chain.
+  const [trackingInput, setTrackingInput] = useState("");
+  const [carrierInput, setCarrierInput] = useState("");
+  const [trackingSaving, setTrackingSaving] = useState(false);
+  const [trackingSaved, setTrackingSaved] = useState(false);
+  const [trackingError, setTrackingError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [txSheetId, setTxSheetId] = useState<string | null>(null);
 
@@ -133,6 +140,41 @@ export default function PurchaseDetailPage() {
   useEffect(() => {
     refetch();
   }, [refetch]);
+
+  useEffect(() => {
+    setTrackingInput(listing?.trackingNumber ?? "");
+    setCarrierInput(listing?.trackingCarrier ?? "");
+  }, [listing?.trackingNumber, listing?.trackingCarrier]);
+
+  const saveTracking = async () => {
+    if (!address || !trackingInput.trim()) {
+      setTrackingError("Enter the tracking number first.");
+      return;
+    }
+    setTrackingSaving(true);
+    setTrackingError(null);
+    try {
+      const res = await fetch(`${getApiUrl()}/api/listing/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sellerAddress: address,
+          trackingNumber: trackingInput.trim(),
+          trackingCarrier: carrierInput.trim() || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body?.error || "Failed to save tracking.");
+      }
+      setTrackingSaved(true);
+      refetch();
+    } catch (e) {
+      setTrackingError(e instanceof Error ? e.message : "Failed to save tracking.");
+    } finally {
+      setTrackingSaving(false);
+    }
+  };
 
   // Delivery address collected at checkout — the buyer sees their own, the
   // seller sees the buyer's.
@@ -342,6 +384,78 @@ export default function PurchaseDetailPage() {
               }}
             >
               You are viewing this order as an observer.
+            </div>
+          )}
+
+          {/* Seller + EscrowV2: tracking entry lives right here — saving it is
+              the entire shipping flow (the settlement engine records the
+              shipment on-chain; no wallet transaction). */}
+          {isParty && role === "seller" && ESCROW_V2 && (phase === "paid" || phase === "shipped") && (
+            <div
+              style={{
+                padding: 14,
+                borderRadius: 14,
+                background: "rgba(255,255,255,0.03)",
+                border: `1px solid ${HP.borderSoft}`,
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 10,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.12em",
+                  color: HP.muted,
+                }}
+              >
+                {phase === "paid" ? "Ship it — enter tracking" : "Update tracking"}
+              </div>
+              <input
+                value={trackingInput}
+                onChange={(e) => setTrackingInput(e.target.value)}
+                placeholder="Tracking number *"
+                style={{
+                  background: HP.bgInput,
+                  border: `1px solid ${HP.borderSoft}`,
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                  fontSize: 13,
+                  color: HP.fg,
+                  outline: "none",
+                }}
+              />
+              <input
+                value={carrierInput}
+                onChange={(e) => setCarrierInput(e.target.value)}
+                placeholder="Carrier (e.g. USPS, UPS, FedEx)"
+                style={{
+                  background: HP.bgInput,
+                  border: `1px solid ${HP.borderSoft}`,
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                  fontSize: 13,
+                  color: HP.fg,
+                  outline: "none",
+                }}
+              />
+              {trackingSaved && phase === "paid" ? (
+                <p style={{ fontSize: 12, color: HP.chrome, margin: 0 }}>
+                  Tracking saved — the shipment will be recorded on-chain automatically.
+                </p>
+              ) : (
+                <Btn onClick={() => void saveTracking()} disabled={trackingSaving || !trackingInput.trim()}>
+                  {trackingSaving
+                    ? "Saving…"
+                    : phase === "paid"
+                      ? "Save tracking — mark as shipped"
+                      : "Save tracking"}
+                </Btn>
+              )}
+              {trackingError && (
+                <p style={{ fontSize: 12, color: "#fda4af", margin: 0 }}>{trackingError}</p>
+              )}
             </div>
           )}
 
@@ -718,9 +832,9 @@ function Actions({
 
   if (phase === "paid") {
     if (isBuyer) return <Btn variant="ghost" onClick={onMessageSeller}>Message seller</Btn>;
-    // With EscrowV2 the seller never signs a transaction — entering tracking
-    // on the listing is the entire shipping flow.
-    if (ESCROW_V2) return <Btn onClick={onUpdateTracking}>Add tracking — mark shipped</Btn>;
+    // With EscrowV2 the seller ships via the inline tracking form rendered
+    // above this component — no extra button needed here.
+    if (ESCROW_V2) return null;
     return (
       <Btn onClick={onMarkShipped} disabled={shipPending}>
         {shipPending ? "Submitting…" : "Mark shipped"}
@@ -739,6 +853,8 @@ function Actions({
         </>
       );
     }
+    // EscrowV2 sellers get the inline tracking form above.
+    if (ESCROW_V2) return null;
     return <Btn variant="ghost" onClick={onUpdateTracking}>Update tracking</Btn>;
   }
   if (phase === "disputed") {
