@@ -117,9 +117,14 @@ function openHashPackDeepLink(pairingUri: string): void {
   }
 }
 
+// WalletConnect pairing URIs expire ~5 minutes after creation. A stale URI
+// makes wallets show a pairing prompt that can never complete (greyed-out
+// Pair button) and reads as "HashPack not detected" on desktop.
+const PAIRING_URI_MAX_AGE_MS = 3 * 60 * 1000;
+
 async function getPairingUri(hc: HashConnect): Promise<string | null> {
-  const direct = (hc as unknown as { pairingString?: string }).pairingString;
-  if (direct && direct.startsWith("wc:")) return direct;
+  // Prefer generating a FRESH pairing string — hc.pairingString is minted at
+  // init time and may already be expired by the time the user clicks connect.
   const generate = (hc as unknown as { generatePairingString?: () => Promise<{ uri?: string }> })
     .generatePairingString;
   if (typeof generate === "function") {
@@ -127,6 +132,8 @@ async function getPairingUri(hc: HashConnect): Promise<string | null> {
     const uri = data?.uri;
     if (uri && uri.startsWith("wc:")) return uri;
   }
+  const direct = (hc as unknown as { pairingString?: string }).pairingString;
+  if (direct && direct.startsWith("wc:")) return direct;
   return null;
 }
 
@@ -350,6 +357,8 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
   const initPromiseRef = useRef<Promise<HashConnect | null> | null>(null);
   const connectInFlightRef = useRef(false);
   const mobilePairingUriRef = useRef<string | null>(null);
+  const mobilePairingUriAtRef = useRef<number>(0);
+  const pairingRefreshTimerRef = useRef<number | null>(null);
   const listenersRef = useRef<{
     pairing: ((s: any) => void) | null;
     disconnect: (() => void) | null;
@@ -463,13 +472,24 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
           resetWalletState();
         }
         // Pre-cache pairing URI so click/tap can deep-link immediately
-        // without waiting on an async call (which browsers block for deep links).
-        void getPairingUri(hc).then((uri) => {
-          if (uri && mounted) {
-            mobilePairingUriRef.current = uri;
-            setPairingUri(uri);
-          }
-        });
+        // without waiting on an async call (which browsers block for deep
+        // links) — and keep it FRESH: pairing URIs expire after ~5 minutes,
+        // and handing the wallet a stale one produces an unpairable prompt.
+        const refreshPairingUri = () => {
+          if (!mounted || (hc.connectedAccountIds?.length ?? 0) > 0) return;
+          void getPairingUri(hc).then((uri) => {
+            if (uri && mounted) {
+              mobilePairingUriRef.current = uri;
+              mobilePairingUriAtRef.current = Date.now();
+              setPairingUri(uri);
+            }
+          });
+        };
+        refreshPairingUri();
+        pairingRefreshTimerRef.current = window.setInterval(
+          refreshPairingUri,
+          PAIRING_URI_MAX_AGE_MS,
+        );
         return hc;
       } catch (e) {
         if (!mounted) return null;
@@ -493,6 +513,10 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
         }
       }
       listenersRef.current = { pairing: null, disconnect: null };
+      if (pairingRefreshTimerRef.current !== null) {
+        window.clearInterval(pairingRefreshTimerRef.current);
+        pairingRefreshTimerRef.current = null;
+      }
     };
   }, [network, resetWalletState]);
 
@@ -528,19 +552,21 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
 
       if ((hc.connectedAccountIds?.length ?? 0) > 0) return;
 
-      const immediatePairingUri =
-        mobilePairingUriRef.current ??
-        (hc as unknown as { pairingString?: string }).pairingString ??
-        null;
-      const pairingUri =
-        immediatePairingUri && immediatePairingUri.startsWith("wc:")
-          ? immediatePairingUri
-          : await getPairingUri(hc);
+      // Use the pre-cached URI only while it's fresh — expired pairing URIs
+      // make the wallet show an unpairable prompt (greyed-out Pair) and read
+      // as "not detected" on desktop. Otherwise mint a fresh one.
+      const cachedUri = mobilePairingUriRef.current;
+      const cacheFresh =
+        !!cachedUri &&
+        cachedUri.startsWith("wc:") &&
+        Date.now() - mobilePairingUriAtRef.current < PAIRING_URI_MAX_AGE_MS;
+      const pairingUri = cacheFresh ? cachedUri : await getPairingUri(hc);
       if (!pairingUri) {
         setError("Could not create a HashPack pairing URI. Refresh and try again.");
         return;
       }
       mobilePairingUriRef.current = pairingUri;
+      mobilePairingUriAtRef.current = Date.now();
 
       const framed = isFramed();
 
