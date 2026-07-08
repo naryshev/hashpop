@@ -14,6 +14,7 @@ import {
   Bell,
   Wallet,
   LayoutGrid,
+  PackageCheck,
   ShoppingCart,
 } from "lucide-react";
 import { useCart } from "../lib/cart";
@@ -135,6 +136,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
         ? [
             { label: "Offers", href: "/offers", icon: <Tag className="h-5 w-5" /> },
             { label: "Purchases", href: "/purchases", icon: <Receipt className="h-5 w-5" /> },
+            { label: "Sold", href: "/purchases?tab=sold", icon: <PackageCheck className="h-5 w-5" /> },
             { label: "Watchlist", href: "/watchlist", icon: <Heart className="h-5 w-5" /> },
             {
               label: "Messages",
