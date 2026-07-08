@@ -73,6 +73,23 @@ function isMobileBrowser(): boolean {
 }
 
 /**
+ * True when the app runs inside an iframe — which is exactly what HashPack's
+ * dApp browser is. In that context deep links must never fire (navigating a
+ * framed page to hashpack:// replaces the app with the browser's
+ * "content blocked" page); pairing happens via hashconnect's iframe
+ * messaging to the surrounding wallet instead.
+ */
+function isFramed(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.self !== window.top;
+  } catch {
+    // Cross-origin parent throws — definitely framed.
+    return true;
+  }
+}
+
+/**
  * Build the HashPack deep-link URI for the given WalletConnect pairing string.
  * On mobile, navigating to this URI will open (or prompt to install) HashPack.
  */
@@ -82,6 +99,7 @@ export function buildHashPackDeepLink(pairingUri: string): string {
 
 function openHashPackDeepLink(pairingUri: string): void {
   if (typeof window === "undefined" || !pairingUri) return;
+  if (isFramed()) return; // wallet dApp browser — iframe pairing handles it
   const deeplink = buildHashPackDeepLink(pairingUri);
   try {
     if (isMobileBrowser()) {
@@ -524,8 +542,11 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
       }
       mobilePairingUriRef.current = pairingUri;
 
-      // Direct HashPack deep-link first on both desktop and mobile.
-      openHashPackDeepLink(pairingUri);
+      const framed = isFramed();
+
+      // Direct HashPack deep-link first on both desktop and mobile — but
+      // never inside a wallet's dApp browser (see openHashPackDeepLink).
+      if (!framed) openHashPackDeepLink(pairingUri);
 
       const maybeConnectToExtension = (
         hc as unknown as { connectToExtension?: () => Promise<unknown> }
@@ -534,7 +555,24 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
         void maybeConnectToExtension.call(hc).catch(() => {});
       }
 
-      if (isMobileBrowser()) {
+      if (framed) {
+        // Wallet dApp browser: pair with the surrounding wallet over
+        // hashconnect's iframe messaging. init() already sends a pairing
+        // request on load; re-send it for this explicit user gesture, then
+        // wait for the wallet's approval like the mobile flow does.
+        const anyHc = hc as unknown as Record<string, unknown>;
+        const iframePair =
+          (anyHc.connectToIframeParent as (() => unknown) | undefined) ??
+          (anyHc._connectToIframeParent as (() => unknown) | undefined);
+        if (typeof iframePair === "function") {
+          try {
+            void iframePair.call(hc);
+          } catch {
+            // fall through to waiting — the init-time request may still land
+          }
+        }
+        await waitForPairing(connectWaitRef, PAIRING_WAIT_MS);
+      } else if (isMobileBrowser()) {
         // Mobile pairs via the deep link / QR; give the user time to approve
         // in the HashPack app and come back.
         await waitForPairing(connectWaitRef, PAIRING_WAIT_MS);
