@@ -1,24 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Allow HashPack and other wallet in-app browsers to embed the site (their
-  // dapp browsers render pages in an iframe). Framing permission is granted
-  // via CSP frame-ancestors ONLY: "ALLOWALL" is not a valid X-Frame-Options
-  // value, and engines that refuse to parse it can treat it as deny — a
-  // silent blank page in the wallet's browser. Absence of X-Frame-Options +
-  // frame-ancestors * is the standards-correct "frameable by anyone".
-  async headers() {
-    return [
-      {
-        source: "/(.*)",
-        headers: [
-          {
-            key: "Content-Security-Policy",
-            value: "frame-ancestors *;",
-          },
-        ],
-      },
-    ];
-  },
+  // Wallet dapp browsers (HashPack) frame the site from chrome-extension://
+  // and custom-scheme origins. Per the CSP spec, `frame-ancestors *` matches
+  // ONLY network schemes (http/https/ws/wss) — so that directive BLOCKS
+  // extension-scheme wrappers (verbatim browser error: "The request has been
+  // blocked... '*' matches only URLs with network schemes"). The only way to
+  // allow framing from any scheme is to send no framing headers at all:
+  // no X-Frame-Options, no frame-ancestors. This is what working Hedera
+  // dapps (e.g. SaucerSwap) serve. Clickjacking protection is intentionally
+  // traded away — being embeddable by wallets is the product requirement.
   // SWC minifier produces duplicate variable declarations when processing
   // @hashgraph/sdk and @hashgraph/proto (protobuf Long.js patterns).
   // Terser handles these edge cases correctly.
