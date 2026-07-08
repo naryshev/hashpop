@@ -318,11 +318,12 @@ async function getOrCreateHashConnect(
       import("@hashgraph/sdk"),
     ]);
     const ledgerId = network === "mainnet" ? sdk.LedgerId.MAINNET : sdk.LedgerId.TESTNET;
+    const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
     const metadata = {
       name: "Hashpop",
-      description: "Hashpop marketplace - HashConnect wallet (HashPack)",
-      icons: ["https://hashpack.app/favicon.ico"],
-      url: typeof window !== "undefined" ? window.location.origin : "http://localhost:3000",
+      description: "Hashpop — verifiable peer-to-peer marketplace on Hedera",
+      icons: [`${origin}/hashpop-cart-3d.PNG`],
+      url: origin,
     };
     const hc = new HashConnect(ledgerId, projectId, metadata, false);
     await hc.init();
