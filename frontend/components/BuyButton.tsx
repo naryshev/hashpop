@@ -3,7 +3,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { marketplaceAbi, marketplaceAddress } from "../lib/contracts";
 import { formatPriceForDisplay } from "../lib/formatPrice";
-import { formatHbarWithUsd } from "../lib/hbarUsd";
 import { getTransactionErrorMessage } from "../lib/transactionError";
 import { useHbarUsd } from "../hooks/useHbarUsd";
 import { listingIdToBytes32 } from "../lib/bytes32";
@@ -15,6 +14,7 @@ import { readListingCompat } from "../lib/marketplaceRead";
 import { getApiUrl } from "../lib/apiUrl";
 import { getTransactionExplorerUrl } from "../lib/explorer";
 import { OfferModal } from "./OfferModal";
+import { ConfirmPurchaseSheet } from "./ConfirmPurchaseSheet";
 import { ShippingAddressModal } from "./ShippingAddressModal";
 import { useSignInModal } from "../lib/signInModal";
 import { useCart } from "../lib/cart";
@@ -29,6 +29,7 @@ export function BuyButton({
   onPurchaseComplete,
   onMessage,
   onOfferSubmitted,
+  descriptionSlot,
 }: {
   listingId: string;
   price: string;
@@ -38,6 +39,8 @@ export function BuyButton({
   onPurchaseComplete?: (txHash?: string) => void;
   onMessage?: () => void;
   onOfferSubmitted?: (txHash: string, amountHbar: string) => void;
+  /** Rendered between the price and PURCHASE (demo-video order). */
+  descriptionSlot?: React.ReactNode;
 }) {
   const idBytes = useMemo(() => listingIdToBytes32(listingId), [listingId]);
 
@@ -106,6 +109,8 @@ export function BuyButton({
   const explorerUrl = getTransactionExplorerUrl(lastTxId, chainId);
 
   const [offerModalOpen, setOfferModalOpen] = useState(false);
+  // Demo-video flow: shipping address → "Confirm purchase" sheet → wallet.
+  const [confirmOpen, setConfirmOpen] = useState(false);
   // Payment is gated on a valid shipping address: the modal must save one to
   // the backend before buy()/the offer form can run. "next" is what happens
   // after the address is confirmed.
@@ -173,7 +178,6 @@ export function BuyButton({
   };
 
   const usdRate = useHbarUsd();
-  const listingPriceWithUsd = formatHbarWithUsd(formatPriceForDisplay(_price || "0"), usdRate);
   const canBuy =
     (hasPrice || chainReadFailed || hasApiPrice) &&
     !isWrongNetwork &&
@@ -181,10 +185,22 @@ export function BuyButton({
     !isConfirming &&
     !isLegacyWeiListing;
 
+  const priceHbarDisplay = formatPriceForDisplay(_price || "0");
+  const priceUsd =
+    usdRate && usdRate > 0 && !Number.isNaN(Number(priceHbarDisplay))
+      ? (Number(priceHbarDisplay) * usdRate).toFixed(2)
+      : null;
   return (
-    <div className="space-y-1">
-      {/* Price line */}
-      <p className="text-xl font-semibold text-white mb-3">{listingPriceWithUsd}</p>
+    <div className="space-y-2">
+      {/* Price line — big green ℏ figure with a muted USD approximation. */}
+      <p className="mb-3 flex items-baseline gap-2">
+        <span className="text-3xl font-extrabold tracking-tight text-[#00ffa3]">
+          {priceHbarDisplay} <span className="italic">ℏ</span>
+        </span>
+        {priceUsd && <span className="text-sm text-silver/70">(${priceUsd})</span>}
+      </p>
+
+      {descriptionSlot}
 
       {notOnChain && (
         <p className="text-xs text-amber-300/90 mb-2">
@@ -209,10 +225,38 @@ export function BuyButton({
           if (canBuy) setShippingGate("buy");
         }}
         disabled={!!address && !canBuy}
-        className="w-full bg-white text-black font-bold uppercase tracking-widest py-4 text-sm hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        className="btn-mint w-full py-4 text-sm uppercase tracking-[0.2em]"
       >
         {isPending ? "Confirm in wallet\u2026" : "Purchase"}
       </button>
+
+      {/* OFFER / MESSAGE — outlined pair below the CTA, per the demo video */}
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            if (!address) {
+              openSignIn({
+                title: "Sign in to make an offer",
+                onConnected: () => setShippingGate("offer"),
+              });
+              return;
+            }
+            // Offers escrow funds up-front, so they need an address too.
+            setShippingGate("offer");
+          }}
+          className="btn-mint-outline py-3.5 text-sm uppercase tracking-[0.18em]"
+        >
+          Offer
+        </button>
+        <button
+          type="button"
+          onClick={onMessage}
+          className="btn-mint-outline py-3.5 text-sm uppercase tracking-[0.18em]"
+        >
+          Message
+        </button>
+      </div>
 
       {/* ADD TO CART */}
       <button
@@ -224,41 +268,13 @@ export function BuyButton({
             cart.add(listingId);
           }
         }}
-        className={`w-full font-bold uppercase tracking-widest py-3.5 text-sm border transition-colors ${
+        className={`w-full rounded-xl border py-3 text-sm font-bold uppercase tracking-[0.18em] transition-colors ${
           inCart
             ? "border-[#00ffa3]/50 text-[#00ffa3] hover:bg-[#00ffa3]/10"
-            : "bg-transparent text-white border-white/40 hover:border-white hover:bg-white/5"
+            : "border-white/15 bg-transparent text-white/85 hover:border-white/40 hover:bg-white/5"
         }`}
       >
         {inCart ? "✓ In cart — view cart" : "Add to cart"}
-      </button>
-
-      {/* OFFER */}
-      <button
-        type="button"
-        onClick={() => {
-          if (!address) {
-            openSignIn({
-              title: "Sign in to make an offer",
-              onConnected: () => setShippingGate("offer"),
-            });
-            return;
-          }
-          // Offers escrow funds up-front, so they need an address too.
-          setShippingGate("offer");
-        }}
-        className="w-full bg-transparent text-white font-bold uppercase tracking-widest py-3.5 text-sm border border-white/40 hover:border-white hover:bg-white/5 transition-colors"
-      >
-        Offer
-      </button>
-
-      {/* MESSAGE */}
-      <button
-        type="button"
-        onClick={onMessage}
-        className="w-full bg-transparent text-white font-bold uppercase tracking-widest py-3.5 text-sm border border-white/40 hover:border-white hover:bg-white/5 transition-colors"
-      >
-        Message
       </button>
 
       {/* Wishlist toggle — subtle, below the main actions */}
@@ -306,10 +322,22 @@ export function BuyButton({
         onConfirmed={() => {
           const next = shippingGate;
           setShippingGate(null);
-          if (next === "buy") void buy();
+          if (next === "buy") setConfirmOpen(true);
           if (next === "offer") setOfferModalOpen(true);
         }}
         onClose={() => setShippingGate(null)}
+      />
+
+      <ConfirmPurchaseSheet
+        open={confirmOpen}
+        listingId={listingId}
+        priceHbar={_price || "0"}
+        contractAddress={marketplaceAddress}
+        confirming={isPending}
+        onConfirm={() => {
+          void buy().finally(() => setConfirmOpen(false));
+        }}
+        onClose={() => setConfirmOpen(false)}
       />
 
       <OfferModal
