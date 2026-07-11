@@ -54,26 +54,53 @@ export default function PurchaseSuccessPage() {
   return (
     <main className="min-h-screen flex items-start justify-center px-4 py-12">
       <div className="w-full max-w-lg">
-        {/* Hero confirmation */}
+        {/* Hero confirmation — glowing green check + LOCKED pill, per the
+            demo video's "Funds locked in escrow" state. */}
         <div className="flex flex-col items-center text-center mb-8">
           <div
-            className="w-16 h-16 flex items-center justify-center bg-[#00ffa3]/10 border border-[#00ffa3]/40 mb-5"
-            style={{ boxShadow: "0 0 32px rgba(0,255,163,0.2)" }}
+            className="mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-[radial-gradient(circle_at_50%_35%,#7dffce_0%,#00ffa3_60%,#00d98a_100%)]"
+            style={{ boxShadow: "0 0 48px rgba(0,255,163,0.45)" }}
           >
             <svg
-              className="w-8 h-8 text-[#00ffa3]"
+              className="h-9 w-9 text-[#04150f]"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
-              strokeWidth={2.5}
+              strokeWidth={3}
             >
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-white">Purchase Confirmed</h1>
-          <p className="text-silver text-sm mt-2 max-w-xs">
-            Your payment is secured in escrow. The seller has been notified.
+          <h1 className="text-2xl font-extrabold tracking-tight text-white">
+            {listing?.requireEscrow === false ? "Purchase complete" : "Funds locked in escrow"}
+          </h1>
+          <p className="text-silver text-sm mt-2 max-w-sm">
+            The seller has been notified.
+            {listing?.requireEscrow !== false && priceDisplay
+              ? ` ${formatPriceForDisplay(listing?.price ?? "0")} ℏ releases when you confirm delivery.`
+              : ""}
           </p>
+          {txHash && (
+            <div className="mt-4 flex max-w-full items-center gap-2.5">
+              <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#f59e0b] px-3 py-1 text-[11px] font-extrabold uppercase tracking-wide text-[#2a1503]">
+                <svg
+                  className="h-3 w-3"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"
+                  />
+                </svg>
+                Locked
+              </span>
+              <span className="truncate font-mono text-[11px] text-silver/70">tx {txHash}</span>
+            </div>
+          )}
         </div>
 
         {/* Listing card */}
@@ -143,11 +170,17 @@ export default function PurchaseSuccessPage() {
 
         {/* CTA buttons */}
         <div className="flex gap-3">
-          <Link href="/marketplace" className="btn-frost flex-1 text-center text-sm">
+          <Link
+            href="/marketplace"
+            className="btn-mint-outline flex-1 py-3 text-center text-sm font-semibold"
+          >
             Marketplace
           </Link>
           {id && (
-            <Link href={listingHref(id)} className="btn-frost-cta flex-1 text-center text-sm">
+            <Link
+              href={listingHref(id)}
+              className="btn-mint flex-1 py-3 text-center text-sm font-semibold"
+            >
               View Listing & Escrow
             </Link>
           )}

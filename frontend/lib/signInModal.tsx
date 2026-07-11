@@ -109,17 +109,19 @@ export function SignInModalProvider({ children }: { children: React.ReactNode })
     open && portalTarget
       ? createPortal(
           <div
-            className="fixed inset-0 z-[300] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+            className="fixed inset-0 z-[300] flex items-end justify-center bg-black/80 backdrop-blur-sm md:items-center md:p-4"
             role="dialog"
             aria-modal="true"
             aria-label="Sign in with HashPack"
             onClick={closeSignIn}
           >
+            {/* Bottom sheet on mobile (rounded top corners, drag-handle look),
+                centered card on desktop — matching the demo video. */}
             <div className="relative w-full max-w-md" onClick={(e) => e.stopPropagation()}>
               <button
                 type="button"
                 onClick={closeSignIn}
-                className="absolute top-2 right-3 z-10 text-lg font-medium leading-none text-white/60 hover:text-white"
+                className="absolute top-3 right-4 z-10 text-lg font-medium leading-none text-white/60 hover:text-white"
                 aria-label="Close"
               >
                 ×
@@ -127,7 +129,7 @@ export function SignInModalProvider({ children }: { children: React.ReactNode })
               {title && (
                 <p className="mb-3 text-center text-sm font-medium text-white/80">{title}</p>
               )}
-              <SignInCard />
+              <SignInCard className="rounded-t-3xl border border-white/10 bg-[#12161f]/95 p-6 pb-[max(env(safe-area-inset-bottom),24px)] shadow-[0_-12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl md:rounded-3xl md:pb-8 sm:p-8" />
             </div>
           </div>,
           portalTarget,

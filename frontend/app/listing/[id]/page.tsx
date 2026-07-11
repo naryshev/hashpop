@@ -8,7 +8,7 @@ import { BuyButton } from "../../../components/BuyButton";
 import { EscrowPanel } from "../../../components/EscrowPanel";
 import { AddressDisplay } from "../../../components/AddressDisplay";
 import { profileAvatarUrl, profileDisplayName, useProfile } from "../../../lib/profiles";
-import { BadgeCheck } from "lucide-react";
+import { BadgeCheck, ChevronLeft, Sparkles } from "lucide-react";
 import { formatContractAmountToHbar, formatPriceForDisplay } from "../../../lib/formatPrice";
 import { formatHbarWithUsd } from "../../../lib/hbarUsd";
 import { useHbarUsd } from "../../../hooks/useHbarUsd";
@@ -171,6 +171,7 @@ export default function ListingPage() {
   const [priceUpdateFailedBanner, setPriceUpdateFailedBanner] = useState<string | null>(null);
   const [inWishlist, setInWishlist] = useState(false);
   const [wishlistLoading, setWishlistLoading] = useState(false);
+  const [watchCount, setWatchCount] = useState(0);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState("scam");
   const [reportDetails, setReportDetails] = useState("");
@@ -351,6 +352,17 @@ export default function ListingPage() {
       })
       .catch(() => {});
   }, [address, id]);
+
+  // "N watching" under the title, from the shared wishlist counts endpoint.
+  useEffect(() => {
+    if (!id) return;
+    fetch(`${getApiUrl()}/api/wishlist/counts`)
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((data: { counts?: Record<string, number> }) => {
+        setWatchCount(data.counts?.[id] ?? 0);
+      })
+      .catch(() => {});
+  }, [id]);
 
   useEffect(() => {
     if (!listing || !address) return;
@@ -746,27 +758,35 @@ export default function ListingPage() {
   // want-to-sell / description / location below the seller chip).
   const titleBlockJsx = (
     <div>
-      <nav className="mb-3 flex flex-wrap items-center gap-1 text-sm text-silver">
-        <Link href="/marketplace" className="hover:text-white">
-          Marketplace
-        </Link>
-        {categoryLabel && categoryLabel !== "Marketplace" && (
-          <>
-            <span>{">"}</span>
-            <span className="text-white">{categoryLabel}</span>
-          </>
-        )}
-      </nav>
       <div className="flex flex-wrap items-start gap-2">
-        <h1 className="min-w-0 flex-1 text-2xl font-bold text-white">
+        <h1 className="min-w-0 flex-1 text-2xl font-extrabold tracking-tight text-white">
           {editing ? editTitle || displayTitle : displayTitle}
         </h1>
         {!isListed && !isUnconfirmed && (
-          <span className="mt-1 flex-shrink-0 border border-white/10 bg-white/10 px-2 py-0.5 text-xs font-medium text-silver">
+          <span className="mt-1 flex-shrink-0 rounded-full border border-white/10 bg-white/10 px-2.5 py-0.5 text-xs font-medium text-silver">
             Archived
           </span>
         )}
       </div>
+      {listing?.seller && (
+        <div className="mt-2 flex min-w-0 items-center gap-2 text-sm text-silver">
+          <span
+            aria-hidden
+            className="h-5 w-5 shrink-0 rounded-full bg-gradient-to-br from-[#38bdf8] to-[#00ffa3]"
+          />
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="shrink-0">by</span>
+            <AddressDisplay
+              address={listing.seller}
+              showVerified={false}
+              className="truncate font-mono text-silver"
+            />
+          </span>
+          {watchCount > 0 && (
+            <span className="shrink-0 text-silver/60">· {watchCount} watching</span>
+          )}
+        </div>
+      )}
       {displaySubtitle && (
         <p className="mt-1 text-sm text-silver">
           {editing ? editSubtitle : displaySubtitle}
@@ -1187,9 +1207,27 @@ export default function ListingPage() {
             </div>
           )}
 
-        {/* Mobile-only title block above the photo. On desktop the title
-            block lives at the top of the right column inside the grid. */}
-        <div className="lg:hidden mb-4">{titleBlockJsx}</div>
+        {/* Back nav above the media (all viewports), like the demo video:
+            a circular back button + "Marketplace" label. The title itself
+            renders below the photo on mobile (top of the right column). */}
+        <nav className="mb-4 flex flex-wrap items-center gap-2 text-sm text-silver">
+          <Link
+            href="/marketplace"
+            aria-label="Back to marketplace"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/[0.06] text-white transition-colors hover:bg-white/10"
+          >
+            <ChevronLeft size={18} />
+          </Link>
+          <Link href="/marketplace" className="hover:text-white">
+            Marketplace
+          </Link>
+          {categoryLabel && categoryLabel !== "Marketplace" && (
+            <>
+              <span className="text-silver/50">{">"}</span>
+              <span className="text-white">{categoryLabel}</span>
+            </>
+          )}
+        </nav>
 
         {/* Content grid — image left, action panels right.
             The breadcrumb + title block now lives at the top of the right
@@ -1243,7 +1281,7 @@ export default function ListingPage() {
                   ))}
                 </div>
               )}
-              <div className="relative aspect-square max-h-[80vh] flex-1 overflow-hidden rounded-glass-lg border border-white/10 bg-black">
+              <div className="relative aspect-square max-h-[80vh] flex-1 overflow-hidden rounded-2xl border border-white/10 bg-black">
                 {mainImageUrl ? (
                   <>
                     {isVideoMedia(mainImageUrl) ? (
@@ -1257,6 +1295,31 @@ export default function ListingPage() {
                     ) : (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={mainImageUrl} alt="" className="h-full w-full object-contain" />
+                    )}
+                    {/* Status pill + on-chain chip, like the demo video.
+                        Non-interactive so the zoom overlay still works. */}
+                    {listing && ["LISTED", "LOCKED", "SOLD", "REFUNDED"].includes(listing.status) && (
+                      <span
+                        className={`pointer-events-none absolute left-3 top-3 z-20 ${
+                          listing.status === "SOLD" || listing.status === "REFUNDED"
+                            ? "pill-sold"
+                            : listing.status === "LOCKED"
+                              ? "pill-pending"
+                              : "pill-active"
+                        }`}
+                      >
+                        {listing.status === "SOLD" || listing.status === "REFUNDED"
+                          ? "Sold"
+                          : listing.status === "LOCKED"
+                            ? "Pending"
+                            : "Active"}
+                      </span>
+                    )}
+                    {listing?.onChainConfirmed && (
+                      <span className="pointer-events-none absolute bottom-3 right-3 z-20 inline-flex items-center gap-1.5 rounded-full border border-[#00ffa3]/30 bg-[#0b1220]/85 px-3 py-1 text-[11px] font-semibold text-[#00ffa3] backdrop-blur-sm">
+                        <Sparkles size={11} />
+                        Verified on-chain
+                      </span>
                     )}
                     <div className="absolute top-3 right-3 flex gap-2">
                       <button
@@ -1468,7 +1531,7 @@ export default function ListingPage() {
               the title is rendered above the photo and the buy panel sits
               directly below the photo. */}
           <div className="min-w-0 space-y-4">
-            <div className="hidden lg:block">{titleBlockJsx}</div>
+            {titleBlockJsx}
             <div className="hidden lg:block border-t border-white/10" />
 
             {listing && priceMismatch && onChainPriceHbar && (
@@ -1500,15 +1563,16 @@ export default function ListingPage() {
               />
             )}
             {listing && isListed && !isSeller && (
-              <p className="text-[11px] text-silver/60">
-                You pay in HBAR. Any USD figure shown is approximate and updates with the live HBAR
-                price.
-              </p>
-            )}
-            {listing && isListed && !isSeller && (
               <BuyButton
                 listingId={listing.id}
                 price={listing.price}
+                descriptionSlot={
+                  listing.description ? (
+                    <p className="mb-3 text-sm leading-relaxed text-silver lg:hidden">
+                      {listing.description}
+                    </p>
+                  ) : null
+                }
                 inWishlist={inWishlist}
                 onToggleWishlist={() => {
                   void toggleWishlist();
@@ -1533,6 +1597,12 @@ export default function ListingPage() {
                   fetchListing(0, false);
                 }}
               />
+            )}
+            {listing && isListed && !isSeller && (
+              <p className="text-[11px] text-silver/60">
+                You pay in HBAR. Any USD figure shown is approximate and updates with the live HBAR
+                price.
+              </p>
             )}
             {listing &&
               listing.status === "SOLD" &&

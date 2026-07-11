@@ -20,17 +20,9 @@ import { TopBarSlot } from "../../lib/topBar";
 import {
   BadgeCheck,
   Bell,
-  Car,
   ChevronDown,
-  Footprints,
-  Laptop,
-  LayoutGrid,
-  Palette,
   Search as SearchIcon,
   SlidersHorizontal,
-  Smartphone,
-  Sofa,
-  Watch,
 } from "lucide-react";
 import { ProfileCardSheet } from "../../components/ProfileCardSheet";
 import { useUnseenActivity } from "../../hooks/useUnseenActivity";
@@ -114,7 +106,7 @@ function SellerInline({ seller, size = 16 }: { seller?: string; size?: number })
   const name = profileDisplayName(profile);
   const avatar = profileAvatarUrl(profile);
   return (
-    <span className="mt-1 flex items-center gap-1 truncate">
+    <span className="flex min-w-0 items-center gap-1 truncate">
       {avatar ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -659,33 +651,17 @@ export default function MarketplacePageClient({
       </TopBarSlot>
       <TopBarSlot name="actions">{actionsCluster}</TopBarSlot>
       <div className="px-3 py-4 sm:px-4">
-        {/* Mobile-only top section: location chip, watchlist/alerts icons,
-            inline search + filter button, and a horizontal category carousel
-            matching the redesigned mobile marketplace. */}
+        {/* Mobile-only top section, matching the demo video: logo + wordmark
+            with the account pill on the right, a green-tinted "Search
+            listings" bar, then a row of text-only filter pills. */}
         <div className="sm:hidden mb-4 space-y-3">
           <div className="flex items-center justify-between gap-3">
-            {walletLabel ? (
-              <button
-                type="button"
-                onClick={() => setProfileCardOpen(true)}
-                aria-label="Open profile"
-                className="-ml-2 flex items-center gap-1.5 rounded-full px-2 py-2 text-white"
-              >
-                <span className="font-mono text-sm font-semibold">{walletLabel}</span>
-                <ChevronDown size={14} className="text-silver" />
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => openSignIn()}
-                aria-label="Log in"
-                className="-ml-2 flex items-center gap-1.5 rounded-full px-2 py-2 text-white"
-              >
-                <span className="text-sm font-semibold">Login</span>
-                <ChevronDown size={14} className="text-silver" />
-              </button>
-            )}
-            <div className="flex items-center gap-1">
+            <Link href="/marketplace" className="flex items-center gap-2" aria-label="Hashpop home">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/hashpop-cart-3d.PNG" alt="" className="h-7 w-auto object-contain" />
+              <span className="text-lg font-extrabold tracking-tight text-[#00ffa3]">Hashpop</span>
+            </Link>
+            <div className="flex items-center gap-1.5">
               <Link
                 href="/activity"
                 aria-label="Notifications"
@@ -696,18 +672,40 @@ export default function MarketplacePageClient({
                   <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[#00ffa3]" />
                 )}
               </Link>
+              {walletLabel ? (
+                <button
+                  type="button"
+                  onClick={() => setProfileCardOpen(true)}
+                  aria-label="Open profile"
+                  className="flex items-center gap-1.5 rounded-full border border-[#00ffa3]/40 bg-[#00ffa3]/[0.06] px-3 py-1.5"
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#00ffa3] shadow-[0_0_4px_rgba(0,255,163,0.8)]" />
+                  <span className="font-mono text-xs font-semibold text-[#00ffa3]">
+                    {walletLabel}
+                  </span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => openSignIn()}
+                  aria-label="Sign in"
+                  className="rounded-full border border-[#00ffa3]/40 bg-[#00ffa3]/[0.06] px-3.5 py-1.5 text-xs font-semibold text-[#00ffa3]"
+                >
+                  Sign in
+                </button>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2">
             <form onSubmit={submitSearch} className="flex-1">
-              <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 focus-within:border-[#00ffa3]/40">
-                <SearchIcon size={14} className="text-silver" />
+              <div className="flex items-center gap-2.5 rounded-xl border border-[#00ffa3]/25 bg-[#0c1622] px-3.5 py-3 transition-colors focus-within:border-[#00ffa3]/60">
+                <SearchIcon size={16} className="text-silver/70" />
                 <input
                   type="text"
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="What are you looking for?"
-                  className="flex-1 bg-transparent text-sm text-white placeholder:text-silver/50 focus:outline-none"
+                  placeholder="Search listings"
+                  className="flex-1 bg-transparent text-sm text-white placeholder:text-silver/60 focus:outline-none"
                 />
               </div>
             </form>
@@ -716,10 +714,10 @@ export default function MarketplacePageClient({
                 type="button"
                 onClick={openFilterPanel}
                 aria-label="Filters & sort"
-                className={`inline-flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
+                className={`inline-flex h-11 w-11 items-center justify-center rounded-xl border transition-colors ${
                   filterOpen || hasActiveFilter
-                    ? "bg-[#00ffa3]/10 text-[#00ffa3]"
-                    : "bg-white/5 text-silver hover:text-white"
+                    ? "border-[#00ffa3]/40 bg-[#00ffa3]/10 text-[#00ffa3]"
+                    : "border-white/10 bg-[#0c1622] text-silver hover:text-white"
                 }`}
               >
                 <SlidersHorizontal size={16} />
@@ -727,57 +725,37 @@ export default function MarketplacePageClient({
               {filterOpen && renderFilterSortPanel()}
             </div>
           </div>
-          <div>
-            <div className="mb-1.5 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-white">Categories</h3>
-              <Link
-                href="/categories"
-                className="text-[11px] text-silver/70 hover:text-white"
-              >
-                See all
-              </Link>
-            </div>
-            <div className="-mx-1 flex gap-2 overflow-x-auto pb-1 px-1 scrollbar-none">
-              {(
-                [
-                  { label: "All", href: "/marketplace", icon: LayoutGrid },
-                  { label: "Watches", href: "/marketplace?category=Watches", icon: Watch },
-                  {
-                    label: "Phones",
-                    href: "/marketplace?category=Smartphones%20%26%20Phones",
-                    icon: Smartphone,
-                  },
-                  { label: "Cars", href: "/marketplace?category=Cars%20%26%20Trucks", icon: Car },
-                  { label: "Laptops", href: "/marketplace?category=Laptops", icon: Laptop },
-                  { label: "Furniture", href: "/marketplace?category=Furniture", icon: Sofa },
-                  { label: "Art", href: "/marketplace?category=Art%20%26%20Prints", icon: Palette },
-                  {
-                    label: "Sneakers",
-                    href: "/marketplace?category=Shoes%20%26%20Sneakers",
-                    icon: Footprints,
-                  },
-                ] as { label: string; href: string; icon: typeof LayoutGrid }[]
-              ).map((c) => {
-                const isActive =
-                  (c.label === "All" && !categoryQuery) ||
-                  decodeURIComponent(c.href.split("category=")[1] ?? "") === categoryQuery;
-                const Icon = c.icon;
-                return (
-                  <Link
-                    key={c.label}
-                    href={c.href}
-                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors ${
-                      isActive
-                        ? "border-[#00ffa3]/40 bg-[#00ffa3]/10 text-[#00ffa3]"
-                        : "border-white/10 bg-white/5 text-silver hover:text-white"
-                    }`}
-                  >
-                    <Icon size={14} />
-                    {c.label}
-                  </Link>
-                );
-              })}
-            </div>
+          <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 scrollbar-none">
+            {(
+              [
+                { label: "All", href: "/marketplace" },
+                { label: "Watches", href: "/marketplace?category=Watches" },
+                { label: "Phones", href: "/marketplace?category=Smartphones%20%26%20Phones" },
+                { label: "Cars", href: "/marketplace?category=Cars%20%26%20Trucks" },
+                { label: "Laptops", href: "/marketplace?category=Laptops" },
+                { label: "Furniture", href: "/marketplace?category=Furniture" },
+                { label: "Art", href: "/marketplace?category=Art%20%26%20Prints" },
+                { label: "Sneakers", href: "/marketplace?category=Shoes%20%26%20Sneakers" },
+                { label: "More", href: "/categories" },
+              ] as { label: string; href: string }[]
+            ).map((c) => {
+              const isActive =
+                (c.label === "All" && !categoryQuery) ||
+                decodeURIComponent(c.href.split("category=")[1] ?? "") === categoryQuery;
+              return (
+                <Link
+                  key={c.label}
+                  href={c.href}
+                  className={`inline-flex shrink-0 items-center rounded-full border px-4 py-1.5 text-[13px] transition-colors ${
+                    isActive
+                      ? "border-[#00ffa3]/70 bg-[#00ffa3]/[0.08] font-semibold text-[#00ffa3]"
+                      : "border-white/10 bg-[#151c29] font-medium text-[#c9cfdb] hover:text-white"
+                  }`}
+                >
+                  {c.label}
+                </Link>
+              );
+            })}
           </div>
         </div>
 
@@ -874,53 +852,64 @@ export default function MarketplacePageClient({
           </p>
         ) : (
           <>
-            <div className="sm:hidden space-y-3">
-              {filteredItems.map((item) => (
-                <Link
-                  key={`${item.itemType}-${item.id}`}
-                  href={listingHref(item.id)}
-                  className="block glass-card overflow-hidden transition-all duration-200 active:border-white/20"
-                >
-                  <div className="relative bg-white/5">
-                    <ListingMedia
-                      listing={item}
-                      className="w-full"
-                      aspectRatio="square"
-                      navigation="arrows"
-                      cardSize
-                      compactHeight="160px"
-                    />
-                  </div>
-                  <div className="p-3">
-                    <h2 className="text-sm font-semibold text-white line-clamp-2 leading-tight">
-                      {item.title || formatListingId(item.id) || "Untitled"}
-                    </h2>
-                    {item.category && (
-                      <span className="mt-1 inline-flex rounded-full bg-white/5 px-2 py-0.5 text-[9px] text-silver/80">
-                        {canonicalizeCategory(item.category)}
+            {/* Mobile cards: two-up grid matching the demo video — status
+                pill + heart over the image, then title, "by seller", and a
+                bright-green ℏ price with the watch count on the right. */}
+            <div className="sm:hidden grid grid-cols-2 gap-3">
+              {filteredItems.map((item) => {
+                const status = normalizeListingStatus(item.status);
+                const isSold = status === "SOLD";
+                const isLocked = status === "LOCKED";
+                return (
+                  <Link
+                    key={`${item.itemType}-${item.id}`}
+                    href={listingHref(item.id)}
+                    className="flex flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0a0f18] transition-colors active:border-[#00ffa3]/50"
+                  >
+                    <div className="relative bg-white/5">
+                      <ListingMedia
+                        listing={item}
+                        className="w-full"
+                        aspectRatio="square"
+                        cardSize
+                        compactHeight="170px"
+                      />
+                      <span
+                        className={`absolute left-2.5 top-2.5 z-10 ${
+                          isSold ? "pill-sold" : isLocked ? "pill-pending" : "pill-active"
+                        }`}
+                      >
+                        {isSold ? "Sold" : isLocked ? "Pending" : "Active"}
                       </span>
-                    )}
-                    {item.seller && (
-                      <div className="text-[10px]">
-                        <SellerInline seller={item.seller} size={14} />
+                      <div className="absolute right-2 top-2 z-10">
+                        <WishlistButton itemId={item.id} itemType={item.itemType} compact />
                       </div>
-                    )}
-                    <div className="flex items-center justify-between mt-1.5">
-                      <p className="text-chrome font-semibold">
-                        {formatHbarWithUsd(formatPriceForDisplay(item.price || "0"), usdRate)}
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <SellerRating seller={item.seller} />
+                    </div>
+                    <div className="flex flex-1 flex-col p-3">
+                      <h2 className="truncate text-[15px] font-semibold leading-snug text-white">
+                        {item.title || formatListingId(item.id) || "Untitled"}
+                      </h2>
+                      {item.seller && (
+                        <div className="mt-1.5 flex items-center gap-1 text-[11px] text-silver/60">
+                          <span className="shrink-0">by</span>
+                          <SellerInline seller={item.seller} size={13} />
+                        </div>
+                      )}
+                      <div className="mt-auto flex items-center justify-between pt-2">
+                        <p className="text-base font-extrabold text-[#00ffa3]">
+                          {formatPriceForDisplay(item.price || "0")}{" "}
+                          <span className="italic">ℏ</span>
+                        </p>
                         {(item.watchlistCount ?? 0) > 0 && (
-                          <span className="text-[10px] text-silver/50 flex items-center gap-0.5">
+                          <span className="flex items-center gap-0.5 text-[11px] text-silver/50">
                             ♡ {item.watchlistCount}
                           </span>
                         )}
                       </div>
                     </div>
-                  </div>
-                </Link>
-              ))}
+                  </Link>
+                );
+              })}
             </div>
             {viewMode !== "editorial" && (
               <div className="hidden sm:flex items-center gap-2 mb-3">
@@ -964,7 +953,7 @@ export default function MarketplacePageClient({
                         </span>
                       )}
                       {item.seller && (
-                        <div className="text-[11px]">
+                        <div className="mt-1 text-[11px]">
                           <SellerInline seller={item.seller} />
                         </div>
                       )}

@@ -170,6 +170,26 @@ a,
   .btn-frost-cta {
     @apply rounded-glass border border-[#00ffa3]/60 bg-[linear-gradient(110deg,#00b37a_0%,#00ffa3_50%,#00e5ff_100%)] px-4 py-2 font-semibold text-black transition-all duration-200 hover:brightness-110 hover:shadow-glow-hover shadow-inner;
   }
+  /* Demo-video design language: mint→cyan gradient CTA with a soft green
+     glow, dark-navy outlined secondary buttons, and saturated status pills.
+     Case/tracking is applied at call sites (PURCHASE is uppercase, "Continue
+     with HashPack" is not). */
+  .btn-mint {
+    @apply rounded-xl bg-[linear-gradient(90deg,#00b97c_0%,#00ffa3_55%,#00e5f0_100%)] font-extrabold text-[#04150f] transition-all duration-200 hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed;
+    box-shadow: 0 0 28px rgba(0, 255, 163, 0.28);
+  }
+  .btn-mint-outline {
+    @apply rounded-xl border border-white/10 bg-[#121a29] font-extrabold text-[#00ffa3] transition-colors duration-200 hover:bg-[#182335] disabled:opacity-40;
+  }
+  .pill-active {
+    @apply rounded-full bg-[#00ffa3] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-[#052018];
+  }
+  .pill-sold {
+    @apply rounded-full bg-[#f43f5e] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-white;
+  }
+  .pill-pending {
+    @apply rounded-full bg-amber-400 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-[#241505];
+  }
   .input-frost {
     @apply rounded-glass border border-[#4a5e83]/50 bg-[#0f1726]/90 backdrop-blur-sm px-3 py-2 text-white placeholder:text-zinc-500 focus:border-[#00ffa3]/60 focus:outline-none focus:ring-1 focus:ring-[#00ffa3]/40 transition;
   }

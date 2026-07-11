@@ -76,14 +76,37 @@ export function SignInCard({ onConnected, className }: SignInCardProps) {
     <div
       className={
         className ??
-        "rounded-3xl border border-white/15 bg-[#15181f]/90 p-6 shadow-[0_16px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl sm:p-8"
+        "rounded-3xl border border-white/10 bg-[#12161f]/95 p-6 shadow-[0_16px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl sm:p-8"
       }
     >
+      {/* Welcome header + trust checklist above the CTA, per the demo video. */}
+      <div className="mb-5 text-center">
+        <h2 className="text-xl font-extrabold tracking-tight text-white">Welcome to Hashpop</h2>
+        <p className="mt-1 text-sm text-silver">
+          Verifiable trade of physical and digital goods.
+        </p>
+      </div>
+
+      <div className="mb-6 space-y-3.5">
+        <Feature
+          title="Trade trusted listings"
+          detail="Transparent on-chain records."
+        />
+        <Feature
+          title="Secure wallet-first sign in"
+          detail="No passwords — authenticate with HashPack."
+        />
+        <Feature
+          title="End-to-end encrypted chat"
+          detail="Negotiate privately, wallet-to-wallet."
+        />
+      </div>
+
       <button
         type="button"
         onClick={handleConnectPress}
         disabled={!isReady || isConnecting}
-        className="btn-frost-cta flex w-full items-center justify-center gap-2 py-4 text-base font-semibold disabled:opacity-60"
+        className="btn-mint flex w-full items-center justify-center gap-2 py-4 text-[15px] font-bold disabled:opacity-60"
         style={{ touchAction: "manipulation", minHeight: "52px" }}
       >
         <Wallet size={18} />
@@ -216,24 +239,17 @@ export function SignInCard({ onConnected, className }: SignInCardProps) {
         </div>
       )}
 
-      <div className="mt-6 space-y-3">
-        <Feature
-          title="Trade trusted listings"
-          detail="Buy and sell with transparent on-chain records."
-        />
-        <Feature
-          title="Verify item history"
-          detail="Track listing status, updates, and ownership signals."
-        />
-        <Feature
-          title="Faster marketplace discovery"
-          detail="Swipe featured items or search by category instantly."
-        />
-        <Feature
-          title="Secure wallet-first sign in"
-          detail="No passwords — authenticate directly with HashPack."
-        />
-      </div>
+      <p className="mt-4 text-center text-xs text-silver/80">
+        By continuing you agree to the{" "}
+        <a href="/terms" className="font-medium text-[#00ffa3] hover:underline">
+          terms
+        </a>{" "}
+        and{" "}
+        <a href="/privacy" className="font-medium text-[#00ffa3] hover:underline">
+          privacy policy
+        </a>
+        .
+      </p>
 
       {error ? <p className="mt-3 text-center text-xs text-amber-300">{error}</p> : null}
     </div>
@@ -243,12 +259,12 @@ export function SignInCard({ onConnected, className }: SignInCardProps) {
 function Feature({ title, detail }: { title: string; detail: string }) {
   return (
     <div className="flex items-start gap-3">
-      <span className="mt-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-white/20 text-[10px] text-white/80">
+      <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[#00ffa3]/60 text-[10px] font-bold text-[#00ffa3]">
         ✓
       </span>
       <div>
         <p className="text-sm font-semibold text-white">{title}</p>
-        <p className="text-sm text-slate-300/90">{detail}</p>
+        <p className="text-sm text-slate-300/80">{detail}</p>
       </div>
     </div>
   );
