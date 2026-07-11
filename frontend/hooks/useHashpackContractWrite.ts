@@ -87,22 +87,101 @@ async function getReceiptWithTimeout(txResponse: any, client: any): Promise<any>
   ]);
 }
 
-function pickSingleNodeAccountId(sdk: any, client: any, network: "mainnet" | "testnet") {
-  const configuredNodes = client?.network ? Object.values(client.network) : [];
-  for (const node of configuredNodes) {
+// Long-standing, well-known consensus nodes used when the client's network
+// map is unavailable. Any healthy node works — consensus doesn't care which
+// node receives the transaction.
+const FALLBACK_NODE_IDS = ["0.0.3", "0.0.4", "0.0.5", "0.0.6", "0.0.7", "0.0.8", "0.0.9"];
+// How many node account ids to freeze into a wallet-submitted transaction.
+// The frozen payload contains one signed-transaction copy per node, so keep
+// this small enough for the WalletConnect relay while still giving the wallet
+// room to fail over past unhealthy nodes.
+const MAX_TX_NODES = 5;
+
+/**
+ * Collect up to `max` distinct node account ids, shuffled. A frozen
+ * transaction can only ever be submitted to the nodes baked into it at freeze
+ * time — HashPack reported "All nodes are unhealthy. Original node list:
+ * 0.0.18" precisely because we used to pin a single (deterministic) node and
+ * the wallet had nothing to fail over to when it was down.
+ */
+function pickNodeAccountIds(
+  sdk: any,
+  client: any,
+  network: "mainnet" | "testnet",
+  max: number = MAX_TX_NODES,
+) {
+  const seen = new Set<string>();
+  const ids: any[] = [];
+  const push = (raw: unknown) => {
     try {
-      if (node && typeof node.toString === "function") {
-        return sdk.AccountId.fromString(node.toString());
-      }
-      if (typeof node === "string") {
-        return sdk.AccountId.fromString(node);
+      const text =
+        typeof raw === "string" ? raw : raw && typeof (raw as any).toString === "function" ? (raw as any).toString() : null;
+      if (!text) return;
+      const id = sdk.AccountId.fromString(text);
+      const key = id.toString();
+      if (!seen.has(key)) {
+        seen.add(key);
+        ids.push(id);
       }
     } catch {
-      // try next
+      // skip unparseable entries
     }
+  };
+  const configuredNodes = client?.network ? Object.values(client.network) : [];
+  for (const node of configuredNodes) push(node);
+  if (ids.length === 0) {
+    for (const raw of FALLBACK_NODE_IDS) push(raw);
   }
-  // Conservative fallback if client network map is unavailable.
-  return sdk.AccountId.fromString(network === "mainnet" ? "0.0.3" : "0.0.3");
+  // Shuffle so a retry (or the next transaction) doesn't always lead with the
+  // same possibly-unhealthy node.
+  for (let i = ids.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+  }
+  void network;
+  return ids.slice(0, Math.max(1, max));
+}
+
+function pickSingleNodeAccountId(sdk: any, client: any, network: "mainnet" | "testnet") {
+  return pickNodeAccountIds(sdk, client, network, 1)[0];
+}
+
+// EVM address (per network) → resolved "shard.realm.num" contract id.
+const contractIdCache = new Map<string, string>();
+
+/**
+ * Resolve an EVM contract address to its real `0.0.x` contract id via the
+ * mirror node. CREATE-derived mainnet addresses aren't long-zero, so
+ * `ContractId.fromSolidityAddress` yields an evmAddress-form id whose numeric
+ * part is 0.0.0 — Hedera nodes accept it, but HashPack's approval sheet shows
+ * "Contract ID: 0.0.0" and fails to load dapp/transaction details. Falls back
+ * to the evmAddress form if the mirror node is unreachable.
+ */
+async function resolveContractId(
+  sdk: any,
+  address: string,
+  network: "mainnet" | "testnet",
+): Promise<any> {
+  const key = `${network}:${address.toLowerCase()}`;
+  const cached = contractIdCache.get(key);
+  if (cached) return sdk.ContractId.fromString(cached);
+  try {
+    const mirrorBase =
+      network === "mainnet"
+        ? "https://mainnet.mirrornode.hedera.com"
+        : "https://testnet.mirrornode.hedera.com";
+    const res = await fetch(`${mirrorBase}/api/v1/contracts/${address.toLowerCase()}`);
+    if (res.ok) {
+      const data = (await res.json()) as { contract_id?: string };
+      if (typeof data?.contract_id === "string" && /^\d+\.\d+\.\d+$/.test(data.contract_id)) {
+        contractIdCache.set(key, data.contract_id);
+        return sdk.ContractId.fromString(data.contract_id);
+      }
+    }
+  } catch {
+    // fall through to evmAddress form
+  }
+  return sdk.ContractId.fromSolidityAddress(address.slice(2));
 }
 
 class TransactionRevertError extends Error {
@@ -189,7 +268,7 @@ export function useHashpackContractWrite() {
             );
             const accountObj = sdk.AccountId.fromString(accountId);
             const txIdObj = sdk.TransactionId.generate(accountObj);
-            const contractId = sdk.ContractId.fromSolidityAddress(request.address.slice(2));
+            const contractId = await resolveContractId(sdk, request.address, network);
             const tx = new sdk.ContractExecuteTransaction()
               .setTransactionId(txIdObj)
               .setContractId(contractId)
@@ -224,9 +303,16 @@ export function useHashpackContractWrite() {
               //     gRPC-web to nodeXX.swirldslabs.com, whose mainnet proxies
               //     reject browser CORS (GrpcServiceError GRPC_WEB).
               // Payable amounts are serialized with the frozen bytes.
+              //
+              // Node list: the wallet can only submit to nodes frozen into the
+              // transaction. Give it SEVERAL (shuffled) so it can fail over —
+              // a single pinned node caused HashPack's "All nodes are
+              // unhealthy. Original node list: 0.0.18" hard failure. The
+              // one-node rule only applies to the signer.signTransaction
+              // paths below (addSignature requires exactly one node); a
+              // wallet-submitted frozen tx has no such constraint.
               if (typeof (tx as any).setNodeAccountIds === "function") {
-                const singleNode = pickSingleNodeAccountId(sdk, freezeClient, network);
-                (tx as any).setNodeAccountIds([singleNode]);
+                (tx as any).setNodeAccountIds(pickNodeAccountIds(sdk, freezeClient, network));
               }
               if (typeof (tx as any).isFrozen === "function" && !(tx as any).isFrozen()) {
                 tx.freezeWith(freezeClient);
