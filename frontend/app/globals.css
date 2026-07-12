@@ -152,6 +152,15 @@ a,
   .glass {
     @apply rounded-glass border border-white/10 bg-white/5 backdrop-blur-glass;
   }
+  /* Full-screen overlays (nearby map, etc.) that should look like a page:
+     mirrors the body background exactly so chrome matches the marketplace. */
+  .bg-app {
+    background:
+      radial-gradient(900px 400px at 10% -10%, rgba(255, 47, 61, 0.2), transparent 55%),
+      radial-gradient(900px 500px at 90% -20%, rgba(0, 255, 163, 0.15), transparent 58%),
+      radial-gradient(900px 600px at 50% 130%, rgba(109, 223, 133, 0.16), transparent 62%),
+      var(--bg);
+  }
   /* Hide scrollbars visually while keeping scroll behavior. Used on the
      desktop content card so the chrome stays minimal. */
   .scrollbar-none {
