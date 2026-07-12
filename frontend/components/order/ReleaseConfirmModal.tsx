@@ -14,7 +14,7 @@ export function ReleaseConfirmModal({
 }: {
   open: boolean;
   amount: string;
-  sellerLabel: string;
+  sellerLabel: React.ReactNode;
   submitting: boolean;
   onConfirm: () => void;
   onCancel: () => void;

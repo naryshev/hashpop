@@ -18,6 +18,22 @@ type Sheet = {
   onClose: () => void;
 };
 
+/**
+ * Long-zero EVM address → "0.0.N". Mirror-node contract results report
+ * from/to as 20-byte EVM addresses; Hedera-native accounts encode
+ * shard/realm/num in them, and we never display raw 0x addresses.
+ */
+function evmToAccountDisplay(evm: string): string {
+  const m = /^0x([0-9a-fA-F]{40})$/.exec((evm || "").trim());
+  if (!m) return evm;
+  const hex = m[1];
+  if (!hex.slice(0, 24).match(/^0+$/)) {
+    // Alias-form address (not long-zero) — shorten rather than dump 40 chars.
+    return `${evm.slice(0, 6)}…${evm.slice(-4)}`;
+  }
+  return `0.0.${BigInt(`0x${hex.slice(24)}`).toString()}`;
+}
+
 export function TxDetailSheet({ open, txId, hashscanHref, onClose }: Sheet) {
   const [tx, setTx] = useState<MirrorTransaction | null>(null);
   const [cc, setCc] = useState<MirrorContractResult | null>(null);
@@ -93,15 +109,15 @@ export function TxDetailSheet({ open, txId, hashscanHref, onClose }: Sheet) {
           maxWidth: 480,
           maxHeight: "88vh",
           overflow: "auto",
-          background: HP.glassCard,
-          border: `1px solid ${HP.border}`,
-          borderRadius: "18px 18px 0 0",
-          padding: "16px 18px 24px",
+          background: "#10161f",
+          border: "1px solid rgba(255,255,255,0.1)",
+          borderRadius: "24px 24px 0 0",
+          padding: "16px 20px 24px",
           color: HP.fg,
           display: "flex",
           flexDirection: "column",
           gap: 14,
-          boxShadow: "0 -24px 48px rgba(0,0,0,0.5)",
+          boxShadow: "0 -12px 40px rgba(0,0,0,0.5)",
         }}
       >
         {/* Drag handle */}
@@ -123,14 +139,13 @@ export function TxDetailSheet({ open, txId, hashscanHref, onClose }: Sheet) {
           {status && (
             <span
               style={{
-                fontSize: 9,
+                fontSize: 10,
                 fontWeight: 800,
-                letterSpacing: "0.06em",
-                padding: "2px 7px",
+                letterSpacing: "0.08em",
+                padding: "3px 10px",
                 borderRadius: 9999,
-                background: isSuccess ? "rgba(0,255,163,0.14)" : "rgba(244,63,94,0.14)",
-                color: isSuccess ? HP.chrome : "#fda4af",
-                border: `1px solid ${isSuccess ? "rgba(0,255,163,0.4)" : "rgba(244,63,94,0.4)"}`,
+                background: isSuccess ? HP.chrome : HP.rose,
+                color: isSuccess ? "#052018" : "#fff",
               }}
             >
               {status}
@@ -209,8 +224,8 @@ export function TxDetailSheet({ open, txId, hashscanHref, onClose }: Sheet) {
                       : "—"
                   }
                 />
-                {cc.from && <KV label="From" value={cc.from} mono wrap />}
-                {cc.to && <KV label="To" value={cc.to} mono wrap />}
+                {cc.from && <KV label="From" value={evmToAccountDisplay(cc.from)} mono />}
+                {cc.to && <KV label="To" value={evmToAccountDisplay(cc.to)} mono />}
               </Section>
             )}
 
@@ -284,11 +299,17 @@ export function TxDetailSheet({ open, txId, hashscanHref, onClose }: Sheet) {
             target="_blank"
             rel="noreferrer"
             style={{
-              fontSize: 12,
+              fontSize: 13,
+              fontWeight: 800,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
               color: HP.chrome,
-              alignSelf: "flex-end",
+              textAlign: "center",
               textDecoration: "none",
-              padding: "8px 4px",
+              padding: "12px 16px",
+              borderRadius: 12,
+              border: "1px solid rgba(255,255,255,0.1)",
+              background: "#121a29",
             }}
           >
             View on HashScan ↗

@@ -10,7 +10,7 @@ export function ItemRow({
 }: {
   title: string;
   image?: string | null;
-  seller: string;
+  seller: React.ReactNode;
   priceHbar: string;
   priceUsd?: string | null;
   compact?: boolean;
