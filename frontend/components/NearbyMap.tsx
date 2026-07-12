@@ -128,13 +128,15 @@ export function NearbyMap({ open, onClose }: { open: boolean; onClose: () => voi
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[130] flex flex-col bg-[#0b111b]"
+      className="bg-app fixed inset-0 z-[130] flex flex-col"
       role="dialog"
       aria-modal="true"
       aria-label="Items near you"
     >
-      <MobileTopBar className="px-4 pt-3" />
-      <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+      {/* Same offsets as the marketplace header (page container px-3 py-4)
+          so the logo / bell / wallet pill sit identically across surfaces. */}
+      <MobileTopBar className="px-3 pt-4" />
+      <div className="flex items-center justify-between gap-3 border-b border-white/10 px-3 py-3">
         <div className="flex items-center gap-2">
           <MapPin size={18} className="text-[#00ffa3]" />
           <h2 className="text-base font-bold text-white">Items near you</h2>
