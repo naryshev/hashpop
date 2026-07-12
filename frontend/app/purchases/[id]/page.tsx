@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 
 import { getApiUrl } from "@/lib/apiUrl";
+import { listingHref } from "@/lib/listingUrl";
 import { useHashpackWallet } from "@/lib/hashpackWallet";
 import { useHbarUsd } from "@/hooks/useHbarUsd";
 import { useRobustContractWrite } from "@/hooks/useRobustContractWrite";
@@ -360,7 +361,7 @@ export default function PurchaseDetailPage() {
         <NavBar
           eyebrow={isBuyer ? "PURCHASE" : "SALE"}
           title={title}
-          onBack={() => router.push("/purchases")}
+          onBack={() => router.push(listingHref(listing?.id ?? id))}
         />
 
         <section
