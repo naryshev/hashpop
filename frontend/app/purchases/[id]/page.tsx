@@ -157,15 +157,18 @@ export default function PurchaseDetailPage() {
     setTrackingSaving(true);
     setTrackingError(null);
     try {
-      const res = await fetch(`${getApiUrl()}/api/listing/${encodeURIComponent(id)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sellerAddress: address,
-          trackingNumber: trackingInput.trim(),
-          trackingCarrier: carrierInput.trim() || undefined,
-        }),
-      });
+      const res = await fetch(
+        `${getApiUrl()}/api/listing/${encodeURIComponent(listing?.id ?? id)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sellerAddress: address,
+            trackingNumber: trackingInput.trim(),
+            trackingCarrier: carrierInput.trim() || undefined,
+          }),
+        },
+      );
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(body?.error || "Failed to save tracking.");
@@ -180,19 +183,21 @@ export default function PurchaseDetailPage() {
   };
 
   // Delivery address collected at checkout — the buyer sees their own, the
-  // seller sees the buyer's.
+  // seller sees the buyer's. Uses the canonical listing id from the API
+  // response (the URL may carry the short ascii form).
+  const canonicalId = listing?.id ?? id;
   const refreshShipTo = useCallback(() => {
-    if (!id || !address) {
+    if (!canonicalId || !address) {
       setShipTo(null);
       return;
     }
     fetch(
-      `${getApiUrl()}/api/listing/${encodeURIComponent(id)}/shipping-address?requester=${encodeURIComponent(address)}`,
+      `${getApiUrl()}/api/listing/${encodeURIComponent(canonicalId)}/shipping-address?requester=${encodeURIComponent(address)}`,
     )
       .then((r) => (r.ok ? r.json() : null))
       .then((data: { address?: ShipToAddress } | null) => setShipTo(data?.address ?? null))
       .catch(() => setShipTo(null));
-  }, [id, address]);
+  }, [canonicalId, address]);
 
   useEffect(() => {
     refreshShipTo();
@@ -548,7 +553,7 @@ export default function PurchaseDetailPage() {
           file — the seller immediately sees it on their side of this page. */}
       <ShippingAddressModal
         open={addrModalOpen}
-        listingId={id}
+        listingId={listing?.id ?? id}
         buyerAddress={address ?? ""}
         ctaLabel="Save delivery address"
         onConfirmed={() => {

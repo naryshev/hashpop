@@ -303,9 +303,12 @@ export default function PurchasesPage() {
                     !disputed &&
                     (step.phase === "paid" || step.phase === "shipped") &&
                     !!row.listingId;
-                  // Per-order detail screen (matches Mobile Order & Escrow design handoff).
+                  // Clicking a purchase opens the listing page — for buyer and
+                  // seller it renders the escrow panel where the buy section
+                  // was. The explicit CTA buttons still deep-link to the
+                  // dedicated order screen.
                   const detailHref = row.listingId
-                    ? `/purchases/${encodeListingIdForUrl(row.listingId)}`
+                    ? listingHref(row.listingId)
                     : targetId
                       ? listingHref(targetId)
                       : "/marketplace";
