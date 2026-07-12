@@ -1,4 +1,5 @@
 "use client";
+import { MobileTopBar } from "@/components/MobileTopBar";
 import { encodeListingIdForUrl, listingHref } from "../../lib/listingUrl";
 
 import { useEffect, useMemo, useState } from "react";
@@ -212,6 +213,7 @@ export default function PurchasesPage() {
   return (
     <main className="min-h-screen">
       <div className="mx-auto max-w-4xl space-y-6 px-4 py-6 sm:px-6">
+        <MobileTopBar className="mb-4" />
         <p className="text-xs text-silver/70">
           Buys and sales at a glance — escrow settles itself on the dates shown.
         </p>

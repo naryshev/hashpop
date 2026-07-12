@@ -24,16 +24,7 @@ import { formatPriceForDisplay } from "../lib/formatPrice";
 import { ProfileContent } from "./ProfileContent";
 import DashboardPage from "../app/dashboard/page";
 
-type View = "menu" | "profile" | "hashpop" | "purchases";
-
-type PurchaseRow = {
-  id: string;
-  amount: string;
-  role: "buyer" | "seller";
-  createdAt: string;
-  listing?: { title?: string | null; status?: string; imageUrl?: string | null } | null;
-  auction?: { title?: string | null; imageUrl?: string | null } | null;
-};
+type View = "menu" | "profile" | "hashpop";
 
 /**
  * Slide-up profile card (bottom sheet) opened from the wallet chip in the
@@ -47,8 +38,6 @@ export function ProfileCardSheet({ open, onClose }: { open: boolean; onClose: ()
   const [mounted, setMounted] = useState(false);
   const [shown, setShown] = useState(false);
   const [view, setView] = useState<View>("menu");
-
-  const [purchases, setPurchases] = useState<PurchaseRow[] | null>(null);
 
   useEffect(() => setMounted(true), []);
 
@@ -75,27 +64,6 @@ export function ProfileCardSheet({ open, onClose }: { open: boolean; onClose: ()
 
   const apiAddr = (address ?? accountId ?? "").toString();
 
-  const loadPurchases = useCallback(async () => {
-    if (!apiAddr) return;
-    try {
-      const res = await fetch(`${getApiUrl()}/api/user/${encodeURIComponent(apiAddr)}/purchases`);
-      if (res.ok) {
-        const data = (await res.json()) as { purchases?: PurchaseRow[] };
-        setPurchases(data.purchases ?? []);
-      } else {
-        setPurchases([]);
-      }
-    } catch {
-      setPurchases([]);
-    }
-  }, [apiAddr]);
-
-  // Lazy-load data when entering a sub-view.
-  useEffect(() => {
-    if (!open) return;
-    if (view === "purchases" && purchases === null) void loadPurchases();
-  }, [open, view, purchases, loadPurchases]);
-
   if (!mounted || !open) return null;
 
   const name = profileDisplayName(profile);
@@ -112,7 +80,6 @@ export function ProfileCardSheet({ open, onClose }: { open: boolean; onClose: ()
     menu: "",
     profile: "Profile",
     hashpop: "My Hashpop",
-    purchases: "Purchases",
   };
 
   const FullPageLink = ({ href, label }: { href: string; label: string }) => (
@@ -233,13 +200,13 @@ export function ProfileCardSheet({ open, onClose }: { open: boolean; onClose: ()
                 >
                   <LayoutDashboard size={18} className="text-silver" /> My Hashpop
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setView("purchases")}
+                <Link
+                  href="/purchases"
+                  onClick={onClose}
                   className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-white transition-colors hover:bg-white/5"
                 >
                   <Receipt size={18} className="text-silver" /> Purchases
-                </button>
+                </Link>
                 <Link
                   href="/offers"
                   onClick={onClose}
@@ -293,48 +260,6 @@ export function ProfileCardSheet({ open, onClose }: { open: boolean; onClose: ()
             </div>
           )}
 
-          {view === "purchases" && (
-            <div className="space-y-2 pb-2">
-              {purchases === null ? (
-                <p className="py-4 text-center text-sm text-silver">Loading…</p>
-              ) : purchases.length === 0 ? (
-                <p className="py-4 text-center text-sm text-silver">No purchases yet.</p>
-              ) : (
-                <>
-                  {purchases.slice(0, 12).map((row) => {
-                    const title =
-                      row.listing?.title || row.auction?.title || "Listing";
-                    const thumb = row.listing?.imageUrl || row.auction?.imageUrl || null;
-                    return (
-                      <div
-                        key={row.id}
-                        className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-2.5"
-                      >
-                        {thumb ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={thumb}
-                            alt=""
-                            className="h-10 w-10 shrink-0 rounded-lg object-cover"
-                          />
-                        ) : (
-                          <div className="h-10 w-10 shrink-0 rounded-lg bg-white/5" />
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm font-medium text-white">{title}</div>
-                          <div className="text-[11px] text-silver/70">
-                            {row.role === "buyer" ? "Bought" : "Sold"} ·{" "}
-                            {formatPriceForDisplay(row.amount || "0")} ℏ
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  <FullPageLink href="/purchases" label="Open all purchases" />
-                </>
-              )}
-            </div>
-          )}
         </div>
       </div>
     </div>,

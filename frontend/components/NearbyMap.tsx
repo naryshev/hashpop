@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import { MapPin, Navigation, X } from "lucide-react";
 import "leaflet/dist/leaflet.css";
 import { getApiUrl } from "../lib/apiUrl";
+import { MobileTopBar } from "./MobileTopBar";
 import type { NearbyItem } from "./NearbyMapInner";
 
 const NearbyMapInner = dynamic(() => import("./NearbyMapInner"), {
@@ -132,6 +133,7 @@ export function NearbyMap({ open, onClose }: { open: boolean; onClose: () => voi
       aria-modal="true"
       aria-label="Items near you"
     >
+      <MobileTopBar className="px-4 pt-3" />
       <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
         <div className="flex items-center gap-2">
           <MapPin size={18} className="text-[#00ffa3]" />

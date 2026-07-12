@@ -1,4 +1,5 @@
 "use client";
+import { MobileTopBar } from "@/components/MobileTopBar";
 import { listingHref } from "../../lib/listingUrl";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -151,6 +152,7 @@ export default function OffersPage() {
   return (
     <main className="min-h-screen">
       <div className="mx-auto max-w-4xl space-y-6 px-4 py-6 sm:px-6">
+        <MobileTopBar className="mb-4" />
         {!address ? (
           <div className="glass-card rounded-xl p-6">
             <p className="mb-3 font-medium text-white">Connect your wallet to view offers.</p>
