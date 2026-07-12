@@ -1,7 +1,15 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
-  content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
+  // lib/ and hooks/ contain client components too (sign-in modal, HashPack
+  // confirm overlay) — classes used only there must be scanned, or they
+  // silently fail to compile (e.g. the overlay's z-index and spinner colors).
+  content: [
+    "./app/**/*.{ts,tsx}",
+    "./components/**/*.{ts,tsx}",
+    "./lib/**/*.{ts,tsx}",
+    "./hooks/**/*.{ts,tsx}",
+  ],
   theme: {
     extend: {
       colors: {

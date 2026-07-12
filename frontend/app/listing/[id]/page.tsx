@@ -172,6 +172,9 @@ export default function ListingPage() {
   const [inWishlist, setInWishlist] = useState(false);
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const [watchCount, setWatchCount] = useState(0);
+  // Seller profile for the by-line under the title (HashPack avatar/name).
+  const sellerProfile = useProfile(listing?.seller ?? null);
+  const sellerAvatar = profileAvatarUrl(sellerProfile);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState("scam");
   const [reportDetails, setReportDetails] = useState("");
@@ -770,10 +773,19 @@ export default function ListingPage() {
       </div>
       {listing?.seller && (
         <div className="mt-2 flex min-w-0 items-center gap-2 text-sm text-silver">
-          <span
-            aria-hidden
-            className="h-5 w-5 shrink-0 rounded-full bg-gradient-to-br from-[#38bdf8] to-[#00ffa3]"
-          />
+          {sellerAvatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={sellerAvatar}
+              alt=""
+              className="h-5 w-5 shrink-0 rounded-full border border-white/10 object-cover"
+            />
+          ) : (
+            <span
+              aria-hidden
+              className="h-5 w-5 shrink-0 rounded-full bg-gradient-to-br from-[#38bdf8] to-[#00ffa3]"
+            />
+          )}
           <span className="flex min-w-0 items-center gap-1.5">
             <span className="shrink-0">by</span>
             <AddressDisplay
