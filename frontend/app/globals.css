@@ -39,6 +39,9 @@ html {
 .leaflet-container {
   z-index: 0;
   isolation: isolate;
+  /* Dark canvas behind tiles — without this Leaflet paints white while
+     dark-theme tiles are still loading, flashing on open. */
+  background: #0b111b;
 }
 
 :root {
