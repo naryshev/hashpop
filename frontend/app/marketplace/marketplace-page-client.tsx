@@ -11,7 +11,8 @@ import { StatusBadge } from "../../components/ui/status-badge-beautiful-accessib
 import { formatPriceForDisplay } from "../../lib/formatPrice";
 import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
-import { canonicalizeCategory } from "../../lib/categories";
+import { canonicalizeCategory, CATEGORY_GROUPS } from "../../lib/categories";
+import { MobileTopBar } from "../../components/MobileTopBar";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
 import { useSignInModal } from "../../lib/signInModal";
 import { getApiUrl } from "../../lib/apiUrl";
@@ -19,13 +20,10 @@ import { profileAvatarUrl, profileDisplayName, useProfile, useProfiles } from ".
 import { TopBarSlot } from "../../lib/topBar";
 import {
   BadgeCheck,
-  Bell,
   ChevronDown,
   Search as SearchIcon,
   SlidersHorizontal,
 } from "lucide-react";
-import { ProfileCardSheet } from "../../components/ProfileCardSheet";
-import { useUnseenActivity } from "../../hooks/useUnseenActivity";
 
 function formatListingId(id: string): string {
   if (!id || !id.startsWith("0x") || id.length !== 66) return id;
@@ -71,6 +69,18 @@ function parsePostedWithinDays(value: string): number | null {
 
 type ViewMode = "grid" | "feed" | "editorial";
 type SortMode = "recent" | "price-asc" | "price-desc" | "trending";
+type ListingType = "all" | "physical" | "digital";
+
+// Digital goods = the "Digital & Software" category group (software, digital
+// downloads, access codes & gift cards, NFTs). Everything else is physical.
+const DIGITAL_CATEGORIES = new Set(
+  CATEGORY_GROUPS.find((g) => g.group === "Digital & Software")?.categories ?? [],
+);
+const ALL_CATEGORIES = CATEGORY_GROUPS.flatMap((g) => g.categories);
+
+function parseListingType(value: string | null): ListingType {
+  return value === "physical" || value === "digital" ? value : "all";
+}
 
 function parseViewMode(value: string | null): ViewMode {
   if (value === "feed" || value === "grid") return value;
@@ -168,13 +178,11 @@ export default function MarketplacePageClient({
 }) {
   const { isConnected, address, accountId } = useHashpackWallet();
   const { openSignIn } = useSignInModal();
-  const hasUnseen = useUnseenActivity();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [searchInput, setSearchInput] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
   const [viewMenuOpen, setViewMenuOpen] = useState(false);
-  const [profileCardOpen, setProfileCardOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   // "F" focuses the top-bar search (unless the user is already typing).
@@ -203,6 +211,14 @@ export default function MarketplacePageClient({
   const locationQuery = searchParams.get("location")?.trim() ?? "";
   const viewMode: ViewMode = parseViewMode(searchParams.get("view"));
   const sortMode: SortMode = parseSortMode(searchParams.get("sort"));
+  const typeQuery: ListingType = parseListingType(searchParams.get("type"));
+  // Category pills for the selected listing type (layer 2 of the mobile
+  // filter). All → every category; physical/digital → their halves.
+  const typeCategories = useMemo(() => {
+    if (typeQuery === "digital") return ALL_CATEGORIES.filter((c) => DIGITAL_CATEGORIES.has(c));
+    if (typeQuery === "physical") return ALL_CATEGORIES.filter((c) => !DIGITAL_CATEGORIES.has(c));
+    return ALL_CATEGORIES;
+  }, [typeQuery]);
   // Items start from the SSR payload but live in state so the client can
   // recover when the server-side fetch timed out or failed (bounded TTFB),
   // and so refreshes can revalidate without a full reload.
@@ -252,16 +268,24 @@ export default function MarketplacePageClient({
   };
 
   const filteredItems = useMemo(() => {
-    let categoryMatched = items;
+    // Listing type (all / physical / digital) narrows before category/query.
+    let typeMatched = items;
+    if (typeQuery !== "all") {
+      typeMatched = items.filter((item) => {
+        const digital = DIGITAL_CATEGORIES.has(canonicalizeCategory(item.category ?? ""));
+        return typeQuery === "digital" ? digital : !digital;
+      });
+    }
+    let categoryMatched = typeMatched;
     if (categoryQuery) {
       const normalizedCategory = categoryQuery.toLowerCase();
-      const strict = items.filter(
+      const strict = typeMatched.filter(
         (item) => canonicalizeCategory(item.category ?? "").toLowerCase() === normalizedCategory,
       );
       if (strict.length > 0) {
         categoryMatched = strict;
       } else {
-        const catFuse = new Fuse(items, {
+        const catFuse = new Fuse(typeMatched, {
           includeScore: true,
           threshold: 0.3,
           ignoreLocation: true,
@@ -345,6 +369,7 @@ export default function MarketplacePageClient({
   }, [
     items,
     query,
+    typeQuery,
     categoryQuery,
     locationQuery,
     minPriceQuery,
@@ -555,7 +580,6 @@ export default function MarketplacePageClient({
 
   // Wallet chip shown top-left of the mobile header — account number only
   // (no avatar) with a carat that slides up the profile card sheet.
-  const walletLabel = accountId ?? (address ? `${address.slice(0, 6)}…${address.slice(-4)}` : null);
 
   // Top-bar search — rectangular rounded "Find…" field with an F shortcut
   // hint, hosted in the global top bar's center slot next to the logo/nav.
@@ -651,51 +675,12 @@ export default function MarketplacePageClient({
       </TopBarSlot>
       <TopBarSlot name="actions">{actionsCluster}</TopBarSlot>
       <div className="px-3 py-4 sm:px-4">
-        {/* Mobile-only top section, matching the demo video: logo + wordmark
-            with the account pill on the right, a green-tinted "Search
-            listings" bar, then a row of text-only filter pills. */}
+        {/* Mobile-only top section, matching the demo video: shared header
+            (logo, bell, wallet pill), a green-tinted "Search listings" bar,
+            then two layers of filter pills — All/Physical/Digital on top,
+            categories for the selected type underneath. */}
         <div className="sm:hidden mb-4 space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <Link href="/marketplace" className="flex items-center gap-2" aria-label="Hashpop home">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/hashpop-cart-3d.PNG" alt="" className="h-7 w-auto object-contain" />
-              <span className="text-lg font-extrabold tracking-tight text-[#00ffa3]">Hashpop</span>
-            </Link>
-            <div className="flex items-center gap-1.5">
-              <Link
-                href="/activity"
-                aria-label="Notifications"
-                className="relative rounded-full p-2 text-silver hover:text-white"
-              >
-                <Bell size={18} />
-                {hasUnseen && (
-                  <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[#00ffa3]" />
-                )}
-              </Link>
-              {walletLabel ? (
-                <button
-                  type="button"
-                  onClick={() => setProfileCardOpen(true)}
-                  aria-label="Open profile"
-                  className="flex items-center gap-1.5 rounded-full border border-[#00ffa3]/40 bg-[#00ffa3]/[0.06] px-3 py-1.5"
-                >
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#00ffa3] shadow-[0_0_4px_rgba(0,255,163,0.8)]" />
-                  <span className="font-mono text-xs font-semibold text-[#00ffa3]">
-                    {walletLabel}
-                  </span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => openSignIn()}
-                  aria-label="Sign in"
-                  className="rounded-full border border-[#00ffa3]/40 bg-[#00ffa3]/[0.06] px-3.5 py-1.5 text-xs font-semibold text-[#00ffa3]"
-                >
-                  Sign in
-                </button>
-              )}
-            </div>
-          </div>
+          <MobileTopBar />
           <div className="flex items-center gap-2">
             <form onSubmit={submitSearch} className="flex-1">
               <div className="flex items-center gap-2.5 rounded-xl border border-[#00ffa3]/25 bg-[#0c1622] px-3.5 py-3 transition-colors focus-within:border-[#00ffa3]/60">
@@ -725,34 +710,50 @@ export default function MarketplacePageClient({
               {filterOpen && renderFilterSortPanel()}
             </div>
           </div>
-          <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 scrollbar-none">
-            {(
-              [
-                { label: "All", href: "/marketplace" },
-                { label: "Watches", href: "/marketplace?category=Watches" },
-                { label: "Phones", href: "/marketplace?category=Smartphones%20%26%20Phones" },
-                { label: "Cars", href: "/marketplace?category=Cars%20%26%20Trucks" },
-                { label: "Laptops", href: "/marketplace?category=Laptops" },
-                { label: "Furniture", href: "/marketplace?category=Furniture" },
-                { label: "Art", href: "/marketplace?category=Art%20%26%20Prints" },
-                { label: "Sneakers", href: "/marketplace?category=Shoes%20%26%20Sneakers" },
-                { label: "More", href: "/categories" },
-              ] as { label: string; href: string }[]
-            ).map((c) => {
-              const isActive =
-                (c.label === "All" && !categoryQuery) ||
-                decodeURIComponent(c.href.split("category=")[1] ?? "") === categoryQuery;
+          {/* Layer 1: listing type. Switching type clears any category pick. */}
+          <div className="flex gap-2">
+            {(["all", "physical", "digital"] as ListingType[]).map((t) => {
+              const isActive = typeQuery === t;
               return (
-                <Link
-                  key={c.label}
-                  href={c.href}
-                  className={`inline-flex shrink-0 items-center rounded-full border px-4 py-1.5 text-[13px] transition-colors ${
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => {
+                    const p = new URLSearchParams(searchParams.toString());
+                    if (t === "all") p.delete("type");
+                    else p.set("type", t);
+                    p.delete("category");
+                    router.push(p.toString() ? `/marketplace?${p.toString()}` : "/marketplace");
+                  }}
+                  className={`inline-flex shrink-0 items-center rounded-full border px-4 py-1.5 text-[13px] capitalize transition-colors ${
                     isActive
                       ? "border-[#00ffa3]/70 bg-[#00ffa3]/[0.08] font-semibold text-[#00ffa3]"
                       : "border-white/10 bg-[#151c29] font-medium text-[#c9cfdb] hover:text-white"
                   }`}
                 >
-                  {c.label}
+                  {t}
+                </button>
+              );
+            })}
+          </div>
+          {/* Layer 2: categories within the selected type. */}
+          <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 scrollbar-none">
+            {typeCategories.map((c) => {
+              const isActive = c === categoryQuery;
+              return (
+                <Link
+                  key={c}
+                  href={`/marketplace?${new URLSearchParams({
+                    ...(typeQuery !== "all" ? { type: typeQuery } : {}),
+                    category: c,
+                  }).toString()}`}
+                  className={`inline-flex shrink-0 items-center rounded-full border px-3.5 py-1.5 text-[12px] transition-colors ${
+                    isActive
+                      ? "border-[#00ffa3]/70 bg-[#00ffa3]/[0.08] font-semibold text-[#00ffa3]"
+                      : "border-white/10 bg-[#151c29] font-medium text-[#c9cfdb] hover:text-white"
+                  }`}
+                >
+                  {c}
                 </Link>
               );
             })}
@@ -1149,7 +1150,6 @@ export default function MarketplacePageClient({
           </>
         )}
       </div>
-      <ProfileCardSheet open={profileCardOpen} onClose={() => setProfileCardOpen(false)} />
     </main>
   );
 }

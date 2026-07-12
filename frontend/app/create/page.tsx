@@ -1,4 +1,5 @@
 "use client";
+import { MobileTopBar } from "@/components/MobileTopBar";
 import { listingHref } from "../../lib/listingUrl";
 
 import { useRef, useState, useMemo, useCallback, useEffect, Suspense } from "react";
@@ -432,6 +433,7 @@ function CreatePageContent() {
   return (
     <main className="min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 relative">
+        <MobileTopBar className="mb-4" />
         {listingSuccess && (createdListingIdRef.current ?? createdListingId) && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
             <div className="glass-card p-8 max-w-sm text-center space-y-6">
