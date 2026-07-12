@@ -7,7 +7,8 @@ import { ConnectWalletButton } from "@/components/ConnectWalletButton";
 import { useHashpackWallet } from "@/lib/hashpackWallet";
 import { getApiUrl } from "@/lib/apiUrl";
 import { formatPriceForDisplay } from "@/lib/formatPrice";
-import { encodeListingIdForUrl, listingHref } from "@/lib/listingUrl";
+import { listingHref } from "@/lib/listingUrl";
+import { AddressDisplay } from "@/components/AddressDisplay";
 import { markActivitySeen } from "@/hooks/useUnseenActivity";
 
 type Kind = "sale" | "purchase" | "offer" | "message" | "review";
@@ -102,12 +103,6 @@ function timeStamp(d: Date | null): string {
   return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 }
 
-function shortAddr(a?: string): string {
-  if (!a) return "";
-  if (/^\d+\.\d+\.\d+$/.test(a)) return a;
-  if (a.startsWith("0x") && a.length > 12) return `${a.slice(0, 6)}…${a.slice(-4)}`;
-  return a;
-}
 
 export default function ActivityPage() {
   const { address, accountId } = useHashpackWallet();
@@ -163,7 +158,7 @@ export default function ActivityPage() {
               title: isSeller ? `Sold "${title}"` : `Bought "${title}"`,
               subtitle: s.listing?.status ? `Order ${s.listing.status.toLowerCase()}` : undefined,
               counterparty: counterparty ?? undefined,
-              href: s.listingId ? `/purchases/${encodeListingIdForUrl(s.listingId)}` : undefined,
+              href: s.listingId ? listingHref(s.listingId) : undefined,
               amountHbar: s.amount ? formatPriceForDisplay(s.amount) : undefined,
               status: s.listing?.status ?? undefined,
             });
@@ -175,7 +170,7 @@ export default function ActivityPage() {
                 when: shippedAt,
                 title: isSeller ? `Marked "${title}" as shipped` : `"${title}" shipped`,
                 counterparty: counterparty ?? undefined,
-                href: s.listingId ? `/purchases/${encodeListingIdForUrl(s.listingId)}` : undefined,
+                href: s.listingId ? listingHref(s.listingId) : undefined,
               });
             }
             const completedAt = parseDate(s.listing?.exchangeConfirmedAt ?? undefined);
@@ -186,7 +181,7 @@ export default function ActivityPage() {
                 when: completedAt,
                 title: isSeller ? `Escrow released for "${title}"` : `Received "${title}"`,
                 counterparty: counterparty ?? undefined,
-                href: s.listingId ? `/purchases/${encodeListingIdForUrl(s.listingId)}` : undefined,
+                href: s.listingId ? listingHref(s.listingId) : undefined,
               });
             }
           }
@@ -359,7 +354,17 @@ export default function ActivityPage() {
                                 <div className="mt-0.5 line-clamp-1 text-[12px] text-silver">{e.subtitle}</div>
                               ) : null}
                               <div className="mt-1 flex flex-wrap items-center gap-2.5 text-[11px] text-silver">
-                                <span className="font-mono">{e.counterparty ? shortAddr(e.counterparty) : "—"}</span>
+                                <span className="flex min-w-0 items-center font-mono">
+                                  {e.counterparty ? (
+                                    <AddressDisplay
+                                      address={e.counterparty}
+                                      showVerified={false}
+                                      className="truncate"
+                                    />
+                                  ) : (
+                                    "—"
+                                  )}
+                                </span>
                                 {e.amountHbar ? (
                                   <span className="text-chrome">{e.amountHbar} ℏ</span>
                                 ) : null}
