@@ -25,6 +25,7 @@ import { useSignInModal } from "../lib/signInModal";
 import { useTopBarSlotFilled, useTopBarSlotRef } from "../lib/topBar";
 import { cn } from "../lib/utils";
 import { Footer } from "./Footer";
+import { MobileTopBar } from "./MobileTopBar";
 import { ProfileCardSheet } from "./ProfileCardSheet";
 import { MessagesModal } from "./MessagesModal";
 
@@ -159,6 +160,21 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
   const fallbackTitle = pathnameTitle(pathname);
   const showFooter = pathname === "/marketplace" || pathname.startsWith("/marketplace");
 
+  // Mobile page header (logo, bell, wallet pill) lives here in the shell —
+  // OUTSIDE the route-keyed fade wrapper below — so it stays put on page
+  // switches while the content still eases in. Shown on the top-level
+  // navigation pages; focused screens (listing, order, activity…) keep
+  // their own back-button chrome.
+  const MOBILE_HEADER_ROUTES = ["/marketplace", "/cart", "/messages", "/purchases", "/offers", "/create"];
+  const showMobileHeader = MOBILE_HEADER_ROUTES.includes(pathname);
+  // Full-screen surfaces (open message thread) hide all chrome.
+  const [immersive, setImmersive] = useState(false);
+  useEffect(() => {
+    const onImmersive = (e: Event) => setImmersive(!!(e as CustomEvent).detail);
+    window.addEventListener("hashpop:immersive", onImmersive);
+    return () => window.removeEventListener("hashpop:immersive", onImmersive);
+  }, []);
+
   return (
     <div className="flex min-h-screen flex-col">
       {/* Top bar — desktop only. Sticky with a blurred backdrop so page
@@ -280,6 +296,11 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
           bordered center card. Mobile gets bottom padding so content clears
           the floating BottomNav; the document itself scrolls. */}
       <main className="flex min-h-[100dvh] flex-1 flex-col pb-24 md:min-h-0 md:pb-0">
+        {showMobileHeader && !immersive && (
+          <div className="px-3 pt-4">
+            <MobileTopBar />
+          </div>
+        )}
         {/* Content takes the available height so the footer (marketplace
             only) stays pinned to the bottom. Keyed on pathname so each route
             change eases in gently instead of snapping. */}

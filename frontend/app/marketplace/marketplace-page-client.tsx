@@ -12,7 +12,6 @@ import { formatPriceForDisplay } from "../../lib/formatPrice";
 import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { canonicalizeCategory, CATEGORY_GROUPS } from "../../lib/categories";
-import { MobileTopBar } from "../../components/MobileTopBar";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
 import { useSignInModal } from "../../lib/signInModal";
 import { getApiUrl } from "../../lib/apiUrl";
@@ -680,7 +679,6 @@ export default function MarketplacePageClient({
             then two layers of filter pills — All/Physical/Digital on top,
             categories for the selected type underneath. */}
         <div className="sm:hidden mb-4 space-y-3">
-          <MobileTopBar />
           <div className="flex items-center gap-2">
             <form onSubmit={submitSearch} className="flex-1">
               <div className="flex items-center gap-2.5 rounded-xl border border-[#00ffa3]/25 bg-[#0c1622] px-3.5 py-3 transition-colors focus-within:border-[#00ffa3]/60">
