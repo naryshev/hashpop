@@ -172,6 +172,9 @@ export default function ListingPage() {
   const [inWishlist, setInWishlist] = useState(false);
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const [watchCount, setWatchCount] = useState(0);
+  // Seller profile for the by-line under the title (HashPack avatar/name).
+  const sellerProfile = useProfile(listing?.seller ?? null);
+  const sellerAvatar = profileAvatarUrl(sellerProfile);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState("scam");
   const [reportDetails, setReportDetails] = useState("");
@@ -578,6 +581,17 @@ export default function ListingPage() {
     Number(onChainListing.status) === 0;
   const isSellerActiveListing = listing?.status === "LISTED";
   const isLockedOnChain = onChainStatusNum === 2;
+  // Buyer/seller of an in-flight or completed order — the order & escrow
+  // surface is private to these two parties.
+  const isBuyerOfOrder =
+    !!listing?.buyer && walletAddressCandidates.includes(listing.buyer.toLowerCase());
+  const isPartyToOrder = isSeller || isBuyerOfOrder;
+  const hasOrder =
+    !!listing &&
+    (listing.status === "LOCKED" ||
+      listing.status === "SOLD" ||
+      listing.status === "REFUNDED" ||
+      isLockedOnChain);
 
   const existingMediaUrls = item
     ? item.mediaUrls?.length
@@ -770,10 +784,19 @@ export default function ListingPage() {
       </div>
       {listing?.seller && (
         <div className="mt-2 flex min-w-0 items-center gap-2 text-sm text-silver">
-          <span
-            aria-hidden
-            className="h-5 w-5 shrink-0 rounded-full bg-gradient-to-br from-[#38bdf8] to-[#00ffa3]"
-          />
+          {sellerAvatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={sellerAvatar}
+              alt=""
+              className="h-5 w-5 shrink-0 rounded-full border border-white/10 object-cover"
+            />
+          ) : (
+            <span
+              aria-hidden
+              className="h-5 w-5 shrink-0 rounded-full bg-gradient-to-br from-[#38bdf8] to-[#00ffa3]"
+            />
+          )}
           <span className="flex min-w-0 items-center gap-1.5">
             <span className="shrink-0">by</span>
             <AddressDisplay
@@ -1253,16 +1276,18 @@ export default function ListingPage() {
                       }
                       className={`relative flex-shrink-0 h-20 w-20 cursor-pointer overflow-hidden rounded-glass border-2 transition-colors ${i === safeMediaIndex ? "border-chrome" : "border-white/20 hover:border-white/40"}`}
                     >
+                      {/* Thumbs crop to fill (object-cover) so odd aspect
+                          ratios don't show black pillarboxes. */}
                       {isVideoMedia(url) ? (
                         <video
                           src={url}
-                          className="h-full w-full object-contain bg-black"
+                          className="h-full w-full object-cover"
                           muted
                           playsInline
                         />
                       ) : (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={url} alt="" className="h-full w-full object-contain bg-black" />
+                        <img src={url} alt="" className="h-full w-full object-cover" />
                       )}
                       {editing && (
                         <button
@@ -1281,7 +1306,9 @@ export default function ListingPage() {
                   ))}
                 </div>
               )}
-              <div className="relative aspect-square max-h-[80vh] flex-1 overflow-hidden rounded-2xl border border-white/10 bg-black">
+              {/* Hero keeps object-contain (no cropping of product shots) but
+                  letterboxes in the site navy so the bars blend in. */}
+              <div className="relative aspect-square max-h-[80vh] flex-1 overflow-hidden rounded-2xl border border-white/10 bg-[#0d1420]">
                 {mainImageUrl ? (
                   <>
                     {isVideoMedia(mainImageUrl) ? (
@@ -1542,7 +1569,29 @@ export default function ListingPage() {
               </p>
             )}
 
+            {/* Order & escrow entry point — buyer and seller only. Links to
+                the dedicated order page (status, shipping address, tracking,
+                release). */}
+            {listing && hasOrder && isPartyToOrder && (
+              <Link
+                href={`/purchases/${encodeListingIdForUrl(listing.id)}`}
+                className="flex items-center justify-between gap-3 rounded-2xl border border-[#00ffa3]/25 bg-[#00ffa3]/[0.06] px-4 py-3.5 transition-colors hover:bg-[#00ffa3]/[0.1]"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-white">Order &amp; escrow</p>
+                  <p className="mt-0.5 text-xs text-silver">
+                    {isSeller
+                      ? "Track the sale, add tracking, and follow the escrow."
+                      : "Track your order, shipping, and the escrow release."}
+                  </p>
+                </div>
+                <span className="shrink-0 text-lg text-[#00ffa3]" aria-hidden>
+                  →
+                </span>
+              </Link>
+            )}
             {listing &&
+              isPartyToOrder &&
               (listing.status === "LOCKED" ||
                 isLockedOnChain ||
                 (!isListed && !!listing.requireEscrow)) && (

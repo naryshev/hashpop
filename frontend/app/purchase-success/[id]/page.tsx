@@ -1,5 +1,5 @@
 "use client";
-import { listingHref } from "../../../lib/listingUrl";
+import { encodeListingIdForUrl } from "../../../lib/listingUrl";
 
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
@@ -178,10 +178,10 @@ export default function PurchaseSuccessPage() {
           </Link>
           {id && (
             <Link
-              href={listingHref(id)}
+              href={`/purchases/${encodeListingIdForUrl(id)}`}
               className="btn-mint flex-1 py-3 text-center text-sm font-semibold"
             >
-              View Listing & Escrow
+              View order & escrow
             </Link>
           )}
         </div>

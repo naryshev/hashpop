@@ -17,6 +17,8 @@ import { OfferModal } from "./OfferModal";
 import { ConfirmPurchaseSheet } from "./ConfirmPurchaseSheet";
 import { ShippingAddressModal } from "./ShippingAddressModal";
 import { useSignInModal } from "../lib/signInModal";
+import { useHashPackConfirm } from "../lib/hashpackConfirm";
+import { resolveContractIdDisplay } from "../lib/contractId";
 import { useCart } from "../lib/cart";
 import { useRouter } from "next/navigation";
 
@@ -116,6 +118,7 @@ export function BuyButton({
   // after the address is confirmed.
   const [shippingGate, setShippingGate] = useState<null | "buy" | "offer">(null);
   const { openSignIn } = useSignInModal();
+  const { setDetail: setConfirmDetail } = useHashPackConfirm();
   const cart = useCart();
   const router = useRouter();
   const inCart = cart.has(listingId);
@@ -153,6 +156,18 @@ export function BuyButton({
           "This listing uses a legacy on-chain price format and cannot be purchased as-is. Ask the seller to edit price and save again, or recreate the listing.",
         );
       }
+      // Context line for the wallet-confirm overlay, matching the demo
+      // video: "escrow 0.0.88231 · locking 100 ℏ". Resolved from cache in
+      // most cases (the confirm sheet already looked it up).
+      const hbarForDetail = formatPriceForDisplay(_price || "0");
+      const contractIdForDetail = await resolveContractIdDisplay(marketplaceAddress).catch(
+        () => null,
+      );
+      setConfirmDetail(
+        contractIdForDetail
+          ? `escrow ${contractIdForDetail} · locking ${hbarForDetail} ℏ`
+          : `locking ${hbarForDetail} ℏ`,
+      );
       const txHash = await send({
         address: marketplaceAddress,
         abi: marketplaceAbi,

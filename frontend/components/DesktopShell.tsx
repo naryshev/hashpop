@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Store,
   PlusSquare,
@@ -15,6 +15,7 @@ import {
   Wallet,
   LayoutGrid,
   PackageCheck,
+  Search as SearchIcon,
   ShoppingCart,
 } from "lucide-react";
 import { useCart } from "../lib/cart";
@@ -126,6 +127,12 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
   // own fallback content. Slot hosts MUST stay empty — createPortal appends
   // to existing children, which would duplicate fallback + portal content.
   const titleFilled = useTopBarSlotFilled("title");
+  // When the current page doesn't provide its own search (only the
+  // marketplace does), the chrome renders a fallback search that routes the
+  // query to the marketplace — so search never disappears on listing pages.
+  const centerFilled = useTopBarSlotFilled("center");
+  const router = useRouter();
+  const [fallbackQuery, setFallbackQuery] = useState("");
 
   const items = useMemo<NavItem[]>(() => {
     return [
@@ -168,6 +175,27 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
           <img src="/hashpop-cart-3d.PNG" alt="" className="h-7 w-auto object-contain" />
         </Link>
         <div ref={centerSlotRef} className="flex items-center" data-topbar-slot="center" />
+        {!centerFilled && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const q = fallbackQuery.trim();
+              router.push(q ? `/marketplace?q=${encodeURIComponent(q)}` : "/marketplace");
+              setFallbackQuery("");
+            }}
+          >
+            <div className="flex w-64 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.06] py-1.5 pl-3 pr-2 transition-colors duration-300 focus-within:border-[#00ffa3]/40">
+              <SearchIcon size={14} className="shrink-0 text-silver" />
+              <input
+                type="text"
+                value={fallbackQuery}
+                onChange={(e) => setFallbackQuery(e.target.value)}
+                placeholder="Search listings"
+                className="flex-1 bg-transparent text-sm text-white placeholder:text-silver/50 focus:outline-none"
+              />
+            </div>
+          </form>
+        )}
         <nav className="flex items-center gap-0.5" aria-label="Primary navigation">
           {items.map((item) => {
             const active =

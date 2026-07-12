@@ -15,6 +15,8 @@ import { getTransactionExplorerUrl } from "@/lib/explorer";
 import { formatContractAmountToHbar, formatPriceForDisplay } from "@/lib/formatPrice";
 import { getListingMediaUrls } from "@/lib/listingMedia";
 import { ConnectWalletButton } from "@/components/ConnectWalletButton";
+import { AddressDisplay } from "@/components/AddressDisplay";
+import { ShippingAddressModal } from "@/components/ShippingAddressModal";
 
 import { Btn } from "@/components/order/Btn";
 import { ItemRow } from "@/components/order/ItemRow";
@@ -102,6 +104,7 @@ export default function PurchaseDetailPage() {
   const [trackingError, setTrackingError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [txSheetId, setTxSheetId] = useState<string | null>(null);
+  const [addrModalOpen, setAddrModalOpen] = useState(false);
 
   const idBytes = useMemo(() => toBytes32(id), [id]);
 
@@ -154,15 +157,18 @@ export default function PurchaseDetailPage() {
     setTrackingSaving(true);
     setTrackingError(null);
     try {
-      const res = await fetch(`${getApiUrl()}/api/listing/${encodeURIComponent(id)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sellerAddress: address,
-          trackingNumber: trackingInput.trim(),
-          trackingCarrier: carrierInput.trim() || undefined,
-        }),
-      });
+      const res = await fetch(
+        `${getApiUrl()}/api/listing/${encodeURIComponent(listing?.id ?? id)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sellerAddress: address,
+            trackingNumber: trackingInput.trim(),
+            trackingCarrier: carrierInput.trim() || undefined,
+          }),
+        },
+      );
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(body?.error || "Failed to save tracking.");
@@ -177,19 +183,25 @@ export default function PurchaseDetailPage() {
   };
 
   // Delivery address collected at checkout — the buyer sees their own, the
-  // seller sees the buyer's.
-  useEffect(() => {
-    if (!id || !address) {
+  // seller sees the buyer's. Uses the canonical listing id from the API
+  // response (the URL may carry the short ascii form).
+  const canonicalId = listing?.id ?? id;
+  const refreshShipTo = useCallback(() => {
+    if (!canonicalId || !address) {
       setShipTo(null);
       return;
     }
     fetch(
-      `${getApiUrl()}/api/listing/${encodeURIComponent(id)}/shipping-address?requester=${encodeURIComponent(address)}`,
+      `${getApiUrl()}/api/listing/${encodeURIComponent(canonicalId)}/shipping-address?requester=${encodeURIComponent(address)}`,
     )
       .then((r) => (r.ok ? r.json() : null))
       .then((data: { address?: ShipToAddress } | null) => setShipTo(data?.address ?? null))
       .catch(() => setShipTo(null));
-  }, [id, address]);
+  }, [canonicalId, address]);
+
+  useEffect(() => {
+    refreshShipTo();
+  }, [refreshShipTo]);
 
   // After a successful on-chain write, refetch escrow state so the stepper advances.
   useEffect(() => {
@@ -234,6 +246,37 @@ export default function PurchaseDetailPage() {
   const role: OrderRole = me === sellerLower ? "seller" : "buyer";
   const isBuyer = role === "buyer";
   const isParty = me === sellerLower || me === buyerLower;
+
+  // Order details (shipping address, tracking, escrow controls) are private
+  // to the two parties. Everyone else gets a minimal gate screen.
+  if (!isParty) {
+    return (
+      <main style={{ minHeight: "100vh", background: HP.bg, color: HP.fg, padding: 24 }}>
+        <div
+          style={{
+            maxWidth: 480,
+            margin: "48px auto 0",
+            padding: 18,
+            borderRadius: 14,
+            border: `1px solid ${HP.borderSoft}`,
+            background: "rgba(255,255,255,0.03)",
+            textAlign: "center",
+          }}
+        >
+          <p style={{ fontWeight: 700, fontSize: 15, margin: 0 }}>This order is private</p>
+          <p style={{ fontSize: 13, color: HP.muted, marginTop: 6 }}>
+            Order and escrow details are only visible to the buyer and the seller.
+          </p>
+          <Link
+            href="/marketplace"
+            style={{ display: "inline-block", marginTop: 14, color: HP.chrome, fontSize: 13 }}
+          >
+            ← Back to marketplace
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   const phase: OrderPhase = phaseFor(escrow?.state, escrow?.disputed);
   const badge = PHASE_BADGE[phase];
@@ -297,7 +340,12 @@ export default function PurchaseDetailPage() {
     setConfirmOpen(false);
   };
 
-  const sellerLabel = listing.seller ? shortAccount(listing.seller) : "seller";
+  // Never render raw 0x addresses — resolve to HashPack name / 0.0.x.
+  const sellerLabel: React.ReactNode = listing.seller ? (
+    <AddressDisplay address={listing.seller} showVerified={false} />
+  ) : (
+    "seller"
+  );
 
   return (
     <main
@@ -355,15 +403,22 @@ export default function PurchaseDetailPage() {
           <ItemRow
             title={title}
             image={thumb}
-            seller={shortAccount(listing.seller)}
+            seller={
+              listing.seller ? (
+                <AddressDisplay address={listing.seller} showVerified={false} />
+              ) : (
+                "seller"
+              )
+            }
             priceHbar={hbarDisplay}
             priceUsd={usdLabel}
           />
 
           <StatusBlock
             phase={phase}
-            buyer={buyerLower}
+            isBuyer={isBuyer}
             shipTo={shipTo}
+            onAddAddress={isBuyer ? () => setAddrModalOpen(true) : undefined}
             tracking={listing.trackingNumber}
             carrier={listing.trackingCarrier}
             releasedTxHash={releaseHash}
@@ -371,21 +426,6 @@ export default function PurchaseDetailPage() {
             sellerLabel={sellerLabel}
             hbar={hbarDisplay}
           />
-
-          {!isParty && (
-            <div
-              style={{
-                padding: 12,
-                borderRadius: 12,
-                border: `1px solid ${HP.borderSoft}`,
-                background: "rgba(255,255,255,0.03)",
-                fontSize: 12,
-                color: HP.muted,
-              }}
-            >
-              You are viewing this order as an observer.
-            </div>
-          )}
 
           {/* Seller + EscrowV2: tracking entry lives right here — saving it is
               the entire shipping flow (the settlement engine records the
@@ -496,7 +536,7 @@ export default function PurchaseDetailPage() {
       <ReleaseConfirmModal
         open={confirmOpen}
         amount={hbarDisplay}
-        sellerLabel={shortAccount(listing.seller)}
+        sellerLabel={sellerLabel}
         submitting={releasePending}
         onConfirm={onConfirmRelease}
         onCancel={() => setConfirmOpen(false)}
@@ -507,6 +547,20 @@ export default function PurchaseDetailPage() {
         txId={txSheetId}
         hashscanHref={getTransactionExplorerUrl(txSheetId, chainId)}
         onClose={() => setTxSheetId(null)}
+      />
+
+      {/* Buyer can (re)save a delivery address post-purchase if none is on
+          file — the seller immediately sees it on their side of this page. */}
+      <ShippingAddressModal
+        open={addrModalOpen}
+        listingId={listing?.id ?? id}
+        buyerAddress={address ?? ""}
+        ctaLabel="Save delivery address"
+        onConfirmed={() => {
+          setAddrModalOpen(false);
+          refreshShipTo();
+        }}
+        onClose={() => setAddrModalOpen(false)}
       />
     </main>
   );
@@ -605,8 +659,9 @@ function NavBar({
 
 function StatusBlock({
   phase,
-  buyer,
+  isBuyer,
   shipTo,
+  onAddAddress,
   tracking,
   carrier,
   releasedTxHash,
@@ -615,13 +670,14 @@ function StatusBlock({
   hbar,
 }: {
   phase: OrderPhase;
-  buyer: string;
+  isBuyer: boolean;
   shipTo: ShipToAddress | null;
+  onAddAddress?: () => void;
   tracking?: string | null;
   carrier?: string | null;
   releasedTxHash: string | null;
   releaseHref: string | null;
-  sellerLabel: string;
+  sellerLabel: React.ReactNode;
   hbar: string;
 }) {
   if (phase === "paid") {
@@ -640,8 +696,30 @@ function StatusBlock({
             </div>
           </div>
         ) : (
-          <div style={{ color: HP.fg, fontFamily: "ui-monospace,Menlo,monospace", fontSize: 12 }}>
-            {buyer || "—"}
+          <div style={{ fontSize: 12, color: HP.muted, lineHeight: 1.5 }}>
+            {isBuyer
+              ? "No delivery address on file for this order."
+              : "The buyer hasn't provided a delivery address yet — message them before shipping."}
+            {isBuyer && onAddAddress && (
+              <button
+                type="button"
+                onClick={onAddAddress}
+                style={{
+                  display: "block",
+                  marginTop: 8,
+                  padding: "8px 14px",
+                  borderRadius: 10,
+                  border: "1px solid rgba(0,255,163,0.4)",
+                  background: "rgba(0,255,163,0.08)",
+                  color: HP.chrome,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                Add delivery address
+              </button>
+            )}
           </div>
         )}
         <div style={{ fontSize: 11, color: HP.muted, marginTop: 2 }}>

@@ -25,6 +25,19 @@ function normalizeWalletAddress(address?: string | null): string {
     .toLowerCase();
 }
 
+/**
+ * Resolve a URL-borne listing id to the canonical DB key. URLs may carry the
+ * canonical bytes32 form (0x + 64 hex) or the short ascii form
+ * (e.g. "lst-1717123456-abc") — the ascii form must be re-encoded to bytes32,
+ * NOT just prefixed with 0x, or lookups silently miss.
+ */
+function resolveListingIdParam(rawId: string): string {
+  const raw = String(rawId || "");
+  return raw.startsWith("0x") && raw.length === 66
+    ? normalizeListingId(raw)
+    : listingIdToBytes32(raw);
+}
+
 /** Convert listing id (0x...64 hex or string) to bytes32 for contract calls. */
 function listingIdToBytes32(id: string): string {
   if (!id || typeof id !== "string") return "0x" + "0".repeat(64);
@@ -1271,7 +1284,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
    */
   router.get("/listing/:id/offers", async (req, res) => {
     try {
-      const id = normalizeListingId(req.params.id ?? "");
+      const id = resolveListingIdParam(req.params.id ?? "");
       const offers = await prisma.offer.findMany({
         where: { listingId: id },
         orderBy: { createdAt: "desc" },
@@ -1527,7 +1540,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       if (!listingReportWebhookUrl) {
         return res.status(503).json({ error: "Reporting is not configured yet." });
       }
-      const id = normalizeListingId(req.params.id ?? "");
+      const id = resolveListingIdParam(req.params.id ?? "");
       const { reporterAddress, reason, details } = (req.body || {}) as {
         reporterAddress?: string;
         reason?: string;
@@ -1673,7 +1686,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
    */
   router.post("/listing/:id/shipping-address", async (req, res) => {
     try {
-      const id = normalizeListingId(req.params.id ?? "");
+      const id = resolveListingIdParam(req.params.id ?? "");
       const body = (req.body || {}) as Record<string, unknown>;
       const buyer = normalizeWalletAddress(body.buyerAddress as string | undefined);
       if (!buyer) return res.status(400).json({ error: "buyerAddress is required" });
@@ -1734,7 +1747,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
    */
   router.get("/listing/:id/shipping-address", async (req, res) => {
     try {
-      const id = normalizeListingId(req.params.id ?? "");
+      const id = resolveListingIdParam(req.params.id ?? "");
       const requester = normalizeWalletAddress(String(req.query.requester ?? ""));
       if (!requester) return res.status(400).json({ error: "requester is required" });
 
@@ -1860,7 +1873,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
   router.patch("/listing/:id", async (req, res) => {
     invalidateListingsCache();
     try {
-      const id = normalizeListingId(req.params.id ?? "");
+      const id = resolveListingIdParam(req.params.id ?? "");
       const {
         title,
         subtitle,
