@@ -26,6 +26,9 @@ export default function NearbyMapInner({ center, userPos, items }: Props) {
       zoom={11}
       scrollWheelZoom
       className="h-full w-full"
+      // Inline style beats leaflet.css's default #ddd canvas, which otherwise
+      // flashes light while the dark tiles are still downloading.
+      style={{ background: "#0b111b" }}
       attributionControl={false}
     >
       <TileLayer
@@ -59,15 +62,15 @@ export default function NearbyMapInner({ center, userPos, items }: Props) {
         >
           <Popup>
             <div className="min-w-[140px]">
-              <div className="text-sm font-semibold text-black">{it.title || "Listing"}</div>
+              <div className="text-sm font-semibold text-white">{it.title || "Listing"}</div>
               {it.price && (
-                <div className="text-xs font-medium text-emerald-700">
+                <div className="text-xs font-bold text-[#00ffa3]">
                   {formatPriceForDisplay(it.price)} ℏ
                 </div>
               )}
               <Link
                 href={listingHref(it.id)}
-                className="mt-1 inline-block text-xs font-semibold text-blue-600 underline"
+                className="mt-1 inline-block text-xs font-semibold text-[#00ffa3] underline underline-offset-2"
               >
                 View listing →
               </Link>

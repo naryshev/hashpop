@@ -54,11 +54,12 @@ export function BottomNav() {
     pathname === href || (href !== "/" && pathname.startsWith(href));
 
   const NavBtn = ({ item }: { item: NavItem }) => {
-    const active = isActive(item.href);
+    const active = isActive(item.href) && !mapOpen;
     return (
       <Link
         href={item.href}
         aria-label={item.label}
+        onClick={() => setMapOpen(false)}
         className={`flex h-12 items-center justify-center transition-colors md:h-14 ${
           active ? "text-chrome" : "text-silver/70 hover:text-white"
         }`}
@@ -82,15 +83,18 @@ export function BottomNav() {
         ))}
         <button
           type="button"
-          onClick={() => setMapOpen(true)}
+          onClick={() => setMapOpen((o) => !o)}
           aria-label="Items near you"
-          className="flex h-12 items-center justify-center text-silver/70 transition-colors hover:text-white"
+          className={`flex h-12 items-center justify-center transition-colors ${
+            mapOpen ? "text-chrome" : "text-silver/70 hover:text-white"
+          }`}
         >
           <MapIcon className="h-5 w-5" />
         </button>
         <Link
           href="/create"
           aria-label="Create listing"
+          onClick={() => setMapOpen(false)}
           className="flex items-center justify-center"
         >
           <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[linear-gradient(135deg,#00b37a_0%,#00ffa3_55%,#00e5ff_100%)] text-black shadow-[0_4px_16px_rgba(0,255,163,0.4)] transition-transform hover:scale-105">
@@ -100,8 +104,9 @@ export function BottomNav() {
         <Link
           href="/cart"
           aria-label="Cart"
+          onClick={() => setMapOpen(false)}
           className={`relative flex h-12 items-center justify-center transition-colors ${
-            isActive("/cart") ? "text-chrome" : "text-silver/70 hover:text-white"
+            isActive("/cart") && !mapOpen ? "text-chrome" : "text-silver/70 hover:text-white"
           }`}
         >
           <ShoppingCart className="h-5 w-5" />
