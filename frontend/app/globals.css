@@ -40,8 +40,46 @@ html {
   z-index: 0;
   isolation: isolate;
   /* Dark canvas behind tiles — without this Leaflet paints white while
-     dark-theme tiles are still loading, flashing on open. */
-  background: #0b111b;
+     dark-theme tiles are still loading, flashing on open. !important because
+     leaflet.css (loaded after globals in the bundle) sets #ddd. */
+  background: #0b111b !important;
+}
+
+/* Hashpop-branded map chrome: dark popups, dark zoom controls, and a gentle
+   tile fade so the map surfaces read as part of the app, not a widget. */
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: #12161f !important;
+  color: #edf2ff !important;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+.leaflet-popup-content-wrapper {
+  border-radius: 14px;
+}
+.leaflet-container a.leaflet-popup-close-button {
+  color: #a9b0bf !important;
+}
+.leaflet-bar {
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45) !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+}
+.leaflet-bar a {
+  background: #12161f !important;
+  color: #edf2ff !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+.leaflet-bar a:hover {
+  background: #1a2231 !important;
+}
+.leaflet-bar a.leaflet-disabled {
+  background: #0e131d !important;
+  color: rgba(255, 255, 255, 0.25) !important;
+}
+.leaflet-tile {
+  transition: opacity 0.3s ease-in;
 }
 
 :root {
