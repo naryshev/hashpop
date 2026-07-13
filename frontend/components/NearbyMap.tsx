@@ -128,7 +128,9 @@ export function NearbyMap({ open, onClose }: { open: boolean; onClose: () => voi
 
   return createPortal(
     <div
-      className="bg-app fixed inset-0 z-[130] flex flex-col"
+      // Below the floating bottom nav (z-60) so the nav stays visible and
+      // usable over the map, like on every other page.
+      className="bg-app fixed inset-0 z-[50] flex flex-col"
       role="dialog"
       aria-modal="true"
       aria-label="Items near you"
