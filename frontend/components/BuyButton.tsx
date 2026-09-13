@@ -21,6 +21,8 @@ import { useHashPackConfirm } from "../lib/hashpackConfirm";
 import { resolveContractIdDisplay } from "../lib/contractId";
 import { useCart } from "../lib/cart";
 import { useRouter } from "next/navigation";
+import { listingCta } from "../lib/materials";
+import { cn } from "../lib/utils";
 
 export function BuyButton({
   listingId,
@@ -41,7 +43,7 @@ export function BuyButton({
   onPurchaseComplete?: (txHash?: string) => void;
   onMessage?: () => void;
   onOfferSubmitted?: (txHash: string, amountHbar: string) => void;
-  /** Rendered between the price and PURCHASE (demo-video order). */
+  /** Rendered between the price and Purchase (description, then callouts). */
   descriptionSlot?: React.ReactNode;
 }) {
   const idBytes = useMemo(() => listingIdToBytes32(listingId), [listingId]);
@@ -205,33 +207,45 @@ export function BuyButton({
     usdRate && usdRate > 0 && !Number.isNaN(Number(priceHbarDisplay))
       ? (Number(priceHbarDisplay) * usdRate).toFixed(2)
       : null;
+  const hasCallout = notOnChain || isLegacyWeiListing;
+  const purchaseOffset = descriptionSlot || hasCallout ? "mt-3" : "mt-4";
+
   return (
-    <div className="space-y-2">
-      {/* Price line — big green ℏ figure with a muted USD approximation. */}
-      <p className="mb-3 flex items-baseline gap-2">
-        <span className="text-3xl font-extrabold tracking-tight text-[#00ffa3]">
+    <div className="mx-auto w-full max-w-[360px]">
+      <p className="flex items-baseline gap-2 text-left">
+        <span className="text-[34px] font-bold leading-none tracking-tight text-chrome">
           {priceHbarDisplay} <span className="italic">ℏ</span>
         </span>
-        {priceUsd && <span className="text-sm text-silver/70">(${priceUsd})</span>}
+        {priceUsd && <span className="text-[15px] text-silver/70">(${priceUsd})</span>}
       </p>
 
-      {descriptionSlot}
+      {descriptionSlot ? <div className="mt-4">{descriptionSlot}</div> : null}
 
       {notOnChain && (
-        <p className="text-xs text-amber-300/90 mb-2">
+        <p
+          className={cn(
+            "rounded-[14px] border border-amber-400/25 bg-amber-400/10 px-3 py-2.5 text-[13px] leading-snug text-amber-200/90",
+            descriptionSlot ? "mt-2" : "mt-4",
+          )}
+        >
           This listing does not exist on the smart contract yet. The seller&apos;s creation
           transaction may not have completed successfully.
         </p>
       )}
       {isLegacyWeiListing && (
-        <p className="text-xs text-amber-300/90 mb-2">
+        <p
+          className={cn(
+            "rounded-[14px] border border-amber-400/25 bg-amber-400/10 px-3 py-2.5 text-[13px] leading-snug text-amber-200/90",
+            descriptionSlot || notOnChain ? "mt-2" : "mt-4",
+          )}
+        >
           This listing uses a legacy price format. The seller needs to edit and save the price
           before it can be purchased.
         </p>
       )}
 
-      {/* PURCHASE */}
       <button
+        type="button"
         onClick={() => {
           if (!address) {
             openSignIn({ title: "Sign in to buy" });
@@ -240,13 +254,12 @@ export function BuyButton({
           if (canBuy) setShippingGate("buy");
         }}
         disabled={!!address && !canBuy}
-        className="btn-mint w-full py-4 text-sm uppercase tracking-[0.2em]"
+        className={cn(listingCta.filled, purchaseOffset)}
       >
         {isPending ? "Confirm in wallet\u2026" : "Purchase"}
       </button>
 
-      {/* OFFER / MESSAGE — outlined pair below the CTA, per the demo video */}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="mt-2 grid grid-cols-2 gap-2">
         <button
           type="button"
           onClick={() => {
@@ -260,20 +273,15 @@ export function BuyButton({
             // Offers escrow funds up-front, so they need an address too.
             setShippingGate("offer");
           }}
-          className="btn-mint-outline py-3.5 text-sm uppercase tracking-[0.18em]"
+          className={listingCta.tinted}
         >
           Offer
         </button>
-        <button
-          type="button"
-          onClick={onMessage}
-          className="btn-mint-outline py-3.5 text-sm uppercase tracking-[0.18em]"
-        >
+        <button type="button" onClick={onMessage} className={listingCta.tinted}>
           Message
         </button>
       </div>
 
-      {/* ADD TO CART */}
       <button
         type="button"
         onClick={() => {
@@ -283,44 +291,35 @@ export function BuyButton({
             cart.add(listingId);
           }
         }}
-        className={`w-full rounded-xl border py-3 text-sm font-bold uppercase tracking-[0.18em] transition-colors ${
-          inCart
-            ? "border-[#00ffa3]/50 text-[#00ffa3] hover:bg-[#00ffa3]/10"
-            : "border-white/15 bg-transparent text-white/85 hover:border-white/40 hover:bg-white/5"
-        }`}
+        className={cn(listingCta.cart, "mt-2", inCart && "text-chrome")}
       >
-        {inCart ? "✓ In cart — view cart" : "Add to cart"}
+        {inCart ? "View cart" : "Add to cart"}
       </button>
 
-      {/* Wishlist toggle — subtle, below the main actions */}
       <button
         type="button"
         onClick={onToggleWishlist}
         disabled={wishlistDisabled}
-        className={`w-full py-2 text-xs font-medium transition-colors disabled:opacity-40 mt-1 ${
-          inWishlist
-            ? "text-emerald-400 hover:text-emerald-300"
-            : "text-white/40 hover:text-white/70"
-        }`}
+        className={cn(listingCta.wishlist, "mt-2", inWishlist && "text-chrome hover:text-chrome")}
         aria-label={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
       >
-        {inWishlist ? "✓ In wishlist" : "+ Add to wishlist"}
+        {inWishlist ? "In wishlist" : "Add to wishlist"}
       </button>
 
       {isSuccess && (
-        <div className="border border-[#00ffa3]/30 bg-[#00ffa3]/5 px-4 py-3 flex items-center gap-3 mt-2">
-          <div className="w-4 h-4 rounded-full border-2 border-[#00ffa3] border-t-transparent animate-spin flex-shrink-0" />
-          <p className="text-sm text-[#00ffa3]">Purchase confirmed — loading confirmation…</p>
+        <div className="mt-2 flex items-center gap-3 rounded-[14px] border border-[#00ffa3]/25 bg-[#00ffa3]/10 px-4 py-3">
+          <div className="h-4 w-4 flex-shrink-0 animate-spin rounded-full border-2 border-[#00ffa3] border-t-transparent" />
+          <p className="text-sm text-chrome">Purchase confirmed — loading confirmation…</p>
         </div>
       )}
       {errorMessage && (
-        <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 space-y-2 mt-2">
-          <p className="text-sm text-red-300/90 break-words">{errorMessage}</p>
+        <div className="mt-2 space-y-2 rounded-[14px] border border-rose-500/30 bg-rose-500/10 px-3 py-2">
+          <p className="break-words text-sm text-rose-300/90">{errorMessage}</p>
           <a
             href="https://docs.hashpack.app/"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-red-200/90 hover:text-red-100 underline"
+            className="text-xs text-rose-200/90 underline hover:text-rose-100"
           >
             HashPack docs – connection help
           </a>

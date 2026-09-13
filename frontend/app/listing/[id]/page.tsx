@@ -1617,7 +1617,7 @@ export default function ListingPage() {
                 price={listing.price}
                 descriptionSlot={
                   listing.description ? (
-                    <p className="mb-3 text-sm leading-relaxed text-silver lg:hidden">
+                    <p className="text-sm leading-relaxed text-silver lg:hidden">
                       {listing.description}
                     </p>
                   ) : null

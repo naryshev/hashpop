@@ -10,3 +10,14 @@ export const material = {
   scrim: "bg-scrim",
   hairline: "border-hairline",
 } as const;
+
+/** Listing CTA block + ConfirmPurchaseSheet footer. Sentence-case labels at call sites. */
+export const listingCta = {
+  filled:
+    "btn-mint flex h-[52px] w-full items-center justify-center rounded-[14px] text-[15px] font-bold",
+  tinted:
+    "flex h-12 w-full items-center justify-center rounded-[14px] border border-[#00ffa3]/25 bg-[#00ffa3]/10 text-[15px] font-bold text-chrome transition-colors hover:bg-[#00ffa3]/15",
+  cart: `${material.regular} flex h-11 w-full items-center justify-center rounded-[14px] text-[15px] font-medium text-white/85 transition-colors hover:bg-white/[0.12]`,
+  wishlist:
+    "w-full py-2 text-center text-[13px] font-medium text-white/50 transition-colors hover:text-white/80 disabled:opacity-40",
+} as const;

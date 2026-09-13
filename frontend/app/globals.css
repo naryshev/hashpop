@@ -226,10 +226,8 @@ a,
   .btn-frost-cta {
     @apply rounded-glass border border-[#00ffa3]/60 bg-[linear-gradient(110deg,#00b37a_0%,#00ffa3_50%,#00e5ff_100%)] px-4 py-2 font-semibold text-black transition-all duration-200 hover:brightness-110 hover:shadow-glow-hover shadow-inner;
   }
-  /* Demo-video design language: mint→cyan gradient CTA with a soft green
-     glow, dark-navy outlined secondary buttons, and saturated status pills.
-     Case/tracking is applied at call sites (PURCHASE is uppercase, "Continue
-     with HashPack" is not). */
+  /* Mint→cyan gradient CTA. Listing/confirm labels are sentence case at the
+     call site (Purchase, Confirm · X ℏ); other surfaces may still set case. */
   .btn-mint {
     @apply rounded-xl bg-[linear-gradient(90deg,#00b97c_0%,#00ffa3_55%,#00e5f0_100%)] font-extrabold text-[#04150f] transition-all duration-200 hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed;
     box-shadow: 0 0 28px rgba(0, 255, 163, 0.28);

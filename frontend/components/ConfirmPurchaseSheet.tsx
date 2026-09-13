@@ -8,7 +8,7 @@ import { getApiUrl } from "../lib/apiUrl";
 import { formatPriceForDisplay } from "../lib/formatPrice";
 import { useHbarUsd } from "../hooks/useHbarUsd";
 import { resolveContractIdDisplay } from "../lib/contractId";
-import { material } from "../lib/materials";
+import { listingCta, material } from "../lib/materials";
 import { cn } from "../lib/utils";
 
 const HBAR = "\u210F";
@@ -94,7 +94,7 @@ export function ConfirmPurchaseSheet({
           type="button"
           onClick={onConfirm}
           disabled={confirming}
-          className="btn-mint h-12 w-full rounded-2xl text-sm uppercase tracking-[0.2em]"
+          className={listingCta.filled}
         >
           {confirming ? "Confirm in wallet\u2026" : `Confirm \u00b7 ${hbar} ${HBAR}`}
         </button>
