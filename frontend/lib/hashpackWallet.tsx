@@ -374,9 +374,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
     pairing: ((s: any) => void) | null;
     disconnect: (() => void) | null;
   }>({ pairing: null, disconnect: null });
-  const wireClientRef = useRef<(hc: HashConnect) => Promise<HashConnect | null>>(
-    async () => null,
-  );
+  const wireClientRef = useRef<(hc: HashConnect) => Promise<HashConnect | null>>(async () => null);
 
   const resetWalletState = useCallback((clearConnectorData = false) => {
     setAccountId(null);

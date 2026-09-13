@@ -48,7 +48,9 @@ describe("withTimeout", () => {
     const pending = withTimeout(hung, INIT_TIMEOUT_MS, INIT_TIMEOUT_MESSAGE);
 
     const expectReject = expect(pending).rejects.toSatisfy((err: unknown) => {
-      return isInitTimeoutError(err) && err instanceof Error && err.message === INIT_TIMEOUT_MESSAGE;
+      return (
+        isInitTimeoutError(err) && err instanceof Error && err.message === INIT_TIMEOUT_MESSAGE
+      );
     });
 
     await vi.advanceTimersByTimeAsync(INIT_TIMEOUT_MS);
