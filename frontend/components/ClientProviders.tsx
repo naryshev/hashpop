@@ -20,13 +20,13 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
         <HashPackConfirmProvider>
           <SignInModalProvider>
             <ProfilesProvider>
-            <TopBarProvider>
-              <WalletAccountSync />
-              <DesktopShell>{children}</DesktopShell>
-              {/* Mobile floating nav; desktop nav lives in DesktopShell. */}
-              <BottomNav />
-              <PwaInstallPrompt />
-            </TopBarProvider>
+              <TopBarProvider>
+                <WalletAccountSync />
+                <DesktopShell>{children}</DesktopShell>
+                {/* Mobile floating nav; desktop nav lives in DesktopShell. */}
+                <BottomNav />
+                <PwaInstallPrompt />
+              </TopBarProvider>
             </ProfilesProvider>
           </SignInModalProvider>
         </HashPackConfirmProvider>

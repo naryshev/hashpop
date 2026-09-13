@@ -88,7 +88,9 @@ export default function CartPage() {
       r.listing.seller.toLowerCase() !== me,
   );
   const unavailable = rows.filter(
-    (r) => r.listing !== undefined && (!r.listing || (r.listing.status || "").toUpperCase() !== "LISTED"),
+    (r) =>
+      r.listing !== undefined &&
+      (!r.listing || (r.listing.status || "").toUpperCase() !== "LISTED"),
   );
   const ownListings = rows.filter(
     (r) => r.listing && r.listing.seller.toLowerCase() === me && me !== "",
@@ -173,13 +175,24 @@ export default function CartPage() {
     if (!st || st === "queued") return null;
     const map: Record<ItemState, { label: string; cls: string }> = {
       queued: { label: "Queued", cls: "text-silver border-white/15 bg-white/5" },
-      signing: { label: "Confirm in wallet…", cls: "text-blue-200 border-blue-400/40 bg-blue-400/10" },
-      bought: { label: "Purchased ✓", cls: "text-emerald-300 border-emerald-400/40 bg-emerald-400/10" },
-      failed: { label: "Failed — try again", cls: "text-rose-300 border-rose-400/40 bg-rose-400/10" },
+      signing: {
+        label: "Confirm in wallet…",
+        cls: "text-blue-200 border-blue-400/40 bg-blue-400/10",
+      },
+      bought: {
+        label: "Purchased ✓",
+        cls: "text-emerald-300 border-emerald-400/40 bg-emerald-400/10",
+      },
+      failed: {
+        label: "Failed — try again",
+        cls: "text-rose-300 border-rose-400/40 bg-rose-400/10",
+      },
     };
     const c = map[st];
     return (
-      <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${c.cls}`}>
+      <span
+        className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${c.cls}`}
+      >
         {c.label}
       </span>
     );
@@ -204,10 +217,7 @@ export default function CartPage() {
             <p className="mt-2 text-sm text-silver">
               Add items from any listing and check out when you&apos;re ready.
             </p>
-            <Link
-              href="/marketplace"
-              className="btn-frost-cta mt-4 inline-block px-6 text-sm"
-            >
+            <Link href="/marketplace" className="btn-frost-cta mt-4 inline-block px-6 text-sm">
               Browse the marketplace
             </Link>
           </div>
@@ -217,9 +227,8 @@ export default function CartPage() {
           <>
             <ul className="space-y-2">
               {rows.map(({ id, listing }) => {
-                const thumb = listing ? getListingMediaUrls(listing)[0] ?? null : null;
-                const gone =
-                  !listing || (listing.status || "").toUpperCase() !== "LISTED";
+                const thumb = listing ? (getListingMediaUrls(listing)[0] ?? null) : null;
+                const gone = !listing || (listing.status || "").toUpperCase() !== "LISTED";
                 const own = !!listing && me !== "" && listing.seller.toLowerCase() === me;
                 return (
                   <li

@@ -263,9 +263,7 @@ function CreatePageContent() {
       const room = MAX_MEDIA_COUNT - prev.length - duplicateMediaUrlsRef.current.length;
       if (newItems.length > room) {
         setMediaError(`Listings are limited to ${MAX_MEDIA_COUNT} photos/videos.`);
-        newItems
-          .slice(Math.max(0, room))
-          .forEach((item) => URL.revokeObjectURL(item.previewUrl));
+        newItems.slice(Math.max(0, room)).forEach((item) => URL.revokeObjectURL(item.previewUrl));
       }
       return room <= 0 ? prev : [...prev, ...newItems.slice(0, room)];
     });
@@ -497,378 +495,384 @@ function CreatePageContent() {
             page sensitive to leaflet/wallet cleanup races on navigation. */}
         {walletConnected && (
           <div className="grid gap-8 lg:grid-cols-[1fr_360px] lg:gap-10">
-          <div className="space-y-8 min-w-0">
-          <section>
-            <SectionHeader
-              title="Photos"
-              sub="First image becomes the cover. Drag to reorder; max 10 files, 15MB each."
-            />
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={ALLOWED_MEDIA_TYPES}
-              multiple
-              onChange={addMedia}
-              className="hidden"
-            />
-            <div className="mt-2 space-y-2">
-              <div
-                className="aspect-video rounded-lg border-2 border-dashed border-white/10 overflow-hidden bg-white/5 flex items-center justify-center hover:border-white/20 transition-colors"
-                onDragOver={handleMediaDragOver}
-                onDrop={(e) => handleMediaDrop(e, 0)}
-              >
-                {featuredItem ? (
+            <div className="space-y-8 min-w-0">
+              <section>
+                <SectionHeader
+                  title="Photos"
+                  sub="First image becomes the cover. Drag to reorder; max 10 files, 15MB each."
+                />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept={ALLOWED_MEDIA_TYPES}
+                  multiple
+                  onChange={addMedia}
+                  className="hidden"
+                />
+                <div className="mt-2 space-y-2">
                   <div
-                    className="relative w-full h-full group cursor-grab active:cursor-grabbing"
-                    draggable
-                    onDragStart={(e) => handleMediaDragStart(e, 0)}
-                    onDragEnd={handleMediaDragEnd}
+                    className="aspect-video rounded-lg border-2 border-dashed border-white/10 overflow-hidden bg-white/5 flex items-center justify-center hover:border-white/20 transition-colors"
+                    onDragOver={handleMediaDragOver}
+                    onDrop={(e) => handleMediaDrop(e, 0)}
                   >
-                    {featuredItem.isVideo ? (
-                      <video
-                        src={featuredItem.previewUrl}
-                        className="object-contain w-full h-full pointer-events-none"
-                        muted
-                        playsInline
-                      />
+                    {featuredItem ? (
+                      <div
+                        className="relative w-full h-full group cursor-grab active:cursor-grabbing"
+                        draggable
+                        onDragStart={(e) => handleMediaDragStart(e, 0)}
+                        onDragEnd={handleMediaDragEnd}
+                      >
+                        {featuredItem.isVideo ? (
+                          <video
+                            src={featuredItem.previewUrl}
+                            className="object-contain w-full h-full pointer-events-none"
+                            muted
+                            playsInline
+                          />
+                        ) : (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            src={featuredItem.previewUrl}
+                            alt="Featured"
+                            className="object-contain w-full h-full pointer-events-none select-none"
+                            draggable={false}
+                          />
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => removeMedia(featuredItem.id)}
+                          className="absolute top-0 right-0 w-8 h-8 flex items-center justify-center bg-black/70 text-white rounded-bl-lg hover:bg-rose-500 transition-colors"
+                          aria-label="Remove"
+                        >
+                          ×
+                        </button>
+                      </div>
                     ) : (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={featuredItem.previewUrl}
-                        alt="Featured"
-                        className="object-contain w-full h-full pointer-events-none select-none"
-                        draggable={false}
-                      />
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-full h-full flex items-center justify-center text-silver hover:text-white border-2 border-dashed border-white/20 rounded-lg"
+                      >
+                        + Add featured image / video
+                      </button>
                     )}
+                  </div>
+                  <div className="flex flex-wrap gap-2 items-center">
+                    {mediaItems.map((item, index) => (
+                      <div
+                        key={item.id}
+                        className={`relative flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-colors cursor-grab active:cursor-grabbing ${index === 0 ? "ring-2 ring-chrome ring-offset-2 ring-offset-[var(--bg)]" : "border-white/10"}`}
+                        draggable
+                        onDragStart={(e) => handleMediaDragStart(e, index)}
+                        onDragEnd={handleMediaDragEnd}
+                        onDragOver={handleMediaDragOver}
+                        onDrop={(e) => handleMediaDrop(e, index)}
+                        title={
+                          index === 0
+                            ? "Featured (drag to reorder)"
+                            : "Drag to reorder or drag to top to set as featured"
+                        }
+                      >
+                        {item.isVideo ? (
+                          <video
+                            src={item.previewUrl}
+                            className="object-cover w-full h-full pointer-events-none"
+                            muted
+                            playsInline
+                          />
+                        ) : (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            src={item.previewUrl}
+                            alt=""
+                            className="object-cover w-full h-full pointer-events-none select-none"
+                            draggable={false}
+                          />
+                        )}
+                        {index > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => removeMedia(item.id)}
+                            className="absolute top-0 right-0 w-6 h-6 flex items-center justify-center bg-black/70 text-white text-sm rounded-bl-lg hover:bg-rose-500 transition-colors"
+                            aria-label="Remove"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    ))}
                     <button
                       type="button"
-                      onClick={() => removeMedia(featuredItem.id)}
-                      className="absolute top-0 right-0 w-8 h-8 flex items-center justify-center bg-black/70 text-white rounded-bl-lg hover:bg-rose-500 transition-colors"
-                      aria-label="Remove"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-20 h-20 rounded-lg border-2 border-dashed border-white/20 text-silver hover:border-chrome hover:text-white flex items-center justify-center text-xl flex-shrink-0"
+                      aria-label="Add media"
                     >
-                      ×
+                      +
                     </button>
                   </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-full h-full flex items-center justify-center text-silver hover:text-white border-2 border-dashed border-white/20 rounded-lg"
-                  >
-                    + Add featured image / video
-                  </button>
+                </div>
+                {mediaError && <p className="text-rose-400 text-xs mt-1">{mediaError}</p>}
+                {triedSubmit && validation.photos && (
+                  <p className="text-rose-400 text-xs mt-1">{validation.photos}</p>
                 )}
-              </div>
-              <div className="flex flex-wrap gap-2 items-center">
-                {mediaItems.map((item, index) => (
-                  <div
-                    key={item.id}
-                    className={`relative flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-colors cursor-grab active:cursor-grabbing ${index === 0 ? "ring-2 ring-chrome ring-offset-2 ring-offset-[var(--bg)]" : "border-white/10"}`}
-                    draggable
-                    onDragStart={(e) => handleMediaDragStart(e, index)}
-                    onDragEnd={handleMediaDragEnd}
-                    onDragOver={handleMediaDragOver}
-                    onDrop={(e) => handleMediaDrop(e, index)}
-                    title={
-                      index === 0
-                        ? "Featured (drag to reorder)"
-                        : "Drag to reorder or drag to top to set as featured"
-                    }
-                  >
-                    {item.isVideo ? (
-                      <video
-                        src={item.previewUrl}
-                        className="object-cover w-full h-full pointer-events-none"
-                        muted
-                        playsInline
-                      />
-                    ) : (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={item.previewUrl}
-                        alt=""
-                        className="object-cover w-full h-full pointer-events-none select-none"
-                        draggable={false}
-                      />
+              </section>
+
+              <section>
+                <SectionHeader title="Basics" />
+                <div className="space-y-4">
+                  <label className="block">
+                    <span className="text-xs font-semibold text-white">
+                      Title <span className="text-chrome">*</span>
+                    </span>
+                    <input
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      className="input-frost mt-1 w-full h-12 text-base font-semibold"
+                      placeholder="e.g. Vintage Polaroid SX-70 — restored bellows"
+                    />
+                    {triedSubmit && validation.title && (
+                      <span className="mt-1 block text-xs text-rose-400">{validation.title}</span>
                     )}
-                    {index > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => removeMedia(item.id)}
-                        className="absolute top-0 right-0 w-6 h-6 flex items-center justify-center bg-black/70 text-white text-sm rounded-bl-lg hover:bg-rose-500 transition-colors"
-                        aria-label="Remove"
-                      >
-                        ×
-                      </button>
+                  </label>
+
+                  <label className="block">
+                    <span className="text-xs font-semibold text-white">Subtitle</span>
+                    <input
+                      value={subtitle}
+                      onChange={(e) => setSubtitle(e.target.value)}
+                      className="input-frost mt-1 w-full"
+                      placeholder="One-line teaser shown on cards"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="flex items-baseline justify-between text-xs font-semibold text-white">
+                      Description
+                      <span className="font-mono text-[10px] uppercase tracking-wide text-silver">
+                        Markdown supported
+                      </span>
+                    </span>
+                    <textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      className="input-frost mt-1 w-full min-h-[100px] resize-y"
+                      placeholder="What makes it worth buying? Condition notes, what's included, any flaws."
+                    />
+                    {triedSubmit && validation.description && (
+                      <span className="mt-1 block text-xs text-rose-400">
+                        {validation.description}
+                      </span>
+                    )}
+                  </label>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <label className="block">
+                      <span className="text-xs font-semibold text-white">
+                        Price <span className="text-chrome">*</span>
+                      </span>
+                      <div className="relative mt-1">
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          value={price}
+                          onChange={(e) => setPrice(e.target.value)}
+                          className="input-frost w-full h-12 text-lg font-semibold font-mono pr-12"
+                          placeholder="0"
+                        />
+                        <span className="absolute inset-y-0 right-3 flex items-center font-mono text-sm text-silver">
+                          ℏ
+                        </span>
+                      </div>
+                      {triedSubmit && validation.price && (
+                        <span className="mt-1 block text-xs text-rose-400">{validation.price}</span>
+                      )}
+                    </label>
+                    <label className="block">
+                      <span className="flex items-baseline justify-between text-xs font-semibold text-white">
+                        Year of production
+                        <span className="font-mono text-[10px] uppercase tracking-wide text-silver">
+                          Optional
+                        </span>
+                      </span>
+                      <input
+                        type="text"
+                        value={yearOfProduction}
+                        onChange={(e) => setYearOfProduction(e.target.value)}
+                        className="input-frost mt-1 w-full h-12"
+                        placeholder="e.g. 1973"
+                      />
+                    </label>
+                  </div>
+                </div>
+              </section>
+
+              <section>
+                <SectionHeader title="Category & condition" />
+                <div className="space-y-5">
+                  <div>
+                    <span className="text-xs font-semibold text-white">
+                      Category <span className="text-chrome">*</span>
+                    </span>
+                    <div className="mt-1">
+                      <CategorySearch
+                        value={category}
+                        onChange={setCategory}
+                        placeholder="Search categories (e.g. watches, cars, software)…"
+                      />
+                    </div>
+                    {triedSubmit && validation.category && (
+                      <span className="mt-1 block text-xs text-rose-400">
+                        {validation.category}
+                      </span>
                     )}
                   </div>
-                ))}
+
+                  <div>
+                    <span className="text-xs font-semibold text-white">
+                      Condition <span className="text-chrome">*</span>
+                    </span>
+                    <div className="mt-2 grid grid-cols-2 sm:grid-cols-5 gap-2">
+                      {CONDITIONS.map((c) => {
+                        const active = condition === c.label;
+                        return (
+                          <button
+                            key={c.label}
+                            type="button"
+                            onClick={() => setCondition(c.label)}
+                            className={`text-left rounded-lg px-2.5 py-2.5 border transition-colors ${
+                              active
+                                ? "bg-[#00ffa3]/10 border-[#00ffa3]/50 text-chrome shadow-[0_0_16px_rgba(0,255,163,0.15)]"
+                                : "bg-white/5 border-white/10 text-white hover:border-white/20"
+                            }`}
+                          >
+                            <div className="text-xs font-bold">{c.label}</div>
+                            <div className="text-[10px] text-silver leading-tight mt-1">
+                              {c.desc}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section>
+                <SectionHeader
+                  title="Location"
+                  sub="Shown publicly only down to neighborhood. Search a city or click the map to drop a pin."
+                />
+                <LocationPicker value={location} onChange={setLocation} />
+              </section>
+
+              <section>
+                <SectionHeader title="Shipping & escrow" />
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-20 h-20 rounded-lg border-2 border-dashed border-white/20 text-silver hover:border-chrome hover:text-white flex items-center justify-center text-xl flex-shrink-0"
-                  aria-label="Add media"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-            {mediaError && <p className="text-rose-400 text-xs mt-1">{mediaError}</p>}
-            {triedSubmit && validation.photos && (
-              <p className="text-rose-400 text-xs mt-1">{validation.photos}</p>
-            )}
-          </section>
-
-          <section>
-            <SectionHeader title="Basics" />
-            <div className="space-y-4">
-              <label className="block">
-                <span className="text-xs font-semibold text-white">
-                  Title <span className="text-chrome">*</span>
-                </span>
-                <input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="input-frost mt-1 w-full h-12 text-base font-semibold"
-                  placeholder="e.g. Vintage Polaroid SX-70 — restored bellows"
-                />
-                {triedSubmit && validation.title && (
-                  <span className="mt-1 block text-xs text-rose-400">{validation.title}</span>
-                )}
-              </label>
-
-              <label className="block">
-                <span className="text-xs font-semibold text-white">Subtitle</span>
-                <input
-                  value={subtitle}
-                  onChange={(e) => setSubtitle(e.target.value)}
-                  className="input-frost mt-1 w-full"
-                  placeholder="One-line teaser shown on cards"
-                />
-              </label>
-
-              <label className="block">
-                <span className="flex items-baseline justify-between text-xs font-semibold text-white">
-                  Description
-                  <span className="font-mono text-[10px] uppercase tracking-wide text-silver">
-                    Markdown supported
-                  </span>
-                </span>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="input-frost mt-1 w-full min-h-[100px] resize-y"
-                  placeholder="What makes it worth buying? Condition notes, what's included, any flaws."
-                />
-                {triedSubmit && validation.description && (
-                  <span className="mt-1 block text-xs text-rose-400">{validation.description}</span>
-                )}
-              </label>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <label className="block">
-                  <span className="text-xs font-semibold text-white">
-                    Price <span className="text-chrome">*</span>
-                  </span>
-                  <div className="relative mt-1">
-                    <input
-                      type="number"
-                      step="any"
-                      min="0"
-                      value={price}
-                      onChange={(e) => setPrice(e.target.value)}
-                      className="input-frost w-full h-12 text-lg font-semibold font-mono pr-12"
-                      placeholder="0"
-                    />
-                    <span className="absolute inset-y-0 right-3 flex items-center font-mono text-sm text-silver">
-                      ℏ
-                    </span>
-                  </div>
-                  {triedSubmit && validation.price && (
-                    <span className="mt-1 block text-xs text-rose-400">{validation.price}</span>
-                  )}
-                </label>
-                <label className="block">
-                  <span className="flex items-baseline justify-between text-xs font-semibold text-white">
-                    Year of production
-                    <span className="font-mono text-[10px] uppercase tracking-wide text-silver">
-                      Optional
-                    </span>
-                  </span>
-                  <input
-                    type="text"
-                    value={yearOfProduction}
-                    onChange={(e) => setYearOfProduction(e.target.value)}
-                    className="input-frost mt-1 w-full h-12"
-                    placeholder="e.g. 1973"
-                  />
-                </label>
-              </div>
-            </div>
-          </section>
-
-          <section>
-            <SectionHeader title="Category & condition" />
-            <div className="space-y-5">
-              <div>
-                <span className="text-xs font-semibold text-white">
-                  Category <span className="text-chrome">*</span>
-                </span>
-                <div className="mt-1">
-                  <CategorySearch
-                    value={category}
-                    onChange={setCategory}
-                    placeholder="Search categories (e.g. watches, cars, software)…"
-                  />
-                </div>
-                {triedSubmit && validation.category && (
-                  <span className="mt-1 block text-xs text-rose-400">{validation.category}</span>
-                )}
-              </div>
-
-              <div>
-                <span className="text-xs font-semibold text-white">
-                  Condition <span className="text-chrome">*</span>
-                </span>
-                <div className="mt-2 grid grid-cols-2 sm:grid-cols-5 gap-2">
-                  {CONDITIONS.map((c) => {
-                    const active = condition === c.label;
-                    return (
-                      <button
-                        key={c.label}
-                        type="button"
-                        onClick={() => setCondition(c.label)}
-                        className={`text-left rounded-lg px-2.5 py-2.5 border transition-colors ${
-                          active
-                            ? "bg-[#00ffa3]/10 border-[#00ffa3]/50 text-chrome shadow-[0_0_16px_rgba(0,255,163,0.15)]"
-                            : "bg-white/5 border-white/10 text-white hover:border-white/20"
-                        }`}
-                      >
-                        <div className="text-xs font-bold">{c.label}</div>
-                        <div className="text-[10px] text-silver leading-tight mt-1">{c.desc}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section>
-            <SectionHeader
-              title="Location"
-              sub="Shown publicly only down to neighborhood. Search a city or click the map to drop a pin."
-            />
-            <LocationPicker value={location} onChange={setLocation} />
-          </section>
-
-          <section>
-            <SectionHeader title="Shipping & escrow" />
-            <button
-              type="button"
-              onClick={() => setRequireEscrow(!requireEscrow)}
-              className={`w-full flex items-center gap-3 rounded-lg px-3.5 py-3 text-left border transition-colors ${
-                requireEscrow
-                  ? "bg-[#00ffa3]/[0.04] border-[#00ffa3]/25"
-                  : "bg-white/5 border-white/10"
-              }`}
-              aria-pressed={requireEscrow}
-            >
-              <div className="flex-1">
-                <div className="text-sm font-semibold text-white">
-                  Require shipping + on-chain escrow
-                </div>
-                <div className="text-xs text-silver mt-0.5 leading-snug">
-                  Funds lock in the marketplace contract until the buyer confirms receipt. Tracking
-                  is required before escrow releases.
-                </div>
-              </div>
-              <span
-                className={`shrink-0 inline-flex w-9 h-5 rounded-full relative transition-colors ${
-                  requireEscrow ? "bg-chrome" : "bg-white/15"
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${
-                    requireEscrow ? "left-[18px]" : "left-0.5"
+                  onClick={() => setRequireEscrow(!requireEscrow)}
+                  className={`w-full flex items-center gap-3 rounded-lg px-3.5 py-3 text-left border transition-colors ${
+                    requireEscrow
+                      ? "bg-[#00ffa3]/[0.04] border-[#00ffa3]/25"
+                      : "bg-white/5 border-white/10"
                   }`}
-                />
-              </span>
-            </button>
-          </section>
+                  aria-pressed={requireEscrow}
+                >
+                  <div className="flex-1">
+                    <div className="text-sm font-semibold text-white">
+                      Require shipping + on-chain escrow
+                    </div>
+                    <div className="text-xs text-silver mt-0.5 leading-snug">
+                      Funds lock in the marketplace contract until the buyer confirms receipt.
+                      Tracking is required before escrow releases.
+                    </div>
+                  </div>
+                  <span
+                    className={`shrink-0 inline-flex w-9 h-5 rounded-full relative transition-colors ${
+                      requireEscrow ? "bg-chrome" : "bg-white/15"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${
+                        requireEscrow ? "left-[18px]" : "left-0.5"
+                      }`}
+                    />
+                  </span>
+                </button>
+              </section>
 
-          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-silver">
-            Posting a listing costs HBAR for the Hedera network (gas) fee — no platform fee.
-            Estimated <span className="text-chrome font-medium">~0.01 – 0.05 ℏ</span>; your wallet
-            will show the exact amount.
-          </div>
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-silver">
+                Posting a listing costs HBAR for the Hedera network (gas) fee — no platform fee.
+                Estimated <span className="text-chrome font-medium">~0.01 – 0.05 ℏ</span>; your
+                wallet will show the exact amount.
+              </div>
 
-          {listingSuccess && !(createdListingIdRef.current ?? createdListingId) && (
-            <p className="text-emerald-400 text-sm">Listing created on-chain. Redirecting…</p>
-          )}
-          {(error || submitError) && (
-            <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 space-y-2">
-              <p className="text-rose-300 text-sm">
-                {submitError ?? getTransactionErrorMessage(error, { chainId })}
-              </p>
-              <p className="text-xs text-silver">
-                You can try again or go{" "}
-                <Link href="/" className="text-chrome hover:text-white underline">
-                  Home
-                </Link>
-                .
-              </p>
+              {listingSuccess && !(createdListingIdRef.current ?? createdListingId) && (
+                <p className="text-emerald-400 text-sm">Listing created on-chain. Redirecting…</p>
+              )}
+              {(error || submitError) && (
+                <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 space-y-2">
+                  <p className="text-rose-300 text-sm">
+                    {submitError ?? getTransactionErrorMessage(error, { chainId })}
+                  </p>
+                  <p className="text-xs text-silver">
+                    You can try again or go{" "}
+                    <Link href="/" className="text-chrome hover:text-white underline">
+                      Home
+                    </Link>
+                    .
+                  </p>
+                </div>
+              )}
             </div>
-          )}
-          </div>
 
-          <aside className="lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto space-y-4">
-            <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-silver">
-              Live preview
-            </div>
-            <ListingPreviewCard
-              title={title}
-              price={price}
-              category={category}
-              condition={condition}
-              location={location.city}
-              featuredItem={featuredItem}
-              account={address}
-              requireEscrow={requireEscrow}
-            />
-            <ListingHealth
-              title={title}
-              price={price}
-              description={description}
-              hasMedia={mediaItems.length > 0}
-              hasLocation={!!location.city || (location.lat != null && location.lng != null)}
-              mediaCount={mediaItems.length}
-            />
-            <button
-              onClick={handleSubmit}
-              disabled={isPending}
-              className="w-full rounded-lg px-5 py-3 bg-chrome text-black text-sm font-bold shadow-[0_0_20px_rgba(0,255,163,0.35)] disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none"
-            >
-              {isPending ? "Confirm in wallet…" : "Publish listing →"}
-            </button>
-            <button
-              type="button"
-              onClick={saveDraft}
-              className="w-full rounded-lg border border-white/15 bg-white/5 px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-300 hover:bg-white/10"
-            >
-              {draftSaved ? "Draft saved ✓" : "Save draft"}
-            </button>
-            <p className="text-center text-[10px] text-silver/60">
-              Drafts save your details on this device — photos aren&apos;t included.
-            </p>
-            {triedSubmit && !isValid && (
-              <p className="text-xs text-rose-300">
-                {Object.values(validation).filter(Boolean).length} requirement
-                {Object.values(validation).filter(Boolean).length === 1 ? "" : "s"} left before you
-                can publish.
+            <aside className="lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto space-y-4">
+              <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-silver">
+                Live preview
+              </div>
+              <ListingPreviewCard
+                title={title}
+                price={price}
+                category={category}
+                condition={condition}
+                location={location.city}
+                featuredItem={featuredItem}
+                account={address}
+                requireEscrow={requireEscrow}
+              />
+              <ListingHealth
+                title={title}
+                price={price}
+                description={description}
+                hasMedia={mediaItems.length > 0}
+                hasLocation={!!location.city || (location.lat != null && location.lng != null)}
+                mediaCount={mediaItems.length}
+              />
+              <button
+                onClick={handleSubmit}
+                disabled={isPending}
+                className="w-full rounded-lg px-5 py-3 bg-chrome text-black text-sm font-bold shadow-[0_0_20px_rgba(0,255,163,0.35)] disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none"
+              >
+                {isPending ? "Confirm in wallet…" : "Publish listing →"}
+              </button>
+              <button
+                type="button"
+                onClick={saveDraft}
+                className="w-full rounded-lg border border-white/15 bg-white/5 px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-300 hover:bg-white/10"
+              >
+                {draftSaved ? "Draft saved ✓" : "Save draft"}
+              </button>
+              <p className="text-center text-[10px] text-silver/60">
+                Drafts save your details on this device — photos aren&apos;t included.
               </p>
-            )}
-          </aside>
+              {triedSubmit && !isValid && (
+                <p className="text-xs text-rose-300">
+                  {Object.values(validation).filter(Boolean).length} requirement
+                  {Object.values(validation).filter(Boolean).length === 1 ? "" : "s"} left before
+                  you can publish.
+                </p>
+              )}
+            </aside>
           </div>
         )}
       </div>
@@ -1017,9 +1021,7 @@ function ListingHealth({
             ✓
           </span>
           <span className={`flex-1 ${c.ok ? "text-white" : "text-silver"}`}>{c.label}</span>
-          {c.hint && (
-            <span className="font-mono text-[10px] text-amber-300">{c.hint}</span>
-          )}
+          {c.hint && <span className="font-mono text-[10px] text-amber-300">{c.hint}</span>}
         </div>
       ))}
     </div>
@@ -1034,7 +1036,6 @@ function SectionHeader({ title, sub }: { title: string; sub?: string }) {
     </div>
   );
 }
-
 
 export default function CreatePage() {
   return (

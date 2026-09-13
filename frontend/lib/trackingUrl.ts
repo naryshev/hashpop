@@ -14,7 +14,8 @@ export function carrierTrackingUrl(
   const key = (carrier ?? "").trim().toLowerCase();
   const encoded = encodeURIComponent(num);
 
-  if (key.includes("usps")) return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${encoded}`;
+  if (key.includes("usps"))
+    return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${encoded}`;
   if (key.includes("ups")) return `https://www.ups.com/track?tracknum=${encoded}`;
   if (key.includes("fedex")) return `https://www.fedex.com/fedextrack/?trknbr=${encoded}`;
   if (key.includes("dhl")) return `https://www.dhl.com/en/express/tracking.html?AWB=${encoded}`;

@@ -117,19 +117,13 @@ describe("EscrowV2", function () {
     it("releases to seller from SHIPPED", async function () {
       const id = await createEscrow();
       await escrow.connect(seller).markShipped(id);
-      await expect(escrow.connect(buyer).confirmReceipt(id)).to.changeEtherBalance(
-        seller,
-        AMOUNT,
-      );
+      await expect(escrow.connect(buyer).confirmReceipt(id)).to.changeEtherBalance(seller, AMOUNT);
       expect((await escrow.escrows(id)).state).to.equal(2); // COMPLETE
     });
 
     it("releases from AWAITING_SHIPMENT too (local pickup, no tracking)", async function () {
       const id = await createEscrow();
-      await expect(escrow.connect(buyer).confirmReceipt(id)).to.changeEtherBalance(
-        seller,
-        AMOUNT,
-      );
+      await expect(escrow.connect(buyer).confirmReceipt(id)).to.changeEtherBalance(seller, AMOUNT);
     });
 
     it("only the buyer; never twice", async function () {
@@ -174,10 +168,7 @@ describe("EscrowV2", function () {
       const id = await createEscrow();
       await expect(escrow.connect(rando).resolveTimeout(id)).to.be.revertedWith("Not timed out");
       await time.increase(7 * DAY + 1);
-      await expect(escrow.connect(rando).resolveTimeout(id)).to.changeEtherBalance(
-        buyer,
-        AMOUNT,
-      );
+      await expect(escrow.connect(rando).resolveTimeout(id)).to.changeEtherBalance(buyer, AMOUNT);
       expect((await escrow.escrows(id)).state).to.equal(3); // REFUNDED
     });
 
@@ -186,10 +177,7 @@ describe("EscrowV2", function () {
       await escrow.connect(seller).markShipped(id);
       await expect(escrow.connect(rando).resolveTimeout(id)).to.be.revertedWith("Not timed out");
       await time.increase(14 * DAY + 1);
-      await expect(escrow.connect(rando).resolveTimeout(id)).to.changeEtherBalance(
-        seller,
-        AMOUNT,
-      );
+      await expect(escrow.connect(rando).resolveTimeout(id)).to.changeEtherBalance(seller, AMOUNT);
       expect((await escrow.escrows(id)).state).to.equal(2); // COMPLETE
     });
 
@@ -207,9 +195,7 @@ describe("EscrowV2", function () {
       const id = await createEscrow();
       await escrow.connect(arbiter).setDisputed(id, true);
       await time.increase(8 * DAY);
-      await expect(escrow.connect(rando).resolveTimeout(id)).to.be.revertedWith(
-        "Dispute pending",
-      );
+      await expect(escrow.connect(rando).resolveTimeout(id)).to.be.revertedWith("Dispute pending");
       // Arbiter resolves in the buyer's favor.
       await expect(escrow.connect(arbiter).refund(id)).to.changeEtherBalance(buyer, AMOUNT);
     });
@@ -219,10 +205,7 @@ describe("EscrowV2", function () {
       await escrow.connect(seller).markShipped(id);
       await escrow.connect(arbiter).setDisputed(id, true);
       await time.increase(90 * DAY + 1);
-      await expect(escrow.connect(rando).resolveTimeout(id)).to.changeEtherBalance(
-        buyer,
-        AMOUNT,
-      );
+      await expect(escrow.connect(rando).resolveTimeout(id)).to.changeEtherBalance(buyer, AMOUNT);
     });
 
     it("only the arbiter can set disputes; unfreezing restores timeouts", async function () {
@@ -231,19 +214,13 @@ describe("EscrowV2", function () {
       await escrow.connect(arbiter).setDisputed(id, true);
       await escrow.connect(arbiter).setDisputed(id, false);
       await time.increase(7 * DAY + 1);
-      await expect(escrow.connect(rando).resolveTimeout(id)).to.changeEtherBalance(
-        buyer,
-        AMOUNT,
-      );
+      await expect(escrow.connect(rando).resolveTimeout(id)).to.changeEtherBalance(buyer, AMOUNT);
     });
 
     it("buyer can still self-release while disputed", async function () {
       const id = await createEscrow();
       await escrow.connect(arbiter).setDisputed(id, true);
-      await expect(escrow.connect(buyer).confirmReceipt(id)).to.changeEtherBalance(
-        seller,
-        AMOUNT,
-      );
+      await expect(escrow.connect(buyer).confirmReceipt(id)).to.changeEtherBalance(seller, AMOUNT);
     });
   });
 
@@ -265,8 +242,7 @@ describe("EscrowV2", function () {
       await expect(escrow.setWindows(3 * DAY, 10 * DAY, 10 * DAY)).to.be.revertedWith(
         "hardTimeout out of bounds",
       );
-      await expect(escrow.connect(rando).setWindows(3 * DAY, 10 * DAY, 60 * DAY)).to.be
-        .reverted;
+      await expect(escrow.connect(rando).setWindows(3 * DAY, 10 * DAY, 60 * DAY)).to.be.reverted;
     });
   });
 });

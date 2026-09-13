@@ -121,7 +121,8 @@ export function consensusToDate(ts: string | undefined | null): Date | null {
 /** Tinybar → "X.YYYYYYYY" HBAR (no padding zeros). */
 export function tinybarToHbar(tinybar: number | string | null | undefined): string {
   if (tinybar == null) return "0";
-  const n = typeof tinybar === "string" ? BigInt(tinybar) : BigInt(Math.abs(Math.trunc(Number(tinybar))));
+  const n =
+    typeof tinybar === "string" ? BigInt(tinybar) : BigInt(Math.abs(Math.trunc(Number(tinybar))));
   const sign = typeof tinybar === "number" && tinybar < 0 ? "-" : "";
   const div = 10n ** 8n;
   const whole = n / div;

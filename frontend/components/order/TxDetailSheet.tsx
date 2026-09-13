@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { HP } from "./tokens";
+import { X } from "lucide-react";
+import { Sheet } from "@/components/ui/Sheet";
+import { Capsule } from "@/components/ui/Capsule";
+import { listingCta, material } from "@/lib/materials";
+import { cn } from "@/lib/utils";
 import {
   consensusToDate,
   fetchMirrorContractResult,
@@ -11,7 +15,7 @@ import {
   tinybarToHbar,
 } from "@/lib/mirrorTx";
 
-type Sheet = {
+type SheetProps = {
   open: boolean;
   txId: string | null;
   hashscanHref?: string | null;
@@ -28,13 +32,12 @@ function evmToAccountDisplay(evm: string): string {
   if (!m) return evm;
   const hex = m[1];
   if (!hex.slice(0, 24).match(/^0+$/)) {
-    // Alias-form address (not long-zero) — shorten rather than dump 40 chars.
     return `${evm.slice(0, 6)}…${evm.slice(-4)}`;
   }
   return `0.0.${BigInt(`0x${hex.slice(24)}`).toString()}`;
 }
 
-export function TxDetailSheet({ open, txId, hashscanHref, onClose }: Sheet) {
+export function TxDetailSheet({ open, txId, hashscanHref, onClose }: SheetProps) {
   const [tx, setTx] = useState<MirrorTransaction | null>(null);
   const [cc, setCc] = useState<MirrorContractResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -68,255 +71,136 @@ export function TxDetailSheet({ open, txId, hashscanHref, onClose }: Sheet) {
     return () => ac.abort();
   }, [open, txId]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  if (!open || !txId) return null;
-
   const consensus = consensusToDate(tx?.consensus_timestamp);
   const status = (cc?.result ?? tx?.result ?? "").toUpperCase();
   const isSuccess = status === "SUCCESS";
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="tx-sheet-title"
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(4,6,12,0.72)",
-        backdropFilter: "blur(6px)",
-        WebkitBackdropFilter: "blur(6px)",
-        zIndex: 60,
-        display: "flex",
-        alignItems: "flex-end",
-        justifyContent: "center",
-        padding: 0,
-      }}
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "100%",
-          maxWidth: 480,
-          maxHeight: "88vh",
-          overflow: "auto",
-          background: "#10161f",
-          border: "1px solid rgba(255,255,255,0.1)",
-          borderRadius: "24px 24px 0 0",
-          padding: "16px 20px 24px",
-          color: HP.fg,
-          display: "flex",
-          flexDirection: "column",
-          gap: 14,
-          boxShadow: "0 -12px 40px rgba(0,0,0,0.5)",
-        }}
-      >
-        {/* Drag handle */}
-        <div
-          aria-hidden
-          style={{
-            width: 36,
-            height: 4,
-            borderRadius: 4,
-            background: "rgba(255,255,255,0.18)",
-            margin: "0 auto 4px",
-          }}
-        />
-
-        <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-          <div id="tx-sheet-title" style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.16em", color: HP.muted, textTransform: "uppercase" }}>
-            Transaction
-          </div>
-          {status && (
-            <span
-              style={{
-                fontSize: 10,
-                fontWeight: 800,
-                letterSpacing: "0.08em",
-                padding: "3px 10px",
-                borderRadius: 9999,
-                background: isSuccess ? HP.chrome : HP.rose,
-                color: isSuccess ? "#052018" : "#fff",
-              }}
-            >
-              {status}
-            </span>
-          )}
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            style={{
-              marginLeft: "auto",
-              width: 28,
-              height: 28,
-              borderRadius: 9999,
-              border: "1px solid rgba(255,255,255,0.1)",
-              background: "rgba(255,255,255,0.04)",
-              color: HP.fg,
-              cursor: "pointer",
-              fontSize: 14,
-              lineHeight: 1,
-            }}
-          >
-            ×
-          </button>
-        </div>
-
-        <div
-          style={{
-            fontFamily: "ui-monospace,Menlo,monospace",
-            fontSize: 12,
-            color: HP.fg,
-            wordBreak: "break-all",
-            lineHeight: 1.45,
-          }}
+    <Sheet
+      open={open && !!txId}
+      onClose={onClose}
+      detent="large"
+      title="Transaction"
+      ariaLabel="Transaction"
+      trailing={
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-white/10 hover:text-fg"
         >
-          {txId}
-        </div>
-
-        {loading && <Loading />}
-        {error && (
-          <div style={{ fontSize: 12, color: "#fda4af" }}>
-            {error}
-            {hashscanHref ? (
-              <>
-                {" "}
-                <a href={hashscanHref} target="_blank" rel="noreferrer" style={{ color: HP.chrome }}>
-                  Open on HashScan ↗
-                </a>
-              </>
-            ) : null}
-          </div>
-        )}
-
-        {!loading && (tx || cc) && (
-          <>
-            <Section title="Summary">
-              <KV label="Type" value={tx?.name ? friendlyType(tx.name) : cc ? "Contract call" : "—"} />
-              <KV
-                label="Consensus at"
-                value={consensus ? consensus.toLocaleString() : "—"}
-              />
-              <KV label="Block" value={cc?.block_number != null ? `#${cc.block_number}` : "—"} />
-              <KV label="Node" value={tx?.node ?? "—"} />
-              {tx?.transaction_hash && (
-                <KV label="Hash" value={tx.transaction_hash} mono wrap />
-              )}
-            </Section>
-
-            {cc && (
-              <Section title="Contract">
-                <KV label="Contract" value={cc.contract_id ?? "—"} mono />
-                <KV
-                  label="Gas used"
-                  value={
-                    cc.gas_used != null
-                      ? `${cc.gas_used.toLocaleString()}${cc.gas_limit ? ` / ${cc.gas_limit.toLocaleString()}` : ""}`
-                      : "—"
-                  }
-                />
-                {cc.from && <KV label="From" value={evmToAccountDisplay(cc.from)} mono />}
-                {cc.to && <KV label="To" value={evmToAccountDisplay(cc.to)} mono />}
-              </Section>
-            )}
-
-            <Section title="Fees">
-              <KV
-                label="Charged"
-                value={tx?.charged_tx_fee != null ? `${tinybarToHbar(tx.charged_tx_fee)} ℏ` : "—"}
-              />
-              <KV
-                label="Max fee"
-                value={tx?.max_fee ? `${tinybarToHbar(tx.max_fee)} ℏ` : "—"}
-              />
-              <KV
-                label="Valid duration"
-                value={tx?.valid_duration_seconds ? `${tx.valid_duration_seconds}s` : "—"}
-              />
-            </Section>
-
-            {tx?.transfers && tx.transfers.length > 0 && (
-              <Section title="Transfers">
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {tx.transfers.map((t, i) => (
-                    <div
-                      key={`${t.account}-${i}`}
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        fontSize: 12,
-                        gap: 8,
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontFamily: "ui-monospace,Menlo,monospace",
-                          color: HP.fg,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {t.account}
-                      </span>
-                      <span
-                        style={{
-                          color: t.amount < 0 ? "#fda4af" : HP.chrome,
-                          fontFamily: "ui-monospace,Menlo,monospace",
-                          flexShrink: 0,
-                        }}
-                      >
-                        {t.amount > 0 ? "+" : ""}
-                        {tinybarToHbar(t.amount)} ℏ
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </Section>
-            )}
-          </>
-        )}
-
-        {!loading && !tx && !cc && !error && (
-          <div style={{ fontSize: 12, color: HP.muted }}>
-            Mirror node hasn&apos;t indexed this transaction yet. Try again in a few seconds.
-          </div>
-        )}
-
-        {hashscanHref && (
+          <X size={18} />
+        </button>
+      }
+      footer={
+        hashscanHref ? (
           <a
             href={hashscanHref}
             target="_blank"
             rel="noreferrer"
-            style={{
-              fontSize: 13,
-              fontWeight: 800,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              color: HP.chrome,
-              textAlign: "center",
-              textDecoration: "none",
-              padding: "12px 16px",
-              borderRadius: 12,
-              border: "1px solid rgba(255,255,255,0.1)",
-              background: "#121a29",
-            }}
+            className={cn(listingCta.tinted, "no-underline")}
           >
             View on HashScan ↗
           </a>
-        )}
-      </div>
-    </div>
+        ) : undefined
+      }
+    >
+      {status && (
+        <div className="mb-3">
+          <Capsule tone={isSuccess ? "mint" : "danger"}>{isSuccess ? "Success" : "Failed"}</Capsule>
+        </div>
+      )}
+
+      {txId && <p className="break-all font-mono text-xs leading-snug text-fg">{txId}</p>}
+
+      {loading && <Loading />}
+      {error && (
+        <p className="text-xs text-rose-300">
+          {error}
+          {hashscanHref ? (
+            <>
+              {" "}
+              <a href={hashscanHref} target="_blank" rel="noreferrer" className="text-chrome">
+                Open on HashScan ↗
+              </a>
+            </>
+          ) : null}
+        </p>
+      )}
+
+      {!loading && (tx || cc) && (
+        <>
+          <Section title="Summary">
+            <KV
+              label="Type"
+              value={tx?.name ? friendlyType(tx.name) : cc ? "Contract call" : "—"}
+            />
+            <KV label="Consensus at" value={consensus ? consensus.toLocaleString() : "—"} />
+            <KV label="Block" value={cc?.block_number != null ? `#${cc.block_number}` : "—"} />
+            <KV label="Node" value={tx?.node ?? "—"} />
+            {tx?.transaction_hash && <KV label="Hash" value={tx.transaction_hash} mono wrap />}
+          </Section>
+
+          {cc && (
+            <Section title="Contract">
+              <KV label="Contract" value={cc.contract_id ?? "—"} mono />
+              <KV
+                label="Gas used"
+                value={
+                  cc.gas_used != null
+                    ? `${cc.gas_used.toLocaleString()}${cc.gas_limit ? ` / ${cc.gas_limit.toLocaleString()}` : ""}`
+                    : "—"
+                }
+              />
+              {cc.from && <KV label="From" value={evmToAccountDisplay(cc.from)} mono />}
+              {cc.to && <KV label="To" value={evmToAccountDisplay(cc.to)} mono />}
+            </Section>
+          )}
+
+          <Section title="Fees">
+            <KV
+              label="Charged"
+              value={tx?.charged_tx_fee != null ? `${tinybarToHbar(tx.charged_tx_fee)} ℏ` : "—"}
+            />
+            <KV label="Max fee" value={tx?.max_fee ? `${tinybarToHbar(tx.max_fee)} ℏ` : "—"} />
+            <KV
+              label="Valid duration"
+              value={tx?.valid_duration_seconds ? `${tx.valid_duration_seconds}s` : "—"}
+            />
+          </Section>
+
+          {tx?.transfers && tx.transfers.length > 0 && (
+            <Section title="Transfers">
+              <div className="flex flex-col gap-1.5">
+                {tx.transfers.map((t, i) => (
+                  <div
+                    key={`${t.account}-${i}`}
+                    className="flex items-center justify-between gap-2 text-xs"
+                  >
+                    <span className="truncate font-mono text-fg">{t.account}</span>
+                    <span
+                      className={cn(
+                        "shrink-0 font-mono",
+                        t.amount < 0 ? "text-rose-300" : "text-chrome",
+                      )}
+                    >
+                      {t.amount > 0 ? "+" : ""}
+                      {tinybarToHbar(t.amount)} ℏ
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </Section>
+          )}
+        </>
+      )}
+
+      {!loading && !tx && !cc && !error && (
+        <p className="text-xs text-muted">
+          Mirror node hasn&apos;t indexed this transaction yet. Try again in a few seconds.
+        </p>
+      )}
+    </Sheet>
   );
 }
 
@@ -329,28 +213,8 @@ function friendlyType(name: string): string {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div
-      style={{
-        padding: 12,
-        borderRadius: 12,
-        border: `1px solid ${HP.borderSoft}`,
-        background: "rgba(255,255,255,0.03)",
-        display: "flex",
-        flexDirection: "column",
-        gap: 8,
-      }}
-    >
-      <div
-        style={{
-          fontSize: 10,
-          fontWeight: 700,
-          color: HP.muted,
-          letterSpacing: "0.12em",
-          textTransform: "uppercase",
-        }}
-      >
-        {title}
-      </div>
+    <div className={cn(material.regular, "mt-3 flex flex-col gap-2 rounded-control p-3")}>
+      <div className="text-[10px] font-bold text-muted">{title}</div>
       {children}
     </div>
   );
@@ -369,24 +233,10 @@ function KV({
 }) {
   return (
     <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        gap: 12,
-        fontSize: 12,
-        alignItems: wrap ? "flex-start" : "center",
-      }}
+      className={cn("flex justify-between gap-3 text-xs", wrap ? "items-start" : "items-center")}
     >
-      <span style={{ color: HP.muted, flexShrink: 0 }}>{label}</span>
-      <span
-        style={{
-          color: HP.fg,
-          textAlign: "right",
-          fontFamily: mono ? "ui-monospace,Menlo,monospace" : "system-ui",
-          wordBreak: wrap ? "break-all" : undefined,
-          minWidth: 0,
-        }}
-      >
+      <span className="shrink-0 text-muted">{label}</span>
+      <span className={cn("min-w-0 text-right text-fg", mono && "font-mono", wrap && "break-all")}>
         {value}
       </span>
     </div>
@@ -395,24 +245,8 @@ function KV({
 
 function Loading() {
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        fontSize: 12,
-        color: HP.muted,
-      }}
-    >
-      <span
-        style={{
-          width: 10,
-          height: 10,
-          borderRadius: 9999,
-          background: HP.chrome,
-          animation: "hp-pulse 1.2s ease-in-out infinite",
-        }}
-      />
+    <div className="flex items-center gap-2 text-xs text-muted">
+      <span className="h-2.5 w-2.5 animate-[hp-pulse_1.2s_ease-in-out_infinite] rounded-full bg-chrome" />
       Loading on-chain details…
     </div>
   );

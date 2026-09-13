@@ -20,8 +20,7 @@ export function MobileTopBar({ className = "" }: { className?: string }) {
   const hasUnseen = useUnseenActivity();
   const [profileOpen, setProfileOpen] = useState(false);
 
-  const walletLabel =
-    accountId ?? (address ? `${address.slice(0, 6)}…${address.slice(-4)}` : null);
+  const walletLabel = accountId ?? (address ? `${address.slice(0, 6)}…${address.slice(-4)}` : null);
 
   return (
     <>

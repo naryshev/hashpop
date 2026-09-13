@@ -171,9 +171,7 @@ async function reconcileUnconfirmedListings(
     orderBy: { createdAt: "asc" },
   });
   confirmedRecheckCursor =
-    recheck.length === CONFIRMED_RECHECK_BATCH
-      ? recheck[recheck.length - 1]!.createdAt
-      : null; // partial page — wrapped; restart from the oldest next pass
+    recheck.length === CONFIRMED_RECHECK_BATCH ? recheck[recheck.length - 1]!.createdAt : null; // partial page — wrapped; restart from the oldest next pass
 
   if (unconfirmed.length === 0 && recheck.length === 0) return;
 

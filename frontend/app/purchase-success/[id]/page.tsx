@@ -141,10 +141,10 @@ export default function PurchaseSuccessPage() {
             What happens next
           </p>
           <p className="text-sm text-silver leading-relaxed">
-            <span className="font-semibold text-white">Your payment is secured in escrow.</span>{" "}
-            The seller has a week to ship — if they don&apos;t, you&apos;re refunded
-            automatically. Once shipped, the seller is paid after a short window unless you
-            report a problem. You never need to do anything unless something goes wrong.
+            <span className="font-semibold text-white">Your payment is secured in escrow.</span> The
+            seller has a week to ship — if they don&apos;t, you&apos;re refunded automatically. Once
+            shipped, the seller is paid after a short window unless you report a problem. You never
+            need to do anything unless something goes wrong.
           </p>
         </div>
 

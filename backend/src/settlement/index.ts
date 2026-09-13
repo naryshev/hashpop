@@ -75,11 +75,7 @@ export function startSettlementEngine(prisma: PrismaClient, log: Logger): void {
   const escrowAddr = process.env.ESCROW_ADDRESS;
   const rpcUrl = process.env.HEDERA_RPC_URL;
   const isV2 = process.env.ESCROW_V2 === "true";
-  const signerKeyRaw = (
-    process.env.ESCROW_ARBITER_KEY ||
-    process.env.SETTLEMENT_KEY ||
-    ""
-  ).trim();
+  const signerKeyRaw = (process.env.ESCROW_ARBITER_KEY || process.env.SETTLEMENT_KEY || "").trim();
   const intervalMs = Math.max(15_000, Number(process.env.SETTLEMENT_INTERVAL_MS || 60_000));
 
   if (!escrowAddr || !rpcUrl) {
@@ -105,7 +101,12 @@ export function startSettlementEngine(prisma: PrismaClient, log: Logger): void {
   const escrow = new ethers.Contract(escrowAddr, isV2 ? ESCROW_V2_ABI : ESCROW_V1_ABI, signer);
 
   log.info(
-    { escrowAddr, mode: isV2 ? "v2 (arbiter)" : "v1 (timeout keeper)", signer: signer.address, intervalMs },
+    {
+      escrowAddr,
+      mode: isV2 ? "v2 (arbiter)" : "v1 (timeout keeper)",
+      signer: signer.address,
+      intervalMs,
+    },
     "Settlement engine started",
   );
 

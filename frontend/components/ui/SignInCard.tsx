@@ -82,16 +82,11 @@ export function SignInCard({ onConnected, className }: SignInCardProps) {
       {/* Welcome header + trust checklist above the CTA, per the demo video. */}
       <div className="mb-5 text-center">
         <h2 className="text-xl font-extrabold tracking-tight text-white">Welcome to Hashpop</h2>
-        <p className="mt-1 text-sm text-silver">
-          Verifiable trade of physical and digital goods.
-        </p>
+        <p className="mt-1 text-sm text-silver">Verifiable trade of physical and digital goods.</p>
       </div>
 
       <div className="mb-6 space-y-3.5">
-        <Feature
-          title="Trade trusted listings"
-          detail="Transparent on-chain records."
-        />
+        <Feature title="Trade trusted listings" detail="Transparent on-chain records." />
         <Feature
           title="Secure wallet-first sign in"
           detail="No passwords — authenticate with HashPack."

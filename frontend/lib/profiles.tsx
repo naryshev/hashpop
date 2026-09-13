@@ -112,7 +112,9 @@ export function useProfile(address: string | null | undefined): PublicProfile | 
 }
 
 /** Resolve many addresses at once; returns the current cache keyed by address. */
-export function useProfiles(addresses: (string | null | undefined)[]): Record<string, PublicProfile> {
+export function useProfiles(
+  addresses: (string | null | undefined)[],
+): Record<string, PublicProfile> {
   const { cache, request } = useProfilesContext();
   const key = addresses.map(normalize).filter(Boolean).sort().join(",");
   useEffect(() => {

@@ -169,13 +169,7 @@ export const CATEGORY_GROUPS: { group: string; categories: string[] }[] = [
   },
   {
     group: "Media",
-    categories: [
-      "Books",
-      "Vinyl & Music",
-      "Movies & TV",
-      "Video Games",
-      "Magazines & Paper Media",
-    ],
+    categories: ["Books", "Vinyl & Music", "Movies & TV", "Video Games", "Magazines & Paper Media"],
   },
   {
     group: "Sports & Outdoors",

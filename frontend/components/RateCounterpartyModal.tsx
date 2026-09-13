@@ -49,9 +49,11 @@ export function RateCounterpartyModal({
       const reviewer = address.toLowerCase();
       const rated = ratedAddress.toLowerCase();
       const message = `hashpop.rate:${saleId}:${rated}:${score}`;
-      const signResult = await (hashconnect as unknown as {
-        signMessages: (accountId: string, messages: string[]) => Promise<unknown>;
-      }).signMessages(accountId, [message]);
+      const signResult = await (
+        hashconnect as unknown as {
+          signMessages: (accountId: string, messages: string[]) => Promise<unknown>;
+        }
+      ).signMessages(accountId, [message]);
       const signature = Array.isArray(signResult)
         ? (signResult[0] as string)
         : ((signResult as { signedMessages?: string[] })?.signedMessages?.[0] ??

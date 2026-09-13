@@ -14,12 +14,7 @@ import { ConnectWalletButton } from "../../components/ConnectWalletButton";
 import { RateCounterpartyModal } from "../../components/RateCounterpartyModal";
 import { OpenDisputeModal } from "../../components/OpenDisputeModal";
 import { carrierTrackingUrl } from "../../lib/trackingUrl";
-import {
-  EscrowView,
-  orderStatusLine,
-  phaseFor,
-  type OrderPhase,
-} from "../../lib/orderStatus";
+import { EscrowView, orderStatusLine, phaseFor, type OrderPhase } from "../../lib/orderStatus";
 
 type PurchaseRow = {
   id: string;
@@ -500,9 +495,7 @@ export default function PurchasesPage() {
           listingTitle={dispute.title}
           openerAddress={address}
           onClose={() => setDispute(null)}
-          onOpened={() =>
-            setDisputedIds((prev) => new Set(prev).add(dispute.listingId))
-          }
+          onOpened={() => setDisputedIds((prev) => new Set(prev).add(dispute.listingId))}
         />
       )}
     </main>

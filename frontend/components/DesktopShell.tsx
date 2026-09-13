@@ -144,7 +144,11 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
         ? [
             { label: "Offers", href: "/offers", icon: <Tag className="h-5 w-5" /> },
             { label: "Purchases", href: "/purchases", icon: <Receipt className="h-5 w-5" /> },
-            { label: "Sold", href: "/purchases?tab=sold", icon: <PackageCheck className="h-5 w-5" /> },
+            {
+              label: "Sold",
+              href: "/purchases?tab=sold",
+              icon: <PackageCheck className="h-5 w-5" />,
+            },
             { label: "Watchlist", href: "/watchlist", icon: <Heart className="h-5 w-5" /> },
             {
               label: "Messages",
@@ -165,7 +169,14 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
   // switches while the content still eases in. Shown on the top-level
   // navigation pages; focused screens (listing, order, activity…) keep
   // their own back-button chrome.
-  const MOBILE_HEADER_ROUTES = ["/marketplace", "/cart", "/messages", "/purchases", "/offers", "/create"];
+  const MOBILE_HEADER_ROUTES = [
+    "/marketplace",
+    "/cart",
+    "/messages",
+    "/purchases",
+    "/offers",
+    "/create",
+  ];
   const showMobileHeader = MOBILE_HEADER_ROUTES.includes(pathname);
   // Full-screen surfaces (open message thread) hide all chrome.
   const [immersive, setImmersive] = useState(false);
@@ -245,7 +256,11 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
 
         {/* Right cluster: page actions slot, alerts, account chip. */}
         <div className="flex items-center gap-2">
-          <div ref={actionsSlotRef} className="flex items-center gap-2" data-topbar-slot="actions" />
+          <div
+            ref={actionsSlotRef}
+            className="flex items-center gap-2"
+            data-topbar-slot="actions"
+          />
           <Link
             href="/cart"
             className="relative flex h-9 w-9 items-center justify-center rounded-glass text-neutral-300 hover:bg-white/5 hover:text-white"

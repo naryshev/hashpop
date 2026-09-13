@@ -20,7 +20,10 @@ async function loadInitialMarketplaceListings(): Promise<{
     const [listingsRes, countsRes] = await Promise.all([
       // Bound the SSR fetch so a slow backend can't stall the whole page's
       // TTFB — on timeout the client refetches after hydration instead.
-      fetch(`${getApiUrl()}/api/listings`, { cache: "no-store", signal: AbortSignal.timeout(3500) }),
+      fetch(`${getApiUrl()}/api/listings`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(3500),
+      }),
       fetch(`${getApiUrl()}/api/wishlist/counts`, {
         cache: "no-store",
         signal: AbortSignal.timeout(3500),
@@ -39,7 +42,7 @@ async function loadInitialMarketplaceListings(): Promise<{
     }
     const data = (await listingsRes.json()) as { listings?: ListingItem[] };
     const counts: Record<string, number> = countsRes.ok
-      ? ((await countsRes.json()) as { counts?: Record<string, number> }).counts ?? {}
+      ? (((await countsRes.json()) as { counts?: Record<string, number> }).counts ?? {})
       : {};
     const list = (data.listings || []).map((l) => ({
       ...l,

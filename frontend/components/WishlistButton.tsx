@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useHashpackWallet } from "../lib/hashpackWallet";
 
 import { getApiUrl } from "../lib/apiUrl";
+import { material } from "../lib/materials";
+import { cn } from "../lib/utils";
 
 type WishlistButtonProps = {
   itemId: string;
@@ -64,7 +66,13 @@ export function WishlistButton({
         type="button"
         onClick={toggle}
         disabled={!address || loading}
-        className={`w-10 h-10 rounded-full flex items-center justify-center text-white shrink-0 ${inWishlist ? "bg-emerald-600/90" : "bg-black/60 hover:bg-black/80"} ${className}`}
+        className={cn(
+          "flex h-11 w-11 shrink-0 items-center justify-center rounded-full",
+          inWishlist
+            ? "bg-chrome text-[#04150f]"
+            : cn(material.thick, "border border-hairline text-white hover:border-white/30"),
+          className,
+        )}
         aria-label={inWishlist ? "In wishlist" : "Add to wishlist"}
       >
         {inWishlist ? "✓" : "♡"}

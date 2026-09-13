@@ -187,18 +187,67 @@ export function ShippingAddressModal({
         </p>
 
         <div className="space-y-2.5">
-          <input value={fields.name} onChange={set("name")} placeholder="Full name *" className={input} autoComplete="name" />
-          <input value={fields.line1} onChange={set("line1")} placeholder="Street address *" className={input} autoComplete="address-line1" />
-          <input value={fields.line2} onChange={set("line2")} placeholder="Apt, suite, unit (optional)" className={input} autoComplete="address-line2" />
+          <input
+            value={fields.name}
+            onChange={set("name")}
+            placeholder="Full name *"
+            className={input}
+            autoComplete="name"
+          />
+          <input
+            value={fields.line1}
+            onChange={set("line1")}
+            placeholder="Street address *"
+            className={input}
+            autoComplete="address-line1"
+          />
+          <input
+            value={fields.line2}
+            onChange={set("line2")}
+            placeholder="Apt, suite, unit (optional)"
+            className={input}
+            autoComplete="address-line2"
+          />
           <div className="grid grid-cols-2 gap-2.5">
-            <input value={fields.city} onChange={set("city")} placeholder="City *" className={input} autoComplete="address-level2" />
-            <input value={fields.region} onChange={set("region")} placeholder="State / region" className={input} autoComplete="address-level1" />
+            <input
+              value={fields.city}
+              onChange={set("city")}
+              placeholder="City *"
+              className={input}
+              autoComplete="address-level2"
+            />
+            <input
+              value={fields.region}
+              onChange={set("region")}
+              placeholder="State / region"
+              className={input}
+              autoComplete="address-level1"
+            />
           </div>
           <div className="grid grid-cols-2 gap-2.5">
-            <input value={fields.postalCode} onChange={set("postalCode")} placeholder="Postal / ZIP *" className={input} autoComplete="postal-code" />
-            <input value={fields.country} onChange={set("country")} placeholder="Country (US) *" maxLength={2} className={input} autoComplete="country" />
+            <input
+              value={fields.postalCode}
+              onChange={set("postalCode")}
+              placeholder="Postal / ZIP *"
+              className={input}
+              autoComplete="postal-code"
+            />
+            <input
+              value={fields.country}
+              onChange={set("country")}
+              placeholder="Country (US) *"
+              maxLength={2}
+              className={input}
+              autoComplete="country"
+            />
           </div>
-          <input value={fields.phone} onChange={set("phone")} placeholder="Phone (optional, for the carrier)" className={input} autoComplete="tel" />
+          <input
+            value={fields.phone}
+            onChange={set("phone")}
+            placeholder="Phone (optional, for the carrier)"
+            className={input}
+            autoComplete="tel"
+          />
         </div>
 
         {error && <p className="mt-3 text-xs text-rose-300">{error}</p>}

@@ -158,7 +158,9 @@ export function ProfileContent({
   const publicProfile = useProfile(address ?? null);
   const fallbackAvatar = profileAvatarUrl(publicProfile);
   const fallbackName = profileDisplayName(publicProfile);
-  const stagedAvatar = editing ? draft?.avatarUrl?.trim() || null : profile?.avatarUrl?.trim() || null;
+  const stagedAvatar = editing
+    ? draft?.avatarUrl?.trim() || null
+    : profile?.avatarUrl?.trim() || null;
   const avatarUrl = stagedAvatar ?? fallbackAvatar;
   // Heading = HashPack wallet username, else the account id. The grey
   // subline always shows the account id, so it's only rendered when the
@@ -233,9 +235,7 @@ export function ProfileContent({
           <div className="glass-card p-6 space-y-4 rounded-xl">
             <div>
               <p className="text-sm text-silver">Reputation Score</p>
-              <p className="text-3xl font-semibold text-chrome mt-1">
-                {stats.reputation ?? "N/A"}
-              </p>
+              <p className="text-3xl font-semibold text-chrome mt-1">{stats.reputation ?? "N/A"}</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -294,7 +294,9 @@ export function ProfileContent({
               </div>
               <div>
                 <p className="text-xs uppercase tracking-wide text-silver">Bio</p>
-                <p className="text-white mt-0.5 whitespace-pre-wrap">{profile?.bio?.trim() || "—"}</p>
+                <p className="text-white mt-0.5 whitespace-pre-wrap">
+                  {profile?.bio?.trim() || "—"}
+                </p>
               </div>
             </>
           ) : (
@@ -359,9 +361,7 @@ export function ProfileContent({
             </div>
           )}
         </div>
-
       </div>
     </main>
   );
 }
-
