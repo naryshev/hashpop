@@ -1,17 +1,23 @@
 import "./globals.css";
 import { ClientProviders } from "../components/ClientProviders";
 import { BootSplash } from "../components/BootSplash";
+import { CookieNotice } from "../components/CookieNotice";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
 import type { Metadata, Viewport } from "next";
 
 export const metadata: Metadata = {
-  title: "Hashpop",
+  // Per-route titles slot into the template ("Cart · Hashpop"); routes
+  // without their own metadata fall back to the default.
+  title: {
+    default: "Hashpop — Hedera Marketplace",
+    template: "%s · Hashpop",
+  },
   description: "Buy and sell on the Hedera network with Hashpop - The community marketplace.",
   icons: {
     icon: "/hashpop-cart-3d.PNG",
     shortcut: "/hashpop-cart-3d.PNG",
-    apple: "/hashpop-cart-3d.PNG",
+    apple: "/icon-192.png",
   },
   manifest: "/manifest.json",
   metadataBase: new URL("https://hashpop.io"),
@@ -72,6 +78,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: BOOT_ERROR_CATCHER }} />
         <BootSplash />
         <ClientProviders>{children}</ClientProviders>
+        <CookieNotice />
         <SpeedInsights />
         <Analytics />
       </body>
