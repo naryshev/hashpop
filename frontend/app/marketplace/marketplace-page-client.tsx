@@ -17,7 +17,7 @@ import { useSignInModal } from "../../lib/signInModal";
 import { getApiUrl } from "../../lib/apiUrl";
 import { useProfile, useProfiles } from "../../lib/profiles";
 import { TopBarSlot } from "../../lib/topBar";
-import { material } from "../../lib/materials";
+import { listingCta, material } from "../../lib/materials";
 import { cn } from "../../lib/utils";
 import { ChevronDown, Search as SearchIcon, SlidersHorizontal } from "lucide-react";
 
@@ -912,8 +912,8 @@ export default function MarketplacePageClient({
                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
                           </div>
                           <div className="absolute left-6 top-6">
-                            <span className="rounded-full bg-[#00ffa3] text-black text-[10px] font-bold tracking-widest px-3 py-1">
-                              EDITOR&apos;S PICK
+                            <span className="rounded-full bg-chrome px-3 py-1 text-[10px] font-bold text-on-chrome">
+                              Editor&apos;s pick
                             </span>
                           </div>
                           <div className="absolute left-6 right-6 bottom-6 max-w-2xl">
@@ -926,7 +926,7 @@ export default function MarketplacePageClient({
                               </p>
                             )}
                             <div className="mt-4 flex items-center gap-3 flex-wrap">
-                              <span className="rounded-glass btn-frost-cta px-4 py-2 text-sm">
+                              <span className={cn(listingCta.filled, "w-auto px-5")}>
                                 Buy for{" "}
                                 {formatHbarWithUsd(
                                   formatPriceForDisplay(hero.price || "0"),
