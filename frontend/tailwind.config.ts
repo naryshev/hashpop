@@ -22,7 +22,18 @@ const config: Config = {
         glow: "rgba(0, 255, 163, 0.2)",
         "glow-strong": "rgba(0, 255, 163, 0.35)",
         silver: "#a9b0bf",
-        chrome: "#00ffa3",
+        chrome: {
+          DEFAULT: "var(--color-chrome)",
+          deep: "var(--color-chrome-deep)",
+          bright: "var(--color-chrome-bright)",
+        },
+        bg: "var(--color-bg)",
+        fg: "var(--color-fg)",
+        muted: "var(--color-muted)",
+        danger: "var(--color-danger)",
+        warning: "var(--color-warning)",
+        "on-chrome": "var(--color-on-chrome)",
+        "on-warning": "var(--color-on-warning)",
         material: {
           regular: "var(--material-regular)",
           thick: "var(--material-thick)",
@@ -34,6 +45,7 @@ const config: Config = {
       backgroundImage: {
         "frost-glass": "linear-gradient(135deg, rgba(18,26,41,0.9) 0%, rgba(15,21,34,0.88) 100%)",
         "frost-card": "linear-gradient(180deg, rgba(18,26,41,0.92) 0%, rgba(12,18,31,0.9) 100%)",
+        cta: "var(--gradient-cta)",
       },
       boxShadow: {
         glow: "0 0 24px rgba(0, 255, 163, 0.25)",
@@ -49,7 +61,8 @@ const config: Config = {
         glass: "0.5rem", // 8px — matches tailwind's rounded-lg
         "glass-lg": "0.75rem", // 12px — matches tailwind's rounded-xl
         tab: "24px",
-        sheet: "28px",
+        sheet: "var(--radius-sheet)",
+        control: "var(--radius-control)",
       },
       backdropBlur: {
         glass: "12px",

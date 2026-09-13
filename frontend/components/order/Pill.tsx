@@ -1,35 +1,16 @@
-import { CSSProperties, ReactNode } from "react";
-import { HP } from "./tokens";
+import { type ReactNode } from "react";
+import { Capsule, type CapsuleTone } from "@/components/ui/Capsule";
 
+/** Shim: prefer Capsule + PHASE_LABEL / STATE_LABEL. */
 export function Pill({
   children,
-  c = HP.chrome,
-  fg = "#000",
-  style,
+  tone = "mint",
 }: {
   children: ReactNode;
+  tone?: CapsuleTone;
+  /** @deprecated Ignored — tones come from the shared capsule map. */
   c?: string;
   fg?: string;
-  style?: CSSProperties;
 }) {
-  return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 6,
-        borderRadius: 9999,
-        background: c,
-        padding: "3px 10px",
-        fontSize: 10,
-        fontWeight: 700,
-        letterSpacing: "0.05em",
-        color: fg,
-        fontFamily: "system-ui",
-        ...style,
-      }}
-    >
-      {children}
-    </span>
-  );
+  return <Capsule tone={tone}>{children}</Capsule>;
 }

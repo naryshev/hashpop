@@ -19,13 +19,15 @@ import { ConnectWalletButton } from "@/components/ConnectWalletButton";
 import { AddressDisplay } from "@/components/AddressDisplay";
 import { ShippingAddressModal } from "@/components/ShippingAddressModal";
 
-import { Btn } from "@/components/order/Btn";
 import { ItemRow } from "@/components/order/ItemRow";
-import { Pill } from "@/components/order/Pill";
 import { ReleaseConfirmModal } from "@/components/order/ReleaseConfirmModal";
 import { TxDetailSheet } from "@/components/order/TxDetailSheet";
 import { TxPill } from "@/components/order/TxPill";
-import { HP, OrderRole } from "@/components/order/tokens";
+import { PHASE_LABEL, PHASE_TONE, type OrderRole } from "@/components/order/tokens";
+import { Button } from "@/components/ui/Button";
+import { Capsule } from "@/components/ui/Capsule";
+import { material } from "@/lib/materials";
+import { cn } from "@/lib/utils";
 import {
   ESCROW_V2,
   EscrowView,
@@ -69,20 +71,6 @@ type ShipToAddress = {
   country: string;
   phone?: string | null;
 };
-
-const PHASE_BADGE: Record<OrderPhase, { c: string; fg: string; label: string }> = {
-  paid: { c: HP.chrome, fg: "#000", label: "PAID" },
-  shipped: { c: HP.amber, fg: "#000", label: "SHIPPED" },
-  complete: { c: HP.chromeDeep, fg: "#fff", label: "COMPLETE" },
-  refunded: { c: HP.rose, fg: "#fff", label: "REFUNDED" },
-  disputed: { c: HP.rose, fg: "#fff", label: "ON HOLD" },
-};
-
-function shortAccount(addr: string | null | undefined): string {
-  if (!addr) return "";
-  if (addr.startsWith("0x")) return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
-  return addr;
-}
 
 export default function PurchaseDetailPage() {
   const router = useRouter();
@@ -213,17 +201,17 @@ export default function PurchaseDetailPage() {
 
   if (loading && !listing) {
     return (
-      <main style={{ minHeight: "100vh", background: HP.bg, color: HP.fg, padding: 24 }}>
-        <p style={{ color: HP.muted, fontSize: 13 }}>Loading order…</p>
+      <main className="bg-app min-h-screen p-6 text-fg">
+        <p className="text-[13px] text-muted">Loading order…</p>
       </main>
     );
   }
 
   if (!listing) {
     return (
-      <main style={{ minHeight: "100vh", background: HP.bg, color: HP.fg, padding: 24 }}>
-        <p style={{ fontWeight: 600 }}>Order not found.</p>
-        <Link href="/purchases" style={{ color: HP.chrome, fontSize: 14 }}>
+      <main className="bg-app min-h-screen p-6 text-fg">
+        <p className="font-semibold">Order not found.</p>
+        <Link href="/purchases" className="text-sm text-chrome">
           ← Back to purchases
         </Link>
       </main>
@@ -232,8 +220,8 @@ export default function PurchaseDetailPage() {
 
   if (!address) {
     return (
-      <main style={{ minHeight: "100vh", background: HP.bg, color: HP.fg, padding: 24 }}>
-        <p style={{ fontSize: 14, color: HP.fg, fontWeight: 600, marginBottom: 12 }}>
+      <main className="bg-app min-h-screen p-6 text-fg">
+        <p className="mb-3 text-sm font-semibold text-fg">
           Connect your wallet to view this order.
         </p>
         <ConnectWalletButton />
@@ -252,26 +240,18 @@ export default function PurchaseDetailPage() {
   // to the two parties. Everyone else gets a minimal gate screen.
   if (!isParty) {
     return (
-      <main style={{ minHeight: "100vh", background: HP.bg, color: HP.fg, padding: 24 }}>
+      <main className="bg-app min-h-screen p-6 text-fg">
         <div
-          style={{
-            maxWidth: 480,
-            margin: "48px auto 0",
-            padding: 18,
-            borderRadius: 14,
-            border: `1px solid ${HP.borderSoft}`,
-            background: "rgba(255,255,255,0.03)",
-            textAlign: "center",
-          }}
+          className={cn(
+            material.regular,
+            "mx-auto mt-12 max-w-md rounded-control p-4.5 text-center",
+          )}
         >
-          <p style={{ fontWeight: 700, fontSize: 15, margin: 0 }}>This order is private</p>
-          <p style={{ fontSize: 13, color: HP.muted, marginTop: 6 }}>
+          <p className="m-0 text-[15px] font-bold">This order is private</p>
+          <p className="mt-1.5 text-[13px] text-muted">
             Order and escrow details are only visible to the buyer and the seller.
           </p>
-          <Link
-            href="/marketplace"
-            style={{ display: "inline-block", marginTop: 14, color: HP.chrome, fontSize: 13 }}
-          >
+          <Link href="/marketplace" className="mt-3.5 inline-block text-[13px] text-chrome">
             ← Back to marketplace
           </Link>
         </div>
@@ -280,7 +260,6 @@ export default function PurchaseDetailPage() {
   }
 
   const phase: OrderPhase = phaseFor(escrow?.state, escrow?.disputed);
-  const badge = PHASE_BADGE[phase];
   const status = orderStatusLine({
     phase,
     role,
@@ -349,41 +328,17 @@ export default function PurchaseDetailPage() {
   );
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: HP.bg,
-        color: HP.fg,
-        fontFamily: "system-ui, -apple-system, sans-serif",
-      }}
-    >
-      <div style={{ maxWidth: 480, margin: "0 auto" }}>
+    <main className="bg-app min-h-screen text-fg">
+      <div className="mx-auto max-w-md">
         <NavBar
-          eyebrow={isBuyer ? "PURCHASE" : "SALE"}
+          eyebrow={isBuyer ? "Purchase" : "Sale"}
           title={title}
           onBack={() => router.push(listingHref(listing?.id ?? id))}
         />
 
-        <section
-          style={{
-            padding: "8px 18px 32px",
-            display: "flex",
-            flexDirection: "column",
-            gap: 14,
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              marginTop: 6,
-              flexWrap: "wrap",
-            }}
-          >
-            <Pill c={badge.c} fg={badge.fg}>
-              {badge.label}
-            </Pill>
+        <section className="flex flex-col gap-3.5 px-[18px] pb-8 pt-2">
+          <div className="mt-1.5 flex flex-wrap items-center gap-2.5">
+            <Capsule tone={PHASE_TONE[phase]}>{PHASE_LABEL[phase]}</Capsule>
             <TxPill
               hash={stepTxHash}
               href={stepTxHref}
@@ -394,19 +349,8 @@ export default function PurchaseDetailPage() {
           </div>
 
           <div>
-            <div
-              style={{
-                fontSize: 22,
-                fontWeight: 800,
-                color: HP.fg,
-                letterSpacing: "-0.01em",
-              }}
-            >
-              {status.label}
-            </div>
-            <div style={{ fontSize: 13, color: HP.muted, marginTop: 4, lineHeight: 1.5 }}>
-              {status.detail}
-            </div>
+            <div className="text-[22px] font-extrabold tracking-tight text-fg">{status.label}</div>
+            <div className="mt-1 text-[13px] leading-relaxed text-muted">{status.detail}</div>
           </div>
 
           <ItemRow
@@ -443,61 +387,28 @@ export default function PurchaseDetailPage() {
             role === "seller" &&
             ESCROW_V2 &&
             (phase === "paid" || phase === "shipped") && (
-              <div
-                style={{
-                  padding: 14,
-                  borderRadius: 14,
-                  background: "rgba(255,255,255,0.03)",
-                  border: `1px solid ${HP.borderSoft}`,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 8,
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 10,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.12em",
-                    color: HP.muted,
-                  }}
-                >
+              <div className={cn(material.regular, "flex flex-col gap-2 rounded-control p-3.5")}>
+                <div className="text-[10px] font-bold text-muted">
                   {phase === "paid" ? "Ship it — enter tracking" : "Update tracking"}
                 </div>
                 <input
                   value={trackingInput}
                   onChange={(e) => setTrackingInput(e.target.value)}
                   placeholder="Tracking number *"
-                  style={{
-                    background: HP.bgInput,
-                    border: `1px solid ${HP.borderSoft}`,
-                    borderRadius: 10,
-                    padding: "10px 12px",
-                    fontSize: 13,
-                    color: HP.fg,
-                    outline: "none",
-                  }}
+                  className="rounded-[10px] border border-hairline bg-bg px-3 py-2.5 text-[13px] text-fg outline-none focus:border-chrome/40"
                 />
                 <input
                   value={carrierInput}
                   onChange={(e) => setCarrierInput(e.target.value)}
                   placeholder="Carrier (e.g. USPS, UPS, FedEx)"
-                  style={{
-                    background: HP.bgInput,
-                    border: `1px solid ${HP.borderSoft}`,
-                    borderRadius: 10,
-                    padding: "10px 12px",
-                    fontSize: 13,
-                    color: HP.fg,
-                    outline: "none",
-                  }}
+                  className="rounded-[10px] border border-hairline bg-bg px-3 py-2.5 text-[13px] text-fg outline-none focus:border-chrome/40"
                 />
                 {trackingSaved && phase === "paid" ? (
-                  <p style={{ fontSize: 12, color: HP.chrome, margin: 0 }}>
+                  <p className="m-0 text-xs text-chrome">
                     Tracking saved — the shipment will be recorded on-chain automatically.
                   </p>
                 ) : (
-                  <Btn
+                  <Button
                     onClick={() => void saveTracking()}
                     disabled={trackingSaving || !trackingInput.trim()}
                   >
@@ -506,11 +417,9 @@ export default function PurchaseDetailPage() {
                       : phase === "paid"
                         ? "Save tracking — mark as shipped"
                         : "Save tracking"}
-                  </Btn>
+                  </Button>
                 )}
-                {trackingError && (
-                  <p style={{ fontSize: 12, color: "#fda4af", margin: 0 }}>{trackingError}</p>
-                )}
+                {trackingError && <p className="m-0 text-xs text-rose-300">{trackingError}</p>}
               </div>
             )}
 
@@ -532,16 +441,7 @@ export default function PurchaseDetailPage() {
           />
 
           {errorMessage && (
-            <div
-              style={{
-                padding: 12,
-                borderRadius: 12,
-                background: "rgba(244,63,94,0.08)",
-                border: "1px solid rgba(244,63,94,0.3)",
-                fontSize: 12,
-                color: "#fda4af",
-              }}
-            >
+            <div className="rounded-control border border-danger/30 bg-danger/10 p-3 text-xs text-rose-300">
               {errorMessage}
             </div>
           )}
@@ -592,32 +492,11 @@ function NavBar({
   title: string;
   onBack: () => void;
 }) {
+  const chip =
+    "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-hairline bg-white/[0.04] text-fg";
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        padding: "14px 18px 4px",
-      }}
-    >
-      <button
-        onClick={onBack}
-        aria-label="Back"
-        style={{
-          width: 32,
-          height: 32,
-          borderRadius: 9999,
-          border: "1px solid rgba(255,255,255,0.1)",
-          background: "rgba(255,255,255,0.04)",
-          color: HP.fg,
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          cursor: "pointer",
-          flexShrink: 0,
-        }}
-      >
+    <div className="flex items-center gap-3 px-[18px] pb-1 pt-3.5">
+      <button type="button" onClick={onBack} aria-label="Back" className={chip}>
         <svg
           width="14"
           height="14"
@@ -631,48 +510,11 @@ function NavBar({
           <path d="m15 18-6-6 6-6" />
         </svg>
       </button>
-      <div style={{ flex: 1, minWidth: 0, textAlign: "center" }}>
-        <div
-          style={{
-            fontSize: 9,
-            color: HP.muted,
-            fontWeight: 600,
-            textTransform: "uppercase",
-            letterSpacing: "0.16em",
-          }}
-        >
-          {eyebrow}
-        </div>
-        <div
-          style={{
-            fontSize: 15,
-            color: HP.fg,
-            fontWeight: 700,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {title}
-        </div>
+      <div className="min-w-0 flex-1 text-center">
+        <div className="text-[9px] font-semibold text-muted">{eyebrow}</div>
+        <div className="truncate text-[15px] font-bold text-fg">{title}</div>
       </div>
-      <div
-        aria-hidden
-        style={{
-          width: 32,
-          height: 32,
-          borderRadius: 9999,
-          border: "1px solid rgba(255,255,255,0.1)",
-          background: "rgba(255,255,255,0.04)",
-          color: HP.fg,
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-          fontWeight: 700,
-          letterSpacing: 1,
-        }}
-      >
+      <div aria-hidden className={cn(chip, "font-bold")}>
         ⋯
       </div>
     </div>
@@ -708,19 +550,19 @@ function StatusBlock({
     return (
       <Row label="Shipping to">
         {shipTo ? (
-          <div style={{ fontSize: 12, color: HP.fg, lineHeight: 1.5 }}>
-            <div style={{ fontWeight: 600 }}>{shipTo.name}</div>
-            <div style={{ color: HP.muted }}>
+          <div className="text-xs leading-relaxed text-fg">
+            <div className="font-semibold">{shipTo.name}</div>
+            <div className="text-muted">
               {shipTo.line1}
               {shipTo.line2 ? `, ${shipTo.line2}` : ""}
             </div>
-            <div style={{ color: HP.muted }}>
+            <div className="text-muted">
               {shipTo.city}
               {shipTo.region ? `, ${shipTo.region}` : ""} {shipTo.postalCode}, {shipTo.country}
             </div>
           </div>
         ) : (
-          <div style={{ fontSize: 12, color: HP.muted, lineHeight: 1.5 }}>
+          <div className="text-xs leading-relaxed text-muted">
             {isBuyer
               ? "No delivery address on file for this order."
               : "The buyer hasn't provided a delivery address yet — message them before shipping."}
@@ -728,59 +570,29 @@ function StatusBlock({
               <button
                 type="button"
                 onClick={onAddAddress}
-                style={{
-                  display: "block",
-                  marginTop: 8,
-                  padding: "8px 14px",
-                  borderRadius: 10,
-                  border: "1px solid rgba(0,255,163,0.4)",
-                  background: "rgba(0,255,163,0.08)",
-                  color: HP.chrome,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
+                className="mt-2 block rounded-[10px] border border-chrome/40 bg-chrome/10 px-3.5 py-2 text-xs font-bold text-chrome"
               >
                 Add delivery address
               </button>
             )}
           </div>
         )}
-        <div style={{ fontSize: 11, color: HP.muted, marginTop: 2 }}>
-          Seller will add tracking when shipped.
-        </div>
+        <div className="mt-0.5 text-[11px] text-muted">Seller will add tracking when shipped.</div>
       </Row>
     );
   }
 
   if (phase === "shipped") {
     return (
-      <div
-        style={{
-          padding: 14,
-          borderRadius: 14,
-          background: "rgba(255,255,255,0.03)",
-          border: `1px solid ${HP.borderSoft}`,
-        }}
-      >
-        <div
-          style={{
-            fontSize: 10,
-            textTransform: "uppercase",
-            letterSpacing: "0.12em",
-            color: HP.muted,
-            marginBottom: 8,
-          }}
-        >
-          Tracking
-        </div>
+      <div className={cn(material.regular, "rounded-control p-3.5")}>
+        <div className="mb-2 text-[10px] font-bold text-muted">Tracking</div>
         {tracking ? (
-          <div style={{ fontSize: 12, fontFamily: "ui-monospace,Menlo,monospace", color: HP.fg }}>
+          <div className="font-mono text-xs text-fg">
             {carrier ? `${carrier} · ` : ""}
             {tracking}
           </div>
         ) : (
-          <div style={{ fontSize: 12, color: HP.muted }}>
+          <div className="text-xs text-muted">
             Tracking not provided. Reach out to the seller for an update.
           </div>
         )}
@@ -790,19 +602,9 @@ function StatusBlock({
 
   if (phase === "refunded") {
     return (
-      <div
-        style={{
-          padding: 18,
-          borderRadius: 14,
-          textAlign: "center",
-          background: "linear-gradient(180deg,rgba(244,63,94,0.08),rgba(244,63,94,0.02))",
-          border: "1px solid rgba(244,63,94,0.3)",
-        }}
-      >
-        <div style={{ fontSize: 14, color: HP.fg, fontWeight: 600 }}>
-          {hbar} ℏ returned to the buyer
-        </div>
-        <div style={{ fontSize: 11, color: HP.muted, marginTop: 4 }}>
+      <div className="rounded-control border border-danger/30 bg-danger/10 p-4.5 text-center">
+        <div className="text-sm font-semibold text-fg">{hbar} ℏ returned to the buyer</div>
+        <div className="mt-1 text-[11px] text-muted">
           The escrow timed out before shipment, so the payment was refunded automatically.
         </div>
       </div>
@@ -811,17 +613,9 @@ function StatusBlock({
 
   if (phase === "complete") {
     return (
-      <div
-        style={{
-          padding: 18,
-          borderRadius: 14,
-          textAlign: "center",
-          background: "linear-gradient(180deg,rgba(0,255,163,0.08),rgba(0,255,163,0.02))",
-          border: "1px solid rgba(0,255,163,0.3)",
-        }}
-      >
-        <div style={{ fontSize: 36, marginBottom: 6 }}>✓</div>
-        <div style={{ fontSize: 14, color: HP.fg, fontWeight: 600 }}>
+      <div className="rounded-control border border-chrome/30 bg-chrome/10 p-4.5 text-center">
+        <div className="mb-1.5 text-4xl">✓</div>
+        <div className="text-sm font-semibold text-fg">
           {hbar} ℏ released to {sellerLabel}
         </div>
         {releasedTxHash ? (
@@ -830,27 +624,12 @@ function StatusBlock({
               href={releaseHref}
               target="_blank"
               rel="noreferrer"
-              style={{
-                fontSize: 11,
-                color: HP.muted,
-                marginTop: 6,
-                display: "inline-block",
-                fontFamily: "ui-monospace,Menlo,monospace",
-                textDecoration: "underline",
-                textDecorationColor: "rgba(255,255,255,0.2)",
-              }}
+              className="mt-1.5 inline-block font-mono text-[11px] text-muted underline"
             >
               {releasedTxHash.slice(0, 18)}… ↗
             </a>
           ) : (
-            <div
-              style={{
-                fontSize: 11,
-                color: HP.muted,
-                marginTop: 4,
-                fontFamily: "ui-monospace,Menlo,monospace",
-              }}
-            >
+            <div className="mt-1 font-mono text-[11px] text-muted">
               {releasedTxHash.slice(0, 18)}…
             </div>
           )
@@ -864,26 +643,9 @@ function StatusBlock({
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div
-      style={{
-        padding: 14,
-        borderRadius: 14,
-        background: "rgba(255,255,255,0.03)",
-        border: "1px solid rgba(255,255,255,0.06)",
-      }}
-    >
-      <div
-        style={{
-          fontSize: 10,
-          textTransform: "uppercase",
-          letterSpacing: "0.12em",
-          color: HP.muted,
-          marginBottom: 6,
-        }}
-      >
-        {label}
-      </div>
-      <div style={{ fontSize: 13 }}>{children}</div>
+    <div className={cn(material.regular, "rounded-control p-3.5")}>
+      <div className="mb-1.5 text-[10px] font-bold text-muted">{label}</div>
+      <div className="text-[13px]">{children}</div>
     </div>
   );
 }
@@ -916,17 +678,12 @@ function Actions({
   if (!isParty) return null;
   const isBuyer = role === "buyer";
 
-  // Non-interactive status label (previously rendered as a dead button).
   const StatusNote = ({ children }: { children: React.ReactNode }) => (
     <div
-      style={{
-        padding: "10px 14px",
-        borderRadius: 12,
-        border: "1px solid rgba(255,255,255,0.08)",
-        fontSize: 12,
-        color: "#a9b0bf",
-        textAlign: "center",
-      }}
+      className={cn(
+        material.regular,
+        "rounded-control px-3.5 py-2.5 text-center text-xs text-muted",
+      )}
     >
       {children}
     </div>
@@ -935,39 +692,35 @@ function Actions({
   if (phase === "paid") {
     if (isBuyer)
       return (
-        <Btn variant="ghost" onClick={onMessageSeller}>
+        <Button variant="gray" onClick={onMessageSeller}>
           Message seller
-        </Btn>
+        </Button>
       );
-    // With EscrowV2 the seller ships via the inline tracking form rendered
-    // above this component — no extra button needed here.
     if (ESCROW_V2) return null;
     return (
-      <Btn onClick={onMarkShipped} disabled={shipPending}>
+      <Button onClick={onMarkShipped} disabled={shipPending}>
         {shipPending ? "Submitting…" : "Mark shipped"}
-      </Btn>
+      </Button>
     );
   }
   if (phase === "shipped") {
     if (isBuyer) {
-      // Optional early release — escrow auto-releases on the shown date anyway.
       return (
-        <>
-          <Btn onClick={onRequestRelease} disabled={releasePending}>
+        <div className="flex flex-col gap-2">
+          <Button onClick={onRequestRelease} disabled={releasePending}>
             {releasePending ? "Submitting…" : "Got it — release now"}
-          </Btn>
-          <Btn variant="ghost" onClick={onMessageSeller}>
+          </Button>
+          <Button variant="gray" onClick={onMessageSeller}>
             Message seller
-          </Btn>
-        </>
+          </Button>
+        </div>
       );
     }
-    // EscrowV2 sellers get the inline tracking form above.
     if (ESCROW_V2) return null;
     return (
-      <Btn variant="ghost" onClick={onUpdateTracking}>
+      <Button variant="gray" onClick={onUpdateTracking}>
         Update tracking
-      </Btn>
+      </Button>
     );
   }
   if (phase === "disputed") {
@@ -979,14 +732,14 @@ function Actions({
   if (phase === "complete") {
     if (releaseHref) {
       return (
-        <Btn
-          variant="ghost"
+        <Button
+          variant="gray"
           onClick={() => {
             window.open(releaseHref, "_blank", "noopener,noreferrer");
           }}
         >
           View receipt on HashScan ↗
-        </Btn>
+        </Button>
       );
     }
     return <StatusNote>Trade complete</StatusNote>;

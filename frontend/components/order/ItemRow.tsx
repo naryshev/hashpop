@@ -1,4 +1,5 @@
-import { HP } from "./tokens";
+import { cn } from "@/lib/utils";
+import { material } from "@/lib/materials";
 
 export function ItemRow({
   title,
@@ -17,73 +18,35 @@ export function ItemRow({
 }) {
   return (
     <div
-      style={{
-        display: "flex",
-        gap: 12,
-        alignItems: "center",
-        padding: compact ? 0 : 14,
-        borderRadius: 14,
-        background: compact ? "transparent" : HP.glassCard,
-        border: compact ? "none" : `1px solid ${HP.border}`,
-      }}
+      className={cn(
+        "flex items-center gap-3",
+        compact ? "" : cn(material.regular, "rounded-control p-3.5"),
+      )}
     >
       <div
-        style={{
-          width: compact ? 44 : 64,
-          height: compact ? 44 : 64,
-          borderRadius: 12,
-          background: "linear-gradient(135deg,#3b3b56,#1a1a2e)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: compact ? 22 : 30,
-          flexShrink: 0,
-          overflow: "hidden",
-        }}
+        className={cn(
+          "flex shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-bg",
+          compact ? "h-11 w-11 text-[22px]" : "h-16 w-16 text-[30px]",
+        )}
       >
         {image ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={image}
-            alt={title}
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-          />
+          <img src={image} alt={title} className="h-full w-full object-cover" />
         ) : (
           <span aria-hidden>📦</span>
         )}
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div
-          style={{
-            fontSize: compact ? 14 : 15,
-            color: HP.fg,
-            fontWeight: 600,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
+      <div className="min-w-0 flex-1">
+        <div className={cn("truncate font-semibold text-fg", compact ? "text-sm" : "text-[15px]")}>
           {title}
         </div>
-        <div
-          style={{
-            fontSize: 11,
-            color: HP.muted,
-            fontFamily: "ui-monospace,Menlo,monospace",
-            marginTop: 2,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          by {seller}
-        </div>
+        <div className="mt-0.5 truncate font-mono text-[11px] text-muted">by {seller}</div>
       </div>
-      <div style={{ textAlign: "right", flexShrink: 0 }}>
-        <div style={{ fontSize: compact ? 14 : 16, fontWeight: 700, color: HP.chrome }}>
+      <div className="shrink-0 text-right">
+        <div className={cn("font-bold text-chrome", compact ? "text-sm" : "text-base")}>
           {priceHbar} ℏ
         </div>
-        {priceUsd && <div style={{ fontSize: 10, color: HP.muted }}>{priceUsd}</div>}
+        {priceUsd && <div className="text-[10px] text-muted">{priceUsd}</div>}
       </div>
     </div>
   );

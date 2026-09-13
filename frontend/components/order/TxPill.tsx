@@ -1,4 +1,4 @@
-import { HP } from "./tokens";
+import { cn } from "@/lib/utils";
 
 function shorten(hash: string): string {
   if (hash.length <= 18) return hash;
@@ -26,52 +26,23 @@ export function TxPill({
   const body = (
     <>
       <span
-        style={{
-          width: 5,
-          height: 5,
-          borderRadius: 9999,
-          background: HP.chrome,
-          boxShadow: "0 0 4px rgba(0,255,163,0.8)",
-          animation: pulsing ? "hp-pulse 1.2s ease-in-out infinite" : undefined,
-        }}
+        className={cn(
+          "h-1.5 w-1.5 shrink-0 rounded-full bg-chrome shadow-glow",
+          pulsing && "animate-[hp-pulse_1.2s_ease-in-out_infinite]",
+        )}
       />
-      <span
-        style={{
-          opacity: 0.7,
-          fontFamily: "system-ui",
-          textTransform: "uppercase",
-          letterSpacing: "0.08em",
-          fontSize: 9,
-        }}
-      >
-        {label}
-      </span>
+      <span className="text-[9px] font-medium opacity-70">{label}</span>
       {shorten(hash)}
-      {interactive ? <span style={{ opacity: 0.5 }}>›</span> : null}
+      {interactive ? <span className="opacity-50">›</span> : null}
     </>
   );
 
-  const shared = {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 6,
-    padding: "4px 9px",
-    borderRadius: 9999,
-    border: "1px solid rgba(0,255,163,0.3)",
-    background: "rgba(0,255,163,0.07)",
-    fontSize: 10,
-    fontFamily: "ui-monospace,Menlo,monospace",
-    color: HP.chrome,
-    textDecoration: "none",
-  } as const;
+  const className =
+    "inline-flex items-center gap-1.5 rounded-full border border-chrome/30 bg-chrome/[0.07] px-2.5 py-1 font-mono text-[10px] text-chrome no-underline";
 
   if (onSelect) {
     return (
-      <button
-        type="button"
-        onClick={onSelect}
-        style={{ ...shared, cursor: "pointer", font: "inherit", fontFamily: shared.fontFamily }}
-      >
+      <button type="button" onClick={onSelect} className={cn(className, "cursor-pointer")}>
         {body}
       </button>
     );
@@ -79,10 +50,10 @@ export function TxPill({
 
   if (href) {
     return (
-      <a href={href} target="_blank" rel="noreferrer" style={shared}>
+      <a href={href} target="_blank" rel="noreferrer" className={className}>
         {body}
       </a>
     );
   }
-  return <div style={shared}>{body}</div>;
+  return <div className={className}>{body}</div>;
 }
