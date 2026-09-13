@@ -89,6 +89,12 @@ html {
   --border: rgba(95, 130, 180, 0.25);
   --frost: rgba(17, 26, 40, 0.45);
   --glow: rgba(0, 255, 163, 0.2);
+  /* iOS 27 Liquid Glass web approximations — shared TabBar / Sheet tokens */
+  --material-regular: rgba(255, 255, 255, 0.08);
+  --material-thick: rgba(14, 20, 34, 0.85);
+  --material-chrome: rgba(0, 255, 163, 0.14);
+  --scrim: rgba(0, 0, 0, 0.5);
+  --hairline: rgba(255, 255, 255, 0.12);
 }
 
 body {
@@ -264,5 +270,9 @@ a,
   }
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
+  }
+  /* Tab bar + sheet footer: iOS safe area with a 12px floor. */
+  .pb-safe {
+    padding-bottom: max(env(safe-area-inset-bottom), 12px);
   }
 }

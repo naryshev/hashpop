@@ -23,6 +23,13 @@ const config: Config = {
         "glow-strong": "rgba(0, 255, 163, 0.35)",
         silver: "#a9b0bf",
         chrome: "#00ffa3",
+        material: {
+          regular: "var(--material-regular)",
+          thick: "var(--material-thick)",
+          chrome: "var(--material-chrome)",
+        },
+        scrim: "var(--scrim)",
+        hairline: "var(--hairline)",
       },
       backgroundImage: {
         "frost-glass": "linear-gradient(135deg, rgba(18,26,41,0.9) 0%, rgba(15,21,34,0.88) 100%)",
@@ -32,6 +39,7 @@ const config: Config = {
         glow: "0 0 24px rgba(0, 255, 163, 0.25)",
         "glow-hover": "0 0 36px rgba(0, 255, 163, 0.4)",
         inner: "inset 0 1px 0 rgba(255,255,255,0.06)",
+        tab: "0 8px 32px rgba(0, 0, 0, 0.35)",
       },
       borderRadius: {
         // Site-wide corner constitution. `glass` is the default radius for
@@ -40,10 +48,14 @@ const config: Config = {
         // together.
         glass: "0.5rem", // 8px — matches tailwind's rounded-lg
         "glass-lg": "0.75rem", // 12px — matches tailwind's rounded-xl
+        tab: "24px",
+        sheet: "28px",
       },
       backdropBlur: {
         glass: "12px",
         "glass-strong": "20px",
+        material: "20px",
+        "material-thick": "28px",
       },
     },
   },
