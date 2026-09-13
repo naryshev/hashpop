@@ -62,9 +62,11 @@ Hard requirements (these are the things that make it "smooth"):
 
 3. Initialize once on mount: create client -> `hc.init()` -> register `pairingEvent` and
    `disconnectionEvent` listeners. Wrap the bootstrap (dynamic import + `hc.init()`) in a ~12s
-   timeout. If it never settles, set `error` + `isReady` — never leave the UI on "Loading wallet…".
-   Before registering, remove any previously registered listeners (store handler refs in a ref)
-   to prevent duplicate handlers. On unmount, unregister them.
+   timeout as a UI deadline. If it never settles, set `error` + `isReady` — never leave the UI on
+   "Loading wallet…". Keep the in-flight HashConnect; if it later resolves, attach listeners then.
+   Do not start a second WalletConnect init against the same storage. Before registering, remove
+   any previously registered listeners (store handler refs in a ref) to prevent duplicate handlers.
+   On unmount, unregister them.
 
 4. Session restore without a prompt. On mount, read a persisted session from localStorage
    (`{network, accountId, address}`) and optimistically set state so the UI shows "connected" instantly.
@@ -83,7 +85,9 @@ Hard requirements (these are the things that make it "smooth"):
    custom-scheme navigations that happen after a promise resolves.
 
 7. connect() flow (single-flight, guarded by a ref):
-   - Ensure a client exists (await the init promise; if it failed, try a fresh client with cleared storage).
+   - Ensure a client exists (await the init promise; if it failed with a transient pairing
+     error, try a fresh client with cleared storage). A hung/timed-out relay init must reuse
+     the in-flight client — do not wipe-and-retry.
    - If already connected, no-op.
    - Get the pre-cached `wc:` URI (or generate one).
    - Fire the HashPack deep link: `hashpack://wc?uri=${encodeURIComponent(pairingUri)}`. On mobile use
@@ -134,6 +138,8 @@ Hard requirements (these are the things that make it "smooth"):
 - Deep links must be synchronous in the click handler (pre-cache the URI).
 - Always have a short desktop "not detected" timeout; never an infinite "Connecting…".
 - Always have a HashConnect init timeout; never an infinite "Loading wallet…".
+- Read `NEXT_PUBLIC_WC_PROJECT_ID` as the literal `process.env.NEXT_PUBLIC_WC_PROJECT_ID` so Next.js
+  inlines it into the client bundle. Passing `process.env` into a helper leaves the id empty at runtime.
 - Mirror node, not the wallet, is the source of truth for EVM address + balance; fall back to long-zero.
 - Persist/restore session so refreshes don't re-prompt.
 - Prune stale WalletConnect pairings before init.
