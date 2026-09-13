@@ -764,10 +764,10 @@ export default function ListingPage() {
     setSelectedMediaIndex((prev) => (prev + 1) % keptMediaUrls.length);
   };
 
-  // Title block + secondary blocks (want-to-sell, description, location)
-  // are rendered in two places so the page can put them in the desktop
-  // 2-column grid and reorder them on mobile (title above the photo;
-  // want-to-sell / description / location below the seller chip).
+  // Title block is rendered twice: mobile (`lg:hidden`) above the gallery,
+  // desktop (`hidden lg:block`) at the top of the right column. Secondary
+  // blocks (want-to-sell, description, location) also render in two places
+  // so they sit under the photo on desktop and below the buy stack on mobile.
   const titleBlockJsx = (
     <div>
       <div className="flex flex-wrap items-start gap-2">
@@ -1222,9 +1222,8 @@ export default function ListingPage() {
             </div>
           )}
 
-        {/* Back nav above the media (all viewports), like the demo video:
-            a circular back button + "Marketplace" label. The title itself
-            renders below the photo on mobile (top of the right column). */}
+        {/* Back nav above the listing (all viewports). On mobile the title
+            follows immediately, then the gallery. */}
         <nav className="mb-4 flex flex-wrap items-center gap-2 text-sm text-silver">
           <Link
             href="/marketplace"
@@ -1244,11 +1243,11 @@ export default function ListingPage() {
           )}
         </nav>
 
-        {/* Content grid — image left, action panels right.
-            The breadcrumb + title block now lives at the top of the right
-            column instead of spanning above the image, so the listing detail
-            reads top-to-bottom in one column on the right while the media
-            gallery takes the full left side. */}
+        <div className="mb-4 lg:hidden">{titleBlockJsx}</div>
+
+        {/* Content grid — image left, action panels right. Desktop keeps
+            the title at the top of the right column; mobile already showed
+            it above this grid. */}
         <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_420px]">
           {/* Left: media gallery — vertical thumb strip on the left of a
               large main image that fills more of the viewport. Thumbs are
@@ -1546,7 +1545,7 @@ export default function ListingPage() {
               the title is rendered above the photo and the buy panel sits
               directly below the photo. */}
           <div className="min-w-0 space-y-4">
-            {titleBlockJsx}
+            <div className="hidden lg:block">{titleBlockJsx}</div>
             <div className="hidden lg:block border-t border-white/10" />
 
             {listing && priceMismatch && onChainPriceHbar && (
@@ -1603,13 +1602,6 @@ export default function ListingPage() {
               <BuyButton
                 listingId={listing.id}
                 price={listing.price}
-                descriptionSlot={
-                  listing.description ? (
-                    <p className="text-sm leading-relaxed text-silver lg:hidden">
-                      {listing.description}
-                    </p>
-                  ) : null
-                }
                 inWishlist={inWishlist}
                 onToggleWishlist={() => {
                   void toggleWishlist();
