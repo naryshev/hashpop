@@ -56,15 +56,12 @@ export function ProfileCardSheet({ open, onClose }: { open: boolean; onClose: ()
     hashpop: "My Hashpop",
   };
 
-  const handleDismiss = () => {
-    if (view === "menu") onClose();
-    else setView("menu");
-  };
-
+  // Scrim tap, drag, Escape, and the X all fully close. Nested
+  // profile/hashpop → menu is only the leading back control.
   return (
     <Sheet
       open={open}
-      onClose={handleDismiss}
+      onClose={onClose}
       detent="large"
       ariaLabel="Your profile"
       title={view === "menu" ? undefined : titles[view]}

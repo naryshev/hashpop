@@ -1,12 +1,12 @@
 "use client";
-import { listingHref } from "../../lib/listingUrl";
+import { formatListingId, listingHref } from "../../lib/listingUrl";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Fuse from "fuse.js";
 import { ListingMedia } from "../../components/ListingMedia";
-import { WishlistButton } from "../../components/WishlistButton";
+import { ListingCard, SellerInline, formatSellerDisplay } from "../../components/ListingCard";
 import { StatusBadge } from "../../components/ui/status-badge-beautiful-accessible-status-indicators";
 import { formatPriceForDisplay } from "../../lib/formatPrice";
 import { formatHbarWithUsd } from "../../lib/hbarUsd";
@@ -15,41 +15,16 @@ import { canonicalizeCategory, CATEGORY_GROUPS } from "../../lib/categories";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
 import { useSignInModal } from "../../lib/signInModal";
 import { getApiUrl } from "../../lib/apiUrl";
-import { profileAvatarUrl, profileDisplayName, useProfile, useProfiles } from "../../lib/profiles";
+import { useProfile, useProfiles } from "../../lib/profiles";
 import { TopBarSlot } from "../../lib/topBar";
-import {
-  BadgeCheck,
-  ChevronDown,
-  Search as SearchIcon,
-  SlidersHorizontal,
-} from "lucide-react";
-
-function formatListingId(id: string): string {
-  if (!id || !id.startsWith("0x") || id.length !== 66) return id;
-  try {
-    const hex = id.slice(2).replace(/0+$/, "");
-    if (hex.length % 2) return id;
-    const bytes = new Uint8Array(hex.length / 2);
-    for (let i = 0; i < hex.length; i += 2) bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
-    const str = new TextDecoder().decode(bytes);
-    return /^[\x20-\x7e]+$/.test(str) ? str : `${id.slice(0, 10)}…`;
-  } catch {
-    return `${id.slice(0, 10)}…`;
-  }
-}
+import { material } from "../../lib/materials";
+import { cn } from "../../lib/utils";
+import { ChevronDown, Search as SearchIcon, SlidersHorizontal } from "lucide-react";
 
 function normalizeListingStatus(status?: string): string {
   return String(status || "")
     .trim()
     .toUpperCase();
-}
-
-function formatSellerDisplay(seller?: string): string {
-  if (!seller) return "";
-  if (/^\d+\.\d+\.\d+$/.test(seller)) return seller;
-  if (seller.startsWith("0x") && seller.length > 12)
-    return `${seller.slice(0, 6)}…${seller.slice(-4)}`;
-  return seller;
 }
 
 function parsePostedWithinDays(value: string): number | null {
@@ -106,35 +81,6 @@ function relativeTimeShort(iso?: string): string {
   const mo = Math.floor(d / 30);
   if (mo < 12) return `${mo}mo`;
   return `${Math.floor(mo / 12)}y`;
-}
-
-/** Seller identity line: avatar + display name (or wallet) + verified badge. */
-function SellerInline({ seller, size = 16 }: { seller?: string; size?: number }) {
-  const profile = useProfile(seller);
-  if (!seller) return null;
-  const name = profileDisplayName(profile);
-  const avatar = profileAvatarUrl(profile);
-  return (
-    <span className="flex min-w-0 items-center gap-1 truncate">
-      {avatar ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={avatar}
-          alt=""
-          className="shrink-0 rounded-full object-cover"
-          style={{ width: size, height: size }}
-        />
-      ) : null}
-      {name ? (
-        <span className="truncate text-silver/70">{name}</span>
-      ) : (
-        <span className="truncate font-mono text-silver/50">{formatSellerDisplay(seller)}</span>
-      )}
-      {profile?.kycVerified && (
-        <BadgeCheck size={12} className="shrink-0 text-[#00ffa3]" aria-label="KYC verified" />
-      )}
-    </span>
-  );
 }
 
 /** Compact star-rating pill; renders nothing when the seller has no ratings. */
@@ -342,10 +288,7 @@ export default function MarketplacePageClient({
       }
       if (conditionQuery && item.condition?.toLowerCase() !== conditionQuery.toLowerCase())
         return false;
-      if (
-        locationQuery &&
-        (item.city ?? "").trim().toLowerCase() !== locationQuery.toLowerCase()
-      )
+      if (locationQuery && (item.city ?? "").trim().toLowerCase() !== locationQuery.toLowerCase())
         return false;
       return true;
     });
@@ -361,8 +304,7 @@ export default function MarketplacePageClient({
       sorted.sort((a, b) => (b.watchlistCount ?? 0) - (a.watchlistCount ?? 0));
     else
       sorted.sort(
-        (a, b) =>
-          new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime(),
+        (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime(),
       );
     return sorted;
   }, [
@@ -419,8 +361,14 @@ export default function MarketplacePageClient({
     setFilterLocation(locationQuery);
   };
 
-  const hasActiveFilter =
-    !!(minPriceQuery || maxPriceQuery || postedWithinQuery || conditionQuery || locationQuery || sortMode !== "recent");
+  const hasActiveFilter = !!(
+    minPriceQuery ||
+    maxPriceQuery ||
+    postedWithinQuery ||
+    conditionQuery ||
+    locationQuery ||
+    sortMode !== "recent"
+  );
 
   // Distinct cities present in the current listing set, used to populate the
   // location dropdown. Cap to 50 to keep the panel manageable.
@@ -430,7 +378,9 @@ export default function MarketplacePageClient({
       const c = it.city?.trim();
       if (c) set.add(c);
     }
-    return Array.from(set).sort((a, b) => a.localeCompare(b)).slice(0, 50);
+    return Array.from(set)
+      .sort((a, b) => a.localeCompare(b))
+      .slice(0, 50);
   }, [items]);
 
   const renderFilterSortPanel = () => (
@@ -653,9 +603,7 @@ export default function MarketplacePageClient({
                 setParam("view", v.id === "editorial" ? null : v.id);
               }}
               className={`block w-full rounded-lg px-3 py-1.5 text-left text-xs transition-colors duration-300 ${
-                viewMode === v.id
-                  ? "bg-[#00ffa3]/10 text-[#00ffa3]"
-                  : "text-white hover:bg-white/5"
+                viewMode === v.id ? "bg-[#00ffa3]/10 text-[#00ffa3]" : "text-white hover:bg-white/5"
               }`}
             >
               {v.label}
@@ -851,64 +799,11 @@ export default function MarketplacePageClient({
           </p>
         ) : (
           <>
-            {/* Mobile cards: two-up grid matching the demo video — status
-                pill + heart over the image, then title, "by seller", and a
-                bright-green ℏ price with the watch count on the right. */}
-            <div className="sm:hidden grid grid-cols-2 gap-3">
-              {filteredItems.map((item) => {
-                const status = normalizeListingStatus(item.status);
-                const isSold = status === "SOLD";
-                const isLocked = status === "LOCKED";
-                return (
-                  <Link
-                    key={`${item.itemType}-${item.id}`}
-                    href={listingHref(item.id)}
-                    className="flex flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0a0f18] transition-colors active:border-[#00ffa3]/50"
-                  >
-                    <div className="relative bg-white/5">
-                      <ListingMedia
-                        listing={item}
-                        className="w-full"
-                        aspectRatio="square"
-                        cardSize
-                        compactHeight="170px"
-                      />
-                      <span
-                        className={`absolute left-2.5 top-2.5 z-10 ${
-                          isSold ? "pill-sold" : isLocked ? "pill-pending" : "pill-active"
-                        }`}
-                      >
-                        {isSold ? "Sold" : isLocked ? "Pending" : "Active"}
-                      </span>
-                      <div className="absolute right-2 top-2 z-10">
-                        <WishlistButton itemId={item.id} itemType={item.itemType} compact />
-                      </div>
-                    </div>
-                    <div className="flex flex-1 flex-col p-3">
-                      <h2 className="truncate text-[15px] font-semibold leading-snug text-white">
-                        {item.title || formatListingId(item.id) || "Untitled"}
-                      </h2>
-                      {item.seller && (
-                        <div className="mt-1.5 flex items-center gap-1 text-[11px] text-silver/60">
-                          <span className="shrink-0">by</span>
-                          <SellerInline seller={item.seller} size={13} />
-                        </div>
-                      )}
-                      <div className="mt-auto flex items-center justify-between pt-2">
-                        <p className="text-base font-extrabold text-[#00ffa3]">
-                          {formatPriceForDisplay(item.price || "0")}{" "}
-                          <span className="italic">ℏ</span>
-                        </p>
-                        {(item.watchlistCount ?? 0) > 0 && (
-                          <span className="flex items-center gap-0.5 text-[11px] text-silver/50">
-                            ♡ {item.watchlistCount}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })}
+            {/* Mobile 2-up: shared ListingCard, compact density. */}
+            <div className="grid grid-cols-2 gap-3 sm:hidden">
+              {filteredItems.map((item) => (
+                <ListingCard key={`${item.itemType}-${item.id}`} item={item} density="compact" />
+              ))}
             </div>
             {viewMode !== "editorial" && (
               <div className="hidden sm:flex items-center gap-2 mb-3">
@@ -922,61 +817,20 @@ export default function MarketplacePageClient({
             )}
 
             {viewMode === "grid" && (
-              <div className="hidden sm:grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+              <div className="hidden gap-5 sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                 {filteredItems.map((item) => (
-                  <Link
-                    key={`${item.itemType}-${item.id}`}
-                    href={listingHref(item.id)}
-                    className="glass-card overflow-hidden transition-all duration-200 hover:border-white/20 hover:shadow-glow"
-                  >
-                    <div className="relative bg-white/5">
-                      <ListingMedia
-                        listing={item}
-                        className="w-full"
-                        aspectRatio="square"
-                        slideshow="hover"
-                        cardSize
-                        compactHeight="220px"
-                      />
-                      <div className="absolute top-2 right-2">
-                        <WishlistButton itemId={item.id} itemType={item.itemType} compact />
-                      </div>
-                    </div>
-                    <div className="p-4">
-                      <h2 className="text-base font-semibold text-white line-clamp-2 leading-snug">
-                        {item.title || formatListingId(item.id) || "Untitled"}
-                      </h2>
-                      {item.category && (
-                        <span className="mt-1.5 inline-flex rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-silver/80">
-                          {canonicalizeCategory(item.category)}
-                        </span>
-                      )}
-                      {item.seller && (
-                        <div className="mt-1 text-[11px]">
-                          <SellerInline seller={item.seller} />
-                        </div>
-                      )}
-                      <div className="flex items-center justify-between mt-2">
-                        <p className="text-chrome font-semibold text-lg">
-                          {formatHbarWithUsd(formatPriceForDisplay(item.price || "0"), usdRate)}
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <SellerRating seller={item.seller} className="flex items-center gap-0.5 text-xs text-amber-300/90" />
-                          {(item.watchlistCount ?? 0) > 0 && (
-                            <span className="text-xs text-silver/50 flex items-center gap-1">
-                              ♡ {item.watchlistCount}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
+                  <ListingCard key={`${item.itemType}-${item.id}`} item={item} density="regular" />
                 ))}
               </div>
             )}
 
             {viewMode === "feed" && (
-              <div className="hidden sm:block divide-y divide-white/5 rounded-xl border border-white/10 bg-white/[0.02]">
+              <div
+                className={cn(
+                  material.regular,
+                  "hidden divide-y divide-hairline rounded-[16px] sm:block",
+                )}
+              >
                 {filteredItems.map((item) => {
                   return (
                     <Link
@@ -1023,9 +877,7 @@ export default function MarketplacePageClient({
                           <div>Listed {relativeTimeShort(item.createdAt)} ago</div>
                         )}
                         {(item.watchlistCount ?? 0) > 0 && (
-                          <div className="text-silver/50">
-                            ♡ {item.watchlistCount} watching
-                          </div>
+                          <div className="text-silver/50">♡ {item.watchlistCount} watching</div>
                         )}
                       </div>
                     </Link>
@@ -1038,16 +890,15 @@ export default function MarketplacePageClient({
               <div className="hidden sm:block space-y-6">
                 {(() => {
                   const hero =
-                    filteredItems.find(
-                      (i) => normalizeListingStatus(i.status) === "LISTED",
-                    ) || filteredItems[0];
+                    filteredItems.find((i) => normalizeListingStatus(i.status) === "LISTED") ||
+                    filteredItems[0];
                   const rest = filteredItems.filter((i) => i.id !== hero?.id);
                   return (
                     <>
                       {hero && (
                         <Link
                           href={listingHref(hero.id)}
-                          className="block relative overflow-hidden rounded-2xl border border-white/10 group"
+                          className="group relative block overflow-hidden rounded-[20px] border border-hairline"
                         >
                           <div className="relative h-[280px] sm:h-[320px] bg-gradient-to-br from-[#1b2940] to-[#0b111b]">
                             <ListingMedia
@@ -1108,7 +959,7 @@ export default function MarketplacePageClient({
                               <Link
                                 key={`${item.itemType}-${item.id}`}
                                 href={listingHref(item.id)}
-                                className={`relative block overflow-hidden rounded-xl border border-white/10 group ${
+                                className={`group relative block overflow-hidden rounded-[16px] border border-hairline ${
                                   tall ? "row-span-2" : ""
                                 }`}
                                 style={{ minHeight: tall ? 256 : 120 }}

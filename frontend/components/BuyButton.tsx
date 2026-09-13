@@ -291,7 +291,7 @@ export function BuyButton({
             cart.add(listingId);
           }
         }}
-        className={cn(listingCta.cart, "mt-2", inCart && "text-chrome")}
+        className={cn(inCart ? listingCta.cartIn : listingCta.cart, "mt-2")}
       >
         {inCart ? "View cart" : "Add to cart"}
       </button>
