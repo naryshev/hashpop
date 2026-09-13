@@ -16,6 +16,14 @@ import {
 import type { MutableRefObject } from "react";
 import type { HashConnect } from "hashconnect";
 import { activeHederaChain } from "./hederaChains";
+import {
+  INIT_TIMEOUT_MESSAGE,
+  INIT_TIMEOUT_MS,
+  MISSING_WC_PROJECT_ID_MESSAGE,
+  getWalletConnectProjectId,
+  shouldRetryHashConnectInit,
+  withTimeout,
+} from "./hashpackWalletInit";
 
 type HederaNetwork = "mainnet" | "testnet";
 
@@ -313,20 +321,29 @@ async function getOrCreateHashConnect(
 
   sharedHashconnectKey = key;
   sharedHashconnectInitPromise = (async () => {
-    const [{ HashConnect }, sdk] = await Promise.all([
-      import("hashconnect"),
-      import("@hashgraph/sdk"),
-    ]);
-    const ledgerId = network === "mainnet" ? sdk.LedgerId.MAINNET : sdk.LedgerId.TESTNET;
-    const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
-    const metadata = {
-      name: "Hashpop",
-      description: "Hashpop — verifiable peer-to-peer marketplace on Hedera",
-      icons: [`${origin}/hashpop-cart-3d.PNG`],
-      url: origin,
-    };
-    const hc = new HashConnect(ledgerId, projectId, metadata, false);
-    await hc.init();
+    // Race the whole client bootstrap — dynamic import + hc.init() — so a
+    // hung WalletConnect relay cannot pin isReady=false forever.
+    const hc = await withTimeout(
+      (async () => {
+        const [{ HashConnect }, sdk] = await Promise.all([
+          import("hashconnect"),
+          import("@hashgraph/sdk"),
+        ]);
+        const ledgerId = network === "mainnet" ? sdk.LedgerId.MAINNET : sdk.LedgerId.TESTNET;
+        const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
+        const metadata = {
+          name: "Hashpop",
+          description: "Hashpop — verifiable peer-to-peer marketplace on Hedera",
+          icons: [`${origin}/hashpop-cart-3d.PNG`],
+          url: origin,
+        };
+        const client = new HashConnect(ledgerId, projectId, metadata, false);
+        await client.init();
+        return client;
+      })(),
+      INIT_TIMEOUT_MS,
+      INIT_TIMEOUT_MESSAGE,
+    );
     sharedHashconnect = hc;
     return hc;
   })();
@@ -391,9 +408,9 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
       setAccountId(restored.accountId);
       setAddress(restored.address ?? accountIdToLongZeroAddress(restored.accountId));
     }
-    const projectId = process.env.NEXT_PUBLIC_WC_PROJECT_ID?.trim();
+    const projectId = getWalletConnectProjectId();
     if (!projectId) {
-      setError("Missing NEXT_PUBLIC_WC_PROJECT_ID. Add it to frontend/.env.local.");
+      setError(MISSING_WC_PROJECT_ID_MESSAGE);
       setIsReady(true);
       return;
     }
@@ -412,7 +429,10 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
         let hc: HashConnect;
         try {
           hc = await createClient(false);
-        } catch {
+        } catch (e) {
+          // A hung relay will not start working after a storage wipe; retrying
+          // would just double the spinner. Transient WC pairing errors will.
+          if (!shouldRetryHashConnectInit(e)) throw e;
           clearWalletConnectorStorage();
           hc = await createClient(true);
         }
@@ -537,9 +557,10 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
         }
       }
       if (!hc) {
-        const projectId = process.env.NEXT_PUBLIC_WC_PROJECT_ID?.trim();
+        const projectId = getWalletConnectProjectId();
         if (projectId) {
-          hc = await getOrCreateHashConnect(network, projectId).catch(async () => {
+          hc = await getOrCreateHashConnect(network, projectId).catch(async (e) => {
+            if (!shouldRetryHashConnectInit(e)) return null;
             clearWalletConnectorStorage();
             return getOrCreateHashConnect(network, projectId, true).catch(() => null);
           });

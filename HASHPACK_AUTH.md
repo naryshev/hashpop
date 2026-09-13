@@ -61,8 +61,10 @@ Hard requirements (these are the things that make it "smooth"):
    `await import("@hashgraph/sdk")`) so they stay out of the main bundle and never run on the server.
 
 3. Initialize once on mount: create client -> `hc.init()` -> register `pairingEvent` and
-   `disconnectionEvent` listeners. Before registering, remove any previously registered listeners
-   (store handler refs in a ref) to prevent duplicate handlers. On unmount, unregister them.
+   `disconnectionEvent` listeners. Wrap the bootstrap (dynamic import + `hc.init()`) in a ~12s
+   timeout. If it never settles, set `error` + `isReady` — never leave the UI on "Loading wallet…".
+   Before registering, remove any previously registered listeners (store handler refs in a ref)
+   to prevent duplicate handlers. On unmount, unregister them.
 
 4. Session restore without a prompt. On mount, read a persisted session from localStorage
    (`{network, accountId, address}`) and optimistically set state so the UI shows "connected" instantly.
@@ -99,13 +101,15 @@ Hard requirements (these are the things that make it "smooth"):
    "Record was recently deleted" init errors. Before init, prune expired/inactive entries from
    `wc@2:core:0.3//pairing`. On init failure, wipe all keys matching
    [`hashconnect`, `hashpack`, `walletconnect`, `wc@`, `wc:`, your app prefix] from local+session storage
-   and retry with a fresh client.
+   and retry with a fresh client. Do NOT wipe-and-retry a hung/timed-out relay init — that just
+   doubles the spinner.
 
 9. disconnect() calls `hc.disconnect()` then clears wallet + connector storage and resets state.
 
 ## UI layer (keep it dumb; provider owns logic)
-- `ConnectWalletButton`: opens a site-wide sign-in modal via context; disabled while `!isReady` or
-  `isConnecting`; label reflects state ("Loading wallet…" / "Connecting…" / "Connect wallet").
+- `ConnectWalletButton`: opens a site-wide sign-in modal via context; disabled while loading
+  (`!isReady && !error`) or `isConnecting`; label reflects state ("Loading wallet…" /
+  "Connecting…" / "Connect wallet"). An init `error` must never keep the button on "Loading wallet…".
 - `SignInCard` inside the modal:
   - Primary "Continue with HashPack" button calls `connect()`. Debounce rapid taps (~300ms).
   - On mobile, fire the deep link synchronously in the handler using the cached `pairingUri`.
@@ -129,6 +133,7 @@ Hard requirements (these are the things that make it "smooth"):
 - StrictMode/double-mount -> shared client + listener de-dup or you get double pairings.
 - Deep links must be synchronous in the click handler (pre-cache the URI).
 - Always have a short desktop "not detected" timeout; never an infinite "Connecting…".
+- Always have a HashConnect init timeout; never an infinite "Loading wallet…".
 - Mirror node, not the wallet, is the source of truth for EVM address + balance; fall back to long-zero.
 - Persist/restore session so refreshes don't re-prompt.
 - Prune stale WalletConnect pairings before init.
