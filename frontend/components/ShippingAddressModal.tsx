@@ -144,14 +144,17 @@ export function ShippingAddressModal({
       dismissible={!saving}
       title="Where should this ship?"
       footer={
-        <button
-          type="button"
-          onClick={() => void submit()}
-          disabled={saving}
-          className={listingCta.filled}
-        >
-          {saving ? "Saving\u2026" : ctaLabel}
-        </button>
+        <div className="flex flex-col gap-2">
+          {error && <p className="text-xs text-rose-300">{error}</p>}
+          <button
+            type="button"
+            onClick={() => void submit()}
+            disabled={saving}
+            className={listingCta.filled}
+          >
+            {saving ? "Saving\u2026" : ctaLabel}
+          </button>
+        </div>
       }
     >
       <p className="mb-4 text-xs text-silver">
@@ -222,8 +225,6 @@ export function ShippingAddressModal({
           autoComplete="tel"
         />
       </div>
-
-      {error && <p className="mt-3 text-xs text-rose-300">{error}</p>}
     </Sheet>
   );
 }

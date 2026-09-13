@@ -4,8 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ShippingAddressModal } from "../ShippingAddressModal";
 import { listingCta } from "../../lib/materials";
 
-let root: Root;
-let host: HTMLElement;
+let root: Root | undefined;
+let host: HTMLElement | undefined;
 
 async function renderModal(props: {
   open?: boolean;
@@ -18,9 +18,10 @@ async function renderModal(props: {
 }) {
   host = document.createElement("div");
   document.body.appendChild(host);
-  root = createRoot(host);
+  const next = createRoot(host);
+  root = next;
   await act(async () => {
-    root.render(
+    next.render(
       createElement(ShippingAddressModal, {
         open: true,
         listingId: "listing-1",
@@ -58,7 +59,6 @@ function saveButton(): HTMLButtonElement {
 
 describe("ShippingAddressModal", () => {
   beforeEach(() => {
-    // React 19 / testing without RTL: allow act() wrapping.
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     vi.stubGlobal(
       "fetch",
@@ -68,10 +68,13 @@ describe("ShippingAddressModal", () => {
   });
 
   afterEach(async () => {
-    await act(async () => {
-      root.unmount();
-    });
-    host.remove();
+    const current = root;
+    if (current) {
+      await act(async () => {
+        current.unmount();
+      });
+    }
+    host?.remove();
     vi.unstubAllGlobals();
   });
 
@@ -91,6 +94,19 @@ describe("ShippingAddressModal", () => {
     expect(sheet.className).not.toMatch(/z-\[300\]/);
     expect(sheet.innerHTML).not.toMatch(/bg-black\/80/);
     expect(sheet.innerHTML).not.toMatch(/btn-frost-cta/);
+  });
+
+  it("shows validation in the footer and does not POST", async () => {
+    await renderModal({});
+
+    await act(async () => {
+      saveButton().click();
+    });
+
+    const fetchMock = fetch as unknown as ReturnType<typeof vi.fn>;
+    expect(fetchMock).not.toHaveBeenCalled();
+    const footer = saveButton().parentElement;
+    expect(footer?.textContent).toContain("Full name is required.");
   });
 
   it("POSTs the trimmed address to the existing shipping-address API", async () => {
