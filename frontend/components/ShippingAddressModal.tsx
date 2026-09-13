@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
-import { Truck, X } from "lucide-react";
 import { getApiUrl } from "../lib/apiUrl";
+import { listingCta } from "../lib/materials";
+import { Sheet } from "./ui/Sheet";
 
 const STORAGE_KEY = "hashpop.shipping.address.v1";
 
@@ -81,24 +81,7 @@ export function ShippingAddressModal({
     setFields(loadSaved());
     setError(null);
     setSaving(false);
-    document.documentElement.style.overflow = "hidden";
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.documentElement.style.overflow = "";
-      document.body.style.overflow = "";
-    };
   }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  if (!open || typeof document === "undefined") return null;
 
   const set = (key: keyof ShippingAddressFields) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setFields((f) => ({ ...f, [key]: e.target.value }));
@@ -153,115 +136,94 @@ export function ShippingAddressModal({
 
   const input = "input-frost w-full text-sm";
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[300] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Shipping address"
-      onClick={onClose}
-    >
-      <div
-        className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-white/10 bg-[#12161f] p-5 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-1 flex items-start justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-chrome">
-              <Truck size={17} />
-            </span>
-            <h2 className="text-base font-bold text-white">Where should this ship?</h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="flex h-8 w-8 items-center justify-center rounded-full text-silver hover:bg-white/10 hover:text-white"
-          >
-            <X size={17} />
-          </button>
-        </div>
-        <p className="mb-4 text-xs text-silver">
-          A delivery address is required before you can pay. Only the seller sees it, and only for
-          this order.
-        </p>
-
-        <div className="space-y-2.5">
-          <input
-            value={fields.name}
-            onChange={set("name")}
-            placeholder="Full name *"
-            className={input}
-            autoComplete="name"
-          />
-          <input
-            value={fields.line1}
-            onChange={set("line1")}
-            placeholder="Street address *"
-            className={input}
-            autoComplete="address-line1"
-          />
-          <input
-            value={fields.line2}
-            onChange={set("line2")}
-            placeholder="Apt, suite, unit (optional)"
-            className={input}
-            autoComplete="address-line2"
-          />
-          <div className="grid grid-cols-2 gap-2.5">
-            <input
-              value={fields.city}
-              onChange={set("city")}
-              placeholder="City *"
-              className={input}
-              autoComplete="address-level2"
-            />
-            <input
-              value={fields.region}
-              onChange={set("region")}
-              placeholder="State / region"
-              className={input}
-              autoComplete="address-level1"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-2.5">
-            <input
-              value={fields.postalCode}
-              onChange={set("postalCode")}
-              placeholder="Postal / ZIP *"
-              className={input}
-              autoComplete="postal-code"
-            />
-            <input
-              value={fields.country}
-              onChange={set("country")}
-              placeholder="Country (US) *"
-              maxLength={2}
-              className={input}
-              autoComplete="country"
-            />
-          </div>
-          <input
-            value={fields.phone}
-            onChange={set("phone")}
-            placeholder="Phone (optional, for the carrier)"
-            className={input}
-            autoComplete="tel"
-          />
-        </div>
-
-        {error && <p className="mt-3 text-xs text-rose-300">{error}</p>}
-
+  return (
+    <Sheet
+      open={open}
+      onClose={onClose}
+      detent="medium"
+      dismissible={!saving}
+      title="Where should this ship?"
+      footer={
         <button
           type="button"
           onClick={() => void submit()}
           disabled={saving}
-          className="btn-frost-cta mt-4 w-full disabled:opacity-60"
+          className={listingCta.filled}
         >
-          {saving ? "Saving…" : ctaLabel}
+          {saving ? "Saving\u2026" : ctaLabel}
         </button>
+      }
+    >
+      <p className="mb-4 text-xs text-silver">
+        A delivery address is required before you can pay. Only the seller sees it, and only for
+        this order.
+      </p>
+
+      <div className="space-y-2.5">
+        <input
+          value={fields.name}
+          onChange={set("name")}
+          placeholder="Full name *"
+          className={input}
+          autoComplete="name"
+        />
+        <input
+          value={fields.line1}
+          onChange={set("line1")}
+          placeholder="Street address *"
+          className={input}
+          autoComplete="address-line1"
+        />
+        <input
+          value={fields.line2}
+          onChange={set("line2")}
+          placeholder="Apt, suite, unit (optional)"
+          className={input}
+          autoComplete="address-line2"
+        />
+        <div className="grid grid-cols-2 gap-2.5">
+          <input
+            value={fields.city}
+            onChange={set("city")}
+            placeholder="City *"
+            className={input}
+            autoComplete="address-level2"
+          />
+          <input
+            value={fields.region}
+            onChange={set("region")}
+            placeholder="State / region"
+            className={input}
+            autoComplete="address-level1"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-2.5">
+          <input
+            value={fields.postalCode}
+            onChange={set("postalCode")}
+            placeholder="Postal / ZIP *"
+            className={input}
+            autoComplete="postal-code"
+          />
+          <input
+            value={fields.country}
+            onChange={set("country")}
+            placeholder="Country (US) *"
+            maxLength={2}
+            className={input}
+            autoComplete="country"
+          />
+        </div>
+        <input
+          value={fields.phone}
+          onChange={set("phone")}
+          placeholder="Phone (optional, for the carrier)"
+          className={input}
+          autoComplete="tel"
+        />
       </div>
-    </div>,
-    document.body,
+
+      {error && <p className="mt-3 text-xs text-rose-300">{error}</p>}
+    </Sheet>
   );
 }
