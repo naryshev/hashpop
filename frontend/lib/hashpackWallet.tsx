@@ -16,6 +16,16 @@ import {
 import type { MutableRefObject } from "react";
 import type { HashConnect } from "hashconnect";
 import { activeHederaChain } from "./hederaChains";
+import {
+  INIT_TIMEOUT_MESSAGE,
+  INIT_TIMEOUT_MS,
+  MISSING_WC_PROJECT_ID_MESSAGE,
+  bootstrapHashConnect,
+  getWalletConnectProjectId,
+  isInitTimeoutError,
+  shouldRetryHashConnectInit,
+  withTimeout,
+} from "./hashpackWalletInit";
 
 type HederaNetwork = "mainnet" | "testnet";
 
@@ -364,6 +374,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
     pairing: ((s: any) => void) | null;
     disconnect: (() => void) | null;
   }>({ pairing: null, disconnect: null });
+  const wireClientRef = useRef<(hc: HashConnect) => Promise<HashConnect | null>>(async () => null);
 
   const resetWalletState = useCallback((clearConnectorData = false) => {
     setAccountId(null);
@@ -391,80 +402,32 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
       setAccountId(restored.accountId);
       setAddress(restored.address ?? accountIdToLongZeroAddress(restored.accountId));
     }
-    const projectId = process.env.NEXT_PUBLIC_WC_PROJECT_ID?.trim();
+    const projectId = getWalletConnectProjectId();
     if (!projectId) {
-      setError("Missing NEXT_PUBLIC_WC_PROJECT_ID. Add it to frontend/.env.local.");
+      setError(MISSING_WC_PROJECT_ID_MESSAGE);
       setIsReady(true);
       return;
     }
 
-    initPromiseRef.current = (async () => {
-      try {
-        // Prune expired/inactive WalletConnect pairings to avoid
-        // "Record was recently deleted" errors during init.
-        clearStalePairings();
+    const wireClient = async (hc: HashConnect): Promise<HashConnect | null> => {
+      // Remove any previously registered listeners to prevent duplicates
+      // (React StrictMode, re-mounts, network changes, late init after UI timeout).
+      if (listenersRef.current.pairing) {
+        hc.pairingEvent.off(listenersRef.current.pairing);
+      }
+      if (listenersRef.current.disconnect) {
+        hc.disconnectionEvent.off(listenersRef.current.disconnect);
+      }
 
-        const createClient = async (forceFresh: boolean) => {
-          const client = await getOrCreateHashConnect(network, projectId, forceFresh);
-          return client;
-        };
-
-        let hc: HashConnect;
-        try {
-          hc = await createClient(false);
-        } catch {
-          clearWalletConnectorStorage();
-          hc = await createClient(true);
-        }
-
-        // Remove any previously registered listeners to prevent duplicates
-        // (React StrictMode, re-mounts, network changes).
-        if (listenersRef.current.pairing) {
-          hc.pairingEvent.off(listenersRef.current.pairing);
-        }
-        if (listenersRef.current.disconnect) {
-          hc.disconnectionEvent.off(listenersRef.current.disconnect);
-        }
-
-        const pairingHandler = async (session: { accountIds: string[] }) => {
-          if (!mounted) return;
-          const first = normalizeAccountId(session.accountIds[0] ?? null);
-          setAccountId(first);
-          setError(null);
-          setNotDetected(false);
-          if (first) {
-            const mirrorData = await fetchMirrorAccount(first, network);
-            if (!mounted) return;
-            const normalized = mirrorData.evmAddress ?? accountIdToLongZeroAddress(first);
-            setAddress(normalized);
-            setBalanceTinybar(mirrorData.balanceTinybar);
-            persistWalletSession({ network, accountId: first, address: normalized });
-          } else {
-            resetWalletState();
-          }
-          // Resolve connect() only after address is fully set so isConnected is
-          // true by the time any caller awaits connect().
-          connectWaitRef.current?.();
-          connectWaitRef.current = null;
-        };
-
-        const disconnectHandler = () => {
-          if (!mounted) return;
-          resetWalletState(true);
-        };
-
-        listenersRef.current = { pairing: pairingHandler, disconnect: disconnectHandler };
-        hc.pairingEvent.on(pairingHandler);
-        hc.disconnectionEvent.on(disconnectHandler);
-
-        if (!mounted) return null;
-        setHashconnect(hc);
-        setIsReady(true);
-        const first = normalizeAccountId(hc.connectedAccountIds[0]?.toString() ?? null);
+      const pairingHandler = async (session: { accountIds: string[] }) => {
+        if (!mounted) return;
+        const first = normalizeAccountId(session.accountIds[0] ?? null);
+        setAccountId(first);
+        setError(null);
+        setNotDetected(false);
         if (first) {
-          setAccountId(first);
           const mirrorData = await fetchMirrorAccount(first, network);
-          if (!mounted) return null;
+          if (!mounted) return;
           const normalized = mirrorData.evmAddress ?? accountIdToLongZeroAddress(first);
           setAddress(normalized);
           setBalanceTinybar(mirrorData.balanceTinybar);
@@ -472,32 +435,105 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
         } else {
           resetWalletState();
         }
-        // Pre-cache pairing URI so click/tap can deep-link immediately
-        // without waiting on an async call (which browsers block for deep
-        // links) — and keep it FRESH: pairing URIs expire after ~5 minutes,
-        // and handing the wallet a stale one produces an unpairable prompt.
-        const refreshPairingUri = () => {
-          if (!mounted || (hc.connectedAccountIds?.length ?? 0) > 0) return;
-          void getPairingUri(hc).then((uri) => {
-            if (uri && mounted) {
-              mobilePairingUriRef.current = uri;
-              mobilePairingUriAtRef.current = Date.now();
-              setPairingUri(uri);
-            }
-          });
-        };
-        refreshPairingUri();
-        pairingRefreshTimerRef.current = window.setInterval(
-          refreshPairingUri,
-          PAIRING_URI_MAX_AGE_MS,
-        );
-        return hc;
+        // Resolve connect() only after address is fully set so isConnected is
+        // true by the time any caller awaits connect().
+        connectWaitRef.current?.();
+        connectWaitRef.current = null;
+      };
+
+      const disconnectHandler = () => {
+        if (!mounted) return;
+        resetWalletState(true);
+      };
+
+      listenersRef.current = { pairing: pairingHandler, disconnect: disconnectHandler };
+      hc.pairingEvent.on(pairingHandler);
+      hc.disconnectionEvent.on(disconnectHandler);
+
+      if (!mounted) return null;
+      setHashconnect(hc);
+      setIsReady(true);
+      setError(null);
+      const first = normalizeAccountId(hc.connectedAccountIds[0]?.toString() ?? null);
+      if (first) {
+        setAccountId(first);
+        const mirrorData = await fetchMirrorAccount(first, network);
+        if (!mounted) return null;
+        const normalized = mirrorData.evmAddress ?? accountIdToLongZeroAddress(first);
+        setAddress(normalized);
+        setBalanceTinybar(mirrorData.balanceTinybar);
+        persistWalletSession({ network, accountId: first, address: normalized });
+      } else {
+        resetWalletState();
+      }
+      // Pre-cache pairing URI so click/tap can deep-link immediately
+      // without waiting on an async call (which browsers block for deep
+      // links) — and keep it FRESH: pairing URIs expire after ~5 minutes,
+      // and handing the wallet a stale one produces an unpairable prompt.
+      const refreshPairingUri = () => {
+        if (!mounted || (hc.connectedAccountIds?.length ?? 0) > 0) return;
+        void getPairingUri(hc).then((uri) => {
+          if (uri && mounted) {
+            mobilePairingUriRef.current = uri;
+            mobilePairingUriAtRef.current = Date.now();
+            setPairingUri(uri);
+          }
+        });
+      };
+      refreshPairingUri();
+      if (pairingRefreshTimerRef.current !== null) {
+        window.clearInterval(pairingRefreshTimerRef.current);
+      }
+      pairingRefreshTimerRef.current = window.setInterval(
+        refreshPairingUri,
+        PAIRING_URI_MAX_AGE_MS,
+      );
+      return hc;
+    };
+    wireClientRef.current = wireClient;
+
+    initPromiseRef.current = (async () => {
+      try {
+        // Prune expired/inactive WalletConnect pairings to avoid
+        // "Record was recently deleted" errors during init.
+        clearStalePairings();
+
+        const result = await bootstrapHashConnect({
+          createClient: (forceFresh) => getOrCreateHashConnect(network, projectId, forceFresh),
+          wipeStorage: clearWalletConnectorStorage,
+        });
+
+        if (result.timedOut) {
+          // UI circuit breaker: leave "Loading wallet…" without killing the
+          // in-flight HashConnect. If it later resolves, wire listeners then.
+          if (mounted) {
+            setError(result.error);
+            setIsReady(true);
+          }
+          if (!result.pending) return null;
+          try {
+            const late = await result.pending;
+            return await wireClient(late);
+          } catch {
+            return null;
+          }
+        }
+
+        if (!result.client) {
+          if (mounted) {
+            setError(result.error ?? "Failed to initialize HashPack connection.");
+            setIsReady(true);
+          }
+          return null;
+        }
+
+        return await wireClient(result.client);
       } catch (e) {
         if (!mounted) return null;
         const msg = e instanceof Error ? e.message : "Failed to initialize HashPack connection.";
         setError(msg);
         setIsReady(true);
-        throw e;
+        return null;
       }
     })();
 
@@ -525,29 +561,43 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
     if (connectInFlightRef.current) return;
     connectInFlightRef.current = true;
     setIsConnecting(true);
-    setError(null);
     setNotDetected(false);
     try {
+      const projectId = getWalletConnectProjectId();
+      if (!projectId) {
+        setError(MISSING_WC_PROJECT_ID_MESSAGE);
+        return;
+      }
+      setError(null);
       let hc = hashconnect;
       if (!hc && initPromiseRef.current) {
         try {
-          hc = await initPromiseRef.current;
-        } catch {
+          hc = await withTimeout(initPromiseRef.current, INIT_TIMEOUT_MS, INIT_TIMEOUT_MESSAGE);
+        } catch (e) {
+          if (isInitTimeoutError(e)) {
+            setError(INIT_TIMEOUT_MESSAGE);
+            return;
+          }
           hc = null;
         }
       }
       if (!hc) {
-        const projectId = process.env.NEXT_PUBLIC_WC_PROJECT_ID?.trim();
-        if (projectId) {
-          hc = await getOrCreateHashConnect(network, projectId).catch(async () => {
-            clearWalletConnectorStorage();
-            return getOrCreateHashConnect(network, projectId, true).catch(() => null);
-          });
-          if (hc) setHashconnect(hc);
+        hc = await withTimeout(
+          getOrCreateHashConnect(network, projectId),
+          INIT_TIMEOUT_MS,
+          INIT_TIMEOUT_MESSAGE,
+        ).catch(async (e) => {
+          if (!shouldRetryHashConnectInit(e)) return null;
+          clearWalletConnectorStorage();
+          return getOrCreateHashConnect(network, projectId, true).catch(() => null);
+        });
+        if (hc) {
+          const wired = await wireClientRef.current(hc);
+          hc = wired;
         }
       }
       if (!hc) {
-        setError("Wallet initialization failed. Refresh and try again.");
+        setError(INIT_TIMEOUT_MESSAGE);
         return;
       }
 

@@ -21,7 +21,7 @@ export function ConnectWalletButton({
   "data-testid": dataTestId = "connect-wallet-button",
   onPress,
 }: ConnectWalletButtonProps) {
-  const { isConnecting, isReady } = useHashpackWallet();
+  const { isConnecting, isReady, error } = useHashpackWallet();
   const { openSignIn } = useSignInModal();
 
   const handleClick = () => {
@@ -32,16 +32,19 @@ export function ConnectWalletButton({
     openSignIn();
   };
 
+  const stillLoading = !isReady && !error;
+
   return (
     <button
       type="button"
       onClick={handleClick}
-      disabled={!isReady || isConnecting}
+      disabled={stillLoading || isConnecting}
       className={className}
       data-connect-wallet
       data-testid={dataTestId}
     >
-      {children ?? (!isReady ? "Loading wallet…" : isConnecting ? "Connecting…" : "Connect wallet")}
+      {children ??
+        (stillLoading ? "Loading wallet…" : isConnecting ? "Connecting…" : "Connect wallet")}
     </button>
   );
 }

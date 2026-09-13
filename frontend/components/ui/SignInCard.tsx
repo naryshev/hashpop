@@ -64,7 +64,8 @@ export function SignInCard({ onConnected, className }: SignInCardProps) {
     setTimeout(() => setCopied(false), 2000);
   }, [pairingUri]);
 
-  const buttonLabel = !isReady
+  const stillLoading = !isReady && !error;
+  const buttonLabel = stillLoading
     ? "Loading wallet..."
     : isConnecting
       ? "Connecting..."
@@ -100,7 +101,7 @@ export function SignInCard({ onConnected, className }: SignInCardProps) {
       <button
         type="button"
         onClick={handleConnectPress}
-        disabled={!isReady || isConnecting}
+        disabled={stillLoading || isConnecting}
         className="btn-mint flex w-full items-center justify-center gap-2 py-4 text-[15px] font-bold disabled:opacity-60"
         style={{ touchAction: "manipulation", minHeight: "52px" }}
       >
