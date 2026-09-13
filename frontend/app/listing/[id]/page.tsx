@@ -1,14 +1,16 @@
 "use client";
 import { listingHref, encodeListingIdForUrl } from "../../../lib/listingUrl";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { BuyButton } from "../../../components/BuyButton";
 import { EscrowPanel } from "../../../components/EscrowPanel";
 import { AddressDisplay } from "../../../components/AddressDisplay";
+import { formatSellerDisplay } from "../../../components/ListingCard";
 import { profileAvatarUrl, profileDisplayName, useProfile } from "../../../lib/profiles";
-import { BadgeCheck, ChevronLeft, Sparkles } from "lucide-react";
+import { BadgeCheck, ChevronLeft, Heart, Share2, Sparkles, Star } from "lucide-react";
+import { cn } from "../../../lib/utils";
 import { formatContractAmountToHbar, formatPriceForDisplay } from "../../../lib/formatPrice";
 import { formatHbarWithUsd } from "../../../lib/hbarUsd";
 import { useHbarUsd } from "../../../hooks/useHbarUsd";
@@ -79,6 +81,71 @@ function SellerProfileMeta({ seller }: { seller: string }) {
         />
       </div>
     </Link>
+  );
+}
+
+function AmberStars({ value, size = 12 }: { value: number; size?: number }) {
+  return (
+    <span className="inline-flex items-center gap-px" aria-hidden>
+      {[1, 2, 3, 4, 5].map((n) => {
+        const fill = Math.min(1, Math.max(0, value - (n - 1)));
+        return (
+          <span key={n} className="relative inline-block" style={{ width: size, height: size }}>
+            <Star size={size} className="text-amber-400/30" />
+            <span className="absolute inset-0 overflow-hidden" style={{ width: `${fill * 100}%` }}>
+              <Star size={size} className="fill-amber-400 text-amber-400" />
+            </span>
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+/**
+ * Amazon-style seller + rating row above the mobile gallery. Lives in the
+ * page flow — never overlaid on the photo.
+ */
+function MobileSellerChrome({ seller }: { seller: string }) {
+  const profile = useProfile(seller);
+  const name = profileDisplayName(profile);
+  const avatar = profileAvatarUrl(profile);
+  const href = `/profile/${encodeURIComponent(seller)}`;
+  const hasRating = profile && profile.ratingCount > 0 && profile.ratingAverage != null;
+  const display = name ?? formatSellerDisplay(seller);
+
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex min-w-0 items-center gap-2">
+        <Link
+          href={href}
+          className="flex min-w-0 items-center gap-2"
+          aria-label={`View ${display} profile`}
+        >
+          {avatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={avatar} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" />
+          ) : (
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-[10px] font-semibold text-silver">
+              {display.slice(0, 2).toUpperCase()}
+            </div>
+          )}
+          <span className="truncate text-sm font-semibold text-white">{display}</span>
+        </Link>
+        <Link href={href} className="shrink-0 text-xs font-medium text-chrome hover:text-white">
+          Visit profile
+        </Link>
+      </div>
+      {hasRating ? (
+        <div className="flex shrink-0 items-center gap-1 text-xs text-amber-300">
+          <span className="font-semibold tabular-nums">{profile.ratingAverage!.toFixed(1)}</span>
+          <AmberStars value={profile.ratingAverage!} />
+          <span className="text-silver/60">({profile.ratingCount})</span>
+        </div>
+      ) : (
+        <span className="shrink-0 text-xs text-silver/50">No ratings yet</span>
+      )}
+    </div>
   );
 }
 
@@ -170,6 +237,8 @@ export default function ListingPage() {
   const [inWishlist, setInWishlist] = useState(false);
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const [watchCount, setWatchCount] = useState(0);
+  const mediaTouchX = useRef<number | null>(null);
+  const mediaSwiped = useRef(false);
   // Seller profile for the by-line under the title (HashPack avatar/name).
   const sellerProfile = useProfile(listing?.seller ?? null);
   const sellerAvatar = profileAvatarUrl(sellerProfile);
@@ -751,6 +820,37 @@ export default function ListingPage() {
 
   const handleSaveEdit = handleSaveEditListing;
 
+  const shareListing = () => {
+    const url = window.location.href;
+    const doCopy = () =>
+      navigator.clipboard
+        .writeText(url)
+        .then(() => {
+          setShareCopied(true);
+          setTimeout(() => setShareCopied(false), 1800);
+        })
+        .catch(() => {});
+    if (navigator.share) {
+      navigator.share({ title: displayTitle, url }).catch(() => doCopy());
+    } else {
+      void doCopy();
+    }
+  };
+
+  const onMediaTouchStart = (e: React.TouchEvent) => {
+    mediaTouchX.current = e.touches[0].clientX;
+    mediaSwiped.current = false;
+  };
+  const onMediaTouchEnd = (e: React.TouchEvent) => {
+    if (mediaTouchX.current == null) return;
+    const delta = e.changedTouches[0].clientX - mediaTouchX.current;
+    mediaTouchX.current = null;
+    if (keptMediaUrls.length <= 1 || Math.abs(delta) < 40) return;
+    mediaSwiped.current = true;
+    if (delta < 0) showNextMedia();
+    else showPrevMedia();
+  };
+
   const mainImageUrl = keptMediaUrls[safeMediaIndex] ?? null;
   const categoryLabel = listing?.category || "Marketplace";
 
@@ -764,10 +864,10 @@ export default function ListingPage() {
     setSelectedMediaIndex((prev) => (prev + 1) % keptMediaUrls.length);
   };
 
-  // Title block + secondary blocks (want-to-sell, description, location)
-  // are rendered in two places so the page can put them in the desktop
-  // 2-column grid and reorder them on mobile (title above the photo;
-  // want-to-sell / description / location below the seller chip).
+  // Title block is rendered twice: mobile (`lg:hidden`) above the gallery,
+  // desktop (`hidden lg:block`) at the top of the right column. Secondary
+  // blocks (want-to-sell, description, location) also render in two places
+  // so they sit under the photo on desktop and below the buy stack on mobile.
   const titleBlockJsx = (
     <div>
       <div className="flex flex-wrap items-start gap-2">
@@ -808,6 +908,34 @@ export default function ListingPage() {
           )}
         </div>
       )}
+      {displaySubtitle && (
+        <p className="mt-1 text-sm text-silver">{editing ? editSubtitle : displaySubtitle}</p>
+      )}
+      {attributesLine && (
+        <p className="mt-0.5 text-sm text-silver/70">
+          {editing
+            ? [editCondition, editYearOfProduction].filter(Boolean).join(" | ")
+            : attributesLine}
+        </p>
+      )}
+    </div>
+  );
+
+  // Mobile title sits under the seller/rating chrome. Seller identity is
+  // already in that row, so this block is title + watching + subtitle only.
+  const mobileTitleBlockJsx = (
+    <div>
+      <div className="flex flex-wrap items-start gap-2">
+        <h1 className="min-w-0 flex-1 text-2xl font-extrabold tracking-tight text-white">
+          {editing ? editTitle || displayTitle : displayTitle}
+        </h1>
+        {!isListed && !isUnconfirmed && (
+          <span className="mt-1 flex-shrink-0 rounded-full border border-white/10 bg-white/10 px-2.5 py-0.5 text-xs font-medium text-silver">
+            Archived
+          </span>
+        )}
+      </div>
+      {watchCount > 0 && <p className="mt-1 text-sm text-silver/60">{watchCount} watching</p>}
       {displaySubtitle && (
         <p className="mt-1 text-sm text-silver">{editing ? editSubtitle : displaySubtitle}</p>
       )}
@@ -1222,9 +1350,7 @@ export default function ListingPage() {
             </div>
           )}
 
-        {/* Back nav above the media (all viewports), like the demo video:
-            a circular back button + "Marketplace" label. The title itself
-            renders below the photo on mobile (top of the right column). */}
+        {/* Back nav, then (mobile) seller/rating chrome + title, then gallery. */}
         <nav className="mb-4 flex flex-wrap items-center gap-2 text-sm text-silver">
           <Link
             href="/marketplace"
@@ -1244,11 +1370,14 @@ export default function ListingPage() {
           )}
         </nav>
 
-        {/* Content grid — image left, action panels right.
-            The breadcrumb + title block now lives at the top of the right
-            column instead of spanning above the image, so the listing detail
-            reads top-to-bottom in one column on the right while the media
-            gallery takes the full left side. */}
+        <div className="mb-3 space-y-3 lg:hidden">
+          {listing.seller && <MobileSellerChrome seller={listing.seller} />}
+          {mobileTitleBlockJsx}
+        </div>
+
+        {/* Content grid — image left, action panels right. Desktop keeps
+            the title at the top of the right column; mobile already showed
+            it above this grid. */}
         <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_420px]">
           {/* Left: media gallery — vertical thumb strip on the left of a
               large main image that fills more of the viewport. Thumbs are
@@ -1256,7 +1385,7 @@ export default function ListingPage() {
           <div className="min-w-0 space-y-4">
             <div className="flex gap-3">
               {keptMediaUrls.length > 1 && (
-                <div className="flex w-20 shrink-0 flex-col gap-2 overflow-y-auto pb-1 max-h-[80vh]">
+                <div className="hidden w-20 shrink-0 flex-col gap-2 overflow-y-auto pb-1 max-h-[80vh] lg:flex">
                   {keptMediaUrls.map((url, i) => (
                     <div
                       key={url}
@@ -1293,9 +1422,13 @@ export default function ListingPage() {
                   ))}
                 </div>
               )}
-              {/* Hero keeps object-contain (no cropping of product shots) but
-                  letterboxes in the site navy so the bars blend in. */}
-              <div className="relative aspect-square max-h-[80vh] flex-1 overflow-hidden rounded-2xl border border-white/10 bg-[#0d1420]">
+              {/* Hero is borderless on mobile (Amazon-style). Desktop keeps
+                  the rounded card + letterbox navy. */}
+              <div
+                className="relative aspect-square max-h-[80vh] flex-1 overflow-hidden bg-[#0d1420] lg:rounded-2xl lg:border lg:border-white/10"
+                onTouchStart={onMediaTouchStart}
+                onTouchEnd={onMediaTouchEnd}
+              >
                 {mainImageUrl ? (
                   <>
                     {isVideoMedia(mainImageUrl) ? (
@@ -1310,8 +1443,8 @@ export default function ListingPage() {
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={mainImageUrl} alt="" className="h-full w-full object-contain" />
                     )}
-                    {/* Status pill + on-chain chip, like the demo video.
-                        Non-interactive so the zoom overlay still works. */}
+                    {/* Status pill stays on the image (top-left). Seller /
+                        rating never overlay the photo. */}
                     {listing &&
                       ["LISTED", "LOCKED", "SOLD", "REFUNDED"].includes(listing.status) && (
                         <span
@@ -1331,18 +1464,18 @@ export default function ListingPage() {
                         </span>
                       )}
                     {listing?.onChainConfirmed && (
-                      <span className="pointer-events-none absolute bottom-3 right-3 z-20 inline-flex items-center gap-1.5 rounded-full border border-[#00ffa3]/30 bg-[#0b1220]/85 px-3 py-1 text-[11px] font-semibold text-[#00ffa3] backdrop-blur-sm">
+                      <span className="pointer-events-none absolute bottom-3 left-3 z-20 inline-flex items-center gap-1.5 rounded-full border border-[#00ffa3]/30 bg-[#0b1220]/85 px-3 py-1 text-[11px] font-semibold text-[#00ffa3] backdrop-blur-sm">
                         <Sparkles size={11} />
                         Verified on-chain
                       </span>
                     )}
-                    <div className="absolute top-3 right-3 flex gap-2">
+                    <div className="absolute top-3 right-3 hidden gap-2 lg:flex">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          toggleWishlist();
+                          void toggleWishlist();
                         }}
                         className={`flex h-10 w-10 items-center justify-center rounded-full text-white ${inWishlist ? "bg-emerald-600/90" : "bg-black/60 hover:bg-black/80"}`}
                         aria-label={inWishlist ? "In wishlist" : "Add to wishlist"}
@@ -1355,20 +1488,7 @@ export default function ListingPage() {
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          const url = window.location.href;
-                          const doCopy = () =>
-                            navigator.clipboard
-                              .writeText(url)
-                              .then(() => {
-                                setShareCopied(true);
-                                setTimeout(() => setShareCopied(false), 1800);
-                              })
-                              .catch(() => {});
-                          if (navigator.share) {
-                            navigator.share({ title: displayTitle, url }).catch(() => doCopy());
-                          } else {
-                            void doCopy();
-                          }
+                          shareListing();
                         }}
                         className="flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
                         aria-label="Share"
@@ -1379,7 +1499,13 @@ export default function ListingPage() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => setGalleryOpen(true)}
+                      onClick={() => {
+                        if (mediaSwiped.current) {
+                          mediaSwiped.current = false;
+                          return;
+                        }
+                        setGalleryOpen(true);
+                      }}
                       className="absolute inset-0 z-10 cursor-zoom-in"
                       aria-label="Open media gallery"
                     />
@@ -1391,6 +1517,57 @@ export default function ListingPage() {
                 )}
               </div>
             </div>
+            {keptMediaUrls.length > 0 && (
+              <div className="flex items-center justify-between gap-3 lg:hidden">
+                <div className="flex min-h-6 flex-1 items-center justify-center gap-1.5">
+                  {keptMediaUrls.length > 1
+                    ? keptMediaUrls.map((url, i) => (
+                        <button
+                          key={url}
+                          type="button"
+                          aria-label={`Show photo ${i + 1} of ${keptMediaUrls.length}`}
+                          aria-current={i === safeMediaIndex}
+                          onClick={() => setSelectedMediaIndex(i)}
+                          className={cn(
+                            "h-1.5 w-1.5 rounded-full transition-colors",
+                            i === safeMediaIndex ? "bg-white" : "bg-white/30",
+                          )}
+                        />
+                      ))
+                    : null}
+                </div>
+                <div className="flex shrink-0 items-center gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void toggleWishlist();
+                    }}
+                    className="flex h-9 w-9 items-center justify-center text-white"
+                    aria-label={inWishlist ? "In wishlist" : "Add to wishlist"}
+                    disabled={wishlistLoading}
+                  >
+                    <Heart
+                      size={20}
+                      strokeWidth={1.75}
+                      className={inWishlist ? "fill-white text-white" : "text-white"}
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={shareListing}
+                    className="flex h-9 w-9 items-center justify-center text-white"
+                    aria-label="Share"
+                    title={shareCopied ? "Link copied!" : "Share"}
+                  >
+                    {shareCopied ? (
+                      <span className="text-sm">✓</span>
+                    ) : (
+                      <Share2 size={20} strokeWidth={1.75} />
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
             {/* Desktop-only: want-to-sell + description + location live in
                 the left column under the photo on desktop. On mobile these
                 are rendered as a separate block below the grid so the buy
@@ -1546,7 +1723,7 @@ export default function ListingPage() {
               the title is rendered above the photo and the buy panel sits
               directly below the photo. */}
           <div className="min-w-0 space-y-4">
-            {titleBlockJsx}
+            <div className="hidden lg:block">{titleBlockJsx}</div>
             <div className="hidden lg:block border-t border-white/10" />
 
             {listing && priceMismatch && onChainPriceHbar && (
@@ -1603,13 +1780,6 @@ export default function ListingPage() {
               <BuyButton
                 listingId={listing.id}
                 price={listing.price}
-                descriptionSlot={
-                  listing.description ? (
-                    <p className="text-sm leading-relaxed text-silver lg:hidden">
-                      {listing.description}
-                    </p>
-                  ) : null
-                }
                 inWishlist={inWishlist}
                 onToggleWishlist={() => {
                   void toggleWishlist();
