@@ -308,10 +308,10 @@ export default function PurchaseDetailPage() {
   // Tx for the on-chain pill: payment tx for paid; in-session hash afterwards.
   const stepTxHash =
     phase === "complete"
-      ? releaseHash ?? listing.txHash ?? null
+      ? (releaseHash ?? listing.txHash ?? null)
       : phase === "shipped"
-        ? shipHash ?? listing.txHash ?? null
-        : listing.txHash ?? null;
+        ? (shipHash ?? listing.txHash ?? null)
+        : (listing.txHash ?? null);
   const stepTxHref = getTransactionExplorerUrl(stepTxHash, chainId);
 
   const errorMessage = getTransactionErrorMessage(shipError ?? releaseError, { chainId });
@@ -372,7 +372,15 @@ export default function PurchaseDetailPage() {
             gap: 14,
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6, flexWrap: "wrap" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              marginTop: 6,
+              flexWrap: "wrap",
+            }}
+          >
             <Pill c={badge.c} fg={badge.fg}>
               {badge.label}
             </Pill>
@@ -431,74 +439,80 @@ export default function PurchaseDetailPage() {
           {/* Seller + EscrowV2: tracking entry lives right here — saving it is
               the entire shipping flow (the settlement engine records the
               shipment on-chain; no wallet transaction). */}
-          {isParty && role === "seller" && ESCROW_V2 && (phase === "paid" || phase === "shipped") && (
-            <div
-              style={{
-                padding: 14,
-                borderRadius: 14,
-                background: "rgba(255,255,255,0.03)",
-                border: `1px solid ${HP.borderSoft}`,
-                display: "flex",
-                flexDirection: "column",
-                gap: 8,
-              }}
-            >
+          {isParty &&
+            role === "seller" &&
+            ESCROW_V2 &&
+            (phase === "paid" || phase === "shipped") && (
               <div
                 style={{
-                  fontSize: 10,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.12em",
-                  color: HP.muted,
+                  padding: 14,
+                  borderRadius: 14,
+                  background: "rgba(255,255,255,0.03)",
+                  border: `1px solid ${HP.borderSoft}`,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
                 }}
               >
-                {phase === "paid" ? "Ship it — enter tracking" : "Update tracking"}
+                <div
+                  style={{
+                    fontSize: 10,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.12em",
+                    color: HP.muted,
+                  }}
+                >
+                  {phase === "paid" ? "Ship it — enter tracking" : "Update tracking"}
+                </div>
+                <input
+                  value={trackingInput}
+                  onChange={(e) => setTrackingInput(e.target.value)}
+                  placeholder="Tracking number *"
+                  style={{
+                    background: HP.bgInput,
+                    border: `1px solid ${HP.borderSoft}`,
+                    borderRadius: 10,
+                    padding: "10px 12px",
+                    fontSize: 13,
+                    color: HP.fg,
+                    outline: "none",
+                  }}
+                />
+                <input
+                  value={carrierInput}
+                  onChange={(e) => setCarrierInput(e.target.value)}
+                  placeholder="Carrier (e.g. USPS, UPS, FedEx)"
+                  style={{
+                    background: HP.bgInput,
+                    border: `1px solid ${HP.borderSoft}`,
+                    borderRadius: 10,
+                    padding: "10px 12px",
+                    fontSize: 13,
+                    color: HP.fg,
+                    outline: "none",
+                  }}
+                />
+                {trackingSaved && phase === "paid" ? (
+                  <p style={{ fontSize: 12, color: HP.chrome, margin: 0 }}>
+                    Tracking saved — the shipment will be recorded on-chain automatically.
+                  </p>
+                ) : (
+                  <Btn
+                    onClick={() => void saveTracking()}
+                    disabled={trackingSaving || !trackingInput.trim()}
+                  >
+                    {trackingSaving
+                      ? "Saving…"
+                      : phase === "paid"
+                        ? "Save tracking — mark as shipped"
+                        : "Save tracking"}
+                  </Btn>
+                )}
+                {trackingError && (
+                  <p style={{ fontSize: 12, color: "#fda4af", margin: 0 }}>{trackingError}</p>
+                )}
               </div>
-              <input
-                value={trackingInput}
-                onChange={(e) => setTrackingInput(e.target.value)}
-                placeholder="Tracking number *"
-                style={{
-                  background: HP.bgInput,
-                  border: `1px solid ${HP.borderSoft}`,
-                  borderRadius: 10,
-                  padding: "10px 12px",
-                  fontSize: 13,
-                  color: HP.fg,
-                  outline: "none",
-                }}
-              />
-              <input
-                value={carrierInput}
-                onChange={(e) => setCarrierInput(e.target.value)}
-                placeholder="Carrier (e.g. USPS, UPS, FedEx)"
-                style={{
-                  background: HP.bgInput,
-                  border: `1px solid ${HP.borderSoft}`,
-                  borderRadius: 10,
-                  padding: "10px 12px",
-                  fontSize: 13,
-                  color: HP.fg,
-                  outline: "none",
-                }}
-              />
-              {trackingSaved && phase === "paid" ? (
-                <p style={{ fontSize: 12, color: HP.chrome, margin: 0 }}>
-                  Tracking saved — the shipment will be recorded on-chain automatically.
-                </p>
-              ) : (
-                <Btn onClick={() => void saveTracking()} disabled={trackingSaving || !trackingInput.trim()}>
-                  {trackingSaving
-                    ? "Saving…"
-                    : phase === "paid"
-                      ? "Save tracking — mark as shipped"
-                      : "Save tracking"}
-                </Btn>
-              )}
-              {trackingError && (
-                <p style={{ fontSize: 12, color: "#fda4af", margin: 0 }}>{trackingError}</p>
-              )}
-            </div>
-          )}
+            )}
 
           <Actions
             phase={phase}
@@ -604,7 +618,16 @@ function NavBar({
           flexShrink: 0,
         }}
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="m15 18-6-6 6-6" />
         </svg>
       </button>
@@ -910,7 +933,12 @@ function Actions({
   );
 
   if (phase === "paid") {
-    if (isBuyer) return <Btn variant="ghost" onClick={onMessageSeller}>Message seller</Btn>;
+    if (isBuyer)
+      return (
+        <Btn variant="ghost" onClick={onMessageSeller}>
+          Message seller
+        </Btn>
+      );
     // With EscrowV2 the seller ships via the inline tracking form rendered
     // above this component — no extra button needed here.
     if (ESCROW_V2) return null;
@@ -928,13 +956,19 @@ function Actions({
           <Btn onClick={onRequestRelease} disabled={releasePending}>
             {releasePending ? "Submitting…" : "Got it — release now"}
           </Btn>
-          <Btn variant="ghost" onClick={onMessageSeller}>Message seller</Btn>
+          <Btn variant="ghost" onClick={onMessageSeller}>
+            Message seller
+          </Btn>
         </>
       );
     }
     // EscrowV2 sellers get the inline tracking form above.
     if (ESCROW_V2) return null;
-    return <Btn variant="ghost" onClick={onUpdateTracking}>Update tracking</Btn>;
+    return (
+      <Btn variant="ghost" onClick={onUpdateTracking}>
+        Update tracking
+      </Btn>
+    );
   }
   if (phase === "disputed") {
     return <StatusNote>Escrow is on hold while the dispute is reviewed.</StatusNote>;

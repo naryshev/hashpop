@@ -271,7 +271,14 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [allSales, setAllSales] = useState<SaleItem[]>([]);
   const [offerRows, setOfferRows] = useState<
-    { amount: string; status: string; createdAt: string; listingId?: string; listing?: { title?: string | null } | null; direction: "received" | "sent" }[]
+    {
+      amount: string;
+      status: string;
+      createdAt: string;
+      listingId?: string;
+      listing?: { title?: string | null } | null;
+      direction: "received" | "sent";
+    }[]
   >([]);
   const [escrowTinybar, setEscrowTinybar] = useState<number>(0);
   const usdRate = useHbarUsd();
@@ -287,14 +294,12 @@ export default function DashboardPage() {
     type Evt = { key: string; label: string; tone: string; at: number; href: string };
     const events: Evt[] = [];
     for (const s of allSales) {
-      const title =
-        s.listing?.title || (s.listingId ? formatListingId(s.listingId) : "listing");
+      const title = s.listing?.title || (s.listingId ? formatListingId(s.listingId) : "listing");
       const amount = `${formatPriceForDisplay(s.amount || "0")} ℏ`;
       const targetId = s.listingId ?? s.listing?.id ?? "";
       events.push({
         key: `sale-${s.id}`,
-        label:
-          s.role === "seller" ? `Sold ${title} · ${amount}` : `Bought ${title} · ${amount}`,
+        label: s.role === "seller" ? `Sold ${title} · ${amount}` : `Bought ${title} · ${amount}`,
         tone: s.role === "seller" ? "#00ffa3" : "#00e5ff",
         at: new Date(s.createdAt).getTime(),
         href: targetId ? listingHref(targetId) : "/purchases",
@@ -432,8 +437,20 @@ export default function DashboardPage() {
         .then((res) => (res.ok ? res.json() : Promise.reject(res)))
         .then(
           (data: {
-            received?: { amount: string; status: string; createdAt: string; listingId?: string; listing?: { title?: string | null } | null }[];
-            sent?: { amount: string; status: string; createdAt: string; listingId?: string; listing?: { title?: string | null } | null }[];
+            received?: {
+              amount: string;
+              status: string;
+              createdAt: string;
+              listingId?: string;
+              listing?: { title?: string | null } | null;
+            }[];
+            sent?: {
+              amount: string;
+              status: string;
+              createdAt: string;
+              listingId?: string;
+              listing?: { title?: string | null } | null;
+            }[];
           }) => {
             if (cancelled) return;
             const isActive = (o: { status: string }) => o.status === "ACTIVE";
@@ -750,7 +767,6 @@ export default function DashboardPage() {
                   </div>
                 )}
               </section>
-
             </>
           )}
         </div>

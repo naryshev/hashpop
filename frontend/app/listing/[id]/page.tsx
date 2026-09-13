@@ -56,9 +56,7 @@ function SellerProfileMeta({ seller }: { seller: string }) {
       <div className="min-w-0">
         <div className="flex items-center gap-1.5 text-sm font-semibold text-white group-hover:text-chrome">
           <span className="truncate">
-            {name ?? (
-              <AddressDisplay address={seller} showVerified={false} preferName={false} />
-            )}
+            {name ?? <AddressDisplay address={seller} showVerified={false} preferName={false} />}
           </span>
           {profile?.kycVerified && (
             <BadgeCheck size={13} className="shrink-0 text-[#00ffa3]" aria-label="KYC verified" />
@@ -811,9 +809,7 @@ export default function ListingPage() {
         </div>
       )}
       {displaySubtitle && (
-        <p className="mt-1 text-sm text-silver">
-          {editing ? editSubtitle : displaySubtitle}
-        </p>
+        <p className="mt-1 text-sm text-silver">{editing ? editSubtitle : displaySubtitle}</p>
       )}
       {attributesLine && (
         <p className="mt-0.5 text-sm text-silver/70">
@@ -898,11 +894,7 @@ export default function ListingPage() {
         <h3 className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-3">
           Location
         </h3>
-        <LocationMap
-          lat={listing.locationLat}
-          lng={listing.locationLng}
-          city={listing.city}
-        />
+        <LocationMap lat={listing.locationLat} lng={listing.locationLng} city={listing.city} />
       </div>
     ) : null;
 
@@ -1279,12 +1271,7 @@ export default function ListingPage() {
                       {/* Thumbs crop to fill (object-cover) so odd aspect
                           ratios don't show black pillarboxes. */}
                       {isVideoMedia(url) ? (
-                        <video
-                          src={url}
-                          className="h-full w-full object-cover"
-                          muted
-                          playsInline
-                        />
+                        <video src={url} className="h-full w-full object-cover" muted playsInline />
                       ) : (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={url} alt="" className="h-full w-full object-cover" />
@@ -1325,23 +1312,24 @@ export default function ListingPage() {
                     )}
                     {/* Status pill + on-chain chip, like the demo video.
                         Non-interactive so the zoom overlay still works. */}
-                    {listing && ["LISTED", "LOCKED", "SOLD", "REFUNDED"].includes(listing.status) && (
-                      <span
-                        className={`pointer-events-none absolute left-3 top-3 z-20 ${
-                          listing.status === "SOLD" || listing.status === "REFUNDED"
-                            ? "pill-sold"
+                    {listing &&
+                      ["LISTED", "LOCKED", "SOLD", "REFUNDED"].includes(listing.status) && (
+                        <span
+                          className={`pointer-events-none absolute left-3 top-3 z-20 ${
+                            listing.status === "SOLD" || listing.status === "REFUNDED"
+                              ? "pill-sold"
+                              : listing.status === "LOCKED"
+                                ? "pill-pending"
+                                : "pill-active"
+                          }`}
+                        >
+                          {listing.status === "SOLD" || listing.status === "REFUNDED"
+                            ? "Sold"
                             : listing.status === "LOCKED"
-                              ? "pill-pending"
-                              : "pill-active"
-                        }`}
-                      >
-                        {listing.status === "SOLD" || listing.status === "REFUNDED"
-                          ? "Sold"
-                          : listing.status === "LOCKED"
-                            ? "Pending"
-                            : "Active"}
-                      </span>
-                    )}
+                              ? "Pending"
+                              : "Active"}
+                        </span>
+                      )}
                     {listing?.onChainConfirmed && (
                       <span className="pointer-events-none absolute bottom-3 right-3 z-20 inline-flex items-center gap-1.5 rounded-full border border-[#00ffa3]/30 bg-[#0b1220]/85 px-3 py-1 text-[11px] font-semibold text-[#00ffa3] backdrop-blur-sm">
                         <Sparkles size={11} />
@@ -1377,9 +1365,7 @@ export default function ListingPage() {
                               })
                               .catch(() => {});
                           if (navigator.share) {
-                            navigator
-                              .share({ title: displayTitle, url })
-                              .catch(() => doCopy());
+                            navigator.share({ title: displayTitle, url }).catch(() => doCopy());
                           } else {
                             void doCopy();
                           }
@@ -1512,7 +1498,9 @@ export default function ListingPage() {
                       const files = Array.from(e.target.files ?? []);
                       const room = Math.max(0, 10 - keptMediaUrls.length);
                       if (files.length > room) {
-                        setEditError(`Listings are limited to 10 photos (${room} slot${room === 1 ? "" : "s"} left).`);
+                        setEditError(
+                          `Listings are limited to 10 photos (${room} slot${room === 1 ? "" : "s"} left).`,
+                        );
                       } else {
                         setEditError(null);
                       }
@@ -1763,7 +1751,9 @@ export default function ListingPage() {
                     <dt className="text-silver/70">Payments:</dt>
                     <dd>
                       <span className="inline-flex items-center gap-1.5 rounded-md border border-[#5b21b6]/40 bg-gradient-to-br from-[#5b21b6]/25 to-[#1e1b4b]/25 px-2.5 py-1 text-xs font-semibold text-white">
-                        <span aria-hidden className="text-[#a78bfa]">⚡</span>
+                        <span aria-hidden className="text-[#a78bfa]">
+                          ⚡
+                        </span>
                         HashPack
                         <span className="text-silver/60">· HBAR</span>
                       </span>

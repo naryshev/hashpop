@@ -102,7 +102,6 @@ function LockIcon({ className }: { className?: string }) {
   );
 }
 
-
 function SendArrow() {
   return (
     <svg
@@ -229,12 +228,13 @@ function StatePill({ stateKey, size = "sm" }: { stateKey: StateKey; size?: "sm" 
   const s = STATE_STYLE[stateKey];
   const pad = size === "sm" ? "px-2 py-0.5 text-[9px]" : "px-2.5 py-1 text-[10px]";
   return (
-    <span className={`inline-flex items-center rounded-full font-bold tracking-wider ${pad} ${s.bg} ${s.text}`}>
+    <span
+      className={`inline-flex items-center rounded-full font-bold tracking-wider ${pad} ${s.bg} ${s.text}`}
+    >
       {s.label}
     </span>
   );
 }
-
 
 export function MessagesPageContent({ embedded = false }: { embedded?: boolean } = {}) {
   const { address } = useHashpackWallet();
@@ -283,9 +283,7 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
       if (listingFetchInFlight.current.has(listingId)) return;
       listingFetchInFlight.current.add(listingId);
       try {
-        const res = await fetch(
-          `${getApiUrl()}/api/listing/${encodeListingIdForUrl(listingId)}`,
-        );
+        const res = await fetch(`${getApiUrl()}/api/listing/${encodeListingIdForUrl(listingId)}`);
         if (!res.ok) return;
         const data = await res.json();
         if (!data?.listing) return;
@@ -405,7 +403,9 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
     }
     let cancelled = false;
     setOtherAccountId(null);
-    fetch(`${getApiUrl()}/api/relay/account-id?evmAddress=${encodeURIComponent(other.toLowerCase())}`)
+    fetch(
+      `${getApiUrl()}/api/relay/account-id?evmAddress=${encodeURIComponent(other.toLowerCase())}`,
+    )
       .then((r) => (r.ok ? r.json() : Promise.reject(r)))
       .then((d: { accountId?: string }) => {
         if (!cancelled) setOtherAccountId(d.accountId ?? null);
@@ -643,9 +643,7 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
               </div>
               <div className="mt-1 flex items-center gap-1.5">
                 {listing?.price && (
-                  <span className="text-[11px] font-semibold text-chrome">
-                    {listing.price} ℏ
-                  </span>
+                  <span className="text-[11px] font-semibold text-chrome">{listing.price} ℏ</span>
                 )}
                 {c.listingId && <StatePill stateKey={stateKey} />}
               </div>
@@ -723,9 +721,7 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
                     // Keyboard closed: keep the composer above the iOS home
                     // indicator. Keyboard open: the viewport already ends at
                     // the keyboard, so padding would leave a gap.
-                    paddingBottom: threadViewport.keyboardOpen
-                      ? 0
-                      : "env(safe-area-inset-bottom)",
+                    paddingBottom: threadViewport.keyboardOpen ? 0 : "env(safe-area-inset-bottom)",
                   }
                 : undefined
             }
@@ -875,7 +871,9 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
                       {threadLoading ? (
                         <p className="text-silver text-sm">Loading thread…</p>
                       ) : threadMessages.length === 0 ? (
-                        <p className="text-silver text-sm">No messages yet. Send a message below.</p>
+                        <p className="text-silver text-sm">
+                          No messages yet. Send a message below.
+                        </p>
                       ) : (
                         <>
                           <div className="my-2 text-center font-mono text-[10px] text-silver">
@@ -884,8 +882,8 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
                               ? `Order opened · ${new Date(
                                   selectedListing.createdAt,
                                 ).toLocaleDateString()}`
-                              : "Conversation"}
-                            {" "}—
+                              : "Conversation"}{" "}
+                            —
                           </div>
                           {threadMessages.map((m) => {
                             const isMe = m.fromAddress.toLowerCase() === address.toLowerCase();
@@ -963,7 +961,6 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
                       </div>
                     </div>
                   </div>
-
                 </div>
               </div>
             ) : (
@@ -982,4 +979,3 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
     </main>
   );
 }
-

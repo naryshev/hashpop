@@ -14,7 +14,7 @@ const FAQS: { category: string; items: Faq[] }[] = [
     items: [
       {
         q: "How do I connect HashPack?",
-        a: "Click \"Connect wallet\" and approve the pairing request in the HashPack browser extension or mobile app. On desktop, install the HashPack extension first. On mobile, use the QR code or deep link to open the HashPack app and approve. If nothing happens within a few seconds on desktop, HashPack likely isn't installed — use the \"Install HashPack\" link or pair via QR code.",
+        a: 'Click "Connect wallet" and approve the pairing request in the HashPack browser extension or mobile app. On desktop, install the HashPack extension first. On mobile, use the QR code or deep link to open the HashPack app and approve. If nothing happens within a few seconds on desktop, HashPack likely isn\'t installed — use the "Install HashPack" link or pair via QR code.',
       },
       {
         q: "What is HBAR and how do I get it?",
@@ -34,12 +34,12 @@ const FAQS: { category: string; items: Faq[] }[] = [
         a: "When you buy an item that requires escrow, your HBAR is locked in the Hashpop smart contract instead of going straight to the seller. The seller ships the item and adds tracking; once you confirm receipt, the funds are released to the seller. If the seller never ships, escrow auto-refunds you after the timeout window.",
       },
       {
-        q: "What does \"PENDING\" status mean?",
+        q: 'What does "PENDING" status mean?',
         a: "PENDING means the listing has been created but its on-chain transaction hasn't been confirmed yet. This is usually resolved within a few seconds. Once confirmed, the listing flips to ACTIVE and can be purchased.",
       },
       {
         q: "How do I confirm I received an item?",
-        a: "Open Purchases → Bought, find the order, and click \"Confirm receipt\" once the item arrives. This releases the escrowed payment to the seller. If you don't act, escrow auto-releases after the timeout.",
+        a: 'Open Purchases → Bought, find the order, and click "Confirm receipt" once the item arrives. This releases the escrowed payment to the seller. If you don\'t act, escrow auto-releases after the timeout.',
       },
       {
         q: "What is the return policy?",
@@ -52,11 +52,11 @@ const FAQS: { category: string; items: Faq[] }[] = [
     items: [
       {
         q: "How do I add tracking after a sale?",
-        a: "Open Purchases → Sold (or the order detail page), click \"Mark as shipped\", and enter the carrier and tracking number. The buyer immediately sees the tracking info with a link to the carrier's tracking page, and the escrow tracker advances to \"Awaiting confirmation\".",
+        a: 'Open Purchases → Sold (or the order detail page), click "Mark as shipped", and enter the carrier and tracking number. The buyer immediately sees the tracking info with a link to the carrier\'s tracking page, and the escrow tracker advances to "Awaiting confirmation".',
       },
       {
         q: "What makes a good listing?",
-        a: "Listings must have at least one photo, a clear title, a price above zero, a category, and a description of at least 20 words. Listings that meet the higher \"Listing health\" targets (3+ photos, a detailed 60+ word description, a pinned location) tend to sell faster and build more trust.",
+        a: 'Listings must have at least one photo, a clear title, a price above zero, a category, and a description of at least 20 words. Listings that meet the higher "Listing health" targets (3+ photos, a detailed 60+ word description, a pinned location) tend to sell faster and build more trust.',
       },
     ],
   },

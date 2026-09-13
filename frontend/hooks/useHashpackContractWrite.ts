@@ -115,7 +115,11 @@ function pickNodeAccountIds(
   const push = (raw: unknown) => {
     try {
       const text =
-        typeof raw === "string" ? raw : raw && typeof (raw as any).toString === "function" ? (raw as any).toString() : null;
+        typeof raw === "string"
+          ? raw
+          : raw && typeof (raw as any).toString === "function"
+            ? (raw as any).toString()
+            : null;
       if (!text) return;
       const id = sdk.AccountId.fromString(text);
       const key = id.toString();
@@ -321,7 +325,11 @@ export function useHashpackContractWrite() {
               walletPrompted = true;
               receipt = await (hashconnect as any).sendTransaction(accountObj as any, tx as any);
               txId = tx.transactionId?.toString?.() ?? receipt?.transactionId?.toString?.() ?? txId;
-            } else if (!isPayableRequest && signer && typeof signer.signTransaction === "function") {
+            } else if (
+              !isPayableRequest &&
+              signer &&
+              typeof signer.signTransaction === "function"
+            ) {
               // Non-payable path: single node → freezeWith → signTransaction → execute.
               //
               // Why not populateTransaction:
@@ -469,9 +477,7 @@ export function useHashpackContractWrite() {
             // times in a row is disorienting and typically means the tx was rejected or
             // the network is unreachable (retrying won't help).
             const canRetry =
-              !walletPrompted &&
-              attempt < MAX_RETRIES - 1 &&
-              isRetryableWalletError(err.message);
+              !walletPrompted && attempt < MAX_RETRIES - 1 && isRetryableWalletError(err.message);
             if (canRetry) continue;
             safeSetError(err);
             throw err;

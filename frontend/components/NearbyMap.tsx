@@ -197,9 +197,7 @@ export function NearbyMap({ open, onClose }: { open: boolean; onClose: () => voi
           </div>
         )}
 
-        {phase === "ready" && (
-          <NearbyMapInner center={center} userPos={userPos} items={items} />
-        )}
+        {phase === "ready" && <NearbyMapInner center={center} userPos={userPos} items={items} />}
       </div>
     </div>,
     document.body,

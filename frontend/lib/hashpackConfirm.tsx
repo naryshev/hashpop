@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 type HashPackConfirmContextValue = {
@@ -131,9 +124,7 @@ function ConfirmModal({ onClose, detail }: { onClose: () => void; detail: string
             <p className="text-sm leading-relaxed text-silver">
               Approve the transaction in HashPack to continue.
             </p>
-            {detail && (
-              <p className="font-mono text-[13px] text-silver/70">{detail}</p>
-            )}
+            {detail && <p className="font-mono text-[13px] text-silver/70">{detail}</p>}
           </div>
 
           {/* CTA */}

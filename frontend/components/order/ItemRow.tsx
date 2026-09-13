@@ -43,7 +43,11 @@ export function ItemRow({
       >
         {image ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={image} alt={title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          <img
+            src={image}
+            alt={title}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          />
         ) : (
           <span aria-hidden>📦</span>
         )}

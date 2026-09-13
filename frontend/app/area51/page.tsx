@@ -37,7 +37,11 @@ function loadToken(): AdminToken | null {
     const raw = window.localStorage.getItem(TOKEN_KEY);
     if (!raw) return null;
     const t = JSON.parse(raw) as AdminToken;
-    if (typeof t?.address !== "string" || typeof t?.t !== "number" || typeof t?.signature !== "string") {
+    if (
+      typeof t?.address !== "string" ||
+      typeof t?.t !== "number" ||
+      typeof t?.signature !== "string"
+    ) {
       return null;
     }
     if (Date.now() - t.t > SESSION_TTL_MS) return null;
@@ -57,9 +61,10 @@ function saveToken(t: AdminToken | null) {
 }
 
 function adminHeader(token: AdminToken): Record<string, string> {
-  const encoded = typeof window !== "undefined"
-    ? window.btoa(JSON.stringify(token))
-    : Buffer.from(JSON.stringify(token)).toString("base64");
+  const encoded =
+    typeof window !== "undefined"
+      ? window.btoa(JSON.stringify(token))
+      : Buffer.from(JSON.stringify(token)).toString("base64");
   return { "x-admin-token": encoded };
 }
 
@@ -150,7 +155,12 @@ export default function Area51Page() {
           fetch(`${getApiUrl()}/api/admin/stats`, { headers }),
           fetch(`${getApiUrl()}/api/admin/listings?${params}`, { headers }),
         ]);
-        if (sRes.status === 401 || lRes.status === 401 || sRes.status === 403 || lRes.status === 403) {
+        if (
+          sRes.status === 401 ||
+          lRes.status === 401 ||
+          sRes.status === 403 ||
+          lRes.status === 403
+        ) {
           saveToken(null);
           setToken(null);
           setError("Admin session expired. Please sign in again.");
@@ -210,13 +220,10 @@ export default function Area51Page() {
       if (!window.confirm(`Permanently remove "${label}" from the marketplace?`)) return;
       setDeleting(id);
       try {
-        const res = await fetch(
-          `${getApiUrl()}/api/admin/listing/${encodeURIComponent(id)}`,
-          {
-            method: "DELETE",
-            headers: adminHeader(token),
-          },
-        );
+        const res = await fetch(`${getApiUrl()}/api/admin/listing/${encodeURIComponent(id)}`, {
+          method: "DELETE",
+          headers: adminHeader(token),
+        });
         if (res.status === 401 || res.status === 403) {
           saveToken(null);
           setToken(null);
@@ -293,8 +300,8 @@ export default function Area51Page() {
           </div>
           <h1 className="text-xl font-bold text-white">Admin sign-in</h1>
           <p className="text-sm text-silver">
-            You&apos;ll be asked to sign a session message in HashPack. The signature is kept on this
-            device for 24 hours.
+            You&apos;ll be asked to sign a session message in HashPack. The signature is kept on
+            this device for 24 hours.
           </p>
           {error && <p className="text-xs text-rose-300">{error}</p>}
           <button
@@ -320,7 +327,8 @@ export default function Area51Page() {
             </p>
             <h1 className="text-2xl font-extrabold tracking-tight text-white">Area 51</h1>
             <p className="text-xs text-silver">
-              Signed in as <span className="font-mono text-chrome">{truncateAddr(token.address)}</span>
+              Signed in as{" "}
+              <span className="font-mono text-chrome">{truncateAddr(token.address)}</span>
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -355,11 +363,7 @@ export default function Area51Page() {
             <StatCard label="Pending" value={String(stats.listings.pending)} accent="#fbbf24" />
             <StatCard label="Locked" value={String(stats.listings.locked)} accent="#f97316" />
             <StatCard label="Sold" value={String(stats.listings.sold)} accent="#a78bfa" />
-            <StatCard
-              label="Volume"
-              value={`${stats.sales.volumeHbar} ℏ`}
-              accent="#00e5ff"
-            />
+            <StatCard label="Volume" value={`${stats.sales.volumeHbar} ℏ`} accent="#00e5ff" />
           </div>
         )}
 
@@ -435,13 +439,9 @@ export default function Area51Page() {
                       >
                         {l.title || l.id.slice(0, 14) + "…"}
                       </a>
-                      {l.category && (
-                        <div className="text-[10px] text-silver">{l.category}</div>
-                      )}
+                      {l.category && <div className="text-[10px] text-silver">{l.category}</div>}
                       {l.disputeStatus === "OPEN" && (
-                        <div className="text-[10px] font-semibold text-amber-300">
-                          Dispute open
-                        </div>
+                        <div className="text-[10px] font-semibold text-amber-300">Dispute open</div>
                       )}
                     </td>
                     <td className="px-3 py-2 font-mono text-xs text-silver">

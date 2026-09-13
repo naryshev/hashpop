@@ -146,8 +146,8 @@ export function OpenDisputeModal({
               Dispute opened. Escrow is frozen and the other party has been notified.
             </p>
             <p className="mt-3 text-xs text-silver">
-              Finish by opening a ticket in Discord and pasting the details below so support can help
-              resolve it.
+              Finish by opening a ticket in Discord and pasting the details below so support can
+              help resolve it.
             </p>
             <pre className="mt-3 max-h-40 overflow-auto whitespace-pre-wrap rounded-lg border border-white/10 bg-black/30 p-3 text-[11px] leading-relaxed text-silver">
               {ticketTemplate}
@@ -168,7 +168,11 @@ export function OpenDisputeModal({
               >
                 Open ticket in Discord
               </a>
-              <button type="button" onClick={onClose} className="text-sm text-silver hover:text-white">
+              <button
+                type="button"
+                onClick={onClose}
+                className="text-sm text-silver hover:text-white"
+              >
                 Done
               </button>
             </div>

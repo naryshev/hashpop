@@ -112,8 +112,8 @@ export function PwaInstallPrompt() {
               Download Hashpop.
             </p>
             <p className="mt-4 max-w-xs text-sm text-silver">
-              Add Hashpop to your home screen for one-tap access to the on-chain
-              marketplace — buy, sell and track escrow anywhere.
+              Add Hashpop to your home screen for one-tap access to the on-chain marketplace — buy,
+              sell and track escrow anywhere.
             </p>
           </div>
           {installEvent && (
@@ -129,9 +129,7 @@ export function PwaInstallPrompt() {
 
         {/* Right: QR */}
         <div className="flex flex-col items-center justify-center gap-4 bg-[linear-gradient(160deg,#0b3b8f,#0b69d4)] p-8 text-center">
-          <p className="text-sm font-semibold text-white/90">
-            Scan with your phone&apos;s camera
-          </p>
+          <p className="text-sm font-semibold text-white/90">Scan with your phone&apos;s camera</p>
           <div className="rounded-2xl bg-white p-3 shadow-lg">
             <QRCodeSVG
               value={origin}
@@ -148,7 +146,8 @@ export function PwaInstallPrompt() {
             />
           </div>
           <p className="max-w-[200px] text-xs text-white/80">
-            Open the link, then tap <span className="font-semibold">Share → Add to Home Screen</span>.
+            Open the link, then tap{" "}
+            <span className="font-semibold">Share → Add to Home Screen</span>.
           </p>
         </div>
       </div>

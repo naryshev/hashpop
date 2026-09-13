@@ -133,7 +133,16 @@ export function TxDetailSheet({ open, txId, hashscanHref, onClose }: Sheet) {
         />
 
         <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-          <div id="tx-sheet-title" style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.16em", color: HP.muted, textTransform: "uppercase" }}>
+          <div
+            id="tx-sheet-title"
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: "0.16em",
+              color: HP.muted,
+              textTransform: "uppercase",
+            }}
+          >
             Transaction
           </div>
           {status && (
@@ -190,7 +199,12 @@ export function TxDetailSheet({ open, txId, hashscanHref, onClose }: Sheet) {
             {hashscanHref ? (
               <>
                 {" "}
-                <a href={hashscanHref} target="_blank" rel="noreferrer" style={{ color: HP.chrome }}>
+                <a
+                  href={hashscanHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ color: HP.chrome }}
+                >
                   Open on HashScan ↗
                 </a>
               </>
@@ -201,16 +215,14 @@ export function TxDetailSheet({ open, txId, hashscanHref, onClose }: Sheet) {
         {!loading && (tx || cc) && (
           <>
             <Section title="Summary">
-              <KV label="Type" value={tx?.name ? friendlyType(tx.name) : cc ? "Contract call" : "—"} />
               <KV
-                label="Consensus at"
-                value={consensus ? consensus.toLocaleString() : "—"}
+                label="Type"
+                value={tx?.name ? friendlyType(tx.name) : cc ? "Contract call" : "—"}
               />
+              <KV label="Consensus at" value={consensus ? consensus.toLocaleString() : "—"} />
               <KV label="Block" value={cc?.block_number != null ? `#${cc.block_number}` : "—"} />
               <KV label="Node" value={tx?.node ?? "—"} />
-              {tx?.transaction_hash && (
-                <KV label="Hash" value={tx.transaction_hash} mono wrap />
-              )}
+              {tx?.transaction_hash && <KV label="Hash" value={tx.transaction_hash} mono wrap />}
             </Section>
 
             {cc && (
@@ -234,10 +246,7 @@ export function TxDetailSheet({ open, txId, hashscanHref, onClose }: Sheet) {
                 label="Charged"
                 value={tx?.charged_tx_fee != null ? `${tinybarToHbar(tx.charged_tx_fee)} ℏ` : "—"}
               />
-              <KV
-                label="Max fee"
-                value={tx?.max_fee ? `${tinybarToHbar(tx.max_fee)} ℏ` : "—"}
-              />
+              <KV label="Max fee" value={tx?.max_fee ? `${tinybarToHbar(tx.max_fee)} ℏ` : "—"} />
               <KV
                 label="Valid duration"
                 value={tx?.valid_duration_seconds ? `${tx.valid_duration_seconds}s` : "—"}

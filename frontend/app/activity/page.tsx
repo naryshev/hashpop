@@ -49,7 +49,12 @@ type SaleRow = {
   amount?: string;
   createdAt?: string;
   role?: "buyer" | "seller";
-  listing?: { title?: string | null; status?: string | null; shippedAt?: string | null; exchangeConfirmedAt?: string | null } | null;
+  listing?: {
+    title?: string | null;
+    status?: string | null;
+    shippedAt?: string | null;
+    exchangeConfirmedAt?: string | null;
+  } | null;
 };
 
 type OfferRow = {
@@ -65,7 +70,14 @@ type OfferRow = {
 type InboxConversation = {
   otherAddress: string;
   listingId?: string | null;
-  lastMessage: { id: string; fromAddress: string; toAddress: string; body: string; encrypted?: boolean; createdAt: string };
+  lastMessage: {
+    id: string;
+    fromAddress: string;
+    toAddress: string;
+    body: string;
+    encrypted?: boolean;
+    createdAt: string;
+  };
   preview: string;
 };
 
@@ -88,7 +100,9 @@ function dayLabel(d: Date | null): string {
   if (!d) return "Unknown";
   const now = new Date();
   const sameDay = (a: Date, b: Date) =>
-    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
   const y = new Date(now);
   y.setDate(now.getDate() - 1);
   if (sameDay(d, now)) return "Today";
@@ -102,7 +116,6 @@ function timeStamp(d: Date | null): string {
   if (!d) return "";
   return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 }
-
 
 export default function ActivityPage() {
   const { address, accountId } = useHashpackWallet();
@@ -136,7 +149,9 @@ export default function ActivityPage() {
     Promise.allSettled([
       fetch(`${api}/api/user/${lower}/purchases`, { signal: ac.signal }).then((r) => r.json()),
       fetch(`${api}/api/user/${lower}/offers`, { signal: ac.signal }).then((r) => r.json()),
-      fetch(`${api}/api/messages/inbox?address=${lower}`, { signal: ac.signal }).then((r) => r.json()),
+      fetch(`${api}/api/messages/inbox?address=${lower}`, { signal: ac.signal }).then((r) =>
+        r.json(),
+      ),
       fetch(`${api}/api/ratings/${lower}`, { signal: ac.signal }).then((r) => r.json()),
     ])
       .then(([pRes, oRes, mRes, rRes]) => {
@@ -311,7 +326,9 @@ export default function ActivityPage() {
         <div className="mb-6">
           <h1 className="text-2xl font-extrabold tracking-[-0.01em] text-white">Activity</h1>
           <p className="mt-1 text-xs text-silver">
-            {userKey ? "Sales, purchases, offers, messages, and reviews." : "Connect your wallet to view activity."}
+            {userKey
+              ? "Sales, purchases, offers, messages, and reviews."
+              : "Connect your wallet to view activity."}
           </p>
         </div>
 
@@ -326,7 +343,9 @@ export default function ActivityPage() {
               {loading ? (
                 <p className="text-sm text-silver">Loading activity…</p>
               ) : visible.length === 0 ? (
-                <p className="text-sm text-silver">No activity yet. Sales, offers, and messages will show up here.</p>
+                <p className="text-sm text-silver">
+                  No activity yet. Sales, offers, and messages will show up here.
+                </p>
               ) : (
                 Array.from(groups.entries()).map(([day, rows]) => (
                   <section key={day} className="mb-7">
@@ -349,9 +368,13 @@ export default function ActivityPage() {
                               {e.kind[0]}
                             </div>
                             <div className="min-w-0 flex-1">
-                              <div className="truncate text-[13px] font-semibold text-white">{e.title}</div>
+                              <div className="truncate text-[13px] font-semibold text-white">
+                                {e.title}
+                              </div>
                               {e.subtitle ? (
-                                <div className="mt-0.5 line-clamp-1 text-[12px] text-silver">{e.subtitle}</div>
+                                <div className="mt-0.5 line-clamp-1 text-[12px] text-silver">
+                                  {e.subtitle}
+                                </div>
                               ) : null}
                               <div className="mt-1 flex flex-wrap items-center gap-2.5 text-[11px] text-silver">
                                 <span className="flex min-w-0 items-center font-mono">
@@ -369,15 +392,22 @@ export default function ActivityPage() {
                                   <span className="text-chrome">{e.amountHbar} ℏ</span>
                                 ) : null}
                                 {e.status ? (
-                                  <span className="uppercase tracking-wide text-[10px]">{e.status}</span>
+                                  <span className="uppercase tracking-wide text-[10px]">
+                                    {e.status}
+                                  </span>
                                 ) : null}
                               </div>
                             </div>
-                            <div className="shrink-0 font-mono text-[11px] text-silver">{timeStamp(e.when)}</div>
+                            <div className="shrink-0 font-mono text-[11px] text-silver">
+                              {timeStamp(e.when)}
+                            </div>
                           </div>
                         );
                         return (
-                          <li key={e.id} className="border-b border-white/[0.03] py-3.5 last:border-0">
+                          <li
+                            key={e.id}
+                            className="border-b border-white/[0.03] py-3.5 last:border-0"
+                          >
                             {e.href ? (
                               <Link href={e.href} className="block hover:opacity-90">
                                 {row}

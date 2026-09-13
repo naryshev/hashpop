@@ -990,14 +990,18 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       // With force=true, the seller explicitly wants the listing removed from the app
       // regardless of on-chain state (e.g. contract was redeployed, tx failed, etc.).
       if (listing.onChainConfirmed && !force)
-        return res.status(400).json({ error: "Listing is confirmed on-chain; cancel via contract" });
-      if (listing.status === "CANCELLED")
-        return res.json({ ok: true }); // already done
+        return res
+          .status(400)
+          .json({ error: "Listing is confirmed on-chain; cancel via contract" });
+      if (listing.status === "CANCELLED") return res.json({ ok: true }); // already done
       await prisma.listing.update({
         where: { id },
         data: { status: "CANCELLED" },
       });
-      log.info({ id, seller, force: !!force }, force ? "Force-cancelled on-chain listing" : "Cancelled off-chain unconfirmed listing");
+      log.info(
+        { id, seller, force: !!force },
+        force ? "Force-cancelled on-chain listing" : "Cancelled off-chain unconfirmed listing",
+      );
       return res.json({ ok: true });
     } catch (err) {
       log.error({ err, id }, "Off-chain cancel failed");
@@ -1221,7 +1225,10 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           }
         }
       } catch (e) {
-        log.warn({ err: e, txHash: txHashStr }, "sync-offer chain verification failed; falling back");
+        log.warn(
+          { err: e, txHash: txHashStr },
+          "sync-offer chain verification failed; falling back",
+        );
       }
     }
     try {
@@ -1634,7 +1641,9 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       if (!opener) return res.status(400).json({ error: "openerAddress is required" });
       const reasonText = typeof reason === "string" ? reason.trim().slice(0, 1000) : "";
       if (reasonText.length < 5) {
-        return res.status(400).json({ error: "Please describe the issue (at least 5 characters)." });
+        return res
+          .status(400)
+          .json({ error: "Please describe the issue (at least 5 characters)." });
       }
 
       const listing = await prisma.listing.findUnique({ where: { id } });
@@ -1711,8 +1720,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       const phone = field("phone", 30) || null;
 
       if (name.length < 2) return res.status(400).json({ error: "Full name is required." });
-      if (line1.length < 4)
-        return res.status(400).json({ error: "Street address is required." });
+      if (line1.length < 4) return res.status(400).json({ error: "Street address is required." });
       if (city.length < 2) return res.status(400).json({ error: "City is required." });
       if (postalCode.length < 3)
         return res.status(400).json({ error: "Postal / ZIP code is required." });
@@ -2836,26 +2844,24 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         username?: { name?: string | null } | null;
         profilePicture?: { thumbUrl?: string | null } | string | null;
       };
-      const data = (await r.json()) as
-        | { profiles?: HashPackProfile[] }
-        | HashPackProfile[];
+      const data = (await r.json()) as { profiles?: HashPackProfile[] } | HashPackProfile[];
       const list = Array.isArray(data) ? data : (data?.profiles ?? []);
       for (const p of list) {
         if (!p?.accountId) continue;
         const nameRaw =
           typeof p.name === "string"
             ? p.name
-            : (p.name && typeof p.name === "object" ? p.name.name : null) ??
-              (p.username && typeof p.username === "object" ? p.username.name : null);
+            : ((p.name && typeof p.name === "object" ? p.name.name : null) ??
+              (p.username && typeof p.username === "object" ? p.username.name : null));
         const pictureRaw =
           typeof p.picture === "string"
             ? p.picture
-            : (p.picture && typeof p.picture === "object" ? p.picture.thumbnail : null) ??
+            : ((p.picture && typeof p.picture === "object" ? p.picture.thumbnail : null) ??
               (typeof p.profilePicture === "string"
                 ? p.profilePicture
                 : p.profilePicture && typeof p.profilePicture === "object"
                   ? p.profilePicture.thumbUrl
-                  : null);
+                  : null));
         out.set(p.accountId, {
           name: typeof nameRaw === "string" && nameRaw.trim() ? nameRaw.trim() : null,
           avatarUrl: typeof pictureRaw === "string" && pictureRaw.trim() ? pictureRaw.trim() : null,
@@ -3019,7 +3025,9 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
   // This is the only admin endpoint that doesn't require a signed session —
   // it just answers "should this wallet see the sign-in screen?".
   router.get("/admin/check", (req, res) => {
-    const address = String(req.query.address ?? "").trim().toLowerCase();
+    const address = String(req.query.address ?? "")
+      .trim()
+      .toLowerCase();
     if (!address) return res.json({ isAdmin: false });
     return res.json({ isAdmin: isAdminAddress(address) });
   });
@@ -3063,7 +3071,9 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     const auth = verifyAdminToken(req);
     if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
     try {
-      const status = String(req.query.status ?? "").trim().toUpperCase();
+      const status = String(req.query.status ?? "")
+        .trim()
+        .toUpperCase();
       const q = String(req.query.q ?? "").trim();
       const where: Record<string, unknown> = {};
       if (status) where.status = status;

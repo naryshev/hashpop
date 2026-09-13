@@ -12,13 +12,7 @@ import { useRobustContractWrite } from "../hooks/useRobustContractWrite";
 import { useHashpackWallet } from "../lib/hashpackWallet";
 import { activeHederaChain } from "../lib/hederaChains";
 import { CARRIERS, carrierTrackingUrl } from "../lib/trackingUrl";
-import {
-  ESCROW_V2,
-  EscrowView,
-  orderStatusLine,
-  phaseFor,
-  StatusLine,
-} from "../lib/orderStatus";
+import { ESCROW_V2, EscrowView, orderStatusLine, phaseFor, StatusLine } from "../lib/orderStatus";
 
 /** Buyer-facing tracking line with a clickable link to the carrier's tracking page. */
 function TrackingLink({
@@ -363,9 +357,7 @@ export function EscrowPanel({
               <AddressDisplay address={escrow.seller} className="text-amber-300 text-xs" />
             </div>
             <div className="text-right">
-              <p className="text-[10px] uppercase tracking-wider text-white/40 mb-0.5">
-                In escrow
-              </p>
+              <p className="text-[10px] uppercase tracking-wider text-white/40 mb-0.5">In escrow</p>
               <p className="text-chrome font-semibold text-xs">
                 {formatHbarWithUsd(formatContractAmountToHbar(escrow.amount), usdRate)}
               </p>
