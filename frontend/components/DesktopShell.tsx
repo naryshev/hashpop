@@ -325,8 +325,8 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
         {showFooter && <Footer />}
       </main>
 
-      {/* Desktop overlays: profile card + messages, so these flows never
-          navigate away from the current page. */}
+      {/* Desktop overlays: account menu sheet + messages. Menu rows
+          close the sheet and navigate; messages stay on-page. */}
       <ProfileCardSheet open={profileOpen} onClose={() => setProfileOpen(false)} />
       <MessagesModal open={messagesOpen} onClose={() => setMessagesOpen(false)} />
     </div>
