@@ -26,6 +26,7 @@ import {
   shouldRetryHashConnectInit,
   withTimeout,
 } from "./hashpackWalletInit";
+import { markAwaitingHashpackReturn } from "./hashpackRestore";
 
 type HederaNetwork = "mainnet" | "testnet";
 
@@ -107,9 +108,10 @@ export function buildHashPackDeepLink(pairingUri: string): string {
   return `hashpack://wc?uri=${encodeURIComponent(pairingUri)}`;
 }
 
-function openHashPackDeepLink(pairingUri: string): void {
+export function openHashPackDeepLink(pairingUri: string): void {
   if (typeof window === "undefined" || !pairingUri) return;
   if (isFramed()) return; // wallet dApp browser — iframe pairing handles it
+  markAwaitingHashpackReturn();
   const deeplink = buildHashPackDeepLink(pairingUri);
   try {
     if (isMobileBrowser()) {

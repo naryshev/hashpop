@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Wallet, Copy, Check, QrCode, ChevronUp, AlertTriangle, ArrowRight } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import { useHashpackWallet, buildHashPackDeepLink } from "../../lib/hashpackWallet";
+import { useHashpackWallet, openHashPackDeepLink } from "../../lib/hashpackWallet";
 
 type SignInCardProps = {
   onConnected?: () => void;
@@ -33,12 +33,11 @@ export function SignInCard({ onConnected, className }: SignInCardProps) {
     lastPressAtRef.current = now;
 
     if (pairingUri) {
-      const deeplink = buildHashPackDeepLink(pairingUri);
       const isMobile = /Android|iPhone|iPad|iPod/i.test(
         typeof navigator !== "undefined" ? navigator.userAgent : "",
       );
       if (isMobile) {
-        window.location.href = deeplink;
+        openHashPackDeepLink(pairingUri);
         setDeepLinkFired(true);
       }
     }
