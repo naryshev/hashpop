@@ -27,6 +27,7 @@ export function HashpackRestoreOverlay() {
   const [returnedFromBackground, setReturnedFromBackground] = useState(false);
   const [hardCapped, setHardCapped] = useState(false);
   const [open, setOpen] = useState(false);
+  const [preview, setPreview] = useState(false);
   const shownAtRef = useRef<number | null>(null);
   const prevVisibilityRef = useRef<DocumentVisibilityState>(
     typeof document === "undefined" ? "visible" : document.visibilityState,
@@ -39,6 +40,11 @@ export function HashpackRestoreOverlay() {
       setAwaitingHashpackReturn(next);
       if (next) setHardCapped(false);
     });
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setPreview(params.has("hpRestoreOverlay"));
   }, []);
 
   useEffect(() => {
@@ -97,7 +103,7 @@ export function HashpackRestoreOverlay() {
     return () => window.clearTimeout(hide);
   }, [wantsShow, open]);
 
-  return <HashpackRestoreOverlayView open={open} />;
+  return <HashpackRestoreOverlayView open={open || preview} />;
 }
 
 export function HashpackRestoreOverlayView({ open }: { open: boolean }) {
