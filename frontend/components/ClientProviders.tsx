@@ -10,6 +10,7 @@ import { BottomNav } from "./BottomNav";
 import { WalletAccountSync } from "./WalletAccountSync";
 import { DesktopShell } from "./DesktopShell";
 import { PwaInstallPrompt } from "./PwaInstallPrompt";
+import { HashpackRestoreOverlay } from "./HashpackRestoreOverlay";
 
 const qc = new QueryClient();
 
@@ -26,6 +27,7 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
                 {/* Mobile floating nav; desktop nav lives in DesktopShell. */}
                 <BottomNav />
                 <PwaInstallPrompt />
+                <HashpackRestoreOverlay />
               </TopBarProvider>
             </ProfilesProvider>
           </SignInModalProvider>
