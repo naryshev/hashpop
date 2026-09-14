@@ -73,8 +73,13 @@ export function shouldEngageHashpackRestore(input: {
 export function noteVisibilityReturn(
   previous: DocumentVisibilityState,
   next: DocumentVisibilityState,
-): boolean {
-  return previous === "hidden" && next === "visible";
+  hadBeenVisible: boolean,
+): { isReturn: boolean; hadBeenVisible: boolean } {
+  const isReturn = hadBeenVisible && previous === "hidden" && next === "visible";
+  return {
+    isReturn,
+    hadBeenVisible: hadBeenVisible || previous === "visible" || next === "visible",
+  };
 }
 
 export function shouldKeepHashpackRestoreVisible(input: {

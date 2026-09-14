@@ -150,14 +150,21 @@ describe("shouldEngageHashpackRestore", () => {
 });
 
 describe("noteVisibilityReturn", () => {
-  it("treats hidden → visible as a deep-link/swipe-back return", () => {
-    expect(noteVisibilityReturn("hidden", "visible")).toBe(true);
+  it("treats hidden → visible as a deep-link/swipe-back return only after the page has been visible", () => {
+    expect(noteVisibilityReturn("hidden", "visible", true).isReturn).toBe(true);
+  });
+
+  it("does not treat the first hidden → visible paint as a HashPack return", () => {
+    // Prerender, background tab, or SSO bounce: document starts hidden.
+    const firstPaint = noteVisibilityReturn("hidden", "visible", false);
+    expect(firstPaint.isReturn).toBe(false);
+    expect(firstPaint.hadBeenVisible).toBe(true);
   });
 
   it("ignores the initial visible state and hide-only transitions", () => {
-    expect(noteVisibilityReturn("visible", "visible")).toBe(false);
-    expect(noteVisibilityReturn("visible", "hidden")).toBe(false);
-    expect(noteVisibilityReturn("hidden", "hidden")).toBe(false);
+    expect(noteVisibilityReturn("visible", "visible", true).isReturn).toBe(false);
+    expect(noteVisibilityReturn("visible", "hidden", true).isReturn).toBe(false);
+    expect(noteVisibilityReturn("hidden", "hidden", false).isReturn).toBe(false);
   });
 });
 

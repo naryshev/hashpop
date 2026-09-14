@@ -32,6 +32,9 @@ export function HashpackRestoreOverlay() {
   const prevVisibilityRef = useRef<DocumentVisibilityState>(
     typeof document === "undefined" ? "visible" : document.visibilityState,
   );
+  const hadBeenVisibleRef = useRef(
+    typeof document === "undefined" ? false : document.visibilityState === "visible",
+  );
 
   useEffect(() => {
     setAwaitingHashpackReturn(isAwaitingHashpackReturn());
@@ -52,7 +55,9 @@ export function HashpackRestoreOverlay() {
       const previous = prevVisibilityRef.current;
       const next = document.visibilityState;
       prevVisibilityRef.current = next;
-      if (noteVisibilityReturn(previous, next)) {
+      const result = noteVisibilityReturn(previous, next, hadBeenVisibleRef.current);
+      hadBeenVisibleRef.current = result.hadBeenVisible;
+      if (result.isReturn) {
         setReturnedFromBackground(true);
         setHardCapped(false);
       }
