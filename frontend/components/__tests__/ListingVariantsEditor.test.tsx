@@ -89,6 +89,31 @@ describe("ListingVariantsEditor", () => {
     await rerender();
     expect(variants.map((v) => v.label)).toEqual(["Blue", ""]);
   });
+
+  it("uses 44px glass chips for reorder and remove", async () => {
+    await render(
+      createElement(ListingVariantsEditor, {
+        variants: [
+          { id: "a", label: "Black", price: "100", mediaIndex: null },
+          { id: "b", label: "Blue", price: "110", mediaIndex: null },
+        ],
+        onChange: () => {},
+      }),
+    );
+    const up = document.querySelector('button[aria-label="Move option 2 up"]') as HTMLButtonElement;
+    const down = document.querySelector(
+      'button[aria-label="Move option 1 down"]',
+    ) as HTMLButtonElement;
+    const remove = document.querySelector(
+      'button[aria-label="Remove option Black"]',
+    ) as HTMLButtonElement;
+    for (const btn of [up, down, remove]) {
+      expect(btn.className).toMatch(/\bh-11\b/);
+      expect(btn.className).toMatch(/\bw-11\b/);
+      expect(btn.className).toContain("bg-material-regular");
+      expect(btn.className).not.toMatch(/\bh-7\b/);
+    }
+  });
 });
 
 describe("ListingVariantPicker", () => {
@@ -141,5 +166,31 @@ describe("ListingVariantPicker", () => {
       btn?.click();
     });
     expect(selected).toBe("b");
+  });
+
+  it("uses material.chrome for the selected option instead of hand-rolled mint", async () => {
+    const variants: ListingVariant[] = [
+      { id: "a", label: "128GB", price: "80", mediaIndex: null },
+      { id: "b", label: "256GB", price: "95", mediaIndex: 1 },
+    ];
+    await render(
+      createElement(ListingVariantPicker, {
+        variants,
+        selectedId: "b",
+        onSelect: () => {},
+      }),
+    );
+    const selected = Array.from(document.querySelectorAll("button")).find((b) =>
+      b.textContent?.includes("256GB"),
+    ) as HTMLButtonElement;
+    const idle = Array.from(document.querySelectorAll("button")).find((b) =>
+      b.textContent?.includes("128GB"),
+    ) as HTMLButtonElement;
+    expect(selected.className).toContain("bg-material-chrome");
+    expect(selected.className).not.toContain("bg-[#00ffa3]/10");
+    expect(selected.className).not.toContain("bg-white/5");
+    expect(idle.className).toContain("bg-material-regular");
+    expect(idle.className).not.toContain("bg-material-chrome");
+    expect(idle.className).not.toContain("bg-white/5");
   });
 });

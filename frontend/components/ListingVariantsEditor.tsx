@@ -1,7 +1,8 @@
 "use client";
 
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "../lib/utils";
-import { material } from "../lib/materials";
+import { glassChip, material } from "../lib/materials";
 import { newListingVariant, type ListingVariant } from "../lib/listingVariants";
 
 export function ListingVariantsEditor({
@@ -51,18 +52,18 @@ export function ListingVariantsEditor({
                     aria-label={`Move option ${index + 1} up`}
                     disabled={index === 0}
                     onClick={() => move(index, -1)}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-hairline text-white/80 disabled:opacity-30"
+                    className={glassChip}
                   >
-                    ↑
+                    <ChevronUp size={18} strokeWidth={2.25} />
                   </button>
                   <button
                     type="button"
                     aria-label={`Move option ${index + 1} down`}
                     disabled={index === variants.length - 1}
                     onClick={() => move(index, 1)}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-hairline text-white/80 disabled:opacity-30"
+                    className={glassChip}
                   >
-                    ↓
+                    <ChevronDown size={18} strokeWidth={2.25} />
                   </button>
                 </div>
                 <div className="min-w-0 flex-1 space-y-2">
@@ -120,7 +121,7 @@ export function ListingVariantsEditor({
                   type="button"
                   aria-label={`Remove option ${v.label || index + 1}`}
                   onClick={() => onChange(variants.filter((_, i) => i !== index))}
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-black/50 text-lg text-white hover:bg-rose-500"
+                  className={cn(glassChip, "hover:bg-rose-500")}
                 >
                   ×
                 </button>

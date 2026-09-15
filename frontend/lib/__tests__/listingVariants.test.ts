@@ -6,6 +6,7 @@ import {
   resolveListingPrice,
   selectedListingVariant,
   validateListingVariantsDraft,
+  variantPriceMismatchesListing,
 } from "../listingVariants";
 
 describe("parseListingVariants", () => {
@@ -71,6 +72,25 @@ describe("selectedListingVariant", () => {
     ];
     expect(selectedListingVariant(variants, null)?.id).toBe("a");
     expect(selectedListingVariant(variants, "b")?.id).toBe("b");
+  });
+});
+
+describe("variantPriceMismatchesListing", () => {
+  it("is false when there is no selected variant price", () => {
+    expect(variantPriceMismatchesListing(undefined, "100")).toBe(false);
+    expect(variantPriceMismatchesListing("", "100")).toBe(false);
+    expect(variantPriceMismatchesListing("100", undefined)).toBe(false);
+  });
+
+  it("is false when the selected SKU matches the listing price", () => {
+    expect(variantPriceMismatchesListing("100", "100")).toBe(false);
+    expect(variantPriceMismatchesListing("100.0", "100")).toBe(false);
+    expect(variantPriceMismatchesListing("100", "100.0000")).toBe(false);
+  });
+
+  it("is true when the selected SKU differs from the on-chain listing price", () => {
+    expect(variantPriceMismatchesListing("130", "100")).toBe(true);
+    expect(variantPriceMismatchesListing("99.99", "100")).toBe(true);
   });
 });
 

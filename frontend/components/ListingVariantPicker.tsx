@@ -28,11 +28,9 @@ export function ListingVariantPicker({
               onClick={() => onSelect(v.id)}
               aria-pressed={active}
               className={cn(
-                material.regular,
+                active ? material.chrome : material.regular,
                 "flex w-full items-center justify-between gap-3 rounded-[14px] px-3.5 py-3 text-left transition-colors",
-                active
-                  ? "border-[#00ffa3]/50 bg-[#00ffa3]/10 text-chrome"
-                  : "text-white hover:bg-white/[0.08]",
+                active ? "text-chrome" : "text-white",
               )}
             >
               <span className="min-w-0 truncate text-sm font-semibold">{v.label}</span>

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { marketplaceAbi, marketplaceAddress } from "../lib/contracts";
-import { formatPriceForDisplay } from "../lib/formatPrice";
+import { formatContractAmountToHbar, formatPriceForDisplay } from "../lib/formatPrice";
 import { getTransactionErrorMessage } from "../lib/transactionError";
 import { useHbarUsd } from "../hooks/useHbarUsd";
 import { listingIdToBytes32 } from "../lib/bytes32";
@@ -23,6 +23,7 @@ import { useCart } from "../lib/cart";
 import { useRouter } from "next/navigation";
 import { listingCta } from "../lib/materials";
 import { cn } from "../lib/utils";
+import { variantPriceMismatchesListing } from "../lib/listingVariants";
 
 export function BuyButton({
   listingId,
@@ -156,6 +157,12 @@ export function BuyButton({
           throw new Error("Listing is no longer available to buy. Please refresh.");
         }
       }
+      const onChainHbar = formatContractAmountToHbar(latestPrice.toString());
+      if (variantPriceMismatchesListing(variantPrice, onChainHbar)) {
+        throw new Error(
+          "This option’s price doesn’t match the on-chain listing. Purchase is disabled until the seller updates the on-chain price.",
+        );
+      }
       const variantPay =
         variantPrice && Number(variantPrice) > 0 ? parseUnits(String(variantPrice), 8) : 0n;
       if (variantPay > 0n) {
@@ -203,19 +210,25 @@ export function BuyButton({
   };
 
   const usdRate = useHbarUsd();
+  const listingHbar =
+    onChainListing && priceWei > 0n
+      ? formatContractAmountToHbar(priceWei.toString())
+      : formatPriceForDisplay(_price);
+  const variantBlocked = variantPriceMismatchesListing(variantPrice, listingHbar);
   const canBuy =
     (hasPrice || chainReadFailed || hasApiPrice) &&
     !isWrongNetwork &&
     !isPending &&
     !isConfirming &&
-    !isLegacyWeiListing;
+    !isLegacyWeiListing &&
+    !variantBlocked;
 
   const priceHbarDisplay = formatPriceForDisplay(variantPrice || _price || "0");
   const priceUsd =
     usdRate && usdRate > 0 && !Number.isNaN(Number(priceHbarDisplay))
       ? (Number(priceHbarDisplay) * usdRate).toFixed(2)
       : null;
-  const hasCallout = notOnChain || isLegacyWeiListing;
+  const hasCallout = notOnChain || isLegacyWeiListing || variantBlocked;
   const purchaseOffset = descriptionSlot || hasCallout ? "mt-3" : "mt-4";
 
   return (
@@ -251,17 +264,30 @@ export function BuyButton({
           before it can be purchased.
         </p>
       )}
+      {variantBlocked && (
+        <p
+          className={cn(
+            "rounded-[14px] border border-amber-400/25 bg-amber-400/10 px-3 py-2.5 text-[13px] leading-snug text-amber-200/90",
+            descriptionSlot || notOnChain || isLegacyWeiListing ? "mt-2" : "mt-4",
+          )}
+        >
+          This option is {formatPriceForDisplay(variantPrice || "0")} ℏ, but the on-chain listing is{" "}
+          {listingHbar} ℏ. Purchase is disabled until they match — the contract can only collect the
+          on-chain price.
+        </p>
+      )}
 
       <button
         type="button"
         onClick={() => {
+          if (variantBlocked) return;
           if (!address) {
             openSignIn({ title: "Sign in to buy" });
             return;
           }
           if (canBuy) setShippingGate("buy");
         }}
-        disabled={!!address && !canBuy}
+        disabled={variantBlocked || (!!address && !canBuy)}
         className={cn(listingCta.filled, purchaseOffset)}
       >
         {isPending ? "Confirm in wallet\u2026" : "Purchase"}

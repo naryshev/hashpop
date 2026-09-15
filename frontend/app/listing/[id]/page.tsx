@@ -11,7 +11,7 @@ import { TrustStrip } from "../../../components/TrustStrip";
 import { ListingVariantsEditor } from "../../../components/ListingVariantsEditor";
 import { ListingVariantPicker } from "../../../components/ListingVariantPicker";
 import { Button } from "../../../components/ui/Button";
-import { material } from "../../../lib/materials";
+import { glassChip, material } from "../../../lib/materials";
 import { LISTING_CONDITIONS } from "../../../lib/listingConditions";
 import {
   parseListingVariants,
@@ -1396,6 +1396,11 @@ export default function ListingPage() {
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={item.url} alt="" className="h-full w-full object-cover" />
                       )}
+                      {editing && i === 0 && (
+                        <span className="pointer-events-none absolute bottom-0 left-0 bg-black/70 px-1 text-[9px] font-bold uppercase text-chrome">
+                          Cover
+                        </span>
+                      )}
                       {editing && (
                         <button
                           type="button"
@@ -1403,7 +1408,7 @@ export default function ListingPage() {
                             e.stopPropagation();
                             removeGalleryItem(item);
                           }}
-                          className="absolute right-0 top-0 z-10 flex h-6 w-6 items-center justify-center rounded-bl-lg bg-black/70 text-sm text-white hover:bg-rose-500"
+                          className={`${glassChip} absolute right-0 top-0 z-10 text-lg hover:bg-rose-500`}
                           aria-label="Remove"
                         >
                           ×
@@ -1675,11 +1680,11 @@ export default function ListingPage() {
                           key={c.label}
                           type="button"
                           onClick={() => setEditCondition(c.label)}
-                          className={`text-left rounded-[14px] px-2.5 py-2.5 border transition-colors ${
-                            active
-                              ? "bg-[#00ffa3]/10 border-[#00ffa3]/50 text-chrome"
-                              : "bg-white/5 border-white/10 text-white hover:border-white/20"
-                          }`}
+                          className={cn(
+                            active ? material.chrome : material.regular,
+                            "text-left rounded-[14px] px-2.5 py-2.5 transition-colors",
+                            active ? "text-chrome" : "text-white",
+                          )}
                         >
                           <div className="text-xs font-bold">{c.label}</div>
                           <div className="text-[10px] text-silver leading-tight mt-1">{c.desc}</div>
