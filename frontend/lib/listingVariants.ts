@@ -1,3 +1,5 @@
+import { formatPriceForDisplay } from "./formatPrice";
+
 export const MAX_LISTING_VARIANTS = 20;
 
 export type ListingVariant = {
@@ -103,6 +105,19 @@ export function resolveListingPrice(opts: {
   const selected = selectedListingVariant(variants, opts.selectedVariantId);
   if (selected) return selected.price;
   return opts.listingPrice;
+}
+
+/** True when a selected SKU cannot be collected by buyNow (`msg.value` must equal listing.price). */
+export function variantPriceMismatchesListing(
+  variantPrice: string | null | undefined,
+  listingPrice: string | null | undefined,
+): boolean {
+  if (variantPrice == null || variantPrice === "") return false;
+  if (listingPrice == null || listingPrice === "") return false;
+  const a = Number(formatPriceForDisplay(variantPrice));
+  const b = Number(formatPriceForDisplay(listingPrice));
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
+  return Math.abs(a - b) > 0.0001;
 }
 
 export function validateListingVariantsDraft(variants: ListingVariant[]): string | null {

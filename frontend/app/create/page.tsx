@@ -16,7 +16,7 @@ import {
   validateListingVariantsDraft,
   type ListingVariant,
 } from "../../lib/listingVariants";
-import { listingCta, material } from "../../lib/materials";
+import { glassChip, listingCta, material } from "../../lib/materials";
 import { getTransactionErrorMessage } from "../../lib/transactionError";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
 import { ConnectWalletButton } from "../../components/ConnectWalletButton";
@@ -590,7 +590,7 @@ function CreatePageContent() {
                         <button
                           type="button"
                           onClick={() => removeMedia(item.id)}
-                          className="absolute top-0 right-0 z-10 w-6 h-6 flex items-center justify-center bg-black/70 text-white text-sm rounded-bl-lg hover:bg-rose-500 transition-colors"
+                          className={`${glassChip} absolute right-0 top-0 z-10 text-lg hover:bg-rose-500`}
                           aria-label="Remove"
                         >
                           ×

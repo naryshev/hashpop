@@ -11,6 +11,9 @@ export const material = {
   hairline: "border-hairline",
 } as const;
 
+/** ≥44px circular glass control (thumb ×, reorder chevrons). */
+export const glassChip = `${material.regular} flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white disabled:opacity-30`;
+
 /** Listing CTA block + ConfirmPurchaseSheet footer. Sentence-case labels at call sites. */
 export const listingCta = {
   filled:
