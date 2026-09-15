@@ -1,11 +1,20 @@
 export const DEAL_ROOM_EMPTY_HEADLINE = "This is the deal room";
 export const DEAL_ROOM_EMPTY_BODY =
-  "Chat about this listing, lock escrow before you meet, and build reputation with every contract.";
-export const DEAL_ROOM_EMPTY_CHIPS = ["Chat", "Escrow", "Reputation"] as const;
+  "Chat here. Lock escrow before you meet. Reputation updates when you both confirm.";
+export const DEAL_ROOM_EMPTY_CHIPS = [
+  "Still available?",
+  "Can we meet today?",
+  "Make an offer",
+  "More photos?",
+] as const;
 export const DEAL_ROOM_PLACEHOLDER = "Message about this listing…";
 export const LOCK_ESCROW_SHEET_TITLE = "Lock escrow before you meet";
 export const LOCK_ESCROW_CTA = "Lock escrow";
 export const LOCK_ESCROW_SECONDARY = "Not now";
+export const LOCK_ESCROW_SHEET_BODY =
+  "Funds stay protected until you both confirm the exchange. Then reputation updates on both wallets.";
+export const MEETUP_CARD_TITLE = "Meetup";
+export const MEETUP_CONFIRM_CTA = "Confirm meetup";
 
 export type DealListing = {
   id: string;
@@ -60,6 +69,29 @@ export function shouldPromptLockEscrow(
   if (listingEscrowLocked(listing)) return false;
   if (!viewerAddress) return false;
   return listing.seller.toLowerCase() !== viewerAddress.toLowerCase();
+}
+
+export type MeetupCard = {
+  title: string;
+  body: string;
+  confirmLabel: string;
+  gateLockEscrow: boolean;
+};
+
+export function meetupStructuredCard(
+  listing: DealListing,
+  viewerAddress: string | null | undefined,
+): MeetupCard | null {
+  const status = (listing.status ?? "").toUpperCase();
+  if (listing.shippedAt || listing.trackingNumber) return null;
+  if (listing.exchangeConfirmedAt) return null;
+  if (status === "SOLD" || status === "COMPLETED") return null;
+  return {
+    title: MEETUP_CARD_TITLE,
+    body: LOCK_ESCROW_SHEET_BODY,
+    confirmLabel: MEETUP_CONFIRM_CTA,
+    gateLockEscrow: shouldPromptLockEscrow(listing, viewerAddress),
+  };
 }
 
 function hasOpenDispute(listing: DealListing): boolean {

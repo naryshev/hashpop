@@ -100,7 +100,7 @@ export function DealRoomOfferCards({
         const actions = offerCardActions(offer, { viewer: address, seller: sellerAddress });
         return (
           <div key={offer.id} className={cn(material.regular, "mx-2 rounded-[16px] px-3.5 py-3")}>
-            <p className="text-[11px] font-medium uppercase tracking-wide text-silver">Offer</p>
+            <p className="text-[13px] font-medium text-silver">Offer</p>
             <p className="mt-1 text-lg font-bold text-white">
               {formatHbarWithUsd(offer.amount, usdRate)}
             </p>

@@ -62,9 +62,54 @@ describe("TrustStrip", () => {
       address: "0xabc0000000000000000000000000000000000001",
       unknown: false,
       successfulCompletions: 0,
+      reputationScore: 0,
       linkToProfile: false,
     });
     expect(document.body.textContent).toContain(ZERO_DEALS_FULL);
+    expect(document.body.textContent).toContain("0");
+  });
+
+  it("renders reputationScore as a large cue on full and primary number on compact", async () => {
+    await renderStrip({
+      density: "full",
+      address: "0xseller",
+      unknown: false,
+      successfulCompletions: 3,
+      reputationScore: 27,
+      linkToProfile: false,
+    });
+    expect(document.body.textContent).toContain("27");
+    expect(document.body.textContent).toContain("3 completed");
+
+    await act(async () => {
+      root!.render(
+        createElement(TrustStrip, {
+          density: "compact",
+          address: "0xseller",
+          displayName: "Ada",
+          unknown: false,
+          successfulCompletions: 3,
+          reputationScore: 27,
+          linkToProfile: false,
+        }),
+      );
+    });
+    expect(document.body.textContent).toContain("27");
+    expect(document.body.textContent).toContain("Ada");
+  });
+
+  it("styles the KYC chip with mint fill and mint border", async () => {
+    await renderStrip({
+      density: "full",
+      address: "0xseller",
+      unknown: false,
+      successfulCompletions: 1,
+      kycStatus: "VERIFIED",
+      linkToProfile: false,
+    });
+    const kyc = document.querySelector('[data-testid="trust-kyc-chip"]');
+    expect(kyc?.className).toContain("bg-[#00ffa3]/10");
+    expect(kyc?.className).toContain("border-[#00ffa3]/25");
   });
 
   it("hides ratings when missing and shows them when present", async () => {

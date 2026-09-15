@@ -1,12 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
   DEAL_ROOM_EMPTY_BODY,
+  DEAL_ROOM_EMPTY_CHIPS,
   DEAL_ROOM_EMPTY_HEADLINE,
   DEAL_ROOM_PLACEHOLDER,
+  LOCK_ESCROW_CTA,
+  LOCK_ESCROW_SECONDARY,
+  LOCK_ESCROW_SHEET_BODY,
   LOCK_ESCROW_SHEET_TITLE,
   escrowBarFromListing,
   escrowSystemCards,
   listingEscrowLocked,
+  meetupStructuredCard,
   offerCardActions,
   shouldPromptLockEscrow,
 } from "../dealRoom";
@@ -30,13 +35,24 @@ const listingBase = {
 };
 
 describe("deal-room frozen copy", () => {
-  it("keeps empty-thread headline, body, and placeholder", () => {
+  it("keeps empty-thread headline, body, chips, and placeholder", () => {
     expect(DEAL_ROOM_EMPTY_HEADLINE).toBe("This is the deal room");
-    expect(DEAL_ROOM_EMPTY_BODY).toMatch(/chat/i);
-    expect(DEAL_ROOM_EMPTY_BODY).toMatch(/escrow/i);
-    expect(DEAL_ROOM_EMPTY_BODY).toMatch(/reputation/i);
+    expect(DEAL_ROOM_EMPTY_BODY).toBe(
+      "Chat here. Lock escrow before you meet. Reputation updates when you both confirm.",
+    );
+    expect([...DEAL_ROOM_EMPTY_CHIPS]).toEqual([
+      "Still available?",
+      "Can we meet today?",
+      "Make an offer",
+      "More photos?",
+    ]);
     expect(DEAL_ROOM_PLACEHOLDER).toBe("Message about this listing…");
     expect(LOCK_ESCROW_SHEET_TITLE).toBe("Lock escrow before you meet");
+    expect(LOCK_ESCROW_CTA).toBe("Lock escrow");
+    expect(LOCK_ESCROW_SECONDARY).toBe("Not now");
+    expect(LOCK_ESCROW_SHEET_BODY).toBe(
+      "Funds stay protected until you both confirm the exchange. Then reputation updates on both wallets.",
+    );
   });
 });
 
@@ -57,6 +73,35 @@ describe("listingEscrowLocked / meetup prompt", () => {
     expect(shouldPromptLockEscrow({ ...listingBase, requireEscrow: false }, "0xbuyer")).toBe(false);
     expect(shouldPromptLockEscrow({ ...listingBase, status: "LOCKED" }, "0xbuyer")).toBe(false);
     expect(shouldPromptLockEscrow(listingBase, null)).toBe(false);
+  });
+});
+
+describe("meetupStructuredCard", () => {
+  it("shows a Meetup card and gates confirm to lock-escrow when funds are not locked", () => {
+    const card = meetupStructuredCard(listingBase, "0xbuyer");
+    expect(card).not.toBeNull();
+    expect(card?.title).toBe("Meetup");
+    expect(card?.confirmLabel).toBe("Confirm meetup");
+    expect(card?.gateLockEscrow).toBe(true);
+  });
+
+  it("does not gate confirm once escrow is locked", () => {
+    const card = meetupStructuredCard({ ...listingBase, status: "LOCKED" }, "0xbuyer");
+    expect(card?.gateLockEscrow).toBe(false);
+  });
+
+  it("hides the Meetup card after ship or completed exchange", () => {
+    expect(
+      meetupStructuredCard({ ...listingBase, shippedAt: "2026-09-01T00:00:00.000Z" }, "0xbuyer"),
+    ).toBeNull();
+    expect(meetupStructuredCard({ ...listingBase, trackingNumber: "1Z999" }, "0xbuyer")).toBeNull();
+    expect(
+      meetupStructuredCard(
+        { ...listingBase, exchangeConfirmedAt: "2026-09-01T00:00:00.000Z" },
+        "0xbuyer",
+      ),
+    ).toBeNull();
+    expect(meetupStructuredCard({ ...listingBase, status: "SOLD" }, "0xbuyer")).toBeNull();
   });
 });
 

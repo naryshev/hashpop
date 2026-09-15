@@ -2,9 +2,58 @@ export type TrustStripDensity = "full" | "compact" | "inline";
 
 export const UNKNOWN_ON_HASHPOP = "New on Hashpop";
 export const ZERO_DEALS_FULL = "0 completed · Builds with each contract";
-export const PROFILE_REVIEWS_OWN_EMPTY = "Your reputation starts with a deal";
-export const PROFILE_LISTINGS_EMPTY = "No listings yet";
-export const PROFILE_BADGES_EMPTY = "No badges yet";
+export const PROFILE_LIST_CTA = "List something";
+
+export type ProfileEmptySurface = "noDeals" | "listings" | "reviews" | "badges";
+
+export type ProfileEmptyCopy = {
+  headline: string;
+  body: string;
+  cta?: string;
+};
+
+/** Frozen Primaries from p2-copy-empty-states.md. */
+export function profileEmptyCopy(surface: ProfileEmptySurface, isSelf: boolean): ProfileEmptyCopy {
+  if (surface === "noDeals") {
+    return isSelf
+      ? {
+          headline: "Your reputation starts with a deal",
+          body: "List real stuff. Chat in-wallet, lock escrow, meet or ship — then your score travels with you.",
+          cta: PROFILE_LIST_CTA,
+        }
+      : {
+          headline: UNKNOWN_ON_HASHPOP,
+          body: "Reputation builds with completed deals. Check back after they’ve closed a few.",
+        };
+  }
+  if (surface === "listings") {
+    return isSelf
+      ? {
+          headline: "List real stuff",
+          body: "Meetups with a contract. Escrow on your wallet. Settled in HBAR.",
+          cta: PROFILE_LIST_CTA,
+        }
+      : {
+          headline: "No listings right now",
+          body: "Reputation still travels with this wallet.",
+        };
+  }
+  if (surface === "reviews") {
+    return isSelf
+      ? {
+          headline: "No reviews yet",
+          body: "Close a deal, then you and your counterparty can rate each other.",
+        }
+      : {
+          headline: "No reviews yet",
+          body: "Reviews appear after completed deals — not before.",
+        };
+  }
+  return {
+    headline: "No badges yet",
+    body: "Badges show up as you complete deals and verify.",
+  };
+}
 
 export type TrustStripInput = {
   density: TrustStripDensity;
@@ -25,6 +74,8 @@ export type TrustStripView = {
   showSkeleton: boolean;
   unknownLabel: string | null;
   completedLine: string | null;
+  scoreLabel: string | null;
+  scoreSize: "large" | "primary" | null;
   showRatings: boolean;
   ratingsLabel: string | null;
   showKyc: boolean;
@@ -48,9 +99,25 @@ function isVerifiedKyc(status?: string | null): boolean {
 function inferUnknown(input: TrustStripInput): boolean {
   if (input.unknown === true) return true;
   if (input.unknown === false) return false;
+  // Full-density profile: zeros are a known empty wallet, not "unknown".
+  // Compact/inline keep inferring New on Hashpop so feeds never show 0.0 (0).
+  if (input.density === "full") return false;
   const deals =
     (input.successfulCompletions ?? 0) + (input.totalSales ?? 0) + (input.completedBuys ?? 0);
   return deals === 0 && !hasRatings(input) && !isVerifiedKyc(input.kycStatus);
+}
+
+function scoreCue(
+  input: TrustStripInput,
+  unknown: boolean,
+): { scoreLabel: string | null; scoreSize: TrustStripView["scoreSize"] } {
+  if (unknown || input.reputationScore == null || input.density === "inline") {
+    return { scoreLabel: null, scoreSize: null };
+  }
+  return {
+    scoreLabel: String(input.reputationScore),
+    scoreSize: input.density === "full" ? "large" : "primary",
+  };
 }
 
 export function trustStripView(input: TrustStripInput): TrustStripView {
@@ -59,6 +126,8 @@ export function trustStripView(input: TrustStripInput): TrustStripView {
       showSkeleton: true,
       unknownLabel: null,
       completedLine: null,
+      scoreLabel: null,
+      scoreSize: null,
       showRatings: false,
       ratingsLabel: null,
       showKyc: false,
@@ -72,6 +141,7 @@ export function trustStripView(input: TrustStripInput): TrustStripView {
   const showRatings = !unknown && hasRatings(input);
   const showKyc = !unknown && isVerifiedKyc(input.kycStatus);
   const completed = completedCount(input);
+  const { scoreLabel, scoreSize } = scoreCue(input, unknown);
 
   let completedLine: string | null = null;
   if (input.density === "full" && !unknown) {
@@ -85,6 +155,8 @@ export function trustStripView(input: TrustStripInput): TrustStripView {
     showSkeleton: false,
     unknownLabel: unknown ? UNKNOWN_ON_HASHPOP : null,
     completedLine,
+    scoreLabel,
+    scoreSize,
     showRatings,
     ratingsLabel: showRatings
       ? `${Number(input.ratingsAvg).toFixed(1)} (${input.ratingsCount})`

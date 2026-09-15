@@ -14,7 +14,7 @@ import { profileAvatarUrl, profileDisplayName, useProfile } from "../lib/profile
 import { TrustStrip } from "./TrustStrip";
 import { DealRoomOfferCards } from "./DealRoomOfferCards";
 import { LockEscrowSheet } from "./LockEscrowSheet";
-import { material } from "../lib/materials";
+import { listingCta, material } from "../lib/materials";
 import { cn } from "../lib/utils";
 import {
   DEAL_ROOM_EMPTY_BODY,
@@ -23,8 +23,10 @@ import {
   DEAL_ROOM_PLACEHOLDER,
   escrowBarFromListing,
   escrowSystemCards,
+  meetupStructuredCard,
   shouldPromptLockEscrow,
   type DealListing,
+  type MeetupCard,
 } from "../lib/dealRoom";
 
 type InboxConversation = {
@@ -959,6 +961,13 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
 
                 <div className="flex min-h-0 flex-1 flex-col">
                   <div className="flex-1 space-y-2 overflow-y-auto px-3 py-3">
+                    {dealListing && (
+                      <MeetupStructuredCard
+                        card={meetupStructuredCard(dealListing, address)}
+                        listingId={dealListing.id}
+                        onGate={() => setLockEscrowOpen(true)}
+                      />
+                    )}
                     {threadLoading ? (
                       <p className="text-silver text-sm">Loading thread…</p>
                     ) : threadMessages.length === 0 ? (
@@ -969,12 +978,14 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
                         </p>
                         <div className="mt-3 flex flex-wrap justify-center gap-1.5">
                           {DEAL_ROOM_EMPTY_CHIPS.map((chip) => (
-                            <span
+                            <button
                               key={chip}
-                              className="rounded-full border border-hairline bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-white/80"
+                              type="button"
+                              onClick={() => setReplyBody(chip)}
+                              className="rounded-full border border-hairline bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-white/80 hover:bg-white/[0.08]"
                             >
                               {chip}
-                            </span>
+                            </button>
                           ))}
                         </div>
                       </div>
@@ -1116,5 +1127,32 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
         )}
       </div>
     </main>
+  );
+}
+
+function MeetupStructuredCard({
+  card,
+  listingId,
+  onGate,
+}: {
+  card: MeetupCard | null;
+  listingId: string;
+  onGate: () => void;
+}) {
+  if (!card) return null;
+  return (
+    <div className={cn(material.regular, "mx-1 rounded-[16px] px-3.5 py-3")}>
+      <p className="text-[12px] font-semibold text-white">{card.title}</p>
+      <p className="mt-0.5 text-[11px] leading-snug text-silver">{card.body}</p>
+      {card.gateLockEscrow ? (
+        <button type="button" onClick={onGate} className={cn(listingCta.tinted, "mt-3 h-10")}>
+          {card.confirmLabel}
+        </button>
+      ) : (
+        <Link href={listingHref(listingId)} className={cn(listingCta.tinted, "mt-3 h-10")}>
+          {card.confirmLabel}
+        </Link>
+      )}
+    </div>
   );
 }

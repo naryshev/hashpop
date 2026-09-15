@@ -5,6 +5,7 @@ import { LockEscrowSheet } from "../LockEscrowSheet";
 import {
   LOCK_ESCROW_CTA,
   LOCK_ESCROW_SECONDARY,
+  LOCK_ESCROW_SHEET_BODY,
   LOCK_ESCROW_SHEET_TITLE,
 } from "../../lib/dealRoom";
 
@@ -46,6 +47,7 @@ describe("LockEscrowSheet", () => {
     const dialog = document.querySelector('[role="dialog"]');
     expect(dialog).toBeTruthy();
     expect(dialog?.textContent).toContain(LOCK_ESCROW_SHEET_TITLE);
+    expect(dialog?.textContent).toContain(LOCK_ESCROW_SHEET_BODY);
     expect(dialog?.textContent).toContain(LOCK_ESCROW_CTA);
     expect(dialog?.textContent).toContain(LOCK_ESCROW_SECONDARY);
   });

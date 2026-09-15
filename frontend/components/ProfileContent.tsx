@@ -12,14 +12,7 @@ import { useHashpackWallet } from "../lib/hashpackWallet";
 import { compressImage } from "../lib/compressImage";
 import { listingCta, material } from "../lib/materials";
 import { profileAvatarUrl, profileDisplayName, useProfile } from "../lib/profiles";
-import {
-  PROFILE_BADGES_EMPTY,
-  PROFILE_LISTINGS_EMPTY,
-  PROFILE_REVIEWS_OWN_EMPTY,
-  UNKNOWN_ON_HASHPOP,
-  identityTitle,
-  profileAddressKey,
-} from "../lib/trustStrip";
+import { identityTitle, profileAddressKey, profileEmptyCopy } from "../lib/trustStrip";
 import { cn } from "../lib/utils";
 
 type ProfileStats = {
@@ -211,12 +204,11 @@ export function ProfileContent({
   });
   const isVerified = profile?.kyc?.status === "VERIFIED";
   const completions = stats?.successfulCompletions ?? stats?.successful ?? 0;
-  const unknown =
-    !statsLoading &&
-    completions === 0 &&
-    (stats?.totalSales ?? 0) === 0 &&
-    (stats?.ratingCount ?? 0) === 0 &&
-    (stats?.completedBuys ?? 0) === 0;
+  const unknown = !statsLoading && stats === null;
+  const noDealsCopy = profileEmptyCopy("noDeals", isSelf);
+  const listingsCopy = profileEmptyCopy("listings", isSelf);
+  const reviewsCopy = profileEmptyCopy("reviews", isSelf);
+  const badgesCopy = profileEmptyCopy("badges", isSelf);
 
   const goBack = useCallback(() => {
     if (typeof window !== "undefined" && window.history.length > 1) router.back();
@@ -333,6 +325,14 @@ export function ProfileContent({
           linkToProfile={false}
         />
 
+        {!statsLoading && stats && completions === 0 && (
+          <EmptyState
+            headline={noDealsCopy.headline}
+            body={noDealsCopy.body}
+            cta={noDealsCopy.cta}
+          />
+        )}
+
         {editing && isSelf && (
           <div className={cn(material.regular, "space-y-3 rounded-[16px] p-4")}>
             <div className="flex items-center justify-between">
@@ -404,12 +404,9 @@ export function ProfileContent({
         {tab === "listings" &&
           (listings.length === 0 ? (
             <EmptyState
-              headline={PROFILE_LISTINGS_EMPTY}
-              body={
-                isSelf
-                  ? "List something to start trading on Hashpop."
-                  : "This seller has nothing listed right now."
-              }
+              headline={listingsCopy.headline}
+              body={listingsCopy.body}
+              cta={listingsCopy.cta}
             />
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -421,14 +418,7 @@ export function ProfileContent({
 
         {tab === "reviews" &&
           (reviews.length === 0 ? (
-            <EmptyState
-              headline={isSelf ? PROFILE_REVIEWS_OWN_EMPTY : UNKNOWN_ON_HASHPOP}
-              body={
-                isSelf
-                  ? "Complete a contract and ratings will land here."
-                  : "No reviews yet — reputation builds with each contract."
-              }
-            />
+            <EmptyState headline={reviewsCopy.headline} body={reviewsCopy.body} />
           ) : (
             <ul className="space-y-2">
               {reviews.map((r) => (
@@ -460,23 +450,23 @@ export function ProfileContent({
               </div>
             </div>
           ) : (
-            <EmptyState
-              headline={PROFILE_BADGES_EMPTY}
-              body={
-                isSelf ? "KYC is the only badge in this release." : "No badges on this profile."
-              }
-            />
+            <EmptyState headline={badgesCopy.headline} body={badgesCopy.body} />
           ))}
       </div>
     </main>
   );
 }
 
-function EmptyState({ headline, body }: { headline: string; body: string }) {
+function EmptyState({ headline, body, cta }: { headline: string; body: string; cta?: string }) {
   return (
     <div className={cn(material.regular, "rounded-[16px] px-5 py-8 text-center")}>
       <p className="text-base font-semibold text-white">{headline}</p>
       <p className="mt-1 text-sm text-silver">{body}</p>
+      {cta && (
+        <Link href="/create" className={cn(listingCta.tinted, "mt-4 inline-flex h-11 px-5")}>
+          {cta}
+        </Link>
+      )}
     </div>
   );
 }
