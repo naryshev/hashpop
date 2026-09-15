@@ -23,6 +23,7 @@ type UseCreateListingOptions = {
   cityRef?: React.MutableRefObject<string | null>;
   locationLatRef?: React.MutableRefObject<number | null>;
   locationLngRef?: React.MutableRefObject<number | null>;
+  variantsRef?: React.MutableRefObject<unknown[] | null>;
 };
 
 export function useCreateListing(options?: UseCreateListingOptions) {
@@ -39,6 +40,7 @@ export function useCreateListing(options?: UseCreateListingOptions) {
     cityRef,
     locationLatRef,
     locationLngRef,
+    variantsRef,
   } = options || {};
   const { send, isPending, error, lastHash } = useRobustContractWrite();
   const { address } = useHashpackWallet();
@@ -80,6 +82,7 @@ export function useCreateListing(options?: UseCreateListingOptions) {
     const city = cityRef?.current ?? undefined;
     const locationLat = locationLatRef?.current ?? undefined;
     const locationLng = locationLngRef?.current ?? undefined;
+    const variants = variantsRef?.current ?? undefined;
     const syncRes = await fetch(`${getApiUrl()}/api/sync-listing`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -100,6 +103,7 @@ export function useCreateListing(options?: UseCreateListingOptions) {
         ...(city && { city }),
         ...(typeof locationLat === "number" && { locationLat }),
         ...(typeof locationLng === "number" && { locationLng }),
+        ...(Array.isArray(variants) && variants.length > 0 && { variants }),
       }),
     }).catch(() => null);
     if (!syncRes?.ok) {

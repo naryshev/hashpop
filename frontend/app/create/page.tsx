@@ -7,8 +7,16 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCreateListing } from "../../hooks/useCreateListing";
 import { CategorySearch } from "../../components/CategorySearch";
 import { LocationPicker, type LocationValue } from "../../components/LocationPicker";
+import { ListingVariantsEditor } from "../../components/ListingVariantsEditor";
 import { compressImage } from "../../lib/compressImage";
 import { formatPriceForDisplay } from "../../lib/formatPrice";
+import { LISTING_CONDITIONS } from "../../lib/listingConditions";
+import {
+  parseListingVariants,
+  validateListingVariantsDraft,
+  type ListingVariant,
+} from "../../lib/listingVariants";
+import { listingCta, material } from "../../lib/materials";
 import { getTransactionErrorMessage } from "../../lib/transactionError";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
 import { ConnectWalletButton } from "../../components/ConnectWalletButton";
@@ -22,14 +30,6 @@ const MAX_MEDIA_COUNT = 10; // photos + videos per listing
 const ALLOWED_IMAGE_TYPES = "image/jpeg,image/jpg,image/png,image/gif,image/webp";
 const ALLOWED_VIDEO_TYPES = "video/mp4,video/webm,video/quicktime";
 const ALLOWED_MEDIA_TYPES = `${ALLOWED_IMAGE_TYPES},${ALLOWED_VIDEO_TYPES}`;
-
-const CONDITIONS: { label: string; desc: string }[] = [
-  { label: "New", desc: "Sealed or unused" },
-  { label: "Like new", desc: "Used briefly · no flaws" },
-  { label: "Used", desc: "Normal wear · works perfectly" },
-  { label: "Worn", desc: "Visible wear · functional" },
-  { label: "For parts", desc: "Damaged / incomplete" },
-];
 
 type MediaItem = {
   id: string;
@@ -45,7 +45,6 @@ function isVideoFile(file: File): boolean {
 function CreatePageContent() {
   const [price, setPrice] = useState("");
   const [title, setTitle] = useState("");
-  const [subtitle, setSubtitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
   const [condition, setCondition] = useState("");
@@ -58,6 +57,7 @@ function CreatePageContent() {
   const [triedSubmit, setTriedSubmit] = useState(false);
   const [duplicateMediaCount, setDuplicateMediaCount] = useState(0);
   const [createdListingId, setCreatedListingId] = useState<string | null>(null);
+  const [variants, setVariants] = useState<ListingVariant[]>([]);
   const createdListingIdRef = useRef<string | null>(null);
   const duplicateMediaUrlsRef = useRef<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -70,7 +70,6 @@ function CreatePageContent() {
   const mediaUrlsRef = useRef<string[]>([]);
   const requireEscrowRef = useRef<boolean>(false);
   const titleRef = useRef<string | null>(null);
-  const subtitleRef = useRef<string | null>(null);
   const descriptionRef = useRef<string | null>(null);
   const categoryRef = useRef<string | null>(null);
   const conditionRef = useRef<string | null>(null);
@@ -78,6 +77,7 @@ function CreatePageContent() {
   const cityRef = useRef<string | null>(null);
   const locationLatRef = useRef<number | null>(null);
   const locationLngRef = useRef<number | null>(null);
+  const variantsRef = useRef<ListingVariant[] | null>(null);
 
   const {
     create,
@@ -90,7 +90,6 @@ function CreatePageContent() {
     mediaUrlsRef,
     requireEscrowRef,
     titleRef,
-    subtitleRef,
     descriptionRef,
     categoryRef,
     conditionRef,
@@ -98,6 +97,7 @@ function CreatePageContent() {
     cityRef,
     locationLatRef,
     locationLngRef,
+    variantsRef,
   });
   const isPending = listingPending;
   const isSuccess = listingSuccess;
@@ -133,7 +133,6 @@ function CreatePageContent() {
       if (!raw) return;
       const d = JSON.parse(raw) as Record<string, unknown>;
       if (typeof d.title === "string") setTitle(d.title);
-      if (typeof d.subtitle === "string") setSubtitle(d.subtitle);
       if (typeof d.description === "string") setDescription(d.description);
       if (typeof d.category === "string") setCategory(d.category);
       if (typeof d.condition === "string") setCondition(d.condition);
@@ -143,6 +142,7 @@ function CreatePageContent() {
       if (d.location && typeof d.location === "object") {
         setLocation(d.location as LocationValue);
       }
+      if (Array.isArray(d.variants)) setVariants(parseListingVariants(d.variants));
       setDraftRestored(true);
     } catch {
       // ignore malformed drafts
@@ -156,7 +156,6 @@ function CreatePageContent() {
         DRAFT_KEY,
         JSON.stringify({
           title,
-          subtitle,
           description,
           category,
           condition,
@@ -164,6 +163,7 @@ function CreatePageContent() {
           price,
           requireEscrow,
           location,
+          variants,
           savedAt: Date.now(),
         }),
       );
@@ -182,7 +182,6 @@ function CreatePageContent() {
     }
     setDraftRestored(false);
     setTitle("");
-    setSubtitle("");
     setDescription("");
     setCategory("");
     setCondition("");
@@ -190,6 +189,7 @@ function CreatePageContent() {
     setPrice("");
     setRequireEscrow(false);
     setLocation({ city: null, lat: null, lng: null });
+    setVariants([]);
   };
 
   // A published listing consumes the draft.
@@ -210,7 +210,6 @@ function CreatePageContent() {
         const item = data.listing;
         if (!item) return;
         setTitle(item.title ?? "");
-        setSubtitle(item.subtitle ?? "");
         setDescription(item.description ?? "");
         setCategory(item.category ?? "");
         setCondition(item.condition ?? "");
@@ -229,6 +228,7 @@ function CreatePageContent() {
         const urls = item.mediaUrls?.length ? item.mediaUrls : item.imageUrl ? [item.imageUrl] : [];
         duplicateMediaUrlsRef.current = urls;
         setDuplicateMediaCount(urls.length);
+        setVariants(parseListingVariants(item.variants));
       })
       .catch(() => {});
   }, [duplicateId]);
@@ -356,26 +356,18 @@ function CreatePageContent() {
     return urls;
   };
 
-  // Minimum publish requirements. Listings that fail any of these are blocked
-  // from publishing so the marketplace can't fill up with empty/low-quality
-  // posts (titleless items, no photos, no description, etc.).
-  const descriptionWordCount = useMemo(
-    () => description.trim().split(/\s+/).filter(Boolean).length,
-    [description],
-  );
+  // Minimum publish requirements. Description is optional.
   const validation = useMemo(() => {
     const photoCount = mediaItems.length + duplicateMediaCount;
+    const variantError = validateListingVariantsDraft(variants);
     return {
       photos: photoCount >= 1 ? null : "Add at least 1 photo.",
       title: title.trim() ? null : "Add a title.",
       price: price && Number(price) > 0 ? null : "Enter a price greater than 0.",
       category: category.trim() ? null : "Select a category.",
-      description:
-        descriptionWordCount >= 20
-          ? null
-          : `Write at least 20 words (currently ${descriptionWordCount}).`,
+      variants: variantError,
     };
-  }, [mediaItems.length, duplicateMediaCount, title, price, category, descriptionWordCount]);
+  }, [mediaItems.length, duplicateMediaCount, title, price, category, variants]);
   const isValid = !Object.values(validation).some(Boolean);
 
   const handleSubmit = async () => {
@@ -383,7 +375,6 @@ function CreatePageContent() {
     setTriedSubmit(true);
     const fromDuplicate = duplicateMediaUrlsRef.current.length > 0;
     titleRef.current = title.trim() || null;
-    subtitleRef.current = subtitle.trim() || null;
     descriptionRef.current = description.trim() || null;
     categoryRef.current = category.trim() || null;
     conditionRef.current = condition.trim() || null;
@@ -392,6 +383,8 @@ function CreatePageContent() {
     locationLatRef.current = typeof location.lat === "number" ? location.lat : null;
     locationLngRef.current = typeof location.lng === "number" ? location.lng : null;
     requireEscrowRef.current = requireEscrow;
+    const readyVariants = parseListingVariants(variants);
+    variantsRef.current = readyVariants.length > 0 ? readyVariants : null;
 
     if (!isValid) {
       setSubmitError("Please fix the highlighted fields before publishing.");
@@ -511,7 +504,7 @@ function CreatePageContent() {
                 />
                 <div className="mt-2 space-y-2">
                   <div
-                    className="aspect-video rounded-lg border-2 border-dashed border-white/10 overflow-hidden bg-white/5 flex items-center justify-center hover:border-white/20 transition-colors"
+                    className={`${material.regular} aspect-video rounded-[14px] overflow-hidden flex items-center justify-center hover:bg-white/[0.08] transition-colors`}
                     onDragOver={handleMediaDragOver}
                     onDrop={(e) => handleMediaDrop(e, 0)}
                   >
@@ -551,7 +544,7 @@ function CreatePageContent() {
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="w-full h-full flex items-center justify-center text-silver hover:text-white border-2 border-dashed border-white/20 rounded-lg"
+                        className="w-full h-full flex items-center justify-center text-silver hover:text-white rounded-[14px] border border-dashed border-white/20"
                       >
                         + Add featured image / video
                       </button>
@@ -589,16 +582,19 @@ function CreatePageContent() {
                             draggable={false}
                           />
                         )}
-                        {index > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => removeMedia(item.id)}
-                            className="absolute top-0 right-0 w-6 h-6 flex items-center justify-center bg-black/70 text-white text-sm rounded-bl-lg hover:bg-rose-500 transition-colors"
-                            aria-label="Remove"
-                          >
-                            ×
-                          </button>
+                        {index === 0 && (
+                          <span className="pointer-events-none absolute bottom-0 left-0 bg-black/70 px-1 text-[9px] font-bold uppercase text-chrome">
+                            Cover
+                          </span>
                         )}
+                        <button
+                          type="button"
+                          onClick={() => removeMedia(item.id)}
+                          className="absolute top-0 right-0 z-10 w-6 h-6 flex items-center justify-center bg-black/70 text-white text-sm rounded-bl-lg hover:bg-rose-500 transition-colors"
+                          aria-label="Remove"
+                        >
+                          ×
+                        </button>
                       </div>
                     ))}
                     <button
@@ -636,20 +632,10 @@ function CreatePageContent() {
                   </label>
 
                   <label className="block">
-                    <span className="text-xs font-semibold text-white">Subtitle</span>
-                    <input
-                      value={subtitle}
-                      onChange={(e) => setSubtitle(e.target.value)}
-                      className="input-frost mt-1 w-full"
-                      placeholder="One-line teaser shown on cards"
-                    />
-                  </label>
-
-                  <label className="block">
                     <span className="flex items-baseline justify-between text-xs font-semibold text-white">
                       Description
                       <span className="font-mono text-[10px] uppercase tracking-wide text-silver">
-                        Markdown supported
+                        Optional
                       </span>
                     </span>
                     <textarea
@@ -658,11 +644,6 @@ function CreatePageContent() {
                       className="input-frost mt-1 w-full min-h-[100px] resize-y"
                       placeholder="What makes it worth buying? Condition notes, what's included, any flaws."
                     />
-                    {triedSubmit && validation.description && (
-                      <span className="mt-1 block text-xs text-rose-400">
-                        {validation.description}
-                      </span>
-                    )}
                   </label>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -733,7 +714,7 @@ function CreatePageContent() {
                       Condition <span className="text-chrome">*</span>
                     </span>
                     <div className="mt-2 grid grid-cols-2 sm:grid-cols-5 gap-2">
-                      {CONDITIONS.map((c) => {
+                      {LISTING_CONDITIONS.map((c) => {
                         const active = condition === c.label;
                         return (
                           <button
@@ -764,6 +745,18 @@ function CreatePageContent() {
                   sub="Shown publicly only down to neighborhood. Search a city or click the map to drop a pin."
                 />
                 <LocationPicker value={location} onChange={setLocation} />
+              </section>
+
+              <section>
+                <ListingVariantsEditor
+                  variants={variants}
+                  onChange={setVariants}
+                  mediaCount={mediaItems.length + duplicateMediaCount}
+                  defaultPrice={price}
+                />
+                {triedSubmit && validation.variants && (
+                  <p className="text-rose-400 text-xs mt-2">{validation.variants}</p>
+                )}
               </section>
 
               <section>
@@ -851,7 +844,7 @@ function CreatePageContent() {
               <button
                 onClick={handleSubmit}
                 disabled={isPending}
-                className="w-full rounded-lg px-5 py-3 bg-chrome text-black text-sm font-bold shadow-[0_0_20px_rgba(0,255,163,0.35)] disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none"
+                className={`${listingCta.filled} disabled:opacity-60 disabled:cursor-not-allowed`}
               >
                 {isPending ? "Confirm in wallet…" : "Publish listing →"}
               </button>
@@ -1001,9 +994,8 @@ function ListingHealth({
       ok: hasLocation,
     },
     {
-      label: "Description ≥ 60 words",
-      ok: wordCount >= 60,
-      hint: wordCount > 0 && wordCount < 60 ? `Add ~${60 - wordCount} more words` : undefined,
+      label: "Description added",
+      ok: wordCount > 0,
     },
   ];
   return (

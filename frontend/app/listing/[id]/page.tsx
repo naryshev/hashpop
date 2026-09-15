@@ -8,6 +8,18 @@ import { BuyButton } from "../../../components/BuyButton";
 import { EscrowPanel } from "../../../components/EscrowPanel";
 import { AddressDisplay } from "../../../components/AddressDisplay";
 import { TrustStrip } from "../../../components/TrustStrip";
+import { ListingVariantsEditor } from "../../../components/ListingVariantsEditor";
+import { ListingVariantPicker } from "../../../components/ListingVariantPicker";
+import { Button } from "../../../components/ui/Button";
+import { material } from "../../../lib/materials";
+import { LISTING_CONDITIONS } from "../../../lib/listingConditions";
+import {
+  parseListingVariants,
+  selectedListingVariant,
+  validateListingVariantsDraft,
+  resolveListingPrice,
+  type ListingVariant,
+} from "../../../lib/listingVariants";
 import { profileAvatarUrl, useProfile } from "../../../lib/profiles";
 import { ChevronLeft, Heart, Share2, Sparkles } from "lucide-react";
 import { cn } from "../../../lib/utils";
@@ -91,6 +103,7 @@ type Listing = {
   originalPapers?: string | null;
   imageUrl?: string | null;
   mediaUrls?: string[];
+  variants?: ListingVariant[] | null;
   city?: string | null;
   locationLat?: number | null;
   locationLng?: number | null;
@@ -119,7 +132,6 @@ export default function ListingPage() {
   const [shareCopied, setShareCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState("");
-  const [editSubtitle, setEditSubtitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editPrice, setEditPrice] = useState("");
   const [editCondition, setEditCondition] = useState("");
@@ -131,6 +143,10 @@ export default function ListingPage() {
   });
   const [editImageFiles, setEditImageFiles] = useState<File[]>([]);
   const [editRemovedMediaUrls, setEditRemovedMediaUrls] = useState<string[]>([]);
+  const [editVariants, setEditVariants] = useState<ListingVariant[]>([]);
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
+  const [editPendingUrls, setEditPendingUrls] = useState<string[]>([]);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [priceUpdateFailedBanner, setPriceUpdateFailedBanner] = useState<string | null>(null);
@@ -274,7 +290,6 @@ export default function ListingPage() {
   useEffect(() => {
     if (!listing) return;
     setEditTitle(listing.title ?? "");
-    setEditSubtitle(listing.subtitle ?? "");
     setEditDescription(listing.description ?? "");
     setEditPrice(formatPriceForDisplay(listing.price));
     setEditCondition(listing.condition ?? "");
@@ -283,6 +298,12 @@ export default function ListingPage() {
       city: listing.city ?? null,
       lat: typeof listing.locationLat === "number" ? listing.locationLat : null,
       lng: typeof listing.locationLng === "number" ? listing.locationLng : null,
+    });
+    const nextVariants = parseListingVariants(listing.variants);
+    setEditVariants(nextVariants);
+    setSelectedVariantId((prev) => {
+      if (prev && nextVariants.some((v) => v.id === prev)) return prev;
+      return nextVariants[0]?.id ?? null;
     });
   }, [listing]);
 
@@ -300,6 +321,14 @@ export default function ListingPage() {
   }, [cancelSuccess, cancelTxHash, router]);
 
   useEffect(() => {
+    const urls = editImageFiles.map((f) => URL.createObjectURL(f));
+    setEditPendingUrls(urls);
+    return () => {
+      urls.forEach((u) => URL.revokeObjectURL(u));
+    };
+  }, [editImageFiles]);
+
+  useEffect(() => {
     const item = listing;
     const existing = item
       ? item.mediaUrls?.length
@@ -309,9 +338,18 @@ export default function ListingPage() {
           : []
       : [];
     const kept = existing.filter((u) => !editRemovedMediaUrls.includes(u));
-    if (kept.length > 0 && selectedMediaIndex >= kept.length)
-      setSelectedMediaIndex(Math.max(0, kept.length - 1));
-  }, [listing, editRemovedMediaUrls, selectedMediaIndex]);
+    const total = kept.length + editImageFiles.length;
+    if (total > 0 && selectedMediaIndex >= total) setSelectedMediaIndex(Math.max(0, total - 1));
+  }, [listing, editRemovedMediaUrls, editImageFiles.length, selectedMediaIndex]);
+
+  useEffect(() => {
+    if (editing || !listing) return;
+    const variants = parseListingVariants(listing.variants);
+    const selected = selectedListingVariant(variants, selectedVariantId);
+    if (typeof selected?.mediaIndex === "number" && selected.mediaIndex >= 0) {
+      setSelectedMediaIndex(selected.mediaIndex);
+    }
+  }, [selectedVariantId, listing, editing]);
 
   useEffect(() => {
     if (!address || !id) return;
@@ -568,8 +606,28 @@ export default function ListingPage() {
         : []
     : [];
   const keptMediaUrls = existingMediaUrls.filter((u) => !editRemovedMediaUrls.includes(u));
+  const galleryItems = (
+    editing
+      ? [
+          ...keptMediaUrls.map((url) => ({
+            key: url,
+            url,
+            pendingIndex: undefined as number | undefined,
+          })),
+          ...editImageFiles.map((file, i) => ({
+            key: `pending-${i}-${file.name}`,
+            url: editPendingUrls[i] ?? "",
+            pendingIndex: i as number | undefined,
+          })),
+        ]
+      : existingMediaUrls.map((url) => ({
+          key: url,
+          url,
+          pendingIndex: undefined as number | undefined,
+        }))
+  ).filter((item) => item.url);
   const safeMediaIndex =
-    keptMediaUrls.length > 0 ? Math.min(selectedMediaIndex, keptMediaUrls.length - 1) : 0;
+    galleryItems.length > 0 ? Math.min(selectedMediaIndex, galleryItems.length - 1) : 0;
   const removeExistingMedia = (url: string) => {
     const idx = keptMediaUrls.indexOf(url);
     setEditRemovedMediaUrls((prev) => [...prev, url]);
@@ -578,6 +636,34 @@ export default function ListingPage() {
     else if (idx === selectedMediaIndex && keptMediaUrls.length > 1)
       setSelectedMediaIndex(Math.min(selectedMediaIndex, keptMediaUrls.length - 2));
   };
+  const removeGalleryItem = (item: { url: string; pendingIndex?: number }) => {
+    if (typeof item.pendingIndex === "number") {
+      setEditImageFiles((prev) => prev.filter((_, i) => i !== item.pendingIndex));
+      if (selectedMediaIndex > 0) setSelectedMediaIndex(selectedMediaIndex - 1);
+      return;
+    }
+    removeExistingMedia(item.url);
+  };
+  const addEditFiles = (files: File[]) => {
+    const room = Math.max(0, 10 - keptMediaUrls.length - editImageFiles.length);
+    if (files.length > room) {
+      setEditError(
+        `Listings are limited to 10 photos (${room} slot${room === 1 ? "" : "s"} left).`,
+      );
+    } else {
+      setEditError(null);
+    }
+    if (room <= 0) return;
+    setEditImageFiles((prev) => [...prev, ...files.slice(0, room)]);
+  };
+
+  const listingVariants = parseListingVariants(listing?.variants);
+  const selectedVariant = selectedListingVariant(listingVariants, selectedVariantId);
+  const buyPrice = resolveListingPrice({
+    listingPrice: listing?.price ?? "0",
+    variants: listingVariants,
+    selectedVariantId,
+  });
 
   const displaySubtitle = listing?.subtitle || "";
   const displayCondition = listing?.condition || "";
@@ -651,19 +737,25 @@ export default function ListingPage() {
           if (data.imageUrl) newUrls.push(data.imageUrl);
         }
       }
+      const variantError = validateListingVariantsDraft(editVariants);
+      if (variantError) {
+        setEditError(variantError);
+        setEditSaving(false);
+        return;
+      }
       const mediaUrls =
         keptUrls.length > 0 || newUrls.length > 0 ? [...keptUrls, ...newUrls] : undefined;
       const body: Record<string, unknown> = {
         // Use canonical DB seller value to avoid alias/long-zero mismatch on backend ownership check.
         sellerAddress: listing.seller || address,
         title: editTitle.trim() || undefined,
-        subtitle: editSubtitle.trim() || undefined,
-        description: editDescription.trim() || undefined,
+        description: editDescription.trim(),
         condition: editCondition.trim() || undefined,
         yearOfProduction: editYearOfProduction.trim() || undefined,
         city: editLocation.city ?? null,
         locationLat: editLocation.lat,
         locationLng: editLocation.lng,
+        variants: parseListingVariants(editVariants),
         ...(mediaUrls !== undefined && { mediaUrls }),
       };
       // Price is now synced only from on-chain events/tx sync endpoint to avoid DB-on-chain divergence.
@@ -745,23 +837,23 @@ export default function ListingPage() {
     if (mediaTouchX.current == null) return;
     const delta = e.changedTouches[0].clientX - mediaTouchX.current;
     mediaTouchX.current = null;
-    if (keptMediaUrls.length <= 1 || Math.abs(delta) < 40) return;
+    if (galleryItems.length <= 1 || Math.abs(delta) < 40) return;
     mediaSwiped.current = true;
     if (delta < 0) showNextMedia();
     else showPrevMedia();
   };
 
-  const mainImageUrl = keptMediaUrls[safeMediaIndex] ?? null;
+  const mainImageUrl = galleryItems[safeMediaIndex]?.url ?? null;
   const categoryLabel = listing?.category || "Marketplace";
 
   const showPrevMedia = () => {
-    if (keptMediaUrls.length <= 1) return;
-    setSelectedMediaIndex((prev) => (prev - 1 + keptMediaUrls.length) % keptMediaUrls.length);
+    if (galleryItems.length <= 1) return;
+    setSelectedMediaIndex((prev) => (prev - 1 + galleryItems.length) % galleryItems.length);
   };
 
   const showNextMedia = () => {
-    if (keptMediaUrls.length <= 1) return;
-    setSelectedMediaIndex((prev) => (prev + 1) % keptMediaUrls.length);
+    if (galleryItems.length <= 1) return;
+    setSelectedMediaIndex((prev) => (prev + 1) % galleryItems.length);
   };
 
   // Title block is rendered twice: mobile (`lg:hidden`) above the gallery,
@@ -808,9 +900,7 @@ export default function ListingPage() {
           )}
         </div>
       )}
-      {displaySubtitle && (
-        <p className="mt-1 text-sm text-silver">{editing ? editSubtitle : displaySubtitle}</p>
-      )}
+      {displaySubtitle && !editing && <p className="mt-1 text-sm text-silver">{displaySubtitle}</p>}
       {attributesLine && (
         <p className="mt-0.5 text-sm text-silver/70">
           {editing
@@ -836,9 +926,7 @@ export default function ListingPage() {
         )}
       </div>
       {watchCount > 0 && <p className="mt-1 text-sm text-silver/60">{watchCount} watching</p>}
-      {displaySubtitle && (
-        <p className="mt-1 text-sm text-silver">{editing ? editSubtitle : displaySubtitle}</p>
-      )}
+      {displaySubtitle && !editing && <p className="mt-1 text-sm text-silver">{displaySubtitle}</p>}
       {attributesLine && (
         <p className="mt-0.5 text-sm text-silver/70">
           {editing
@@ -1182,7 +1270,7 @@ export default function ListingPage() {
             <div className="mx-auto flex h-full w-full max-w-6xl flex-col rounded-glass border border-white/10 bg-[#07152a]/95 shadow-2xl">
               <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
                 <p className="truncate text-sm text-silver">
-                  Media {safeMediaIndex + 1} of {keptMediaUrls.length}
+                  Media {safeMediaIndex + 1} of {galleryItems.length}
                 </p>
                 <button
                   type="button"
@@ -1205,7 +1293,7 @@ export default function ListingPage() {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={mainImageUrl} alt="" className="h-full w-full object-contain" />
                 )}
-                {keptMediaUrls.length > 1 && (
+                {galleryItems.length > 1 && (
                   <>
                     <button
                       type="button"
@@ -1284,35 +1372,38 @@ export default function ListingPage() {
               hidden when the listing only has a single media item. */}
           <div className="min-w-0 space-y-4">
             <div className="flex gap-3">
-              {keptMediaUrls.length > 1 && (
+              {(editing || galleryItems.length > 1) && (
                 <div className="hidden w-20 shrink-0 flex-col gap-2 overflow-y-auto pb-1 max-h-[80vh] lg:flex">
-                  {keptMediaUrls.map((url, i) => (
+                  {galleryItems.map((item, i) => (
                     <div
-                      key={url}
-                      role={editing ? undefined : "button"}
-                      tabIndex={editing ? undefined : 0}
-                      onClick={() => !editing && setSelectedMediaIndex(i)}
+                      key={item.key}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setSelectedMediaIndex(i)}
                       onKeyDown={(e) =>
-                        !editing && (e.key === "Enter" || e.key === " ") && setSelectedMediaIndex(i)
+                        (e.key === "Enter" || e.key === " ") && setSelectedMediaIndex(i)
                       }
                       className={`relative flex-shrink-0 h-20 w-20 cursor-pointer overflow-hidden rounded-glass border-2 transition-colors ${i === safeMediaIndex ? "border-chrome" : "border-white/20 hover:border-white/40"}`}
                     >
-                      {/* Thumbs crop to fill (object-cover) so odd aspect
-                          ratios don't show black pillarboxes. */}
-                      {isVideoMedia(url) ? (
-                        <video src={url} className="h-full w-full object-cover" muted playsInline />
+                      {isVideoMedia(item.url) ? (
+                        <video
+                          src={item.url}
+                          className="h-full w-full object-cover"
+                          muted
+                          playsInline
+                        />
                       ) : (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={url} alt="" className="h-full w-full object-cover" />
+                        <img src={item.url} alt="" className="h-full w-full object-cover" />
                       )}
                       {editing && (
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            removeExistingMedia(url);
+                            removeGalleryItem(item);
                           }}
-                          className="absolute right-0 top-0 flex h-6 w-6 items-center justify-center rounded-bl-lg bg-black/70 text-sm text-white hover:bg-rose-500"
+                          className="absolute right-0 top-0 z-10 flex h-6 w-6 items-center justify-center rounded-bl-lg bg-black/70 text-sm text-white hover:bg-rose-500"
                           aria-label="Remove"
                         >
                           ×
@@ -1320,6 +1411,16 @@ export default function ListingPage() {
                       )}
                     </div>
                   ))}
+                  {editing && keptMediaUrls.length + editImageFiles.length < 10 && (
+                    <button
+                      type="button"
+                      onClick={() => editFileInputRef.current?.click()}
+                      className="flex h-20 w-20 shrink-0 items-center justify-center rounded-glass border-2 border-dashed border-white/30 text-2xl text-silver hover:border-chrome hover:text-white"
+                      aria-label="Add photos"
+                    >
+                      +
+                    </button>
+                  )}
                 </div>
               )}
               {/* Hero is borderless on mobile (Amazon-style). Desktop keeps
@@ -1369,63 +1470,108 @@ export default function ListingPage() {
                         Verified on-chain
                       </span>
                     )}
-                    <div className="absolute top-3 right-3 hidden gap-2 lg:flex">
+                    {editing ? (
+                      <div className="absolute top-3 right-3 z-30 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const current = galleryItems[safeMediaIndex];
+                            if (current) removeGalleryItem(current);
+                          }}
+                          className="flex h-10 w-10 items-center justify-center rounded-full bg-black/70 text-xl text-white hover:bg-rose-500"
+                          aria-label="Remove photo"
+                        >
+                          ×
+                        </button>
+                        {keptMediaUrls.length + editImageFiles.length < 10 && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              editFileInputRef.current?.click();
+                            }}
+                            className="flex h-10 w-10 items-center justify-center rounded-full bg-black/70 text-2xl text-white hover:bg-black/90"
+                            aria-label="Add photos"
+                          >
+                            +
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="absolute top-3 right-3 hidden gap-2 lg:flex">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            void toggleWishlist();
+                          }}
+                          className={`flex h-10 w-10 items-center justify-center rounded-full text-white ${inWishlist ? "bg-emerald-600/90" : "bg-black/60 hover:bg-black/80"}`}
+                          aria-label={inWishlist ? "In wishlist" : "Add to wishlist"}
+                          disabled={wishlistLoading}
+                        >
+                          {inWishlist ? "✓" : "♡"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            shareListing();
+                          }}
+                          className="flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+                          aria-label="Share"
+                          title={shareCopied ? "Link copied!" : "Share"}
+                        >
+                          {shareCopied ? "✓" : "⎘"}
+                        </button>
+                      </div>
+                    )}
+                    {!editing && (
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          void toggleWishlist();
+                        onClick={() => {
+                          if (mediaSwiped.current) {
+                            mediaSwiped.current = false;
+                            return;
+                          }
+                          setGalleryOpen(true);
                         }}
-                        className={`flex h-10 w-10 items-center justify-center rounded-full text-white ${inWishlist ? "bg-emerald-600/90" : "bg-black/60 hover:bg-black/80"}`}
-                        aria-label={inWishlist ? "In wishlist" : "Add to wishlist"}
-                        disabled={wishlistLoading}
-                      >
-                        {inWishlist ? "✓" : "♡"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          shareListing();
-                        }}
-                        className="flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
-                        aria-label="Share"
-                        title={shareCopied ? "Link copied!" : "Share"}
-                      >
-                        {shareCopied ? "✓" : "⎘"}
-                      </button>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (mediaSwiped.current) {
-                          mediaSwiped.current = false;
-                          return;
-                        }
-                        setGalleryOpen(true);
-                      }}
-                      className="absolute inset-0 z-10 cursor-zoom-in"
-                      aria-label="Open media gallery"
-                    />
+                        className="absolute inset-0 z-10 cursor-zoom-in"
+                        aria-label="Open media gallery"
+                      />
+                    )}
                   </>
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center text-silver">
-                    No image
+                    {editing ? (
+                      <button
+                        type="button"
+                        onClick={() => editFileInputRef.current?.click()}
+                        className="flex h-full w-full flex-col items-center justify-center gap-2 text-silver hover:text-white"
+                      >
+                        <span className="text-3xl">+</span>
+                        <span className="text-sm">Add photos</span>
+                      </button>
+                    ) : (
+                      "No image"
+                    )}
                   </div>
                 )}
               </div>
             </div>
-            {keptMediaUrls.length > 0 && (
+            {galleryItems.length > 0 && (
               <div className="flex items-center justify-between gap-3 lg:hidden">
                 <div className="flex min-h-6 flex-1 items-center justify-center gap-1.5">
-                  {keptMediaUrls.length > 1
-                    ? keptMediaUrls.map((url, i) => (
+                  {galleryItems.length > 1
+                    ? galleryItems.map((item, i) => (
                         <button
-                          key={url}
+                          key={item.key}
                           type="button"
-                          aria-label={`Show photo ${i + 1} of ${keptMediaUrls.length}`}
+                          aria-label={`Show photo ${i + 1} of ${galleryItems.length}`}
                           aria-current={i === safeMediaIndex}
                           onClick={() => setSelectedMediaIndex(i)}
                           className={cn(
@@ -1473,14 +1619,32 @@ export default function ListingPage() {
                 are rendered as a separate block below the grid so the buy
                 panel / shipping / seller surface immediately after the
                 photo. */}
+            <input
+              ref={editFileInputRef}
+              type="file"
+              accept={ALLOWED_TYPES}
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                addEditFiles(Array.from(e.target.files ?? []));
+                e.target.value = "";
+              }}
+            />
             <div className="hidden lg:block">{wantToSellJsx}</div>
             <div className="hidden lg:block">{descriptionJsx}</div>
             <div className="hidden lg:block">{locationJsx}</div>
             {isSeller && isSellerActiveListing && editing && (
-              <div className="glass-card p-4 space-y-3">
-                <h3 className="text-white font-medium">Configure</h3>
+              <div className={cn(material.regular, "space-y-4 rounded-[18px] p-4")}>
+                <div>
+                  <h3 className="text-xs font-extrabold uppercase tracking-[0.12em] text-white">
+                    Configure
+                  </h3>
+                  <p className="mt-1 text-xs text-silver">
+                    Photos: tap + on the gallery or × on a photo to change media.
+                  </p>
+                </div>
                 <label className="block">
-                  <span className="text-xs text-silver">Title</span>
+                  <span className="text-xs font-semibold text-white">Title</span>
                   <input
                     value={editTitle}
                     onChange={(e) => setEditTitle(e.target.value)}
@@ -1488,33 +1652,44 @@ export default function ListingPage() {
                   />
                 </label>
                 <label className="block">
-                  <span className="text-xs text-silver">Subtitle</span>
-                  <input
-                    value={editSubtitle}
-                    onChange={(e) => setEditSubtitle(e.target.value)}
-                    className="input-frost mt-1 w-full text-sm"
-                    placeholder="Short description"
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-xs text-silver">Description</span>
+                  <span className="flex items-baseline justify-between text-xs font-semibold text-white">
+                    Description
+                    <span className="font-mono text-[10px] uppercase tracking-wide text-silver">
+                      Optional
+                    </span>
+                  </span>
                   <textarea
                     value={editDescription}
                     onChange={(e) => setEditDescription(e.target.value)}
                     className="input-frost mt-1 w-full text-sm min-h-[80px] resize-y"
+                    placeholder="Condition notes, what’s included, any flaws."
                   />
                 </label>
+                <div>
+                  <span className="text-xs font-semibold text-white">Condition</span>
+                  <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {LISTING_CONDITIONS.map((c) => {
+                      const active = editCondition === c.label;
+                      return (
+                        <button
+                          key={c.label}
+                          type="button"
+                          onClick={() => setEditCondition(c.label)}
+                          className={`text-left rounded-[14px] px-2.5 py-2.5 border transition-colors ${
+                            active
+                              ? "bg-[#00ffa3]/10 border-[#00ffa3]/50 text-chrome"
+                              : "bg-white/5 border-white/10 text-white hover:border-white/20"
+                          }`}
+                        >
+                          <div className="text-xs font-bold">{c.label}</div>
+                          <div className="text-[10px] text-silver leading-tight mt-1">{c.desc}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
                 <label className="block">
-                  <span className="text-xs text-silver">Condition</span>
-                  <input
-                    value={editCondition}
-                    onChange={(e) => setEditCondition(e.target.value)}
-                    className="input-frost mt-1 w-full text-sm"
-                    placeholder="e.g. Like new"
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-xs text-silver">Year of production</span>
+                  <span className="text-xs font-semibold text-white">Year of production</span>
                   <input
                     value={editYearOfProduction}
                     onChange={(e) => setEditYearOfProduction(e.target.value)}
@@ -1523,13 +1698,13 @@ export default function ListingPage() {
                   />
                 </label>
                 <div className="block">
-                  <span className="text-xs text-silver">Location (optional)</span>
+                  <span className="text-xs font-semibold text-white">Location (optional)</span>
                   <div className="mt-1">
                     <LocationPicker value={editLocation} onChange={setEditLocation} />
                   </div>
                 </div>
                 <label className="block">
-                  <span className="text-xs text-silver">Price (HBAR)</span>
+                  <span className="text-xs font-semibold text-white">Price (HBAR)</span>
                   <input
                     type="number"
                     step="any"
@@ -1539,80 +1714,35 @@ export default function ListingPage() {
                     className="input-frost mt-1 w-full text-sm"
                   />
                 </label>
-                {keptMediaUrls.length > 0 && (
-                  <div className="block">
-                    <span className="text-xs text-silver">Current media (× to remove)</span>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      {keptMediaUrls.map((url) => (
-                        <div
-                          key={url}
-                          className="relative w-16 h-16 rounded-glass overflow-hidden border border-white/10 flex-shrink-0"
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={url} alt="" className="object-cover w-full h-full" />
-                          <button
-                            type="button"
-                            onClick={() => removeExistingMedia(url)}
-                            className="absolute top-0 right-0 w-6 h-6 flex items-center justify-center bg-black/70 text-white text-sm rounded-bl-lg hover:bg-rose-500"
-                            aria-label="Remove"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                <label className="block">
-                  <span className="text-xs text-silver">
-                    Add photos (optional) — max 10 per listing, 2MB each
-                  </span>
-                  <input
-                    type="file"
-                    accept={ALLOWED_TYPES}
-                    multiple
-                    onChange={(e) => {
-                      const files = Array.from(e.target.files ?? []);
-                      const room = Math.max(0, 10 - keptMediaUrls.length);
-                      if (files.length > room) {
-                        setEditError(
-                          `Listings are limited to 10 photos (${room} slot${room === 1 ? "" : "s"} left).`,
-                        );
-                      } else {
-                        setEditError(null);
-                      }
-                      setEditImageFiles(files.slice(0, room));
-                    }}
-                    className="input-frost mt-1 w-full text-silver text-sm file:text-xs"
-                  />
-                  {editImageFiles.length > 0 && (
-                    <p className="text-silver text-xs mt-1">
-                      {editImageFiles.length} photo(s) selected
-                    </p>
-                  )}
-                </label>
+                <ListingVariantsEditor
+                  variants={editVariants}
+                  onChange={setEditVariants}
+                  mediaCount={galleryItems.length}
+                  defaultPrice={editPrice}
+                />
                 {editError && <p className="text-rose-400 text-xs">{editError}</p>}
                 <div className="flex gap-2">
-                  <button
+                  <Button
                     type="button"
                     onClick={handleSaveEdit}
                     disabled={editSaving}
-                    className="btn-frost-cta flex-1 disabled:opacity-60"
+                    className="flex-1"
                   >
                     {editSaving ? "Saving…" : "Save"}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
+                    variant="gray"
                     onClick={() => {
                       setEditing(false);
                       setEditError(null);
                       setEditImageFiles([]);
                       setEditRemovedMediaUrls([]);
                     }}
-                    className="btn-frost-cta border-white/20"
+                    className="flex-1"
                   >
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
@@ -1676,10 +1806,18 @@ export default function ListingPage() {
                 onChanged={() => fetchListing(0, false)}
               />
             )}
+            {listing && isListed && !isSeller && listingVariants.length > 0 && (
+              <ListingVariantPicker
+                variants={listingVariants}
+                selectedId={selectedVariant?.id ?? selectedVariantId}
+                onSelect={setSelectedVariantId}
+              />
+            )}
             {listing && isListed && !isSeller && (
               <BuyButton
                 listingId={listing.id}
                 price={listing.price}
+                variantPrice={listingVariants.length > 0 ? buyPrice : undefined}
                 inWishlist={inWishlist}
                 onToggleWishlist={() => {
                   void toggleWishlist();
