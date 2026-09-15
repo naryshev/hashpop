@@ -27,6 +27,7 @@ import { cn } from "../lib/utils";
 export function BuyButton({
   listingId,
   price: _price,
+  variantPrice,
   inWishlist = false,
   onToggleWishlist,
   wishlistDisabled = false,
@@ -37,6 +38,8 @@ export function BuyButton({
 }: {
   listingId: string;
   price: string;
+  /** Selected SKU absolute price; when set, display and payment use this amount. */
+  variantPrice?: string;
   inWishlist?: boolean;
   onToggleWishlist?: () => void;
   wishlistDisabled?: boolean;
@@ -153,6 +156,11 @@ export function BuyButton({
           throw new Error("Listing is no longer available to buy. Please refresh.");
         }
       }
+      const variantPay =
+        variantPrice && Number(variantPrice) > 0 ? parseUnits(String(variantPrice), 8) : 0n;
+      if (variantPay > 0n) {
+        latestPrice = variantPay;
+      }
       if (latestPrice >= 10n ** 15n) {
         throw new Error(
           "This listing uses a legacy on-chain price format and cannot be purchased as-is. Ask the seller to edit price and save again, or recreate the listing.",
@@ -161,14 +169,14 @@ export function BuyButton({
       // Context line for the wallet-confirm overlay, matching the demo
       // video: "escrow 0.0.88231 · locking 100 ℏ". Resolved from cache in
       // most cases (the confirm sheet already looked it up).
-      const hbarForDetail = formatPriceForDisplay(_price || "0");
+      const payHbarForDetail = formatPriceForDisplay(variantPrice || _price || "0");
       const contractIdForDetail = await resolveContractIdDisplay(marketplaceAddress).catch(
         () => null,
       );
       setConfirmDetail(
         contractIdForDetail
-          ? `escrow ${contractIdForDetail} · locking ${hbarForDetail} ℏ`
-          : `locking ${hbarForDetail} ℏ`,
+          ? `escrow ${contractIdForDetail} · locking ${payHbarForDetail} ℏ`
+          : `locking ${payHbarForDetail} ℏ`,
       );
       const txHash = await send({
         address: marketplaceAddress,
@@ -202,7 +210,7 @@ export function BuyButton({
     !isConfirming &&
     !isLegacyWeiListing;
 
-  const priceHbarDisplay = formatPriceForDisplay(_price || "0");
+  const priceHbarDisplay = formatPriceForDisplay(variantPrice || _price || "0");
   const priceUsd =
     usdRate && usdRate > 0 && !Number.isNaN(Number(priceHbarDisplay))
       ? (Number(priceHbarDisplay) * usdRate).toFixed(2)
@@ -345,7 +353,7 @@ export function BuyButton({
       <ConfirmPurchaseSheet
         open={confirmOpen}
         listingId={listingId}
-        priceHbar={_price || "0"}
+        priceHbar={variantPrice || _price || "0"}
         contractAddress={marketplaceAddress}
         confirming={isPending}
         onConfirm={() => {
@@ -358,7 +366,7 @@ export function BuyButton({
         open={offerModalOpen}
         onClose={() => setOfferModalOpen(false)}
         listingId={listingId}
-        askingPriceHbar={_price || "0"}
+        askingPriceHbar={variantPrice || _price || "0"}
         onOfferSubmitted={onOfferSubmitted}
       />
     </div>

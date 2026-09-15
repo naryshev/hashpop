@@ -34,6 +34,8 @@ model Listing {
   originalPapers     String?
   imageUrl           String?
   mediaUrls          String[] @default([])
+  /// SKU options: [{ id, label, price, mediaIndex? }]. Null/empty = single-price listing.
+  variants           Json?
   city               String?
   locationLat        Float?
   locationLng        Float?

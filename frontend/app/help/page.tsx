@@ -56,7 +56,7 @@ const FAQS: { category: string; items: Faq[] }[] = [
       },
       {
         q: "What makes a good listing?",
-        a: 'Listings must have at least one photo, a clear title, a price above zero, a category, and a description of at least 20 words. Listings that meet the higher "Listing health" targets (3+ photos, a detailed 60+ word description, a pinned location) tend to sell faster and build more trust.',
+        a: "Listings need at least one photo, a clear title, a price above zero, and a category. A description is optional. Listings that add more photos and a pinned location tend to sell faster and build more trust. You can also add priced options (color, storage, condition) on one listing.",
       },
     ],
   },

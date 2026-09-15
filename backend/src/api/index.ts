@@ -9,6 +9,7 @@ import { fetchMirrorEvents } from "../mirror";
 import { decodeEvents, EXPECTED_TOPIC0_ITEM_LISTED } from "../indexer/decoder";
 import { saveUpload } from "../storage";
 import { decryptJson, encryptJson, secretBoxConfigured } from "../lib/secretBox";
+import { listingVariantsForDb } from "../listingVariants";
 
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB
 const MAX_MEDIA_SIZE = 15 * 1024 * 1024; // 15MB for video
@@ -535,6 +536,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       city,
       locationLat,
       locationLng,
+      variants,
     } = (req.body || {}) as {
       txHash?: string;
       listingId?: string;
@@ -552,6 +554,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       city?: string;
       locationLat?: number;
       locationLng?: number;
+      variants?: unknown;
     };
     const fallbackListingId =
       typeof listingId === "string" && listingId.trim()
@@ -602,6 +605,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         : null;
     const hasCoords = latNum !== null && lngNum !== null;
     const requireEscrowBool = !!requireEscrow;
+    const variantsList = listingVariantsForDb(variants);
 
     const upsertFallbackListing = async () => {
       if (!canFallbackUpsert) return null;
@@ -626,6 +630,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         ...(yearStr != null && { yearOfProduction: yearStr }),
         ...(cityStr != null && { city: cityStr }),
         ...(hasCoords && { locationLat: latNum, locationLng: lngNum }),
+        ...(variantsList !== undefined && { variants: variantsList }),
       };
       const fallbackCreateData: any = {
         id: fallbackListingId!,
@@ -645,6 +650,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         ...(yearStr != null && { yearOfProduction: yearStr }),
         ...(cityStr != null && { city: cityStr }),
         ...(hasCoords && { locationLat: latNum, locationLng: lngNum }),
+        ...(variantsList !== undefined && { variants: variantsList }),
       };
       await prisma.listing.upsert({
         where: { id: fallbackListingId! },
@@ -757,6 +763,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           ...(yearStr != null && { yearOfProduction: yearStr }),
           ...(cityStr != null && { city: cityStr }),
           ...(hasCoords && { locationLat: latNum, locationLng: lngNum }),
+          ...(variantsList !== undefined && { variants: variantsList }),
         };
         const createData: any = {
           id: listingId,
@@ -776,6 +783,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           ...(yearStr != null && { yearOfProduction: yearStr }),
           ...(cityStr != null && { city: cityStr }),
           ...(hasCoords && { locationLat: latNum, locationLng: lngNum }),
+          ...(variantsList !== undefined && { variants: variantsList }),
         };
         await prisma.listing.upsert({
           where: { id: listingId },
@@ -1898,6 +1906,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         city,
         locationLat,
         locationLng,
+        variants,
       } = (req.body || {}) as {
         title?: string;
         subtitle?: string;
@@ -1914,6 +1923,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         city?: string | null;
         locationLat?: number | null;
         locationLng?: number | null;
+        variants?: unknown;
       };
       const listing = await prisma.listing.findUnique({ where: { id } });
       if (!listing) return res.status(404).json({ error: "Listing not found" });
@@ -1939,6 +1949,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         city?: string | null;
         locationLat?: number | null;
         locationLng?: number | null;
+        variants?: ReturnType<typeof listingVariantsForDb>;
       } = {};
       if (title !== undefined) update.title = title === "" ? null : title;
       if (subtitle !== undefined) update.subtitle = subtitle === "" ? null : subtitle;
@@ -1947,6 +1958,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       if (condition !== undefined) update.condition = condition === "" ? null : condition;
       if (yearOfProduction !== undefined)
         update.yearOfProduction = yearOfProduction === "" ? null : yearOfProduction;
+      if (variants !== undefined) update.variants = listingVariantsForDb(variants) ?? [];
       // Intentionally ignore direct price writes here.
       // Listing price must be synced from on-chain events/tx-sync endpoints only.
       if (mediaUrls !== undefined && Array.isArray(mediaUrls)) {
