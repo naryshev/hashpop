@@ -6,7 +6,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Fuse from "fuse.js";
 import { ListingMedia } from "../../components/ListingMedia";
-import { ListingCard, SellerInline, formatSellerDisplay } from "../../components/ListingCard";
+import { ListingCard, formatSellerDisplay } from "../../components/ListingCard";
+import { TrustStrip } from "../../components/TrustStrip";
 import { StatusBadge } from "../../components/ui/status-badge-beautiful-accessible-status-indicators";
 import { formatPriceForDisplay } from "../../lib/formatPrice";
 import { formatHbarWithUsd } from "../../lib/hbarUsd";
@@ -15,7 +16,7 @@ import { canonicalizeCategory, CATEGORY_GROUPS } from "../../lib/categories";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
 import { useSignInModal } from "../../lib/signInModal";
 import { getApiUrl } from "../../lib/apiUrl";
-import { useProfile, useProfiles } from "../../lib/profiles";
+import { useProfiles } from "../../lib/profiles";
 import { TopBarSlot } from "../../lib/topBar";
 import { listingCta, material } from "../../lib/materials";
 import { cn } from "../../lib/utils";
@@ -81,18 +82,6 @@ function relativeTimeShort(iso?: string): string {
   const mo = Math.floor(d / 30);
   if (mo < 12) return `${mo}mo`;
   return `${Math.floor(mo / 12)}y`;
-}
-
-/** Compact star-rating pill; renders nothing when the seller has no ratings. */
-function SellerRating({ seller, className }: { seller?: string; className?: string }) {
-  const profile = useProfile(seller);
-  if (!profile || profile.ratingCount === 0 || profile.ratingAverage == null) return null;
-  return (
-    <span className={className ?? "flex items-center gap-0.5 text-[10px] text-amber-300/90"}>
-      ★ {profile.ratingAverage.toFixed(1)}
-      <span className="text-silver/50">({profile.ratingCount})</span>
-    </span>
-  );
 }
 
 export type ListingItem = {
@@ -863,8 +852,13 @@ export default function MarketplacePageClient({
                           {item.condition && (
                             <span className="text-silver/60">{item.condition}</span>
                           )}
-                          {item.seller && <SellerInline seller={item.seller} size={14} />}
-                          <SellerRating seller={item.seller} />
+                          {item.seller && (
+                            <TrustStrip
+                              density="inline"
+                              address={item.seller}
+                              linkToProfile={false}
+                            />
+                          )}
                         </div>
                       </div>
                       <div>

@@ -7,9 +7,9 @@ import Link from "next/link";
 import { BuyButton } from "../../../components/BuyButton";
 import { EscrowPanel } from "../../../components/EscrowPanel";
 import { AddressDisplay } from "../../../components/AddressDisplay";
-import { formatSellerDisplay } from "../../../components/ListingCard";
-import { profileAvatarUrl, profileDisplayName, useProfile } from "../../../lib/profiles";
-import { BadgeCheck, ChevronLeft, Heart, Share2, Sparkles, Star } from "lucide-react";
+import { TrustStrip } from "../../../components/TrustStrip";
+import { profileAvatarUrl, useProfile } from "../../../lib/profiles";
+import { ChevronLeft, Heart, Share2, Sparkles } from "lucide-react";
 import { cn } from "../../../lib/utils";
 import { formatContractAmountToHbar, formatPriceForDisplay } from "../../../lib/formatPrice";
 import { formatHbarWithUsd } from "../../../lib/hbarUsd";
@@ -31,122 +31,22 @@ import { OffersPanel } from "../../../components/OffersPanel";
 
 import { getApiUrl } from "../../../lib/apiUrl";
 
-/**
- * Compact seller chip: avatar on the left, display name + Hedera account ID
- * stacked on the right. Matches the HashPack PFP chip pattern shown in their
- * profile docs. Inline KYC tick + rating sit next to the name.
- */
 function SellerProfileMeta({ seller }: { seller: string }) {
-  const profile = useProfile(seller);
-  const name = profileDisplayName(profile);
-  const avatar = profileAvatarUrl(profile);
-  const hasRating = profile && profile.ratingCount > 0 && profile.ratingAverage != null;
   return (
-    <Link
-      href={`/profile/${encodeURIComponent(seller)}`}
-      className="group inline-flex max-w-full items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 transition-colors hover:bg-white/[0.07]"
-      aria-label="View seller profile"
-    >
-      {avatar ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={avatar} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
-      ) : (
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs text-silver">
-          {(name ?? seller).slice(0, 2).toUpperCase()}
-        </div>
-      )}
-      <div className="min-w-0">
-        <div className="flex items-center gap-1.5 text-sm font-semibold text-white group-hover:text-chrome">
-          <span className="truncate">
-            {name ?? <AddressDisplay address={seller} showVerified={false} preferName={false} />}
-          </span>
-          {profile?.kycVerified && (
-            <BadgeCheck size={13} className="shrink-0 text-[#00ffa3]" aria-label="KYC verified" />
-          )}
-          {hasRating ? (
-            <span className="text-[11px] font-normal text-amber-300/90">
-              ★ {profile!.ratingAverage!.toFixed(1)}
-              <span className="ml-0.5 text-silver/60">({profile!.ratingCount})</span>
-            </span>
-          ) : (
-            <span className="text-[11px] font-normal text-silver/50">No ratings yet</span>
-          )}
-        </div>
-        {/* Subheading: always the 0.0.x account id, never the name or 0x. */}
-        <AddressDisplay
-          address={seller}
-          showVerified={false}
-          preferName={false}
-          className="block truncate font-mono text-[11px] text-silver/70"
-        />
-      </div>
-    </Link>
-  );
-}
-
-function AmberStars({ value, size = 12 }: { value: number; size?: number }) {
-  return (
-    <span className="inline-flex items-center gap-px" aria-hidden>
-      {[1, 2, 3, 4, 5].map((n) => {
-        const fill = Math.min(1, Math.max(0, value - (n - 1)));
-        return (
-          <span key={n} className="relative inline-block" style={{ width: size, height: size }}>
-            <Star size={size} className="text-amber-400/30" />
-            <span className="absolute inset-0 overflow-hidden" style={{ width: `${fill * 100}%` }}>
-              <Star size={size} className="fill-amber-400 text-amber-400" />
-            </span>
-          </span>
-        );
-      })}
-    </span>
-  );
-}
-
-/**
- * Amazon-style seller + rating row above the mobile gallery. Lives in the
- * page flow — never overlaid on the photo.
- */
-function MobileSellerChrome({ seller }: { seller: string }) {
-  const profile = useProfile(seller);
-  const name = profileDisplayName(profile);
-  const avatar = profileAvatarUrl(profile);
-  const href = `/profile/${encodeURIComponent(seller)}`;
-  const hasRating = profile && profile.ratingCount > 0 && profile.ratingAverage != null;
-  const display = name ?? formatSellerDisplay(seller);
-
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <div className="flex min-w-0 items-center gap-2">
-        <Link
-          href={href}
-          className="flex min-w-0 items-center gap-2"
-          aria-label={`View ${display} profile`}
-        >
-          {avatar ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={avatar} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" />
-          ) : (
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-[10px] font-semibold text-silver">
-              {display.slice(0, 2).toUpperCase()}
-            </div>
-          )}
-          <span className="truncate text-sm font-semibold text-white">{display}</span>
-        </Link>
-        <Link href={href} className="shrink-0 text-xs font-medium text-chrome hover:text-white">
-          Visit profile
-        </Link>
-      </div>
-      {hasRating ? (
-        <div className="flex shrink-0 items-center gap-1 text-xs text-amber-300">
-          <span className="font-semibold tabular-nums">{profile.ratingAverage!.toFixed(1)}</span>
-          <AmberStars value={profile.ratingAverage!} />
-          <span className="text-silver/60">({profile.ratingCount})</span>
-        </div>
-      ) : (
-        <span className="shrink-0 text-xs text-silver/50">No ratings yet</span>
-      )}
+    <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
+      <TrustStrip density="compact" address={seller} />
+      <AddressDisplay
+        address={seller}
+        showVerified={false}
+        preferName={false}
+        className="mt-1 block truncate font-mono text-[11px] text-silver/70"
+      />
     </div>
   );
+}
+
+function MobileSellerChrome({ seller }: { seller: string }) {
+  return <TrustStrip density="compact" address={seller} />;
 }
 
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024;
