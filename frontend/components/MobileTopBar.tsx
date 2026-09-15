@@ -2,10 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Bell } from "lucide-react";
 import { useHashpackWallet } from "../lib/hashpackWallet";
 import { useSignInModal } from "../lib/signInModal";
-import { useUnseenActivity } from "../hooks/useUnseenActivity";
+import { NotificationBell } from "./NotificationBell";
 import { ProfileCardSheet } from "./ProfileCardSheet";
 
 /**
@@ -17,7 +16,6 @@ import { ProfileCardSheet } from "./ProfileCardSheet";
 export function MobileTopBar({ className = "" }: { className?: string }) {
   const { accountId, address } = useHashpackWallet();
   const { openSignIn } = useSignInModal();
-  const hasUnseen = useUnseenActivity();
   const [profileOpen, setProfileOpen] = useState(false);
 
   const walletLabel = accountId ?? (address ? `${address.slice(0, 6)}…${address.slice(-4)}` : null);
@@ -31,16 +29,7 @@ export function MobileTopBar({ className = "" }: { className?: string }) {
           <span className="text-lg font-extrabold tracking-tight text-[#00ffa3]">Hashpop</span>
         </Link>
         <div className="flex items-center gap-1.5">
-          <Link
-            href="/activity"
-            aria-label="Notifications"
-            className="relative rounded-full p-2 text-silver hover:text-white"
-          >
-            <Bell size={18} />
-            {hasUnseen && (
-              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[#00ffa3]" />
-            )}
-          </Link>
+          <NotificationBell variant="mobile" />
           {walletLabel ? (
             <button
               type="button"

@@ -7,7 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { AddressDisplay } from "./AddressDisplay";
 import { useHashpackWallet } from "../lib/hashpackWallet";
 import { getApiUrl } from "../lib/apiUrl";
-import { markActivitySeen } from "../hooks/useUnseenActivity";
+import { markThreadRead } from "../lib/unreadThreads";
 import { useEncryptionKey } from "../lib/useEncryptionKey";
 import { decryptMessage } from "../lib/chatEncryption";
 import { profileAvatarUrl, profileDisplayName, useProfile } from "../lib/profiles";
@@ -262,15 +262,17 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
   const { address } = useHashpackWallet();
   const searchParams = useSearchParams();
 
-  // Reading messages clears the "new activity" dot on the bells.
-  useEffect(() => {
-    markActivitySeen();
-  }, []);
   const [conversations, setConversations] = useState<InboxConversation[]>([]);
   const [inboxLoading, setInboxLoading] = useState(false);
   const [selectedThread, setSelectedThread] = useState<{ other: string; listingId: string } | null>(
     null,
   );
+
+  // Opening a thread marks it read so the dock badge is distinct-thread unread.
+  useEffect(() => {
+    if (!selectedThread) return;
+    markThreadRead(selectedThread.other, selectedThread.listingId || null);
+  }, [selectedThread]);
   const [threadMessages, setThreadMessages] = useState<Message[]>([]);
   const [decryptedBodies, setDecryptedBodies] = useState<Record<string, string>>({});
   const [threadLoading, setThreadLoading] = useState(false);

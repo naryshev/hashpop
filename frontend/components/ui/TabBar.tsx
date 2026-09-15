@@ -4,6 +4,8 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { material } from "@/lib/materials";
+import { formatDockBadgeCount } from "@/lib/dockBadge";
+import { DockBadge } from "./DockBadge";
 
 export type TabBarItem = {
   id: string;
@@ -37,25 +39,21 @@ function TabCell({
   active: boolean;
   onSelect?: (id: string) => void;
 }) {
-  const badge =
-    item.badge != null && item.badge > 0 ? (item.badge > 9 ? "9+" : String(item.badge)) : null;
+  const badgeLabel = formatDockBadgeCount(item.badge ?? 0);
+  const ariaLabel = badgeLabel ? `${item.label}, ${badgeLabel}` : item.label;
 
   const inner = (
-    <>
-      <span
-        className={cn(
-          "flex h-11 w-11 items-center justify-center rounded-full transition-colors",
-          active ? cn(material.chrome, "text-chrome") : "text-silver/70 hover:text-white",
-        )}
-      >
-        {item.icon}
-      </span>
-      {badge && (
-        <span className="absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-chrome px-1 text-[9px] font-bold text-black">
-          {badge}
-        </span>
+    <span
+      className={cn(
+        "flex h-11 w-11 items-center justify-center rounded-full transition-colors",
+        active ? cn(material.chrome, "text-chrome") : "text-silver/70 hover:text-white",
       )}
-    </>
+    >
+      <span className="relative inline-flex">
+        {item.icon}
+        <DockBadge count={item.badge ?? 0} />
+      </span>
+    </span>
   );
 
   const className = "relative flex h-11 items-center justify-center";
@@ -64,7 +62,7 @@ function TabCell({
     return (
       <Link
         href={item.href}
-        aria-label={item.label}
+        aria-label={ariaLabel}
         aria-current={active ? "page" : undefined}
         onClick={() => onSelect?.(item.id)}
         className={className}
@@ -77,7 +75,7 @@ function TabCell({
   return (
     <button
       type="button"
-      aria-label={item.label}
+      aria-label={ariaLabel}
       aria-pressed={active}
       onClick={() => onSelect?.(item.id)}
       className={className}
