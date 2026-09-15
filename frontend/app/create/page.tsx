@@ -17,6 +17,7 @@ import {
   type ListingVariant,
 } from "../../lib/listingVariants";
 import { glassChip, listingCta, material } from "../../lib/materials";
+import { cn } from "../../lib/utils";
 import { getTransactionErrorMessage } from "../../lib/transactionError";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
 import { ConnectWalletButton } from "../../components/ConnectWalletButton";
@@ -721,11 +722,11 @@ function CreatePageContent() {
                             key={c.label}
                             type="button"
                             onClick={() => setCondition(c.label)}
-                            className={`text-left rounded-lg px-2.5 py-2.5 border transition-colors ${
-                              active
-                                ? "bg-[#00ffa3]/10 border-[#00ffa3]/50 text-chrome shadow-[0_0_16px_rgba(0,255,163,0.15)]"
-                                : "bg-white/5 border-white/10 text-white hover:border-white/20"
-                            }`}
+                            className={cn(
+                              active ? material.chrome : material.regular,
+                              "text-left rounded-[14px] px-2.5 py-2.5 transition-colors",
+                              active ? "text-chrome" : "text-white",
+                            )}
                           >
                             <div className="text-xs font-bold">{c.label}</div>
                             <div className="text-[10px] text-silver leading-tight mt-1">
