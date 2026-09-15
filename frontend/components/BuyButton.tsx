@@ -280,13 +280,14 @@ export function BuyButton({
       <button
         type="button"
         onClick={() => {
+          if (variantBlocked) return;
           if (!address) {
             openSignIn({ title: "Sign in to buy" });
             return;
           }
           if (canBuy) setShippingGate("buy");
         }}
-        disabled={!!address && !canBuy}
+        disabled={variantBlocked || (!!address && !canBuy)}
         className={cn(listingCta.filled, purchaseOffset)}
       >
         {isPending ? "Confirm in wallet\u2026" : "Purchase"}
