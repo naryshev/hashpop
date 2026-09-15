@@ -4,7 +4,12 @@ import { useRouter } from "next/navigation";
 import { Sheet } from "./ui/Sheet";
 import { listingCta, material } from "../lib/materials";
 import { listingHref } from "../lib/listingUrl";
-import { LOCK_ESCROW_CTA, LOCK_ESCROW_SECONDARY, LOCK_ESCROW_SHEET_TITLE } from "../lib/dealRoom";
+import {
+  LOCK_ESCROW_CTA,
+  LOCK_ESCROW_SECONDARY,
+  LOCK_ESCROW_SHEET_BODY,
+  LOCK_ESCROW_SHEET_TITLE,
+} from "../lib/dealRoom";
 import { cn } from "../lib/utils";
 
 export function LockEscrowSheet({
@@ -49,10 +54,7 @@ export function LockEscrowSheet({
         </div>
       }
     >
-      <p className="text-sm leading-relaxed text-silver">
-        Funds stay on-chain until you confirm the exchange. Lock escrow before you meet so both
-        sides are covered.
-      </p>
+      <p className="text-sm leading-relaxed text-silver">{LOCK_ESCROW_SHEET_BODY}</p>
     </Sheet>
   );
 }

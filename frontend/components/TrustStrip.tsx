@@ -29,13 +29,26 @@ export type TrustStripProps = {
   linkToProfile?: boolean;
 };
 
-function Chip({ children, className }: { children: React.ReactNode; className?: string }) {
+function Chip({
+  children,
+  className,
+  mint,
+  ...rest
+}: {
+  children: React.ReactNode;
+  className?: string;
+  mint?: boolean;
+} & React.HTMLAttributes<HTMLSpanElement>) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full border border-hairline bg-white/[0.04] px-2 py-0.5 text-[11px] font-medium text-white/80",
+        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium",
+        mint
+          ? "border border-[#00ffa3]/25 bg-[#00ffa3]/10 text-chrome"
+          : "border border-hairline bg-white/[0.04] text-white/80",
         className,
       )}
+      {...rest}
     >
       {children}
     </span>
@@ -122,17 +135,19 @@ export function TrustStrip({
     </span>
   );
 
-  const signals = (
-    <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-      {view.showSkeleton && (
-        <span className="h-4 w-24 animate-pulse rounded-full bg-white/10" aria-hidden />
+  const scoreCue = view.scoreLabel ? (
+    <span
+      className={cn(
+        "shrink-0 font-bold tabular-nums text-white",
+        view.scoreSize === "large" ? "text-[32px] leading-none tracking-tight" : "text-sm",
       )}
-      {view.unknownLabel && (
-        <span className={cn("text-silver/70", density === "full" ? "text-sm" : "text-[11px]")}>
-          {view.unknownLabel}
-        </span>
-      )}
-      {view.completedLine && <span className="text-sm text-white/80">{view.completedLine}</span>}
+    >
+      {view.scoreLabel}
+    </span>
+  ) : null;
+
+  const chips = (
+    <>
       {view.showRatings && view.ratingsLabel && (
         <Chip className="text-amber-300/90">
           <Star size={11} className="fill-amber-400 text-amber-400" />
@@ -140,13 +155,31 @@ export function TrustStrip({
         </Chip>
       )}
       {view.showKyc && (
-        <Chip className="text-chrome">
+        <Chip mint className="text-chrome" data-testid="trust-kyc-chip">
           <BadgeCheck size={12} className="text-chrome" aria-hidden />
           {density === "full" ? view.kycLabel : null}
         </Chip>
       )}
       {view.refundsLabel && <Chip className="text-silver/70">{view.refundsLabel}</Chip>}
       {view.timeoutsLabel && <Chip className="text-silver/70">{view.timeoutsLabel}</Chip>}
+    </>
+  );
+
+  const signals = (
+    <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+      {view.showSkeleton && (
+        <span className="h-4 w-24 animate-pulse rounded-full bg-white/10" aria-hidden />
+      )}
+      {density !== "full" && scoreCue}
+      {view.unknownLabel && (
+        <span className={cn("text-silver/70", density === "full" ? "text-sm" : "text-[11px]")}>
+          {view.unknownLabel}
+        </span>
+      )}
+      {density !== "full" && view.completedLine && (
+        <span className="text-sm text-white/80">{view.completedLine}</span>
+      )}
+      {density !== "full" && chips}
     </span>
   );
 
@@ -159,7 +192,22 @@ export function TrustStrip({
           className,
         )}
       >
-        {signals}
+        {view.showSkeleton ? (
+          <span className="h-4 w-24 animate-pulse rounded-full bg-white/10" aria-hidden />
+        ) : (
+          <>
+            {scoreCue}
+            <span className="flex min-w-0 flex-col justify-center gap-1">
+              {view.unknownLabel && (
+                <span className="text-sm text-silver/70">{view.unknownLabel}</span>
+              )}
+              {view.completedLine && (
+                <span className="text-sm text-white/80">{view.completedLine}</span>
+              )}
+              <span className="flex min-w-0 flex-wrap items-center gap-1.5">{chips}</span>
+            </span>
+          </>
+        )}
       </div>
     ) : density === "compact" ? (
       <div
