@@ -4,6 +4,7 @@ import Link from "next/link";
 import { BadgeCheck } from "lucide-react";
 import { ListingMedia } from "./ListingMedia";
 import { WishlistButton } from "./WishlistButton";
+import { TrustStrip } from "./TrustStrip";
 import { formatListingId, listingHref } from "../lib/listingUrl";
 import { formatPriceForDisplay } from "../lib/formatPrice";
 import { material } from "../lib/materials";
@@ -94,48 +95,49 @@ export function ListingCard({
   const status = listingStatus(item.status);
 
   return (
-    <Link
-      href={listingHref(item.id)}
+    <article
       className={cn(
         material.regular,
         "flex flex-col overflow-hidden transition-colors hover:border-chrome/40",
         compact ? "rounded-[20px]" : "rounded-[16px]",
       )}
     >
-      <div className="relative bg-[#0b111b]">
-        <ListingMedia
-          listing={item}
-          className="w-full"
-          aspectRatio="square"
-          slideshow={compact ? undefined : "hover"}
-          cardSize
-          compactHeight={compact ? "170px" : "220px"}
-        />
-        <span className={cn("absolute left-2.5 top-2.5 z-10", statusCapsule[status])}>
-          {statusLabel[status]}
-        </span>
-        <div className="absolute right-1 top-1 z-10">
-          <WishlistButton itemId={item.id} itemType="listing" compact />
-        </div>
-      </div>
-      <div className="flex flex-1 flex-col p-3">
-        <h2 className="line-clamp-2 text-[15px] font-semibold leading-snug text-white">
-          {item.title || formatListingId(item.id) || "Untitled"}
-        </h2>
-        {item.seller && (
-          <div className="mt-1 text-[12px] text-silver/60">
-            <SellerInline seller={item.seller} size={compact ? 16 : 18} />
+      <Link href={listingHref(item.id)} className="flex flex-1 flex-col">
+        <div className="relative bg-[#0b111b]">
+          <ListingMedia
+            listing={item}
+            className="w-full"
+            aspectRatio="square"
+            slideshow={compact ? undefined : "hover"}
+            cardSize
+            compactHeight={compact ? "170px" : "220px"}
+          />
+          <span className={cn("absolute left-2.5 top-2.5 z-10", statusCapsule[status])}>
+            {statusLabel[status]}
+          </span>
+          <div className="absolute right-1 top-1 z-10">
+            <WishlistButton itemId={item.id} itemType="listing" compact />
           </div>
-        )}
-        <div className="mt-2 flex items-center justify-between">
-          <p className="text-[17px] font-bold text-chrome">
-            {formatPriceForDisplay(item.price || "0")} <span className="italic">ℏ</span>
-          </p>
-          {(item.watchlistCount ?? 0) > 0 && (
-            <span className="text-[11px] text-silver/50">♡ {item.watchlistCount}</span>
-          )}
         </div>
-      </div>
-    </Link>
+        <div className="flex flex-1 flex-col p-3 pb-1">
+          <h2 className="line-clamp-2 text-[15px] font-semibold leading-snug text-white">
+            {item.title || formatListingId(item.id) || "Untitled"}
+          </h2>
+          <div className="mt-2 flex items-center justify-between">
+            <p className="text-[17px] font-bold text-chrome">
+              {formatPriceForDisplay(item.price || "0")} <span className="italic">ℏ</span>
+            </p>
+            {(item.watchlistCount ?? 0) > 0 && (
+              <span className="text-[11px] text-silver/50">♡ {item.watchlistCount}</span>
+            )}
+          </div>
+        </div>
+      </Link>
+      {item.seller && (
+        <div className="px-3 pb-3">
+          <TrustStrip density="inline" address={item.seller} />
+        </div>
+      )}
+    </article>
   );
 }

@@ -1,22 +1,40 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { BadgeCheck, Mail, User } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { BadgeCheck, ChevronLeft, LayoutDashboard, Mail, User } from "lucide-react";
 import { AddressDisplay } from "./AddressDisplay";
+import { ListingCard, type ListingCardItem } from "./ListingCard";
+import { TrustStrip } from "./TrustStrip";
 import { getApiUrl } from "../lib/apiUrl";
 import { useHashpackWallet } from "../lib/hashpackWallet";
 import { compressImage } from "../lib/compressImage";
+import { listingCta, material } from "../lib/materials";
 import { profileAvatarUrl, profileDisplayName, useProfile } from "../lib/profiles";
+import {
+  PROFILE_BADGES_EMPTY,
+  PROFILE_LISTINGS_EMPTY,
+  PROFILE_REVIEWS_OWN_EMPTY,
+  UNKNOWN_ON_HASHPOP,
+  identityTitle,
+  profileAddressKey,
+} from "../lib/trustStrip";
+import { cn } from "../lib/utils";
 
 type ProfileStats = {
   address: string;
   totalSales?: number;
   activeListings?: number;
   reputation?: number;
+  reputationScore?: number;
   ratingCount?: number;
   ratingAverage?: number | null;
   successful?: number;
+  successfulCompletions?: number;
+  refunds?: number;
+  timeouts?: number;
+  completedBuys?: number;
 };
 
 type Kyc = {
@@ -42,32 +60,50 @@ type ProfileData = {
   kyc: Kyc;
 };
 
+type RatingRow = {
+  id: string;
+  reviewerAddress: string;
+  score: number;
+  comment?: string | null;
+  createdAt: string;
+};
+
+type ProfileTab = "listings" | "reviews" | "badges";
+
+const TABS: { key: ProfileTab; label: string }[] = [
+  { key: "listings", label: "Listings" },
+  { key: "reviews", label: "Reviews" },
+  { key: "badges", label: "Badges" },
+];
+
 export function ProfileContent({
-  address,
+  address: addressParam,
   startInEdit = false,
-  embedded = false,
 }: {
   address: string;
   startInEdit?: boolean;
-  /** When rendered inside a modal/sheet, skip the full-viewport min-height so
-   *  the container only scrolls when the content actually overflows. */
-  embedded?: boolean;
 }) {
-  const addressLower = address?.toLowerCase() ?? "";
+  const router = useRouter();
+  const address = profileAddressKey(addressParam);
   const { address: connectedAddress, accountId } = useHashpackWallet();
   const isSelf = useMemo(() => {
-    const me = (connectedAddress ?? accountId ?? "").toLowerCase();
-    return !!me && me === addressLower;
-  }, [connectedAddress, accountId, addressLower]);
+    const keys = [connectedAddress, accountId]
+      .filter(Boolean)
+      .map((v) => profileAddressKey(String(v)));
+    return !!address && keys.includes(address);
+  }, [connectedAddress, accountId, address]);
 
   const [stats, setStats] = useState<ProfileStats | null>(null);
   const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [listings, setListings] = useState<ListingCardItem[]>([]);
+  const [reviews, setReviews] = useState<RatingRow[]>([]);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [tab, setTab] = useState<ProfileTab>("listings");
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<ProfileData | null>(null);
   const [saving, setSaving] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
 
-  // Allow deep links (e.g. ?edit=1) to land straight in edit mode.
   useEffect(() => {
     if (isSelf && startInEdit) setEditing(true);
   }, [isSelf, startInEdit]);
@@ -75,14 +111,24 @@ export function ProfileContent({
   useEffect(() => {
     if (!address) return;
     const api = getApiUrl();
-    fetch(`${api}/api/user/${address}`)
+    setStatsLoading(true);
+    fetch(`${api}/api/user/${encodeURIComponent(address)}`)
       .then((r) => r.json())
-      .then(setStats)
-      .catch(() => setStats(null));
-    fetch(`${api}/api/user/${address}/profile`)
+      .then((d: ProfileStats) => setStats(d))
+      .catch(() => setStats(null))
+      .finally(() => setStatsLoading(false));
+    fetch(`${api}/api/user/${encodeURIComponent(address)}/profile`)
       .then((r) => r.json())
       .then((p: ProfileData) => setProfile(p))
       .catch(() => setProfile(null));
+    fetch(`${api}/api/user/${encodeURIComponent(address)}/listings`)
+      .then((r) => r.json())
+      .then((d: { active?: ListingCardItem[] }) => setListings(d.active ?? []))
+      .catch(() => setListings([]));
+    fetch(`${api}/api/ratings/${encodeURIComponent(address)}`)
+      .then((r) => r.json())
+      .then((d: { ratings?: RatingRow[] }) => setReviews(d.ratings ?? []))
+      .catch(() => setReviews([]));
   }, [address]);
 
   useEffect(() => {
@@ -101,16 +147,16 @@ export function ProfileContent({
           bio: draft.bio ?? "",
           avatarUrl: draft.avatarUrl ?? "",
           kyc: {
-            legalName: draft.kyc.legalName ?? "",
-            dateOfBirth: draft.kyc.dateOfBirth ?? "",
-            country: draft.kyc.country ?? "",
-            idType: draft.kyc.idType ?? "",
-            idNumber: draft.kyc.idNumber ?? "",
-            addressLine1: draft.kyc.addressLine1 ?? "",
-            addressLine2: draft.kyc.addressLine2 ?? "",
-            city: draft.kyc.city ?? "",
-            region: draft.kyc.region ?? "",
-            postalCode: draft.kyc.postalCode ?? "",
+            legalName: draft.kyc?.legalName ?? "",
+            dateOfBirth: draft.kyc?.dateOfBirth ?? "",
+            country: draft.kyc?.country ?? "",
+            idType: draft.kyc?.idType ?? "",
+            idNumber: draft.kyc?.idNumber ?? "",
+            addressLine1: draft.kyc?.addressLine1 ?? "",
+            addressLine2: draft.kyc?.addressLine2 ?? "",
+            city: draft.kyc?.city ?? "",
+            region: draft.kyc?.region ?? "",
+            postalCode: draft.kyc?.postalCode ?? "",
           },
         }),
       });
@@ -146,60 +192,84 @@ export function ProfileContent({
         setDraft((d) => (d ? { ...d, avatarUrl: data.mediaUrl } : d));
       }
     } catch {
-      // Silently ignore; user can retry.
+      // retry
     } finally {
       setAvatarUploading(false);
     }
   };
 
-  // Fall back to the user's HashPack wallet username + profile picture when
-  // they haven't set their own on Hashpop. Editing always shows the draft so
-  // upload + remove preview immediately.
-  const publicProfile = useProfile(address ?? null);
+  const publicProfile = useProfile(address);
   const fallbackAvatar = profileAvatarUrl(publicProfile);
-  const fallbackName = profileDisplayName(publicProfile);
   const stagedAvatar = editing
     ? draft?.avatarUrl?.trim() || null
     : profile?.avatarUrl?.trim() || null;
   const avatarUrl = stagedAvatar ?? fallbackAvatar;
-  // Heading = HashPack wallet username, else the account id. The grey
-  // subline always shows the account id, so it's only rendered when the
-  // heading is a name (otherwise it would duplicate).
-  const headerName = publicProfile?.hashpackName?.trim() || fallbackName || null;
+  const title = identityTitle({
+    displayName: profile?.displayName,
+    hashpackName: profileDisplayName(publicProfile) ?? publicProfile?.hashpackName,
+    address,
+  });
   const isVerified = profile?.kyc?.status === "VERIFIED";
+  const completions = stats?.successfulCompletions ?? stats?.successful ?? 0;
+  const unknown =
+    !statsLoading &&
+    completions === 0 &&
+    (stats?.totalSales ?? 0) === 0 &&
+    (stats?.ratingCount ?? 0) === 0 &&
+    (stats?.completedBuys ?? 0) === 0;
+
+  const goBack = useCallback(() => {
+    if (typeof window !== "undefined" && window.history.length > 1) router.back();
+    else router.push("/marketplace");
+  }, [router]);
 
   return (
-    <main className={embedded ? "" : "min-h-screen"}>
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            {avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={avatarUrl}
-                alt=""
-                className="h-14 w-14 shrink-0 rounded-full border border-white/10 object-cover"
-              />
-            ) : (
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-silver/60">
-                <User size={26} />
-              </div>
-            )}
-            <div className="min-w-0">
-              <h1 className="flex items-center gap-1.5 truncate text-xl sm:text-2xl font-bold text-white">
-                {headerName ?? (
-                  <AddressDisplay address={address} showVerified={false} preferName={false} />
-                )}
-                {isVerified && (
-                  <BadgeCheck size={20} className="text-[#00ffa3]" aria-label="KYC verified" />
-                )}
-              </h1>
-              {headerName && (
-                <p className="mt-1 text-sm text-silver">
-                  <AddressDisplay address={address} showVerified={false} preferName={false} />
-                </p>
-              )}
+    <main className="min-h-screen pb-24">
+      <header className={cn(material.regular, "sticky top-0 z-20 border-b px-3 py-3 sm:px-6")}>
+        <div className="mx-auto flex max-w-3xl items-center gap-3">
+          <button
+            type="button"
+            onClick={goBack}
+            aria-label="Back"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-white hover:bg-white/10"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <h1 className="min-w-0 flex-1 truncate text-[28px] font-bold tracking-tight text-white">
+            {isSelf ? "Profile" : title}
+          </h1>
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-3xl space-y-5 px-4 py-6 sm:px-6">
+        <div className="flex items-start gap-4">
+          {avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={avatarUrl}
+              alt=""
+              className="h-[72px] w-[72px] shrink-0 rounded-full border border-hairline object-cover sm:h-[88px] sm:w-[88px]"
+            />
+          ) : (
+            <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-full border border-hairline bg-white/5 text-silver/60 sm:h-[88px] sm:w-[88px]">
+              <User size={32} />
             </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <h2 className="flex items-center gap-1.5 text-2xl font-bold text-white sm:text-3xl">
+              <span className="truncate">{title}</span>
+              {isVerified && (
+                <BadgeCheck size={22} className="shrink-0 text-chrome" aria-label="KYC verified" />
+              )}
+            </h2>
+            <p className="mt-1 font-mono text-sm text-silver">
+              <AddressDisplay address={address} showVerified={false} preferName={false} />
+            </p>
+            {(editing ? draft?.bio : profile?.bio)?.trim() ? (
+              <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-white/80">
+                {editing ? draft?.bio : profile?.bio}
+              </p>
+            ) : null}
           </div>
           {isSelf ? (
             editing ? (
@@ -223,7 +293,7 @@ export function ProfileContent({
           ) : (
             <Link
               href={`/messages?openThread=${encodeURIComponent(address)}`}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[linear-gradient(110deg,#00b37a_0%,#00ffa3_50%,#00e5ff_100%)] px-3.5 py-2 text-xs font-bold text-black shadow-glow"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[linear-gradient(110deg,#00b37a_0%,#00ffa3_50%,#00e5ff_100%)] px-3.5 py-2 text-xs font-bold text-black"
             >
               <Mail size={14} />
               Message
@@ -231,46 +301,42 @@ export function ProfileContent({
           )}
         </div>
 
-        {stats ? (
-          <div className="glass-card p-6 space-y-4 rounded-xl">
-            <div>
-              <p className="text-sm text-silver">Reputation Score</p>
-              <p className="text-3xl font-semibold text-chrome mt-1">{stats.reputation ?? "N/A"}</p>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-silver">Average Rating</p>
-                <p className="text-xl font-semibold text-white mt-1">
-                  {stats.ratingAverage != null ? Number(stats.ratingAverage).toFixed(1) : "N/A"}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-silver">Ratings Count</p>
-                <p className="text-xl font-semibold text-white mt-1">{stats.ratingCount ?? 0}</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-silver">Total Sales</p>
-                <p className="text-xl font-semibold text-white mt-1">{stats.totalSales ?? 0}</p>
-              </div>
-              <div>
-                <p className="text-sm text-silver">Successful</p>
-                <p className="text-xl font-semibold text-white mt-1">{stats.successful ?? 0}</p>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <p className="text-silver">Loading profile...</p>
+        {isSelf && (
+          <Link
+            href="/dashboard"
+            className={cn(
+              listingCta.tinted,
+              "inline-flex h-11 items-center justify-center gap-2 rounded-[14px] px-4",
+            )}
+          >
+            <LayoutDashboard size={16} />
+            My Hashpop
+          </Link>
         )}
 
-        <div className="glass-card p-6 rounded-xl space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-white">About</h2>
-              <p className="text-xs text-silver mt-0.5">Display name and short bio.</p>
-            </div>
-            {isSelf && editing && (
+        <TrustStrip
+          density="full"
+          address={address}
+          displayName={profile?.displayName}
+          avatarUrl={avatarUrl}
+          reputationScore={stats?.reputationScore ?? stats?.reputation}
+          totalSales={stats?.totalSales}
+          successfulCompletions={completions}
+          refunds={stats?.refunds}
+          timeouts={stats?.timeouts}
+          kycStatus={profile?.kyc?.status}
+          ratingsAvg={stats?.ratingAverage}
+          ratingsCount={stats?.ratingCount}
+          completedBuys={stats?.completedBuys}
+          loading={statsLoading}
+          unknown={unknown}
+          linkToProfile={false}
+        />
+
+        {editing && isSelf && (
+          <div className={cn(material.regular, "space-y-3 rounded-[16px] p-4")}>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-white">Edit profile</p>
               <button
                 type="button"
                 onClick={() => {
@@ -281,87 +347,136 @@ export function ProfileContent({
               >
                 Cancel
               </button>
-            )}
-          </div>
-
-          {!editing ? (
-            <>
-              <div>
-                <p className="text-xs uppercase tracking-wide text-silver">Username</p>
-                <p className="text-white mt-0.5">
-                  {publicProfile?.hashpackName?.trim() || "— set one in your HashPack wallet"}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-wide text-silver">Bio</p>
-                <p className="text-white mt-0.5 whitespace-pre-wrap">
-                  {profile?.bio?.trim() || "—"}
-                </p>
-              </div>
-            </>
-          ) : (
-            <div className="space-y-3">
-              <div>
-                <span className="text-xs uppercase tracking-wide text-silver">Avatar</span>
-                <div className="mt-1 flex items-center gap-3">
-                  {avatarUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={avatarUrl}
-                      alt=""
-                      className="h-14 w-14 rounded-full object-cover border border-white/10"
-                    />
-                  ) : (
-                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10 text-silver">
-                      ?
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <label className="cursor-pointer rounded-md border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white hover:bg-white/10">
-                      {avatarUploading ? "Uploading…" : "Upload"}
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/png,image/gif,image/webp"
-                        className="hidden"
-                        disabled={avatarUploading}
-                        onChange={onAvatarSelected}
-                      />
-                    </label>
-                    {avatarUrl && (
-                      <button
-                        type="button"
-                        onClick={() => setDraft((d) => (d ? { ...d, avatarUrl: null } : d))}
-                        className="text-xs text-silver hover:text-rose-300"
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div>
-                <span className="text-xs uppercase tracking-wide text-silver">Username</span>
-                <p className="mt-1 text-sm text-white">
-                  {publicProfile?.hashpackName?.trim() || "—"}
-                </p>
-                <span className="mt-1 block text-[11px] text-silver/70">
-                  Usernames come from your HashPack wallet profile and can&apos;t be edited here.
-                </span>
-              </div>
-              <label className="block">
-                <span className="text-xs uppercase tracking-wide text-silver">Bio</span>
-                <textarea
-                  className="mt-1 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
-                  rows={3}
-                  value={draft?.bio ?? ""}
-                  onChange={(e) => setDraft((d) => (d ? { ...d, bio: e.target.value } : d))}
-                  maxLength={500}
+            </div>
+            <div className="flex items-center gap-3">
+              <label className="cursor-pointer rounded-md border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white hover:bg-white/10">
+                {avatarUploading ? "Uploading…" : "Upload photo"}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  className="hidden"
+                  disabled={avatarUploading}
+                  onChange={onAvatarSelected}
                 />
               </label>
+              {avatarUrl && (
+                <button
+                  type="button"
+                  onClick={() => setDraft((d) => (d ? { ...d, avatarUrl: null } : d))}
+                  className="text-xs text-silver hover:text-rose-300"
+                >
+                  Remove
+                </button>
+              )}
             </div>
-          )}
+            <label className="block">
+              <span className="text-xs text-silver">Bio</span>
+              <textarea
+                className="mt-1 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
+                rows={3}
+                value={draft?.bio ?? ""}
+                onChange={(e) => setDraft((d) => (d ? { ...d, bio: e.target.value } : d))}
+                maxLength={500}
+              />
+            </label>
+          </div>
+        )}
+
+        <div className="flex gap-1 rounded-full border border-hairline bg-white/[0.04] p-1">
+          {TABS.map((t) => {
+            const active = tab === t.key;
+            return (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setTab(t.key)}
+                className={cn(
+                  "flex-1 rounded-full px-3 py-1.5 text-[13px] font-semibold transition-colors",
+                  active ? "bg-[#00ffa3]/15 text-[#00ffa3]" : "text-silver hover:text-white",
+                )}
+              >
+                {t.label}
+              </button>
+            );
+          })}
         </div>
+
+        {tab === "listings" &&
+          (listings.length === 0 ? (
+            <EmptyState
+              headline={PROFILE_LISTINGS_EMPTY}
+              body={
+                isSelf
+                  ? "List something to start trading on Hashpop."
+                  : "This seller has nothing listed right now."
+              }
+            />
+          ) : (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {listings.map((item) => (
+                <ListingCard key={item.id} item={item} density="compact" />
+              ))}
+            </div>
+          ))}
+
+        {tab === "reviews" &&
+          (reviews.length === 0 ? (
+            <EmptyState
+              headline={isSelf ? PROFILE_REVIEWS_OWN_EMPTY : UNKNOWN_ON_HASHPOP}
+              body={
+                isSelf
+                  ? "Complete a contract and ratings will land here."
+                  : "No reviews yet — reputation builds with each contract."
+              }
+            />
+          ) : (
+            <ul className="space-y-2">
+              {reviews.map((r) => (
+                <li key={r.id} className={cn(material.regular, "rounded-[16px] px-4 py-3")}>
+                  <div className="flex items-center justify-between gap-2">
+                    <AddressDisplay
+                      address={r.reviewerAddress}
+                      className="text-sm text-white"
+                      showVerified={false}
+                    />
+                    <span className="text-sm font-semibold text-amber-300">★ {r.score}</span>
+                  </div>
+                  {r.comment?.trim() && <p className="mt-1 text-sm text-white/80">{r.comment}</p>}
+                  <p className="mt-1 font-mono text-[10px] text-silver">
+                    {new Date(r.createdAt).toLocaleDateString()}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          ))}
+
+        {tab === "badges" &&
+          (isVerified ? (
+            <div className={cn(material.regular, "flex items-center gap-3 rounded-[16px] p-4")}>
+              <BadgeCheck size={28} className="text-chrome" />
+              <div>
+                <p className="text-sm font-semibold text-white">KYC verified</p>
+                <p className="text-xs text-silver">Identity checked on Hashpop.</p>
+              </div>
+            </div>
+          ) : (
+            <EmptyState
+              headline={PROFILE_BADGES_EMPTY}
+              body={
+                isSelf ? "KYC is the only badge in this release." : "No badges on this profile."
+              }
+            />
+          ))}
       </div>
     </main>
+  );
+}
+
+function EmptyState({ headline, body }: { headline: string; body: string }) {
+  return (
+    <div className={cn(material.regular, "rounded-[16px] px-5 py-8 text-center")}>
+      <p className="text-base font-semibold text-white">{headline}</p>
+      <p className="mt-1 text-sm text-silver">{body}</p>
+    </div>
   );
 }

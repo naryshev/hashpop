@@ -1,5 +1,5 @@
 "use client";
-import { encodeListingIdForUrl, formatListingId, listingHref } from "../lib/listingUrl";
+import { encodeListingIdForUrl, listingHref } from "../lib/listingUrl";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -11,6 +11,21 @@ import { markActivitySeen } from "../hooks/useUnseenActivity";
 import { useEncryptionKey } from "../lib/useEncryptionKey";
 import { decryptMessage } from "../lib/chatEncryption";
 import { profileAvatarUrl, profileDisplayName, useProfile } from "../lib/profiles";
+import { TrustStrip } from "./TrustStrip";
+import { DealRoomOfferCards } from "./DealRoomOfferCards";
+import { LockEscrowSheet } from "./LockEscrowSheet";
+import { material } from "../lib/materials";
+import { cn } from "../lib/utils";
+import {
+  DEAL_ROOM_EMPTY_BODY,
+  DEAL_ROOM_EMPTY_CHIPS,
+  DEAL_ROOM_EMPTY_HEADLINE,
+  DEAL_ROOM_PLACEHOLDER,
+  escrowBarFromListing,
+  escrowSystemCards,
+  shouldPromptLockEscrow,
+  type DealListing,
+} from "../lib/dealRoom";
 
 type InboxConversation = {
   otherAddress: string;
@@ -50,6 +65,11 @@ type ListingPreview = {
   trackingNumber: string | null;
   trackingCarrier: string | null;
   createdAt: string | null;
+  onChainConfirmed: boolean;
+  disputeStatus: string | null;
+  disputeReason: string | null;
+  disputeOpenedBy: string | null;
+  disputeOpenedAt: string | null;
 };
 
 // Per-conversation status pill shown on inbox rows, derived from the listing's
@@ -256,6 +276,8 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
   const [sending, setSending] = useState(false);
   const [listingPreviews, setListingPreviews] = useState<Record<string, ListingPreview>>({});
   const [msgTab, setMsgTab] = useState<MsgTab>("buying");
+  const [lockEscrowOpen, setLockEscrowOpen] = useState(false);
+  const dismissedLockRef = useRef<string | null>(null);
   // keypair is used only to opportunistically decrypt legacy encrypted
   // history if a key was already derived; new messages are plaintext.
   const { keypair } = useEncryptionKey();
@@ -304,6 +326,11 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
             trackingNumber: l.trackingNumber ?? null,
             trackingCarrier: l.trackingCarrier ?? null,
             createdAt: l.createdAt ?? null,
+            onChainConfirmed: !!l.onChainConfirmed,
+            disputeStatus: l.disputeStatus ?? null,
+            disputeReason: l.disputeReason ?? null,
+            disputeOpenedBy: l.disputeOpenedBy ?? null,
+            disputeOpenedAt: l.disputeOpenedAt ?? null,
           },
         }));
       } catch {
@@ -604,6 +631,34 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
     ? listingPreviews[selectedThread.listingId]
     : undefined;
   const swatch = selectedListing ? paletteFor(selectedListing.id) : null;
+  const dealListing: DealListing | undefined = selectedListing
+    ? {
+        id: selectedListing.id,
+        seller: selectedListing.seller,
+        buyer: selectedListing.buyer,
+        price: selectedListing.price,
+        status: selectedListing.status,
+        requireEscrow: selectedListing.requireEscrow,
+        trackingNumber: selectedListing.trackingNumber,
+        trackingCarrier: selectedListing.trackingCarrier,
+        shippedAt: selectedListing.shippedAt,
+        exchangeConfirmedAt: selectedListing.exchangeConfirmedAt,
+        onChainConfirmed: selectedListing.onChainConfirmed,
+        disputeStatus: selectedListing.disputeStatus,
+        disputeReason: selectedListing.disputeReason,
+        disputeOpenedBy: selectedListing.disputeOpenedBy,
+        disputeOpenedAt: selectedListing.disputeOpenedAt,
+        title: selectedListing.title,
+        imageUrl: selectedListing.imageUrl,
+        createdAt: selectedListing.createdAt,
+      }
+    : undefined;
+
+  useEffect(() => {
+    if (!selectedListing || !address || !selectedThread) return;
+    if (dismissedLockRef.current === selectedListing.id) return;
+    if (shouldPromptLockEscrow(selectedListing, address)) setLockEscrowOpen(true);
+  }, [selectedListing, address, selectedThread]);
 
   // Single row template reused by both the "Listings" and "Direct messages"
   // sections so the only difference between sections is the heading above.
@@ -806,24 +861,21 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
             {/* Thread + right rail */}
             {selectedThread ? (
               <div className="flex min-h-0 flex-1 flex-col">
-                {/* Large order header */}
                 <div
-                  className="flex items-center gap-3 border-b border-white/10 px-4 py-3 sm:gap-4 sm:px-5 sm:py-4"
-                  style={{
-                    background: swatch
-                      ? `linear-gradient(135deg, ${swatch[0]}33, transparent)`
-                      : undefined,
-                  }}
+                  className={cn(
+                    material.chrome,
+                    "flex items-center gap-3 border-b px-3 py-2.5 sm:px-4",
+                  )}
                 >
                   <button
                     type="button"
                     onClick={() => setSelectedThread(null)}
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white hover:bg-white/20 active:scale-95 transition lg:hidden"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 lg:hidden"
                     aria-label="Back to inbox"
                   >
                     <svg
-                      width="22"
-                      height="22"
+                      width="20"
+                      height="20"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
@@ -835,133 +887,220 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
                       <path d="m15 18-6-6 6-6" />
                     </svg>
                   </button>
-                  {selectedListing ? (
-                    <ItemThumb listing={selectedListing} size={56} />
-                  ) : (
-                    <Avatar address={selectedThread.other} size={56} />
-                  )}
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-base font-bold text-white">
-                      {selectedListing?.title ?? "Direct conversation"}
-                    </div>
-                    <div className="mt-1 flex items-center gap-2">
-                      <Avatar address={selectedThread.other} size={18} />
-                      <span className="font-mono text-[11px] text-white/80">
-                        <AddressDisplay
-                          address={selectedThread.other}
-                          className="text-white/80 font-mono text-[11px]"
-                        />
-                      </span>
-                    </div>
+                    <p className="truncate text-[13px] font-semibold text-white">
+                      {selectedListing ? "Deal room" : "Conversation"}
+                    </p>
+                    <p className="truncate text-[11px] text-silver">
+                      {selectedListing?.title ?? "Direct message"}
+                    </p>
                   </div>
-                  {selectedListing?.price && (
-                    <div className="text-right">
-                      <div className="text-lg font-extrabold text-chrome">
-                        {selectedListing.price} ℏ
-                      </div>
-                      <div className="font-mono text-[10px] text-silver">locked in escrow</div>
-                    </div>
-                  )}
                 </div>
 
-                <div className="flex min-h-0 flex-1 flex-col">
-                  {/* Messages column */}
-                  <div className="flex min-h-0 flex-1 flex-col">
-                    <div className="flex-1 space-y-2 overflow-y-auto px-5 py-4">
-                      {threadLoading ? (
-                        <p className="text-silver text-sm">Loading thread…</p>
-                      ) : threadMessages.length === 0 ? (
-                        <p className="text-silver text-sm">
-                          No messages yet. Send a message below.
+                {selectedListing && (
+                  <Link
+                    href={listingHref(selectedListing.id)}
+                    className="flex items-center gap-3 border-b border-hairline px-4 py-2.5"
+                    style={{
+                      background: swatch
+                        ? `linear-gradient(135deg, ${swatch[0]}33, transparent)`
+                        : undefined,
+                    }}
+                  >
+                    <ItemThumb listing={selectedListing} size={44} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-white">
+                        {selectedListing.title ?? "Listing"}
+                      </p>
+                      {selectedListing.price && (
+                        <p className="text-[13px] font-bold text-chrome">
+                          {selectedListing.price} ℏ
                         </p>
-                      ) : (
-                        <>
-                          <div className="my-2 text-center font-mono text-[10px] text-silver">
-                            —{" "}
-                            {selectedListing?.createdAt
-                              ? `Order opened · ${new Date(
-                                  selectedListing.createdAt,
-                                ).toLocaleDateString()}`
-                              : "Conversation"}{" "}
-                            —
-                          </div>
-                          {threadMessages.map((m) => {
-                            const isMe = m.fromAddress.toLowerCase() === address.toLowerCase();
-                            return (
-                              <div
-                                key={m.id}
-                                className={`flex ${isMe ? "justify-end" : "justify-start"}`}
-                              >
-                                <div
-                                  className={`max-w-[70%] rounded-glass-lg px-3.5 py-2 text-sm shadow-inner ${
-                                    isMe
-                                      ? "bg-chrome text-black"
-                                      : "border border-white/10 bg-[#0e1422]/85 text-white"
-                                  }`}
-                                >
-                                  <p className="whitespace-pre-wrap leading-relaxed">
-                                    {getDisplayBody(m)}
-                                  </p>
-                                  <div
-                                    className={`mt-1 flex items-center justify-end gap-1.5 text-[10px] ${
-                                      isMe ? "text-black/55" : "text-silver"
-                                    }`}
-                                  >
-                                    <span>
-                                      {new Date(m.createdAt).toLocaleTimeString([], {
-                                        hour: "2-digit",
-                                        minute: "2-digit",
-                                      })}
-                                    </span>
-                                    {m.encrypted && <LockIcon className="h-2.5 w-2.5 opacity-70" />}
-                                    {isMe && <span>✓✓</span>}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </>
                       )}
                     </div>
+                  </Link>
+                )}
 
-                    {/* Composer */}
-                    <div className="border-t border-white/10 bg-[#0b111b] px-4 py-3">
-                      <div className="flex items-end gap-2">
-                        <div className="flex flex-1 items-end gap-2 rounded-glass-lg border border-white/10 bg-[#0f1726]/90 px-3 py-2 focus-within:border-chrome/50">
-                          <textarea
-                            value={replyBody}
-                            onChange={(e) => setReplyBody(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" && !e.shiftKey) {
-                                e.preventDefault();
-                                void sendReply();
-                              }
-                            }}
-                            placeholder={`Message ${
-                              profileDisplayName(otherProfile) ??
-                              otherAccountId ??
-                              (selectedThread.other.startsWith("0x") &&
-                              selectedThread.other.length === 42
-                                ? `${selectedThread.other.slice(0, 6)}…${selectedThread.other.slice(-4)}`
-                                : selectedThread.other.slice(0, 10))
-                            }…`}
-                            rows={1}
-                            className="flex-1 resize-none bg-transparent text-sm text-white placeholder:text-silver focus:outline-none min-h-[24px] max-h-32"
+                <div className="border-b border-hairline px-4 py-2">
+                  <TrustStrip density="compact" address={selectedThread.other} />
+                </div>
+
+                {dealListing && (
+                  <div className="border-b border-hairline px-4 py-2">
+                    {(() => {
+                      const role =
+                        address && dealListing.seller.toLowerCase() === address.toLowerCase()
+                          ? "seller"
+                          : "buyer";
+                      const bar = escrowBarFromListing(dealListing, undefined, role);
+                      return (
+                        <div className="flex items-start gap-2">
+                          <span
+                            className={cn(
+                              "mt-1 h-2 w-2 shrink-0 rounded-full",
+                              bar.tone === "disputed" || bar.tone === "refunded"
+                                ? "bg-rose-400"
+                                : bar.tone === "complete"
+                                  ? "bg-[#00ffa3]"
+                                  : bar.tone === "active"
+                                    ? "bg-amber-300"
+                                    : "bg-white/30",
+                            )}
                           />
+                          <div className="min-w-0">
+                            <p className="text-[12px] font-semibold text-white">{bar.label}</p>
+                            <p className="text-[11px] leading-snug text-silver">{bar.detail}</p>
+                          </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={sendReply}
-                          disabled={!replyBody.trim() || sending}
-                          className="btn-frost-cta inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm disabled:opacity-50"
-                        >
-                          {sending ? "Sending…" : "Send"}
-                          {!sending && <SendArrow />}
-                        </button>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                <div className="flex min-h-0 flex-1 flex-col">
+                  <div className="flex-1 space-y-2 overflow-y-auto px-3 py-3">
+                    {threadLoading ? (
+                      <p className="text-silver text-sm">Loading thread…</p>
+                    ) : threadMessages.length === 0 ? (
+                      <div className="px-3 py-8 text-center">
+                        <p className="text-lg font-bold text-white">{DEAL_ROOM_EMPTY_HEADLINE}</p>
+                        <p className="mt-2 text-sm leading-relaxed text-silver">
+                          {DEAL_ROOM_EMPTY_BODY}
+                        </p>
+                        <div className="mt-3 flex flex-wrap justify-center gap-1.5">
+                          {DEAL_ROOM_EMPTY_CHIPS.map((chip) => (
+                            <span
+                              key={chip}
+                              className="rounded-full border border-hairline bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-white/80"
+                            >
+                              {chip}
+                            </span>
+                          ))}
+                        </div>
                       </div>
+                    ) : (
+                      <>
+                        {dealListing &&
+                          escrowSystemCards(dealListing).map((card) => (
+                            <div
+                              key={card.key}
+                              className={cn(
+                                material.regular,
+                                "mx-1 rounded-[16px] px-3.5 py-2.5 text-center",
+                              )}
+                            >
+                              <p className="text-[12px] font-semibold text-white">{card.title}</p>
+                              <p className="mt-0.5 text-[11px] text-silver">{card.body}</p>
+                            </div>
+                          ))}
+                        {selectedListing && (
+                          <DealRoomOfferCards
+                            listingId={selectedListing.id}
+                            sellerAddress={selectedListing.seller}
+                            askingPriceHbar={selectedListing.price}
+                          />
+                        )}
+                        {threadMessages.map((m) => {
+                          const isMe = m.fromAddress.toLowerCase() === address.toLowerCase();
+                          return (
+                            <div
+                              key={m.id}
+                              className={`flex ${isMe ? "justify-end" : "justify-start"}`}
+                            >
+                              <div
+                                className={`max-w-[70%] rounded-glass-lg px-3.5 py-2 text-sm shadow-inner ${
+                                  isMe
+                                    ? "bg-chrome text-black"
+                                    : "border border-white/10 bg-[#0e1422]/85 text-white"
+                                }`}
+                              >
+                                <p className="whitespace-pre-wrap leading-relaxed">
+                                  {getDisplayBody(m)}
+                                </p>
+                                <div
+                                  className={`mt-1 flex items-center justify-end gap-1.5 text-[10px] ${
+                                    isMe ? "text-black/55" : "text-silver"
+                                  }`}
+                                >
+                                  <span>
+                                    {new Date(m.createdAt).toLocaleTimeString([], {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                  </span>
+                                  {m.encrypted && <LockIcon className="h-2.5 w-2.5 opacity-70" />}
+                                  {isMe && <span>✓✓</span>}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </>
+                    )}
+                    {threadMessages.length === 0 && selectedListing && (
+                      <DealRoomOfferCards
+                        listingId={selectedListing.id}
+                        sellerAddress={selectedListing.seller}
+                        askingPriceHbar={selectedListing.price}
+                      />
+                    )}
+                  </div>
+
+                  <div className={cn(material.regular, "border-t px-3 py-2.5")}>
+                    <div className="flex items-end gap-2">
+                      <div
+                        className={cn(
+                          material.regular,
+                          "flex flex-1 items-end gap-2 rounded-[14px] px-3 py-2",
+                        )}
+                      >
+                        <textarea
+                          value={replyBody}
+                          onChange={(e) => setReplyBody(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              void sendReply();
+                            }
+                          }}
+                          placeholder={
+                            selectedListing
+                              ? DEAL_ROOM_PLACEHOLDER
+                              : `Message ${
+                                  profileDisplayName(otherProfile) ??
+                                  otherAccountId ??
+                                  (selectedThread.other.startsWith("0x") &&
+                                  selectedThread.other.length === 42
+                                    ? `${selectedThread.other.slice(0, 6)}…${selectedThread.other.slice(-4)}`
+                                    : selectedThread.other.slice(0, 10))
+                                }…`
+                          }
+                          rows={1}
+                          className="min-h-[24px] max-h-32 flex-1 resize-none bg-transparent text-sm text-white placeholder:text-silver focus:outline-none"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={sendReply}
+                        disabled={!replyBody.trim() || sending}
+                        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#00ffa3] text-black disabled:opacity-50"
+                        aria-label="Send"
+                      >
+                        {sending ? <span className="text-[10px] font-bold">…</span> : <SendArrow />}
+                      </button>
                     </div>
                   </div>
                 </div>
+                {selectedListing && (
+                  <LockEscrowSheet
+                    open={lockEscrowOpen}
+                    listingId={selectedListing.id}
+                    onClose={() => {
+                      dismissedLockRef.current = selectedListing.id;
+                      setLockEscrowOpen(false);
+                    }}
+                  />
+                )}
               </div>
             ) : (
               <div className="hidden flex-1 items-center justify-center p-8 text-center text-silver lg:flex">
