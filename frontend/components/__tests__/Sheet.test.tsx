@@ -58,15 +58,19 @@ describe("Sheet", () => {
     host?.remove();
   });
 
-  it("anchors a top-edge panel under the top of the viewport", async () => {
+  it("anchors a top-edge panel under the top bar", async () => {
     await renderSheet("top");
     const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
     expect(dialog.getAttribute("data-sheet-edge")).toBe("top");
     expect(dialog.className).toContain("items-start");
-    expect(dialog.className).toContain("md:items-center");
+    expect(dialog.className).toContain("md:top-14");
+    expect(dialog.className).toContain("max-md:top-[calc(env(safe-area-inset-top)+3.5rem)]");
+    expect(dialog.className).not.toContain("items-end");
     const panel = dialog.querySelector("[data-sheet-panel]") as HTMLElement;
-    expect(panel.className).toContain("rounded-b-sheet");
+    expect(panel.className).toContain("rounded-sheet");
+    expect(panel.className).not.toContain("rounded-t-sheet");
     expect(panel.getAttribute("data-sheet-motion")).toBe("slide-down");
+    expect(panel.querySelector(".pb-safe")).toBeNull();
   });
 
   it("keeps the default bottom sheet layout", async () => {

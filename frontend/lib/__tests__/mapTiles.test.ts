@@ -13,6 +13,7 @@ import {
   NEARBY_DEFAULT_ZOOM,
   OPENFREEMAP_DARK_STYLE_URL,
   PICKER_AREA_ZOOM,
+  PICKER_EMPTY_ZOOM,
   areaPaint,
   isKeyFreeBasemap,
   resolveDarkMapStyleUrl,
@@ -69,6 +70,7 @@ describe("shared dark map config", () => {
     expect(LISTING_AREA_ZOOM).toBe(COUNTRY_AREA_ZOOM);
     expect(PICKER_AREA_ZOOM).toBe(COUNTRY_AREA_ZOOM);
     expect(NEARBY_DEFAULT_ZOOM).toBe(8);
+    expect(PICKER_EMPTY_ZOOM).toBe(3);
     expect(areaPaint.fillOpacity).toBeGreaterThanOrEqual(0.2);
     expect(areaPaint.fillOpacity).toBeLessThanOrEqual(0.3);
     expect(areaPaint.color).toBe("#00ffa3");

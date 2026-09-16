@@ -33,7 +33,8 @@ const sheetPanel = cva(
       },
       edge: {
         bottom: "rounded-t-sheet md:rounded-sheet",
-        top: "rounded-b-sheet md:rounded-sheet",
+        /** Hangs under the top bar, so all corners are rounded. */
+        top: "rounded-sheet",
       },
     },
     defaultVariants: { detent: "medium", edge: "bottom" },
@@ -153,10 +154,10 @@ export function Sheet({
       {open && (
         <div
           className={cn(
-            "fixed inset-0 z-[130] flex justify-center",
             fromTop
-              ? "items-start pt-[env(safe-area-inset-top)] md:items-center md:p-4"
-              : "items-end md:items-center md:p-4",
+              ? // Sit under DesktopShell h-14 / mobile pt-4 + top bar so the header stays live.
+                "fixed left-0 right-0 bottom-0 z-[130] flex items-start justify-center max-md:top-[calc(env(safe-area-inset-top)+3.5rem)] md:top-14 md:px-4"
+              : "fixed inset-0 z-[130] flex items-end justify-center md:items-center md:p-4",
           )}
           role="dialog"
           aria-modal="true"
@@ -217,8 +218,8 @@ export function Sheet({
             <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-2">{children}</div>
 
             {footer ? (
-              <div className="shrink-0 px-5 pt-3 pb-safe">{footer}</div>
-            ) : (
+              <div className={cn("shrink-0 px-5 pt-3", fromTop ? "pb-3" : "pb-safe")}>{footer}</div>
+            ) : fromTop ? null : (
               <div className="pb-safe" />
             )}
 

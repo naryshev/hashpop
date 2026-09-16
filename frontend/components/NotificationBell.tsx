@@ -45,7 +45,14 @@ export function NotificationBell({
     <>
       <button
         type="button"
-        onClick={openSheet}
+        onClick={() => {
+          if (open) {
+            setOpen(false);
+            return;
+          }
+          openSheet();
+        }}
+        aria-expanded={open}
         aria-label={badgeLabel ? `Notifications, ${badgeLabel}` : "Notifications"}
         className={cn(hit, className)}
       >
