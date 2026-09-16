@@ -6,6 +6,7 @@ import {
   geocodeRequestUrl,
   parseGeocodeResponse,
 } from "../geocode";
+import { GEOCODER_MAPTILER, resolveGeocoder } from "../geocoder";
 import { maptilerForwardUrl, parseMaptilerFeatures, shortPlaceLabel } from "../maptilerGeocode";
 
 describe("geocode client helpers", () => {
@@ -34,6 +35,16 @@ describe("geocode client helpers", () => {
         200,
       ).suggestions,
     ).toHaveLength(1);
+  });
+});
+
+describe("GEOCODER swap hook", () => {
+  it("resolves to MapTiler for unset, maptiler, and future/unknown values", () => {
+    expect(resolveGeocoder({})).toBe(GEOCODER_MAPTILER);
+    expect(resolveGeocoder({ GEOCODER: "maptiler" })).toBe(GEOCODER_MAPTILER);
+    expect(resolveGeocoder({ GEOCODER: "MAPTILER" })).toBe(GEOCODER_MAPTILER);
+    expect(resolveGeocoder({ GEOCODER: "photon" })).toBe(GEOCODER_MAPTILER);
+    expect(resolveGeocoder({ GEOCODER: "nominatim" })).toBe(GEOCODER_MAPTILER);
   });
 });
 

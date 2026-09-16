@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SEARCH_UNAVAILABLE_COPY } from "../../../lib/geocode";
+import { GEOCODER_MAPTILER, resolveGeocoder } from "../../../lib/geocoder";
 import { maptilerForwardUrl, parseMaptilerFeatures } from "../../../lib/maptilerGeocode";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +10,14 @@ function json(body: unknown, status = 200) {
 }
 
 export async function GET(req: NextRequest) {
+  // GEOCODER env is a future Photon swap hook. MapTiler is the only case today.
+  switch (resolveGeocoder()) {
+    case GEOCODER_MAPTILER:
+      return maptilerGeocode(req);
+  }
+}
+
+async function maptilerGeocode(req: NextRequest) {
   const key = process.env.MAPTILER_API_KEY?.trim();
   if (!key) {
     return json({ available: false, suggestions: [], error: SEARCH_UNAVAILABLE_COPY }, 503);

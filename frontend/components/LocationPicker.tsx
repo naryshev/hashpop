@@ -116,13 +116,6 @@ export function LocationPicker({ value, onChange }: Props) {
     onChange({ city: hit.label, lat, lng });
   };
 
-  const handleMapPick = (lat: number, lng: number) => {
-    const rLat = roundCoordForPrivacy(lat);
-    const rLng = roundCoordForPrivacy(lng);
-    if (rLat == null || rLng == null) return;
-    onChange({ city: value.city, lat: rLat, lng: rLng });
-  };
-
   const clear = () => {
     setQuery("");
     setSuggestions([]);
@@ -184,7 +177,7 @@ export function LocationPicker({ value, onChange }: Props) {
           ? "Approximate area only — exact address stays private."
           : SEARCH_UNAVAILABLE_COPY}
       </p>
-      <LocationPickerMap lat={value.lat} lng={value.lng} onPick={handleMapPick} />
+      <LocationPickerMap lat={value.lat} lng={value.lng} />
       {value.lat != null && value.lng != null && (
         <p className="text-xs text-silver">
           Approximate location
