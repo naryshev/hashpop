@@ -486,7 +486,7 @@ function CreatePageContent() {
 
         {/* Render the form only when the wallet is connected. The disabled
             form for unauthenticated visitors served no purpose and made the
-            page sensitive to leaflet/wallet cleanup races on navigation. */}
+            page sensitive to map/wallet cleanup races on navigation. */}
         {walletConnected && (
           <div className="grid gap-8 lg:grid-cols-[1fr_360px] lg:gap-10">
             <div className="space-y-8 min-w-0">
@@ -743,7 +743,7 @@ function CreatePageContent() {
               <section>
                 <SectionHeader
                   title="Location"
-                  sub="Shown publicly only down to neighborhood. Search a city or click the map to drop a pin."
+                  sub="Shown publicly only down to neighborhood. Search a city or ZIP to set an approximate area."
                 />
                 <LocationPicker value={location} onChange={setLocation} />
               </section>
