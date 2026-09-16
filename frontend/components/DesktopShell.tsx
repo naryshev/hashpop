@@ -11,7 +11,6 @@ import {
   Info,
   Tag,
   Receipt,
-  Bell,
   Wallet,
   LayoutGrid,
   PackageCheck,
@@ -19,7 +18,7 @@ import {
   ShoppingCart,
 } from "lucide-react";
 import { useCart } from "../lib/cart";
-import { useUnseenActivity } from "../hooks/useUnseenActivity";
+import { useUnreadCount } from "../hooks/useUnreadCount";
 import { useHashpackWallet } from "../lib/hashpackWallet";
 import { useSignInModal } from "../lib/signInModal";
 import { useTopBarSlotFilled, useTopBarSlotRef } from "../lib/topBar";
@@ -28,6 +27,9 @@ import { Footer } from "./Footer";
 import { MobileTopBar } from "./MobileTopBar";
 import { ProfileCardSheet } from "./ProfileCardSheet";
 import { MessagesModal } from "./MessagesModal";
+import { NotificationBell } from "./NotificationBell";
+import { DockBadge } from "./ui/DockBadge";
+import { formatDockBadgeCount } from "../lib/dockBadge";
 
 type NavItem = {
   label: string;
@@ -107,7 +109,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
   const { isConnected, accountId, address } = useHashpackWallet();
   const { openSignIn } = useSignInModal();
   const { count: cartCount } = useCart();
-  const hasUnseen = useUnseenActivity();
+  const unreadThreads = useUnreadCount();
   const [profileOpen, setProfileOpen] = useState(false);
   const [messagesOpen, setMessagesOpen] = useState(false);
 
@@ -153,13 +155,18 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
             {
               label: "Messages",
               onClick: () => setMessagesOpen(true),
-              icon: <MessageSquare className="h-5 w-5" />,
+              icon: (
+                <span className="relative inline-flex">
+                  <MessageSquare className="h-5 w-5" />
+                  <DockBadge count={unreadThreads} size="compact" />
+                </span>
+              ),
             },
           ]
         : []),
       { label: "Support", href: "/support", icon: <Info className="h-5 w-5" /> },
     ];
-  }, [effectiveConnected]);
+  }, [effectiveConnected, unreadThreads]);
 
   const fallbackTitle = pathnameTitle(pathname);
   const showFooter = pathname === "/marketplace" || pathname.startsWith("/marketplace");
@@ -264,25 +271,16 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
           <Link
             href="/cart"
             className="relative flex h-9 w-9 items-center justify-center rounded-glass text-neutral-300 hover:bg-white/5 hover:text-white"
-            aria-label="Cart"
+            aria-label={
+              formatDockBadgeCount(cartCount) ? `Cart, ${formatDockBadgeCount(cartCount)}` : "Cart"
+            }
           >
-            <ShoppingCart className="h-4 w-4" />
-            {cartCount > 0 && (
-              <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#00ffa3] px-1 text-[9px] font-bold text-black">
-                {cartCount > 9 ? "9+" : cartCount}
-              </span>
-            )}
+            <span className="relative inline-flex">
+              <ShoppingCart className="h-4 w-4" />
+              <DockBadge count={cartCount} size="compact" />
+            </span>
           </Link>
-          <Link
-            href="/activity"
-            className="relative flex h-9 w-9 items-center justify-center rounded-glass text-neutral-300 hover:bg-white/5 hover:text-white"
-            aria-label="Activity"
-          >
-            <Bell className="h-4 w-4" />
-            {hasUnseen && (
-              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[#00ffa3]" />
-            )}
-          </Link>
+          <NotificationBell variant="desktop" />
           {effectiveConnected ? (
             <button
               type="button"

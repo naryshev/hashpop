@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Map as MapIcon, MessageSquare, Plus, ShoppingCart, Store } from "lucide-react";
 import { useCart } from "../lib/cart";
+import { useUnreadCount } from "../hooks/useUnreadCount";
 import { NearbyMap } from "./NearbyMap";
 import { TabBar, type TabBarItem } from "./ui/TabBar";
 
@@ -14,6 +15,7 @@ import { TabBar, type TabBarItem } from "./ui/TabBar";
 export function BottomNav() {
   const pathname = usePathname();
   const { count: cartCount } = useCart();
+  const unreadThreads = useUnreadCount();
   const [mapOpen, setMapOpen] = useState(false);
 
   // Full-screen surfaces (an open message thread) hide the bar entirely —
@@ -52,6 +54,7 @@ export function BottomNav() {
       href: "/messages",
       label: "Messages",
       icon: <MessageSquare className="h-6 w-6" />,
+      badge: unreadThreads,
     },
   ];
 
