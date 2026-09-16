@@ -66,4 +66,28 @@ describe("DockBadge", () => {
     });
     expect(document.querySelector("[data-dock-badge]")?.textContent).toBe("9+");
   });
+
+  it("uses a tighter compact size for 16–20px header icons", async () => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+    const next = createRoot(host);
+    root = next;
+    await act(async () => {
+      next.render(
+        createElement(
+          "span",
+          { className: "relative inline-flex" },
+          createElement(DockBadge, { count: 3, size: "compact" }),
+        ),
+      );
+    });
+    const badge = document.querySelector("[data-dock-badge]") as HTMLElement;
+    expect(badge.getAttribute("data-dock-badge-size")).toBe("compact");
+    expect(badge.className).toContain("h-3.5");
+    expect(badge.className).toContain("text-[8px]");
+    expect(badge.className).toContain("-top-px");
+    expect(badge.className).toContain("-right-0.5");
+    expect(badge.className).not.toContain("h-4");
+    expect(badge.className).not.toContain("text-[9px]");
+  });
 });

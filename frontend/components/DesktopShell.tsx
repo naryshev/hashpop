@@ -158,7 +158,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
               icon: (
                 <span className="relative inline-flex">
                   <MessageSquare className="h-5 w-5" />
-                  <DockBadge count={unreadThreads} />
+                  <DockBadge count={unreadThreads} size="compact" />
                 </span>
               ),
             },
@@ -277,7 +277,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
           >
             <span className="relative inline-flex">
               <ShoppingCart className="h-4 w-4" />
-              <DockBadge count={cartCount} />
+              <DockBadge count={cartCount} size="compact" />
             </span>
           </Link>
           <NotificationBell variant="desktop" />

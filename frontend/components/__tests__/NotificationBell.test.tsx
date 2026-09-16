@@ -119,5 +119,10 @@ describe("NotificationBell", () => {
     expect(document.body.textContent).toContain("12 ℏ on Polaroid");
     expect(document.body.textContent).toContain("just now");
     expect(document.body.textContent).not.toContain("New message");
+    const row = document.querySelector("li");
+    expect(row?.className).toContain("border-hairline");
+    expect(row?.className).not.toContain("border-white/[0.06]");
+    expect(row?.querySelector("a")?.className).toContain("bg-material-regular");
+    expect(row?.querySelector("a")?.className).toContain("border-hairline");
   });
 });

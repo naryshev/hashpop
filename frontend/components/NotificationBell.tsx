@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { material } from "@/lib/materials";
 import { Sheet } from "./ui/Sheet";
 import { useDealNotifications, markDealUpdatesSeen } from "../hooks/useDealNotifications";
 import {
@@ -69,7 +70,7 @@ export function NotificationBell({
           <ul className="pb-3">
             {items.map((item) => {
               const row = (
-                <div className="flex items-start gap-3 py-3">
+                <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[13px] font-semibold text-white">
                       {item.title}
@@ -81,18 +82,19 @@ export function NotificationBell({
                   </div>
                 </div>
               );
+              const chrome = cn(material.regular, "block rounded-[14px] px-3 py-2.5");
               return (
-                <li key={item.id} className="border-b border-white/[0.06] last:border-0">
+                <li key={item.id} className="border-b border-hairline py-1.5 last:border-0">
                   {item.href ? (
                     <Link
                       href={item.href}
-                      className="block hover:opacity-90"
+                      className={cn(chrome, "hover:opacity-90")}
                       onClick={() => setOpen(false)}
                     >
                       {row}
                     </Link>
                   ) : (
-                    row
+                    <div className={chrome}>{row}</div>
                   )}
                 </li>
               );
