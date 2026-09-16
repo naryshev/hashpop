@@ -59,12 +59,12 @@ describe("shared dark map config", () => {
     expect(MAP_CANVAS_BG).toBe("#0b111b");
   });
 
-  it("uses a 2.5km mint area disc at neighborhood zoom (not street-level)", () => {
-    expect(LISTING_AREA_RADIUS_M).toBe(2500);
-    expect(LISTING_AREA_ZOOM).toBeGreaterThanOrEqual(11);
-    expect(LISTING_AREA_ZOOM).toBeLessThanOrEqual(12);
-    expect(PICKER_AREA_ZOOM).toBeGreaterThanOrEqual(11);
-    expect(PICKER_AREA_ZOOM).toBeLessThanOrEqual(12);
+  it("uses a 5km mint area disc at neighborhood zoom (not street-level)", () => {
+    expect(LISTING_AREA_RADIUS_M).toBe(5000);
+    expect(LISTING_AREA_ZOOM).toBeGreaterThanOrEqual(10);
+    expect(LISTING_AREA_ZOOM).toBeLessThanOrEqual(11);
+    expect(PICKER_AREA_ZOOM).toBeGreaterThanOrEqual(10);
+    expect(PICKER_AREA_ZOOM).toBeLessThanOrEqual(11);
     expect(areaPaint.fillOpacity).toBeGreaterThanOrEqual(0.2);
     expect(areaPaint.fillOpacity).toBeLessThanOrEqual(0.3);
     expect(areaPaint.color).toBe("#00ffa3");
@@ -85,8 +85,8 @@ describe("shared dark map config", () => {
     ).toBe(OPENFREEMAP_DARK_STYLE_URL);
   });
 
-  it("uses a 5km mint disc for the Nearby user/search center only", () => {
+  it("shares the 5km mint disc between listing privacy and Nearby user/search center", () => {
     expect(NEARBY_CENTER_RADIUS_M).toBe(5000);
-    expect(NEARBY_CENTER_RADIUS_M).toBeGreaterThan(LISTING_AREA_RADIUS_M);
+    expect(NEARBY_CENTER_RADIUS_M).toBe(LISTING_AREA_RADIUS_M);
   });
 });

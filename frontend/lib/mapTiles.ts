@@ -37,17 +37,17 @@ export const MAP_ATTRIBUTION =
 
 export const MAP_CANVAS_BG = color.bg;
 
-/** Creative default: ~2.5 km privacy blob on listing picker + detail. */
-export const LISTING_AREA_RADIUS_M = 2500;
+/** Product lock: ~5 km privacy blob on listing picker + detail, and Nearby center. */
+export const LISTING_AREA_RADIUS_M = 5000;
 
-/** Area-scale zoom — never street-level on listing detail. */
-export const LISTING_AREA_ZOOM = 11;
-export const PICKER_AREA_ZOOM = 11;
+/** Area-scale zoom for a 5 km disc — never street-level on listing detail. */
+export const LISTING_AREA_ZOOM = 10;
+export const PICKER_AREA_ZOOM = 10;
 export const NEARBY_DEFAULT_ZOOM = 11;
 export const PICKER_EMPTY_ZOOM = 3;
 
-/** Nearby user/search center — ~5 km mint area disc (not per listing). */
-export const NEARBY_CENTER_RADIUS_M = 5000;
+/** Nearby user/search center uses the same 5 km mint disc (not per listing). */
+export const NEARBY_CENTER_RADIUS_M = LISTING_AREA_RADIUS_M;
 
 export const areaPaint = {
   color: color.chrome,
