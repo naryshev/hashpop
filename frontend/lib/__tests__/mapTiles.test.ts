@@ -5,10 +5,12 @@ import {
   DARK_MAP_STYLE_URL,
   KEY_GATED_TILE_HOST_RE,
   LISTING_AREA_RADIUS_M,
+  COUNTRY_AREA_ZOOM,
   LISTING_AREA_ZOOM,
   MAP_ATTRIBUTION,
   MAP_CANVAS_BG,
   NEARBY_CENTER_RADIUS_M,
+  NEARBY_DEFAULT_ZOOM,
   OPENFREEMAP_DARK_STYLE_URL,
   PICKER_AREA_ZOOM,
   areaPaint,
@@ -59,12 +61,14 @@ describe("shared dark map config", () => {
     expect(MAP_CANVAS_BG).toBe("#0b111b");
   });
 
-  it("uses a 5km mint area disc at neighborhood zoom (not street-level)", () => {
+  it("uses a 5km mint area disc at country-scale zoom (not neighborhood or street)", () => {
     expect(LISTING_AREA_RADIUS_M).toBe(5000);
-    expect(LISTING_AREA_ZOOM).toBeGreaterThanOrEqual(10);
-    expect(LISTING_AREA_ZOOM).toBeLessThanOrEqual(11);
-    expect(PICKER_AREA_ZOOM).toBeGreaterThanOrEqual(10);
-    expect(PICKER_AREA_ZOOM).toBeLessThanOrEqual(11);
+    expect(COUNTRY_AREA_ZOOM).toBe(7);
+    expect(LISTING_AREA_ZOOM).toBe(7);
+    expect(PICKER_AREA_ZOOM).toBe(7);
+    expect(LISTING_AREA_ZOOM).toBe(COUNTRY_AREA_ZOOM);
+    expect(PICKER_AREA_ZOOM).toBe(COUNTRY_AREA_ZOOM);
+    expect(NEARBY_DEFAULT_ZOOM).toBe(8);
     expect(areaPaint.fillOpacity).toBeGreaterThanOrEqual(0.2);
     expect(areaPaint.fillOpacity).toBeLessThanOrEqual(0.3);
     expect(areaPaint.color).toBe("#00ffa3");

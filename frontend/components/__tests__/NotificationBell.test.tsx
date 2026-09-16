@@ -41,13 +41,17 @@ let mockState: {
 let root: Root | undefined;
 let host: HTMLElement | undefined;
 
-async function renderBell() {
+function unseenStubs(count: number) {
+  return Array.from({ length: count }, (_, i) => ({ id: `u${i}` }));
+}
+
+async function renderBell(variant: "mobile" | "desktop" = "mobile") {
   host = document.createElement("div");
   document.body.appendChild(host);
   const next = createRoot(host);
   root = next;
   await act(async () => {
-    next.render(createElement(NotificationBell, { variant: "mobile" }));
+    next.render(createElement(NotificationBell, { variant }));
   });
 }
 
@@ -68,16 +72,47 @@ describe("NotificationBell", () => {
     host?.remove();
   });
 
-  it("shows a quiet mint/red dot with no numeral", async () => {
-    mockState = { items: [], unseen: [], tone: "mint", loading: false };
+  it("hides the count bubble at 0 unread", async () => {
+    mockState = { items: [], unseen: [], tone: null, loading: false };
     await renderBell();
-    const btn = document.querySelector(
-      'button[aria-label="Notifications, new updates"]',
-    ) as HTMLButtonElement;
+    const btn = document.querySelector('button[aria-label="Notifications"]') as HTMLButtonElement;
     expect(btn).toBeTruthy();
-    expect(btn.querySelector("[data-bell-dot='mint']")).toBeTruthy();
     expect(btn.querySelector("[data-dock-badge]")).toBeNull();
-    expect(btn.textContent?.replace(/\s+/g, "")).not.toMatch(/\d/);
+    expect(btn.querySelector("[data-bell-dot]")).toBeNull();
+  });
+
+  it("shows a mint DockBadge for unread deal updates (1 / 9 / 9+)", async () => {
+    mockState = { items: [], unseen: unseenStubs(1), tone: "mint", loading: false };
+    await renderBell();
+    let btn = document.querySelector('button[aria-label="Notifications, 1"]') as HTMLButtonElement;
+    let badge = btn.querySelector("[data-dock-badge]") as HTMLElement;
+    expect(badge).toBeTruthy();
+    expect(badge.textContent).toBe("1");
+    expect(badge.className).toContain("bg-[#00ffa3]");
+    expect(badge.className).toContain("text-[#0a0e14]");
+    expect(btn.querySelector("[data-bell-dot]")).toBeNull();
+
+    mockState = { items: [], unseen: unseenStubs(9), tone: "mint", loading: false };
+    await act(async () => {
+      root!.render(createElement(NotificationBell, { variant: "mobile" }));
+    });
+    btn = document.querySelector('button[aria-label="Notifications, 9"]') as HTMLButtonElement;
+    expect(btn.querySelector("[data-dock-badge]")?.textContent).toBe("9");
+
+    mockState = { items: [], unseen: unseenStubs(10), tone: "red", loading: false };
+    await act(async () => {
+      root!.render(createElement(NotificationBell, { variant: "mobile" }));
+    });
+    btn = document.querySelector('button[aria-label="Notifications, 9+"]') as HTMLButtonElement;
+    expect(btn.querySelector("[data-dock-badge]")?.textContent).toBe("9+");
+    expect(btn.querySelector("[data-bell-dot]")).toBeNull();
+  });
+
+  it("uses compact DockBadge on the smaller desktop header bell", async () => {
+    mockState = { items: [], unseen: unseenStubs(3), tone: "mint", loading: false };
+    await renderBell("desktop");
+    const badge = document.querySelector("[data-dock-badge]") as HTMLElement;
+    expect(badge.getAttribute("data-dock-badge-size")).toBe("compact");
   });
 
   it("opens a deal-update list with frozen empty copy", async () => {
@@ -89,6 +124,20 @@ describe("NotificationBell", () => {
     expect(markSeen).toHaveBeenCalled();
     expect(document.body.textContent).toContain(DEAL_UPDATES_EMPTY_TITLE);
     expect(document.body.textContent).toContain(DEAL_UPDATES_EMPTY_BODY);
+  });
+
+  it("slides the Updates panel down from the top", async () => {
+    await renderBell();
+    const btn = document.querySelector('button[aria-label="Notifications"]') as HTMLButtonElement;
+    await act(async () => {
+      btn.click();
+    });
+    const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
+    expect(dialog?.getAttribute("data-sheet-edge")).toBe("top");
+    expect(dialog?.className).toContain("items-start");
+    expect(dialog?.className).not.toContain("items-end");
+    const panel = dialog.querySelector("[data-sheet-panel]") as HTMLElement;
+    expect(panel?.getAttribute("data-sheet-motion")).toBe("slide-down");
   });
 
   it("renders sentence-case title, one-line body, and relative time", async () => {
@@ -109,9 +158,7 @@ describe("NotificationBell", () => {
       loading: false,
     };
     await renderBell();
-    const btn = document.querySelector(
-      "button[aria-label='Notifications, new updates']",
-    ) as HTMLButtonElement;
+    const btn = document.querySelector('button[aria-label="Notifications"]') as HTMLButtonElement;
     await act(async () => {
       btn.click();
     });
