@@ -44,7 +44,7 @@ html {
 .maplibregl-canvas,
 .maplibregl-canvas-container,
 .maplibregl-marker {
-  cursor: default;
+  cursor: inherit;
 }
 
 /* Hashpop-branded map chrome: dark popups, dark zoom controls. */

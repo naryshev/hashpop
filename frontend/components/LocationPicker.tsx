@@ -34,6 +34,7 @@ export function LocationPicker({ value, onChange }: Props) {
   const [searching, setSearching] = useState(false);
   const [showList, setShowList] = useState(false);
   const [searchAvailable, setSearchAvailable] = useState(true);
+  const [geoProximity, setGeoProximity] = useState<{ lat: number; lng: number } | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -52,6 +53,23 @@ export function LocationPicker({ value, onChange }: Props) {
   }, []);
 
   useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) return;
+    let cancelled = false;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if (!cancelled) {
+          setGeoProximity({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        }
+      },
+      () => {},
+      { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!searchAvailable) {
       setSuggestions([]);
@@ -64,7 +82,9 @@ export function LocationPicker({ value, onChange }: Props) {
     }
     if (trimmed === (value.city ?? "")) return;
     const proximity =
-      value.lat != null && value.lng != null ? { lat: value.lat, lng: value.lng } : undefined;
+      value.lat != null && value.lng != null
+        ? { lat: value.lat, lng: value.lng }
+        : (geoProximity ?? undefined);
     debounceRef.current = setTimeout(async () => {
       try {
         setSearching(true);
@@ -84,7 +104,7 @@ export function LocationPicker({ value, onChange }: Props) {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query, value.city, value.lat, value.lng, searchAvailable]);
+  }, [query, value.city, value.lat, value.lng, searchAvailable, geoProximity]);
 
   const pick = (hit: GeocodeHit) => {
     const lat = roundCoordForPrivacy(hit.lat);
@@ -94,6 +114,13 @@ export function LocationPicker({ value, onChange }: Props) {
     setSuggestions([]);
     setShowList(false);
     onChange({ city: hit.label, lat, lng });
+  };
+
+  const handleMapPick = (lat: number, lng: number) => {
+    const rLat = roundCoordForPrivacy(lat);
+    const rLng = roundCoordForPrivacy(lng);
+    if (rLat == null || rLng == null) return;
+    onChange({ city: value.city, lat: rLat, lng: rLng });
   };
 
   const clear = () => {
@@ -157,7 +184,7 @@ export function LocationPicker({ value, onChange }: Props) {
           ? "Approximate area only — exact address stays private."
           : SEARCH_UNAVAILABLE_COPY}
       </p>
-      <LocationPickerMap lat={value.lat} lng={value.lng} />
+      <LocationPickerMap lat={value.lat} lng={value.lng} onPick={handleMapPick} />
       {value.lat != null && value.lng != null && (
         <p className="text-xs text-silver">
           Approximate location
