@@ -46,6 +46,9 @@ export const PICKER_AREA_ZOOM = 11;
 export const NEARBY_DEFAULT_ZOOM = 11;
 export const PICKER_EMPTY_ZOOM = 3;
 
+/** Nearby user/search center — ~5 km mint area disc (not per listing). */
+export const NEARBY_CENTER_RADIUS_M = 5000;
+
 export const areaPaint = {
   color: color.chrome,
   fillColor: color.chrome,

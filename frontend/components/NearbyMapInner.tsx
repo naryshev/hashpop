@@ -5,8 +5,7 @@ import { Marker, Popup } from "react-map-gl/maplibre";
 import Link from "next/link";
 import { listingHref } from "../lib/listingUrl";
 import { formatPriceForDisplay } from "../lib/formatPrice";
-import { color } from "../lib/designTokens";
-import { NEARBY_DEFAULT_ZOOM } from "../lib/mapTiles";
+import { NEARBY_CENTER_RADIUS_M, NEARBY_DEFAULT_ZOOM } from "../lib/mapTiles";
 import { AreaDisc } from "./AreaDisc";
 import DarkMap from "./DarkMap";
 
@@ -24,32 +23,26 @@ type Props = {
   items: NearbyItem[];
 };
 
-const USER_AREA_RADIUS_M = 1200;
-
 export default function NearbyMapInner({ center, userPos, items }: Props) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const active = items.find((it) => it.id === activeId) ?? null;
 
   return (
     <DarkMap latitude={center[0]} longitude={center[1]} zoom={NEARBY_DEFAULT_ZOOM} interactive>
+      <AreaDisc
+        id="nearby-center"
+        lat={center[0]}
+        lng={center[1]}
+        radiusM={NEARBY_CENTER_RADIUS_M}
+      />
+
       {userPos ? (
-        <>
-          <AreaDisc
-            id="user-area"
-            lat={userPos[0]}
-            lng={userPos[1]}
-            radiusM={USER_AREA_RADIUS_M}
-            color={color.chromeBright}
-            fillOpacity={0.15}
+        <Marker longitude={userPos[1]} latitude={userPos[0]} anchor="center">
+          <span
+            className="block h-2.5 w-2.5 rounded-full border-2 border-white bg-chrome"
+            aria-label="Your location"
           />
-          <Marker longitude={userPos[1]} latitude={userPos[0]} anchor="center">
-            <span
-              className="block h-3.5 w-3.5 rounded-full border-2 border-white"
-              style={{ background: color.chromeBright }}
-              aria-label="Your location"
-            />
-          </Marker>
-        </>
+        </Marker>
       ) : null}
 
       {items.map((it) => (

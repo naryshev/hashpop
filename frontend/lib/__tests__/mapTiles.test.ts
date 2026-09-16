@@ -8,6 +8,7 @@ import {
   LISTING_AREA_ZOOM,
   MAP_ATTRIBUTION,
   MAP_CANVAS_BG,
+  NEARBY_CENTER_RADIUS_M,
   OPENFREEMAP_DARK_STYLE_URL,
   PICKER_AREA_ZOOM,
   areaPaint,
@@ -82,5 +83,10 @@ describe("shared dark map config", () => {
         NEXT_PUBLIC_MAP_STYLE_URL: "https://api.maptiler.com/maps/dark/style.json?key=secret",
       }),
     ).toBe(OPENFREEMAP_DARK_STYLE_URL);
+  });
+
+  it("uses a 5km mint disc for the Nearby user/search center only", () => {
+    expect(NEARBY_CENTER_RADIUS_M).toBe(5000);
+    expect(NEARBY_CENTER_RADIUS_M).toBeGreaterThan(LISTING_AREA_RADIUS_M);
   });
 });
