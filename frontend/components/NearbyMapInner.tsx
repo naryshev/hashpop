@@ -1,9 +1,13 @@
 "use client";
 
-import { MapContainer, TileLayer, Circle, CircleMarker, Popup } from "react-leaflet";
+import { useState } from "react";
+import { Marker, Popup } from "react-map-gl/maplibre";
 import Link from "next/link";
 import { listingHref } from "../lib/listingUrl";
 import { formatPriceForDisplay } from "../lib/formatPrice";
+import { NEARBY_CENTER_RADIUS_M, NEARBY_DEFAULT_ZOOM } from "../lib/mapTiles";
+import { AreaDisc } from "./AreaDisc";
+import DarkMap from "./DarkMap";
 
 export type NearbyItem = {
   id: string;
@@ -20,64 +24,71 @@ type Props = {
 };
 
 export default function NearbyMapInner({ center, userPos, items }: Props) {
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const active = items.find((it) => it.id === activeId) ?? null;
+
   return (
-    <MapContainer
-      center={center}
-      zoom={11}
-      scrollWheelZoom
-      className="h-full w-full"
-      // Inline style beats leaflet.css's default #ddd canvas, which otherwise
-      // flashes light while the dark tiles are still downloading.
-      style={{ background: "#0b111b" }}
-      attributionControl={false}
-    >
-      <TileLayer
-        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-        subdomains="abcd"
-        maxZoom={20}
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+    <DarkMap latitude={center[0]} longitude={center[1]} zoom={NEARBY_DEFAULT_ZOOM} interactive>
+      <AreaDisc
+        id="nearby-center"
+        lat={center[0]}
+        lng={center[1]}
+        radiusM={NEARBY_CENTER_RADIUS_M}
       />
 
-      {userPos && (
-        <>
-          <Circle
-            center={userPos}
-            radius={1200}
-            pathOptions={{ color: "#14a4ff", fillColor: "#14a4ff", fillOpacity: 0.15, weight: 1 }}
+      {userPos ? (
+        <Marker longitude={userPos[1]} latitude={userPos[0]} anchor="center">
+          <span
+            className="block h-2.5 w-2.5 rounded-full border-2 border-white bg-chrome"
+            aria-label="Your location"
           />
-          <CircleMarker
-            center={userPos}
-            radius={7}
-            pathOptions={{ color: "#ffffff", fillColor: "#14a4ff", fillOpacity: 1, weight: 2 }}
-          />
-        </>
-      )}
+        </Marker>
+      ) : null}
 
       {items.map((it) => (
-        <CircleMarker
+        <Marker
           key={it.id}
-          center={[it.lat, it.lng]}
-          radius={9}
-          pathOptions={{ color: "#0b111b", fillColor: "#00ffa3", fillOpacity: 1, weight: 2 }}
+          longitude={it.lng}
+          latitude={it.lat}
+          anchor="center"
+          onClick={(event) => {
+            event.originalEvent.stopPropagation();
+            setActiveId(it.id);
+          }}
         >
-          <Popup>
-            <div className="min-w-[140px]">
-              <div className="text-sm font-semibold text-white">{it.title || "Listing"}</div>
-              {it.price && (
-                <div className="text-xs font-bold text-[#00ffa3]">
-                  {formatPriceForDisplay(it.price)} ℏ
-                </div>
-              )}
-              <Link
-                href={listingHref(it.id)}
-                className="mt-1 inline-block text-xs font-semibold text-[#00ffa3] underline underline-offset-2"
-              >
-                View listing →
-              </Link>
-            </div>
-          </Popup>
-        </CircleMarker>
+          <button
+            type="button"
+            aria-label={it.title || "Listing"}
+            className="block h-2.5 w-2.5 rounded-full border-2 border-bg bg-chrome"
+          />
+        </Marker>
       ))}
-    </MapContainer>
+
+      {active ? (
+        <Popup
+          longitude={active.lng}
+          latitude={active.lat}
+          anchor="bottom"
+          onClose={() => setActiveId(null)}
+          closeOnClick={false}
+          offset={12}
+        >
+          <div className="min-w-[140px]">
+            <div className="text-sm font-semibold text-white">{active.title || "Listing"}</div>
+            {active.price ? (
+              <div className="text-xs font-bold text-chrome">
+                {formatPriceForDisplay(active.price)} ℏ
+              </div>
+            ) : null}
+            <Link
+              href={listingHref(active.id)}
+              className="mt-1 inline-block text-xs font-semibold text-chrome underline underline-offset-2"
+            >
+              View listing →
+            </Link>
+          </div>
+        </Popup>
+      ) : null}
+    </DarkMap>
   );
 }

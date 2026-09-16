@@ -18,6 +18,8 @@ const nextConfig = {
     "@hashgraph/proto",
     "@hashgraph/hedera-wallet-connect",
     "hashconnect",
+    "maplibre-gl",
+    "react-map-gl",
   ],
   webpack: (config, { isServer }) => {
     // Stub so @metamask/sdk (pulled in by wagmi/connectors) doesn't break the build
