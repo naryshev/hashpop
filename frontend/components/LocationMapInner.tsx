@@ -1,6 +1,8 @@
 "use client";
 
-import { MapContainer, TileLayer, Circle } from "react-leaflet";
+import { AreaDisc } from "./AreaDisc";
+import DarkMap from "./DarkMap";
+import { LISTING_AREA_RADIUS_M, LISTING_AREA_ZOOM, MAP_FRAME_CLASS } from "../lib/mapTiles";
 
 type Props = {
   lat: number;
@@ -9,35 +11,12 @@ type Props = {
 
 export default function LocationMapInner({ lat, lng }: Props) {
   return (
-    <div className="relative w-full overflow-hidden rounded-glass border border-white/10">
-      <MapContainer
-        center={[lat, lng]}
-        zoom={12}
-        scrollWheelZoom={false}
-        dragging={false}
-        doubleClickZoom={false}
-        touchZoom={false}
-        zoomControl={false}
-        attributionControl={false}
-        className="aspect-[16/7] w-full"
-      >
-        <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-          subdomains="abcd"
-          maxZoom={20}
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-        />
-        <Circle
-          center={[lat, lng]}
-          radius={1500}
-          pathOptions={{
-            color: "#34d399",
-            fillColor: "#34d399",
-            fillOpacity: 0.35,
-            weight: 1,
-          }}
-        />
-      </MapContainer>
+    <div className={MAP_FRAME_CLASS}>
+      <div className="aspect-[16/7] w-full">
+        <DarkMap latitude={lat} longitude={lng} zoom={LISTING_AREA_ZOOM} interactive={false}>
+          <AreaDisc id="listing-area" lat={lat} lng={lng} radiusM={LISTING_AREA_RADIUS_M} />
+        </DarkMap>
+      </div>
     </div>
   );
 }

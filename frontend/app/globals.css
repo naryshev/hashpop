@@ -33,53 +33,52 @@ html {
   background: transparent;
 }
 
-/* Contain Leaflet's internal z-indexes (panes 200-700, controls 1000) inside
-   the map's own stacking context so maps can never paint above overlays
+/* Contain MapLibre stacking inside the map so it never paints above overlays
    (sign-in modal, profile sheet, offer/rate/dispute dialogs, etc.). */
-.leaflet-container {
+.maplibregl-map {
   z-index: 0;
   isolation: isolate;
-  /* Dark canvas behind tiles — without this Leaflet paints white while
-     dark-theme tiles are still loading, flashing on open. !important because
-     leaflet.css (loaded after globals in the bundle) sets #ddd. */
-  background: #0b111b !important;
+  font: inherit;
+  background: var(--color-bg, #0b111b) !important;
+}
+.maplibregl-canvas,
+.maplibregl-canvas-container,
+.maplibregl-marker {
+  cursor: default;
 }
 
-/* Hashpop-branded map chrome: dark popups, dark zoom controls, and a gentle
-   tile fade so the map surfaces read as part of the app, not a widget. */
-.leaflet-popup-content-wrapper,
-.leaflet-popup-tip {
+/* Hashpop-branded map chrome: dark popups, dark zoom controls. */
+.maplibregl-popup-content {
   background: #12161f !important;
-  color: #edf2ff !important;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
-}
-.leaflet-popup-content-wrapper {
+  color: var(--color-fg, #edf2ff) !important;
+  border: 1px solid var(--hairline, rgba(255, 255, 255, 0.12));
   border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  padding: 10px 12px;
 }
-.leaflet-container a.leaflet-popup-close-button {
-  color: #a9b0bf !important;
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
+  border-top-color: #12161f;
 }
-.leaflet-bar {
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+.maplibregl-popup-close-button {
+  color: var(--color-muted, #a9b0bf) !important;
+}
+.maplibregl-ctrl-group {
+  background: #12161f !important;
+  border: 1px solid var(--hairline, rgba(255, 255, 255, 0.12)) !important;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45) !important;
   border-radius: 12px !important;
   overflow: hidden;
 }
-.leaflet-bar a {
+.maplibregl-ctrl-group button {
   background: #12161f !important;
-  color: #edf2ff !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  filter: invert(1) hue-rotate(180deg);
 }
-.leaflet-bar a:hover {
-  background: #1a2231 !important;
+.maplibregl-ctrl-attrib {
+  background: var(--material-thick, rgba(14, 20, 34, 0.85)) !important;
+  color: var(--color-muted, #a9b0bf) !important;
 }
-.leaflet-bar a.leaflet-disabled {
-  background: #0e131d !important;
-  color: rgba(255, 255, 255, 0.25) !important;
-}
-.leaflet-tile {
-  transition: opacity 0.3s ease-in;
+.maplibregl-ctrl-attrib a {
+  color: var(--color-fg, #edf2ff) !important;
 }
 
 :root {
