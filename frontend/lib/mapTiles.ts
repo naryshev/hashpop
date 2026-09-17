@@ -40,10 +40,15 @@ export const MAP_CANVAS_BG = color.bg;
 /** Product lock: ~5 km privacy blob on listing picker + detail, and Nearby center. */
 export const LISTING_AREA_RADIUS_M = 5000;
 
-/** Area-scale zoom for a 5 km disc — never street-level on listing detail. */
-export const LISTING_AREA_ZOOM = 10;
-export const PICKER_AREA_ZOOM = 10;
-export const NEARBY_DEFAULT_ZOOM = 11;
+/**
+ * Country-scale zoom so a 5 km mint disc reads as a small soft blob.
+ * Listing detail + create picker share this; Nearby is one step tighter
+ * so listing dots stay usable. Radius stays LISTING_AREA_RADIUS_M.
+ */
+export const COUNTRY_AREA_ZOOM = 7;
+export const LISTING_AREA_ZOOM = COUNTRY_AREA_ZOOM;
+export const PICKER_AREA_ZOOM = COUNTRY_AREA_ZOOM;
+export const NEARBY_DEFAULT_ZOOM = 8;
 export const PICKER_EMPTY_ZOOM = 3;
 
 /** Nearby user/search center uses the same 5 km mint disc (not per listing). */

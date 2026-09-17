@@ -5,7 +5,9 @@ import Link from "next/link";
 import { Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { material } from "@/lib/materials";
+import { formatDockBadgeCount } from "@/lib/dockBadge";
 import { Sheet } from "./ui/Sheet";
+import { DockBadge } from "./ui/DockBadge";
 import { useDealNotifications, markDealUpdatesSeen } from "../hooks/useDealNotifications";
 import {
   DEAL_UPDATES_EMPTY_BODY,
@@ -25,8 +27,9 @@ export function NotificationBell({
   iconClassName,
   variant = "mobile",
 }: NotificationBellProps) {
-  const { items, tone, loading } = useDealNotifications();
+  const { items, unseen, loading } = useDealNotifications();
   const [open, setOpen] = useState(false);
+  const badgeLabel = formatDockBadgeCount(unseen.length);
 
   const openSheet = () => {
     markDealUpdatesSeen();
@@ -42,23 +45,23 @@ export function NotificationBell({
     <>
       <button
         type="button"
-        onClick={openSheet}
-        aria-label={tone ? "Notifications, new updates" : "Notifications"}
+        onClick={() => {
+          if (open) {
+            setOpen(false);
+            return;
+          }
+          openSheet();
+        }}
+        aria-expanded={open}
+        aria-label={badgeLabel ? `Notifications, ${badgeLabel}` : "Notifications"}
         className={cn(hit, className)}
       >
-        <Bell className={iconClassName} size={variant === "desktop" ? 16 : 18} />
-        {tone && (
-          <span
-            data-bell-dot={tone}
-            className={cn(
-              "absolute h-2 w-2 rounded-full",
-              variant === "desktop" ? "right-1.5 top-1.5" : "right-1.5 top-1.5",
-              tone === "red" ? "bg-[#f43f5e]" : "bg-[#00ffa3]",
-            )}
-          />
-        )}
+        <span className="relative inline-flex">
+          <Bell className={iconClassName} size={variant === "desktop" ? 16 : 18} />
+          <DockBadge count={unseen.length} size="compact" />
+        </span>
       </button>
-      <Sheet open={open} onClose={() => setOpen(false)} title="Updates" detent="medium">
+      <Sheet open={open} onClose={() => setOpen(false)} title="Updates" detent="medium" edge="top">
         {loading && items.length === 0 ? (
           <p className="py-6 text-sm text-silver">Loading updates…</p>
         ) : items.length === 0 ? (
