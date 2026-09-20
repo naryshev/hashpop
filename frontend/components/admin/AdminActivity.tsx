@@ -31,9 +31,8 @@ export function AdminActivity({
 
   return (
     <section className={`${material.regular} overflow-hidden rounded-[14px] ${className}`}>
-      <div className="flex items-center justify-between border-b border-hairline px-3 py-2.5">
+      <div className="border-b border-hairline px-3 py-2.5">
         <h2 className="text-sm font-semibold text-white">Activity</h2>
-        <span className="text-[11px] text-silver">View all</span>
       </div>
       {visible.length === 0 ? (
         <p className="px-3 py-6 text-sm text-silver">
