@@ -61,7 +61,7 @@ function pathnameTitle(pathname: string): string {
   if (pathname.startsWith("/profile")) return "Profile";
   if (pathname.startsWith("/listing")) return "";
   if (pathname.startsWith("/purchase-success")) return "Purchase";
-  if (pathname.startsWith("/admin")) return "Admin";
+  if (pathname.startsWith("/admin") || pathname.startsWith("/area51")) return "Admin";
   return "";
 }
 

@@ -183,3 +183,7 @@ model Offer {
   @@index([buyer])
   @@unique([listingId, buyer])
 }
+
+// Phase 2 (Trust & Safety): reports inbox / user-risk models are intentionally
+// not added in this schema. Phase 3 money/escrow admin resolve is also later.
+

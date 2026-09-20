@@ -112,6 +112,13 @@ export const pausableAdminAbi: Abi = [
     outputs: [{ name: "", type: "bool" }],
   },
   {
+    name: "pause",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [],
+    outputs: [],
+  },
+  {
     name: "unpause",
     type: "function",
     stateMutability: "nonpayable",

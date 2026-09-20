@@ -73,7 +73,7 @@ export function BottomNav() {
       <TabBar
         items={items}
         activeId={activeId}
-        hidden={immersive}
+        hidden={immersive || pathname.startsWith("/admin") || pathname.startsWith("/area51")}
         onSelect={(id) => {
           if (id === "nearby") setMapOpen((open) => !open);
           else setMapOpen(false);
