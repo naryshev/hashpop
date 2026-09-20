@@ -30,6 +30,29 @@ describe("isAdminAddress", () => {
     expect(isAdminAddress("0xbbb", list)).toBe(true);
     expect(isAdminAddress("0xccc", list)).toBe(false);
   });
+
+  it("expands a Hedera 0.0.x allowlist entry to the long-zero-padded EVM alias", () => {
+    const evm = "0x000000000000000000000000000000000093ddbb";
+    expect(isAdminAddress(evm, "0.0.9690555")).toBe(true);
+    expect(isAdminAddress(evm.toUpperCase(), "0.0.9690555")).toBe(true);
+    expect(isAdminAddress("0x93ddbb", "0.0.9690555")).toBe(true);
+    expect(isAdminAddress("0.0.9690555", "0.0.9690555")).toBe(true);
+    expect(isAdminAddress("0x000000000000000000000000000000000093ddbc", "0.0.9690555")).toBe(false);
+  });
+
+  it("accepts mixed Hedera and 0x entries in a comma-separated list", () => {
+    const list = "0.0.9690555, 0xAAA";
+    expect(isAdminAddress("0x000000000000000000000000000000000093ddbb", list)).toBe(true);
+    expect(isAdminAddress("0xaaa", list)).toBe(true);
+    expect(isAdminAddress("0xbbb", list)).toBe(false);
+  });
+
+  it("keeps 0x-only allowlists working", () => {
+    const evm = "0x000000000000000000000000000000000093ddbb";
+    expect(isAdminAddress(evm, evm)).toBe(true);
+    expect(isAdminAddress("0x93ddbb", evm)).toBe(true);
+    expect(isAdminAddress(evm, "0x93DDBB")).toBe(true);
+  });
 });
 
 describe("verifyAdminToken", () => {

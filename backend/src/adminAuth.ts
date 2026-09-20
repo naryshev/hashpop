@@ -10,18 +10,49 @@ export type AdminAuthResult =
   | { ok: true; address: string }
   | { ok: false; error: string; status: number };
 
+const HEDERA_ACCOUNT_RE = /^(\d+)\.(\d+)\.(\d+)$/;
+
+/** `0.0.N` → long-zero-padded EVM alias. Shard/realm are ignored (0.0.N form). */
+export function hederaAccountToEvmAlias(accountId: string): string | null {
+  const match = accountId.trim().toLowerCase().match(HEDERA_ACCOUNT_RE);
+  if (!match) return null;
+  return `0x${BigInt(match[3]).toString(16).padStart(40, "0")}`;
+}
+
+function normalizeEvmHex(value: string): string | null {
+  if (!value.startsWith("0x")) return null;
+  const hex = value.slice(2);
+  if (!/^[0-9a-f]+$/.test(hex) || hex.length > 40) return null;
+  return `0x${hex.padStart(40, "0")}`;
+}
+
+/** All comparable forms of one allowlist/candidate entry (lowercase, EVM-padded). */
+export function adminIdentityAliases(raw: string): string[] {
+  const trimmed = raw.trim().toLowerCase();
+  if (!trimmed) return [];
+  const aliases = new Set<string>([trimmed]);
+  const fromHedera = hederaAccountToEvmAlias(trimmed);
+  if (fromHedera) aliases.add(fromHedera);
+  const fromEvm = normalizeEvmHex(trimmed);
+  if (fromEvm) aliases.add(fromEvm);
+  return [...aliases];
+}
+
+export function parseAdminAllowlist(raw: string): Set<string> {
+  const set = new Set<string>();
+  for (const part of raw.split(",")) {
+    for (const alias of adminIdentityAliases(part)) set.add(alias);
+  }
+  return set;
+}
+
 export function isAdminAddress(
   addr: string | null | undefined,
   allowlist = process.env.ADMIN_ADDRESSES ?? "",
 ): boolean {
   if (!addr) return false;
-  const set = new Set(
-    allowlist
-      .split(",")
-      .map((s) => s.trim().toLowerCase())
-      .filter(Boolean),
-  );
-  return set.has(addr.toLowerCase());
+  const allowed = parseAdminAllowlist(allowlist);
+  return adminIdentityAliases(addr).some((id) => allowed.has(id));
 }
 
 function headerValue(value: string | string[] | undefined): string | null {
