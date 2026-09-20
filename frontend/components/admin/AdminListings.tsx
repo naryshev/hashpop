@@ -1,14 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { forwardRef } from "react";
 import Link from "next/link";
-import { Trash2 } from "lucide-react";
-import { getApiUrl } from "../../lib/apiUrl";
 import { listingHref } from "../../lib/listingUrl";
-import { truncateAdminAddr } from "../../lib/adminFormat";
-import { useAdminSession } from "./AdminShell";
+import {
+  formatRelativeAge,
+  listingStatusPill,
+  STATUS_PILL_CLASS,
+  truncateAdminAddr,
+} from "../../lib/adminFormat";
+import { material } from "../../lib/materials";
 
-type AdminListing = {
+export type ListingChip = "" | "ACTIVE" | "PENDING" | "LOCKED" | "SOLD";
+
+export type AdminListing = {
   id: string;
   seller: string;
   buyer: string | null;
@@ -18,187 +23,223 @@ type AdminListing = {
   category: string | null;
   imageUrl: string | null;
   createdAt: string;
+  updatedAt?: string;
   onChainConfirmed: boolean;
   disputeStatus: string | null;
 };
 
-export function AdminListings() {
-  const { headers, handleAuthStatus } = useAdminSession();
-  const [listings, setListings] = useState<AdminListing[]>([]);
-  const [filter, setFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState<string | null>(null);
+const CHIPS: { id: ListingChip; label: string }[] = [
+  { id: "", label: "Any" },
+  { id: "ACTIVE", label: "Active" },
+  { id: "PENDING", label: "Pending" },
+  { id: "LOCKED", label: "Locked" },
+  { id: "SOLD", label: "Sold" },
+];
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      if (filter.trim()) params.set("q", filter.trim());
-      if (statusFilter) params.set("status", statusFilter);
-      const res = await fetch(`${getApiUrl()}/api/admin/listings?${params}`, { headers });
-      if (handleAuthStatus(res.status)) return;
-      if (!res.ok) throw new Error("Failed to load listings");
-      const data = (await res.json()) as { listings?: AdminListing[] };
-      setListings(data.listings ?? []);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load listings");
-    } finally {
-      setLoading(false);
-    }
-  }, [filter, statusFilter, headers, handleAuthStatus]);
-
-  useEffect(() => {
-    void load();
-    // Search text is applied explicitly so typing does not refetch every keystroke.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter, headers, handleAuthStatus]);
-
-  const deleteListing = useCallback(
-    async (id: string, title: string | null) => {
-      const label = title || id.slice(0, 12) + "…";
-      if (!window.confirm(`Permanently remove "${label}" from the marketplace?`)) return;
-      setDeleting(id);
-      try {
-        const res = await fetch(`${getApiUrl()}/api/admin/listing/${encodeURIComponent(id)}`, {
-          method: "DELETE",
-          headers,
-        });
-        if (handleAuthStatus(res.status)) return;
-        if (!res.ok) {
-          const body = (await res.json().catch(() => ({}))) as { error?: string };
-          throw new Error(body.error || "Delete failed");
-        }
-        setListings((prev) => prev.filter((l) => l.id !== id));
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Delete failed");
-      } finally {
-        setDeleting(null);
-      }
-    },
-    [headers, handleAuthStatus],
-  );
-
+export const AdminListings = forwardRef<
+  HTMLElement,
+  {
+    listings: AdminListing[];
+    search: string;
+    onSearch: (value: string) => void;
+    statusChip: ListingChip;
+    onStatusChip: (value: ListingChip) => void;
+    loading?: boolean;
+    deleting?: string | null;
+    onApply: () => void;
+    onDelete: (id: string, title: string | null) => void;
+    className?: string;
+  }
+>(function AdminListings(
+  {
+    listings,
+    search,
+    onSearch,
+    statusChip,
+    onStatusChip,
+    loading,
+    deleting,
+    onApply,
+    onDelete,
+    className = "",
+  },
+  ref,
+) {
   return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="text-xl font-extrabold text-white">Listing health</h2>
-        <p className="text-xs text-silver">Search, filter, and take down listings.</p>
-      </div>
-
-      {error && (
-        <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
-          {error}
-        </div>
-      )}
-
-      <div className="flex flex-wrap items-center gap-2">
+    <section
+      ref={ref}
+      id="listings"
+      className={`${material.regular} overflow-hidden rounded-[14px] ${className}`}
+    >
+      <div className="flex flex-wrap items-center gap-2 border-b border-hairline px-3 py-2.5">
+        <h2 className="text-sm font-semibold text-white">Listings</h2>
+        {listings.length > 0 && (
+          <span className="rounded-full bg-[#00ffa3]/15 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-[#00ffa3]">
+            {listings.length}
+          </span>
+        )}
         <input
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          placeholder="Search by id, title, seller, buyer…"
-          className="input-frost w-72 text-sm"
+          value={search}
+          onChange={(e) => onSearch(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onApply();
+          }}
+          placeholder="Search id, title, seller…"
+          className={`${material.regular} h-8 min-w-[200px] flex-1 rounded-[14px] px-3 text-sm text-white placeholder:text-silver/50 focus:outline-none`}
         />
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="input-frost text-sm"
-        >
-          <option value="">Any status</option>
-          <option value="LISTED">Listed</option>
-          <option value="LOCKED">Locked</option>
-          <option value="SOLD">Sold</option>
-          <option value="CANCELLED">Cancelled</option>
-        </select>
-        <button
-          type="button"
-          onClick={() => void load()}
-          className="rounded-full border border-white/15 bg-white/5 px-3.5 py-2 text-xs text-white hover:bg-white/10"
-        >
-          {loading ? "Refreshing…" : "Apply"}
-        </button>
+        <div className="flex flex-wrap gap-1">
+          {CHIPS.map((chip) => (
+            <button
+              key={chip.id || "any"}
+              type="button"
+              onClick={() => onStatusChip(chip.id)}
+              className={`rounded-full px-2.5 py-1 text-[11px] ${
+                statusChip === chip.id
+                  ? "bg-[#00ffa3]/15 text-[#00ffa3]"
+                  : `${material.regular} text-silver`
+              }`}
+            >
+              {chip.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="overflow-x-auto rounded-glass-lg border border-white/10 bg-[#0e1422]">
+      <div className="hidden overflow-x-auto md:block">
         <table className="min-w-full text-left text-sm">
-          <thead className="bg-white/[0.03] text-[10px] font-bold uppercase tracking-[0.14em] text-silver">
+          <thead className="sticky top-0 bg-[#0e1422] text-xs text-silver">
             <tr>
-              <th className="px-3 py-2.5"></th>
-              <th className="px-3 py-2.5">Title</th>
-              <th className="px-3 py-2.5">Seller</th>
-              <th className="px-3 py-2.5">Price</th>
-              <th className="px-3 py-2.5">Status</th>
-              <th className="px-3 py-2.5">On-chain</th>
-              <th className="px-3 py-2.5">Created</th>
-              <th className="px-3 py-2.5 text-right"></th>
+              <th className="px-3 py-2 font-medium"></th>
+              <th className="px-3 py-2 font-medium">Title</th>
+              <th className="px-3 py-2 font-medium">Status</th>
+              <th className="px-3 py-2 font-medium">Seller</th>
+              <th className="px-3 py-2 font-medium">Price ℏ</th>
+              <th className="px-3 py-2 font-medium">Updated</th>
+              <th className="px-3 py-2 font-medium text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/5">
+          <tbody>
             {listings.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-3 py-6 text-center text-silver">
-                  {loading ? "Loading…" : "No listings match the current filter."}
+                <td colSpan={7} className="px-3 py-8 text-center">
+                  {loading ? (
+                    <p className="text-sm text-silver">Loading…</p>
+                  ) : (
+                    <>
+                      <p className="text-sm text-white">No listings match.</p>
+                      <p className="mt-1 text-xs text-silver">
+                        Try another status or clear search.
+                      </p>
+                    </>
+                  )}
                 </td>
               </tr>
             ) : (
-              listings.map((l) => (
-                <tr key={l.id} className="align-middle">
-                  <td className="px-3 py-2">
-                    {l.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={l.imageUrl} alt="" className="h-10 w-10 rounded-lg object-cover" />
-                    ) : (
-                      <div className="h-10 w-10 rounded-lg bg-white/5" />
-                    )}
-                  </td>
-                  <td className="max-w-[220px] truncate px-3 py-2 text-white">
-                    <Link
-                      href={listingHref(l.id)}
-                      className="hover:text-chrome"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
+              listings.map((l) => {
+                const pill = listingStatusPill(l.status, l.onChainConfirmed, l.disputeStatus);
+                return (
+                  <tr key={l.id} className="h-11 border-t border-hairline hover:bg-white/[0.04]">
+                    <td className="px-3">
+                      {l.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={l.imageUrl} alt="" className="h-8 w-8 rounded object-cover" />
+                      ) : (
+                        <div className="h-8 w-8 rounded bg-white/5" />
+                      )}
+                    </td>
+                    <td className="max-w-[220px] truncate px-3 text-white">
                       {l.title || l.id.slice(0, 14) + "…"}
-                    </Link>
-                    {l.category && <div className="text-[10px] text-silver">{l.category}</div>}
-                    {l.disputeStatus === "OPEN" && (
-                      <div className="text-[10px] font-semibold text-amber-300">Dispute open</div>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 font-mono text-xs text-silver">
-                    {truncateAdminAddr(l.seller)}
-                  </td>
-                  <td className="px-3 py-2 font-mono text-xs text-chrome">{l.price} ℏ</td>
-                  <td className="px-3 py-2 text-xs text-white">{l.status}</td>
-                  <td className="px-3 py-2 text-xs">
-                    {l.onChainConfirmed ? (
-                      <span className="text-emerald-300">✓ confirmed</span>
-                    ) : (
-                      <span className="text-amber-300">pending</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-[11px] text-silver">
-                    {new Date(l.createdAt).toLocaleDateString()}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <button
-                      type="button"
-                      onClick={() => void deleteListing(l.id, l.title)}
-                      disabled={deleting === l.id}
-                      className="inline-flex items-center gap-1 rounded-lg border border-rose-500/40 bg-rose-500/10 px-2.5 py-1.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 disabled:opacity-60"
-                    >
-                      <Trash2 size={12} />
-                      {deleting === l.id ? "Removing…" : "Remove"}
-                    </button>
-                  </td>
-                </tr>
-              ))
+                    </td>
+                    <td className="px-3">
+                      <span
+                        className={`${material.regular} ${STATUS_PILL_CLASS[pill.tone]} rounded-full px-2 py-0.5 text-[11px]`}
+                      >
+                        {pill.label}
+                      </span>
+                    </td>
+                    <td className="px-3 font-mono text-xs text-silver">
+                      {truncateAdminAddr(l.seller)}
+                    </td>
+                    <td className="px-3 font-mono text-xs tabular-nums text-white">{l.price}</td>
+                    <td className="px-3 text-xs text-silver">
+                      {formatRelativeAge(l.updatedAt || l.createdAt)}
+                    </td>
+                    <td className="px-3 text-right">
+                      <Link
+                        href={listingHref(l.id)}
+                        target="_blank"
+                        className="mr-2 text-xs text-silver hover:text-white"
+                      >
+                        View
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => onDelete(l.id, l.title)}
+                        disabled={deleting === l.id}
+                        className="text-xs text-danger hover:underline disabled:opacity-60"
+                      >
+                        {deleting === l.id ? "Removing…" : "Delete"}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
       </div>
-    </div>
+
+      <div className="divide-y divide-hairline md:hidden">
+        {listings.length === 0 ? (
+          <div className="px-3 py-8 text-center">
+            {loading ? (
+              <p className="text-sm text-silver">Loading…</p>
+            ) : (
+              <>
+                <p className="text-sm text-white">No listings match.</p>
+                <p className="mt-1 text-xs text-silver">Try another status or clear search.</p>
+              </>
+            )}
+          </div>
+        ) : (
+          listings.map((l) => {
+            const pill = listingStatusPill(l.status, l.onChainConfirmed, l.disputeStatus);
+            return (
+              <details key={l.id} className="px-3 py-2.5">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-2">
+                  <span className="truncate text-sm text-white">
+                    {l.title || l.id.slice(0, 14) + "…"}
+                  </span>
+                  <span
+                    className={`${material.regular} ${STATUS_PILL_CLASS[pill.tone]} rounded-full px-2 py-0.5 text-[11px]`}
+                  >
+                    {pill.label}
+                  </span>
+                  <span className="font-mono text-xs tabular-nums text-white">{l.price} ℏ</span>
+                </summary>
+                <div className="mt-2 flex items-center justify-between text-xs text-silver">
+                  <span>{truncateAdminAddr(l.seller)}</span>
+                  <span className="flex gap-3">
+                    <Link href={listingHref(l.id)} target="_blank" className="hover:text-white">
+                      View
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => onDelete(l.id, l.title)}
+                      className="text-danger"
+                    >
+                      Delete
+                    </button>
+                  </span>
+                </div>
+              </details>
+            );
+          })
+        )}
+      </div>
+      {loading && listings.length > 0 && (
+        <p className="border-t border-hairline px-3 py-2 text-[11px] text-silver">Refreshing…</p>
+      )}
+    </section>
   );
-}
+});

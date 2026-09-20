@@ -28,6 +28,17 @@ describe("adminListingsWhere", () => {
       ],
     });
   });
+
+  it("maps Active and Pending chips onto listed + on-chain flags", () => {
+    expect(adminListingsWhere("", "active")).toEqual({
+      status: "LISTED",
+      onChainConfirmed: true,
+    });
+    expect(adminListingsWhere("", "pending")).toEqual({
+      status: "LISTED",
+      onChainConfirmed: false,
+    });
+  });
 });
 
 describe("mergeAdminEvents", () => {
@@ -208,12 +219,14 @@ describe("fetchAdminDeals", () => {
       stuck: true,
       ageDays: 10,
       status: "LOCKED",
+      stage: "Locked",
     });
     expect(deals[1]).toMatchObject({
       listingId: "fresh",
       stuck: false,
       disputeStatus: "OPEN",
       ageDays: 2,
+      stage: "Disputed",
     });
   });
 

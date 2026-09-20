@@ -36,6 +36,8 @@ export type AdminStats = {
   deals: { locked: number; openDisputes: number; sold: number; withBuyer: number };
 };
 
+export type DealStage = "Offered" | "Locked" | "Meetup" | "Complete" | "Disputed";
+
 export type AdminDeal = {
   listingId: string;
   title: string | null;
@@ -44,13 +46,29 @@ export type AdminDeal = {
   buyer: string | null;
   amountHbar: string;
   status: string;
+  stage: DealStage;
   disputeStatus: string | null;
   disputeOpenedAt: string | null;
   createdAt: string;
+  updatedAt: string;
   attentionAt: string;
   ageDays: number;
   stuck: boolean;
 };
+
+export function dealStage(row: {
+  status?: string | null;
+  disputeStatus?: string | null;
+  shippedAt?: Date | string | null;
+  exchangeConfirmedAt?: Date | string | null;
+}): DealStage {
+  if (row.disputeStatus === "OPEN") return "Disputed";
+  const s = (row.status ?? "").toUpperCase();
+  if (s === "SOLD") return "Complete";
+  if (s === "LOCKED" && (row.shippedAt || row.exchangeConfirmedAt)) return "Meetup";
+  if (s === "LOCKED") return "Locked";
+  return "Offered";
+}
 
 function weiToHbar(wei: bigint): string {
   if (wei === 0n) return "0";
@@ -86,7 +104,15 @@ export function adminListingsWhere(q: string, status: string): Record<string, un
   const where: Record<string, unknown> = {};
   const statusNorm = status.trim().toUpperCase();
   const query = q.trim();
-  if (statusNorm) where.status = statusNorm;
+  if (statusNorm === "ACTIVE") {
+    where.status = "LISTED";
+    where.onChainConfirmed = true;
+  } else if (statusNorm === "PENDING") {
+    where.status = "LISTED";
+    where.onChainConfirmed = false;
+  } else if (statusNorm) {
+    where.status = statusNorm;
+  }
   if (query) {
     where.OR = [
       { id: { contains: query } },
@@ -344,6 +370,8 @@ export async function fetchAdminActivity(
 
 type DealListingRow = ListingRow & {
   imageUrl?: string | null;
+  shippedAt?: Date | null;
+  exchangeConfirmedAt?: Date | null;
   sales?: Array<{ amount?: string | null }>;
 };
 
@@ -377,6 +405,8 @@ export async function fetchAdminDeals(
       disputeOpenedAt: true,
       createdAt: true,
       updatedAt: true,
+      shippedAt: true,
+      exchangeConfirmedAt: true,
       sales: { orderBy: { createdAt: "desc" }, take: 1, select: { amount: true } },
     },
   })) as DealListingRow[];
@@ -395,9 +425,11 @@ export async function fetchAdminDeals(
       buyer: row.buyer ?? null,
       amountHbar: adminAmountToHbar(saleAmount || row.price),
       status: row.status ?? "",
+      stage: dealStage(row),
       disputeStatus: row.disputeStatus ?? null,
       disputeOpenedAt: row.disputeOpenedAt ? iso(row.disputeOpenedAt) : null,
       createdAt: iso(row.createdAt),
+      updatedAt: iso(row.updatedAt),
       attentionAt: iso(attentionDate),
       ageDays,
       stuck: needsWatch && ageDays >= stuckDays,

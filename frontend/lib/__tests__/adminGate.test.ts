@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { resolveAdminGateView } from "../adminGate";
 import { ADMIN_NAV, adminTabFromPath } from "../adminNav";
+import { resolveAdminGateView } from "../adminGate";
 
 describe("resolveAdminGateView", () => {
   it("asks disconnected visitors to sign in", () => {
@@ -68,19 +68,24 @@ describe("resolveAdminGateView", () => {
 });
 
 describe("adminNav", () => {
-  it("includes Phase 1 tabs plus later-phase stubs", () => {
-    const ids = ADMIN_NAV.map((item) => item.id);
-    expect(ids).toEqual(["overview", "listings", "deals", "contracts", "trust", "money"]);
+  it("locks Phase 1 rail to Overview, Trust & safety, Money, Contracts", () => {
+    expect(ADMIN_NAV.map((item) => item.id)).toEqual(["overview", "trust", "money", "contracts"]);
+    expect(ADMIN_NAV.map((item) => item.label)).toEqual([
+      "Overview",
+      "Trust & safety",
+      "Money",
+      "Contracts",
+    ]);
     expect(ADMIN_NAV.filter((item) => item.comingSoon).map((item) => item.id)).toEqual([
       "trust",
       "money",
     ]);
   });
 
-  it("maps admin subroutes to the active tab", () => {
+  it("maps admin routes to the locked tabs", () => {
     expect(adminTabFromPath("/admin")).toBe("overview");
-    expect(adminTabFromPath("/admin/listings")).toBe("listings");
-    expect(adminTabFromPath("/admin/deals")).toBe("deals");
     expect(adminTabFromPath("/admin/contracts")).toBe("contracts");
+    expect(adminTabFromPath("/admin/listings")).toBe("overview");
+    expect(adminTabFromPath("/admin/deals")).toBe("overview");
   });
 });

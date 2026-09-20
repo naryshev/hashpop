@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getApiUrl } from "../../lib/apiUrl";
-import { listingHref } from "../../lib/listingUrl";
-import { ACTIVITY_LABELS, formatRelativeAge, truncateAdminAddr } from "../../lib/adminFormat";
+import { material } from "../../lib/materials";
 import { useAdminSession } from "./AdminShell";
+import { AdminActivity, type ActivityEvent } from "./AdminActivity";
+import { AdminListings, type AdminListing, type ListingChip } from "./AdminListings";
+import { AdminDeals, type AdminDeal } from "./AdminDeals";
 
 type AdminStats = {
   listings: {
@@ -21,180 +22,229 @@ type AdminStats = {
   deals: { locked: number; openDisputes: number; sold: number; withBuyer: number };
 };
 
-type ActivityEvent = {
-  type: string;
-  at: string;
-  listingId?: string | null;
-  listingTitle?: string | null;
-  actor?: string | null;
-  counterparty?: string | null;
-  amountHbar?: string | null;
-  status?: string | null;
-};
+type KpiFilter = ListingChip | "disputes" | null;
 
-function StatCard({
+function KpiCard({
   label,
   value,
-  hint,
   accent,
+  onClick,
+  loading,
 }: {
   label: string;
   value: string;
-  hint?: string;
-  accent?: string;
+  accent: string;
+  onClick?: () => void;
+  loading?: boolean;
 }) {
-  return (
-    <div className="glass-card p-4">
-      <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-silver">{label}</div>
-      <div
-        className="mt-2 text-2xl font-extrabold tracking-tight"
-        style={{ color: accent ?? "#ffffff" }}
-      >
-        {value}
-      </div>
-      {hint ? <div className="mt-1 text-[11px] text-silver">{hint}</div> : null}
-    </div>
+  const inner = (
+    <>
+      <div className="text-xs text-silver">{label}</div>
+      {loading ? (
+        <div className="mt-2 h-7 w-16 animate-pulse rounded bg-white/10" />
+      ) : (
+        <div className="mt-2 text-2xl font-bold tabular-nums" style={{ color: accent }}>
+          {value}
+        </div>
+      )}
+    </>
   );
+  const frame = `${material.regular} rounded-[14px] p-3 text-left`;
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`${frame} transition-colors hover:bg-white/[0.04]`}
+      >
+        {inner}
+      </button>
+    );
+  }
+  return <div className={frame}>{inner}</div>;
 }
 
 export function AdminOverview() {
   const { headers, handleAuthStatus } = useAdminSession();
+  const listingsRef = useRef<HTMLElement | null>(null);
+  const dealsRef = useRef<HTMLElement | null>(null);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [events, setEvents] = useState<ActivityEvent[]>([]);
+  const [listings, setListings] = useState<AdminListing[]>([]);
+  const [deals, setDeals] = useState<AdminDeal[]>([]);
+  const [search, setSearch] = useState("");
+  const [statusChip, setStatusChip] = useState<ListingChip>("");
+  const [stuckOnly, setStuckOnly] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [sRes, aRes] = await Promise.all([
+      const params = new URLSearchParams();
+      if (search.trim()) params.set("q", search.trim());
+      if (statusChip) params.set("status", statusChip);
+      const dealParams = new URLSearchParams();
+      if (stuckOnly) dealParams.set("stuck", "1");
+      dealParams.set("stuckDays", "7");
+      const [sRes, aRes, lRes, dRes] = await Promise.all([
         fetch(`${getApiUrl()}/api/admin/stats`, { headers }),
-        fetch(`${getApiUrl()}/api/admin/activity?limit=80`, { headers }),
+        fetch(`${getApiUrl()}/api/admin/activity?limit=20`, { headers }),
+        fetch(`${getApiUrl()}/api/admin/listings?${params}`, { headers }),
+        fetch(`${getApiUrl()}/api/admin/deals?${dealParams}`, { headers }),
       ]);
-      if (handleAuthStatus(sRes.status) || handleAuthStatus(aRes.status)) return;
-      if (!sRes.ok || !aRes.ok) throw new Error("Failed to load overview");
+      if (
+        handleAuthStatus(sRes.status) ||
+        handleAuthStatus(aRes.status) ||
+        handleAuthStatus(lRes.status) ||
+        handleAuthStatus(dRes.status)
+      ) {
+        return;
+      }
+      if (!sRes.ok || !aRes.ok || !lRes.ok || !dRes.ok) throw new Error("Failed to load overview");
       setStats((await sRes.json()) as AdminStats);
-      const data = (await aRes.json()) as { events?: ActivityEvent[] };
-      setEvents(data.events ?? []);
+      setEvents(((await aRes.json()) as { events?: ActivityEvent[] }).events ?? []);
+      setListings(((await lRes.json()) as { listings?: AdminListing[] }).listings ?? []);
+      setDeals(((await dRes.json()) as { deals?: AdminDeal[] }).deals ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load overview");
     } finally {
       setLoading(false);
     }
-  }, [headers, handleAuthStatus]);
+  }, [headers, handleAuthStatus, search, statusChip, stuckOnly]);
 
   useEffect(() => {
     void load();
-  }, [load]);
+    // Search is applied explicitly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [headers, handleAuthStatus, statusChip, stuckOnly]);
+
+  const applyKpi = (filter: KpiFilter) => {
+    if (filter === "disputes") {
+      setStuckOnly(false);
+      dealsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    if (filter != null) setStatusChip(filter);
+    listingsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const deleteListing = useCallback(
+    async (id: string, title: string | null) => {
+      const label = title || id.slice(0, 12) + "…";
+      if (!window.confirm(`Permanently remove "${label}" from the marketplace?`)) return;
+      setDeleting(id);
+      try {
+        const res = await fetch(`${getApiUrl()}/api/admin/listing/${encodeURIComponent(id)}`, {
+          method: "DELETE",
+          headers,
+        });
+        if (handleAuthStatus(res.status)) return;
+        if (!res.ok) {
+          const body = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(body.error || "Delete failed");
+        }
+        setListings((prev) => prev.filter((l) => l.id !== id));
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Delete failed");
+      } finally {
+        setDeleting(null);
+      }
+    },
+    [headers, handleAuthStatus],
+  );
+
+  const openDisputes = stats?.deals.openDisputes ?? 0;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-extrabold text-white">Overview</h2>
-          <p className="text-xs text-silver">
-            Live platform health from existing marketplace data.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => void load()}
-          disabled={loading}
-          className="rounded-full border border-white/15 bg-white/5 px-3.5 py-2 text-xs text-white hover:bg-white/10 disabled:opacity-60"
-        >
-          {loading ? "Refreshing…" : "Refresh"}
-        </button>
-      </div>
-
+    <div className="mx-auto max-w-[1440px] space-y-4">
       {error && (
-        <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
+        <div className="rounded-[14px] border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
           {error}
         </div>
       )}
 
-      {stats && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            label="Users"
-            value={String(stats.users.count)}
-            hint="Registered wallets"
-            accent="#ffffff"
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <KpiCard
+          label="Users"
+          value={String(stats?.users.count ?? "—")}
+          accent="#ffffff"
+          loading={loading && !stats}
+        />
+        <KpiCard
+          label="Active"
+          value={String(stats?.listings.active ?? "—")}
+          accent="#00ffa3"
+          loading={loading && !stats}
+          onClick={() => applyKpi("ACTIVE")}
+        />
+        <KpiCard
+          label="Pending"
+          value={String(stats?.listings.pending ?? "—")}
+          accent="#fbbf24"
+          loading={loading && !stats}
+          onClick={() => applyKpi("PENDING")}
+        />
+        <KpiCard
+          label="Locked"
+          value={String(stats?.listings.locked ?? "—")}
+          accent="#00e5ff"
+          loading={loading && !stats}
+          onClick={() => applyKpi("LOCKED")}
+        />
+        <KpiCard
+          label="Sold"
+          value={String(stats?.listings.sold ?? "—")}
+          accent="#a78bfa"
+          loading={loading && !stats}
+          onClick={() => applyKpi("SOLD")}
+        />
+        <KpiCard
+          label="Volume ℏ"
+          value={stats ? stats.sales.volumeHbar : "—"}
+          accent="#ffffff"
+          loading={loading && !stats}
+        />
+        {openDisputes > 0 && (
+          <KpiCard
+            label="Disputes"
+            value={String(openDisputes)}
+            accent="#f43f5e"
+            onClick={() => applyKpi("disputes")}
           />
-          <StatCard
-            label="Listings"
-            value={String(stats.listings.total)}
-            hint={`${stats.listings.active} live · ${stats.listings.pending} pending · ${stats.listings.cancelled} cancelled`}
-            accent="#00ffa3"
-          />
-          <StatCard
-            label="Deals"
-            value={String(stats.sales.count)}
-            hint={`${stats.deals.locked} locked · ${stats.deals.openDisputes} open disputes · ${stats.deals.withBuyer} in progress`}
-            accent="#f97316"
-          />
-          <StatCard
-            label="Volume"
-            value={`${stats.sales.volumeHbar} ℏ`}
-            hint={`${stats.listings.sold} sold`}
-            accent="#00e5ff"
-          />
-        </div>
-      )}
-
-      <section className="glass-card overflow-hidden">
-        <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-          <h3 className="text-sm font-bold text-white">Platform activity</h3>
-          <span className="text-[10px] uppercase tracking-wider text-silver">
-            Sales · listings · offers · disputes
-          </span>
-        </div>
-        {events.length === 0 ? (
-          <p className="px-4 py-8 text-center text-sm text-silver">
-            {loading ? "Loading…" : "No recent platform events."}
-          </p>
-        ) : (
-          <ul className="divide-y divide-white/5">
-            {events.map((event, i) => {
-              const href = event.listingId ? listingHref(event.listingId) : null;
-              const title = event.listingTitle || event.listingId?.slice(0, 14) || "Listing";
-              return (
-                <li key={`${event.type}-${event.at}-${event.listingId ?? i}`} className="px-4 py-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#00ffa3]">
-                        {ACTIVITY_LABELS[event.type] ?? event.type}
-                      </p>
-                      <p className="mt-1 truncate text-sm text-white">
-                        {href ? (
-                          <Link href={href} className="hover:text-chrome" target="_blank">
-                            {title}
-                          </Link>
-                        ) : (
-                          title
-                        )}
-                        {event.amountHbar ? (
-                          <span className="ml-2 font-mono text-xs text-chrome">
-                            {event.amountHbar} ℏ
-                          </span>
-                        ) : null}
-                      </p>
-                      <p className="mt-0.5 font-mono text-[11px] text-silver">
-                        {truncateAdminAddr(event.actor)}
-                        {event.counterparty ? ` → ${truncateAdminAddr(event.counterparty)}` : ""}
-                        {event.status ? ` · ${event.status}` : ""}
-                      </p>
-                    </div>
-                    <time className="shrink-0 text-[11px] text-silver" dateTime={event.at}>
-                      {formatRelativeAge(event.at)}
-                    </time>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
         )}
-      </section>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <AdminActivity
+          events={events}
+          loading={loading && events.length === 0}
+          className="xl:col-start-3 xl:row-span-2"
+        />
+        <AdminListings
+          ref={listingsRef}
+          listings={listings}
+          search={search}
+          onSearch={setSearch}
+          statusChip={statusChip}
+          onStatusChip={setStatusChip}
+          loading={loading}
+          deleting={deleting}
+          onApply={() => void load()}
+          onDelete={deleteListing}
+          className="xl:col-span-2"
+        />
+        <AdminDeals
+          ref={dealsRef}
+          deals={deals}
+          stuckOnly={stuckOnly}
+          onStuckOnly={setStuckOnly}
+          loading={loading}
+          className="xl:col-span-2"
+        />
+      </div>
     </div>
   );
 }

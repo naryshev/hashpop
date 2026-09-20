@@ -1,13 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { forwardRef } from "react";
 import Link from "next/link";
-import { getApiUrl } from "../../lib/apiUrl";
 import { listingHref } from "../../lib/listingUrl";
-import { truncateAdminAddr } from "../../lib/adminFormat";
-import { useAdminSession } from "./AdminShell";
+import {
+  dealStageFromRow,
+  formatRelativeAge,
+  STATUS_PILL_CLASS,
+  truncateAdminAddr,
+  type ListingStatusTone,
+} from "../../lib/adminFormat";
+import { material } from "../../lib/materials";
 
-type AdminDeal = {
+export type AdminDeal = {
   listingId: string;
   title: string | null;
   imageUrl: string | null;
@@ -15,128 +20,180 @@ type AdminDeal = {
   buyer: string | null;
   amountHbar: string;
   status: string;
+  stage?: string;
   disputeStatus: string | null;
+  updatedAt?: string;
+  createdAt?: string;
   ageDays: number;
   stuck: boolean;
 };
 
-export function AdminDeals() {
-  const { headers, handleAuthStatus } = useAdminSession();
-  const [deals, setDeals] = useState<AdminDeal[]>([]);
-  const [stuckOnly, setStuckOnly] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+const STAGE_TONE: Record<string, ListingStatusTone> = {
+  Offered: "silver",
+  Locked: "bright",
+  Meetup: "warning",
+  Complete: "mint",
+  Disputed: "danger",
+};
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      if (stuckOnly) params.set("stuck", "1");
-      params.set("stuckDays", "7");
-      const res = await fetch(`${getApiUrl()}/api/admin/deals?${params}`, { headers });
-      if (handleAuthStatus(res.status)) return;
-      if (!res.ok) throw new Error("Failed to load deals");
-      const data = (await res.json()) as { deals?: AdminDeal[] };
-      setDeals(data.deals ?? []);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load deals");
-    } finally {
-      setLoading(false);
-    }
-  }, [headers, handleAuthStatus, stuckOnly]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
+export const AdminDeals = forwardRef<
+  HTMLElement,
+  {
+    deals: AdminDeal[];
+    stuckOnly: boolean;
+    onStuckOnly: (value: boolean) => void;
+    loading?: boolean;
+    className?: string;
+  }
+>(function AdminDeals({ deals, stuckOnly, onStuckOnly, loading, className = "" }, ref) {
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-extrabold text-white">Deal health</h2>
-          <p className="text-xs text-silver">
-            Locked listings, open disputes, and in-progress deals. Stuck = 7+ days.
-          </p>
-        </div>
-        <label className="flex items-center gap-2 text-xs text-silver">
+    <section
+      ref={ref}
+      id="deals"
+      className={`${material.regular} overflow-hidden rounded-[14px] ${className}`}
+    >
+      <div className="flex flex-wrap items-center gap-2 border-b border-hairline px-3 py-2.5">
+        <h2 className="text-sm font-semibold text-white">Deals</h2>
+        {deals.length > 0 && (
+          <span className="rounded-full bg-[#00ffa3]/15 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-[#00ffa3]">
+            {deals.length}
+          </span>
+        )}
+        <label className="ml-auto flex items-center gap-2 text-xs text-silver">
           <input
             type="checkbox"
             checked={stuckOnly}
-            onChange={(e) => setStuckOnly(e.target.checked)}
+            onChange={(e) => onStuckOnly(e.target.checked)}
             className="accent-[#00ffa3]"
           />
-          Stuck only (&gt;7 days)
+          Stuck only
         </label>
       </div>
 
-      {error && (
-        <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
-          {error}
-        </div>
-      )}
-
-      <div className="overflow-x-auto rounded-glass-lg border border-white/10 bg-[#0e1422]">
+      <div className="hidden overflow-x-auto md:block">
         <table className="min-w-full text-left text-sm">
-          <thead className="bg-white/[0.03] text-[10px] font-bold uppercase tracking-[0.14em] text-silver">
+          <thead className="sticky top-0 bg-[#0e1422] text-xs text-silver">
             <tr>
-              <th className="px-3 py-2.5"></th>
-              <th className="px-3 py-2.5">Listing</th>
-              <th className="px-3 py-2.5">Parties</th>
-              <th className="px-3 py-2.5">Amount</th>
-              <th className="px-3 py-2.5">Status</th>
-              <th className="px-3 py-2.5">Age</th>
+              <th className="px-3 py-2 font-medium">Listing</th>
+              <th className="px-3 py-2 font-medium">Buyer</th>
+              <th className="px-3 py-2 font-medium">Seller</th>
+              <th className="px-3 py-2 font-medium">Amount ℏ</th>
+              <th className="px-3 py-2 font-medium">Stage</th>
+              <th className="px-3 py-2 font-medium">Updated</th>
+              <th className="px-3 py-2 font-medium text-right">View</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/5">
+          <tbody>
             {deals.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-3 py-6 text-center text-silver">
-                  {loading ? "Loading…" : "No deals need attention."}
+                <td colSpan={7} className="px-3 py-8 text-center">
+                  {loading ? (
+                    <p className="text-sm text-silver">Loading…</p>
+                  ) : (
+                    <>
+                      <p className="text-sm text-white">No open deals.</p>
+                      <p className="mt-1 text-xs text-silver">
+                        Escrow and in-flight sales show up here.
+                      </p>
+                    </>
+                  )}
                 </td>
               </tr>
             ) : (
-              deals.map((d) => (
-                <tr key={d.listingId} className="align-middle">
-                  <td className="px-3 py-2">
-                    {d.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={d.imageUrl} alt="" className="h-10 w-10 rounded-lg object-cover" />
-                    ) : (
-                      <div className="h-10 w-10 rounded-lg bg-white/5" />
-                    )}
-                  </td>
-                  <td className="max-w-[240px] truncate px-3 py-2 text-white">
-                    <Link
-                      href={listingHref(d.listingId)}
-                      className="hover:text-chrome"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
+              deals.map((d) => {
+                const stage = d.stage || dealStageFromRow(d);
+                const tone = STAGE_TONE[stage] ?? "silver";
+                return (
+                  <tr
+                    key={d.listingId}
+                    className="h-11 border-t border-hairline hover:bg-white/[0.04]"
+                  >
+                    <td className="max-w-[220px] truncate px-3 text-white">
                       {d.title || d.listingId.slice(0, 14) + "…"}
-                    </Link>
-                    {d.stuck && (
-                      <div className="text-[10px] font-semibold text-rose-300">Stuck</div>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 font-mono text-[11px] text-silver">
-                    <div>S {truncateAdminAddr(d.seller)}</div>
-                    <div>B {truncateAdminAddr(d.buyer)}</div>
-                  </td>
-                  <td className="px-3 py-2 font-mono text-xs text-chrome">{d.amountHbar} ℏ</td>
-                  <td className="px-3 py-2 text-xs text-white">
-                    {d.status}
-                    {d.disputeStatus === "OPEN" && (
-                      <div className="text-[10px] font-semibold text-amber-300">Dispute open</div>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-xs text-silver">{d.ageDays}d</td>
-                </tr>
-              ))
+                      {d.stuck && <span className="ml-2 text-[10px] text-danger">Stuck</span>}
+                    </td>
+                    <td className="px-3 font-mono text-xs text-silver">
+                      {truncateAdminAddr(d.buyer)}
+                    </td>
+                    <td className="px-3 font-mono text-xs text-silver">
+                      {truncateAdminAddr(d.seller)}
+                    </td>
+                    <td className="px-3 font-mono text-xs tabular-nums text-white">
+                      {d.amountHbar}
+                    </td>
+                    <td className="px-3">
+                      <span
+                        className={`${material.regular} ${STATUS_PILL_CLASS[tone]} rounded-full px-2 py-0.5 text-[11px]`}
+                      >
+                        {stage}
+                      </span>
+                    </td>
+                    <td className="px-3 text-xs text-silver">
+                      {formatRelativeAge(d.updatedAt || d.createdAt || "")}
+                    </td>
+                    <td className="px-3 text-right">
+                      <Link
+                        href={listingHref(d.listingId)}
+                        target="_blank"
+                        className="text-xs text-silver hover:text-white"
+                      >
+                        View
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
       </div>
-    </div>
+
+      <div className="divide-y divide-hairline md:hidden">
+        {deals.length === 0 ? (
+          <div className="px-3 py-8 text-center">
+            {loading ? (
+              <p className="text-sm text-silver">Loading…</p>
+            ) : (
+              <>
+                <p className="text-sm text-white">No open deals.</p>
+                <p className="mt-1 text-xs text-silver">Escrow and in-flight sales show up here.</p>
+              </>
+            )}
+          </div>
+        ) : (
+          deals.map((d) => {
+            const stage = d.stage || dealStageFromRow(d);
+            const tone = STAGE_TONE[stage] ?? "silver";
+            return (
+              <div key={d.listingId} className="px-3 py-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-sm text-white">
+                    {d.title || d.listingId.slice(0, 14) + "…"}
+                  </span>
+                  <span
+                    className={`${material.regular} ${STATUS_PILL_CLASS[tone]} rounded-full px-2 py-0.5 text-[11px]`}
+                  >
+                    {stage}
+                  </span>
+                </div>
+                <div className="mt-1 flex items-center justify-between text-xs text-silver">
+                  <span className="tabular-nums text-white">{d.amountHbar} ℏ</span>
+                  <Link
+                    href={listingHref(d.listingId)}
+                    target="_blank"
+                    className="hover:text-white"
+                  >
+                    View
+                  </Link>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+      {loading && deals.length > 0 && (
+        <p className="border-t border-hairline px-3 py-2 text-[11px] text-silver">Refreshing…</p>
+      )}
+    </section>
   );
-}
+});

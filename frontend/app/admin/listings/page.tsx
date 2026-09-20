@@ -1,7 +1,5 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { AdminListings } from "../../../components/admin/AdminListings";
-
-export default function AdminListingsPage() {
-  return <AdminListings />;
+export default function AdminListingsRedirect() {
+  redirect("/admin");
 }

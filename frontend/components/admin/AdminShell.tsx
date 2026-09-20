@@ -3,7 +3,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ShieldAlert } from "lucide-react";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
 import { ConnectWalletButton } from "../ConnectWalletButton";
 import { getApiUrl } from "../../lib/apiUrl";
@@ -32,6 +31,29 @@ export function useAdminSession(): AdminSessionValue {
   const ctx = useContext(AdminSessionContext);
   if (!ctx) throw new Error("useAdminSession must be used within AdminShell");
   return ctx;
+}
+
+function GateCanvas({ children }: { children: React.ReactNode }) {
+  return (
+    <main className="flex min-h-[100dvh] items-center justify-center bg-bg px-4">
+      <div className="mx-auto max-w-md text-center">{children}</div>
+    </main>
+  );
+}
+
+function HydratingSkeleton() {
+  return (
+    <main className="min-h-[100dvh] bg-bg p-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div
+            key={i}
+            className={`${material.regular} h-[88px] animate-pulse rounded-[14px] bg-white/[0.04]`}
+          />
+        ))}
+      </div>
+    </main>
+  );
 }
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
@@ -140,102 +162,67 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     };
   }, [token, signOut, handleAuthStatus]);
 
+  if (view === "checking") return <HydratingSkeleton />;
+
   if (view === "connect") {
     return (
-      <main className="min-h-screen">
-        <div className="mx-auto max-w-md space-y-4 px-4 py-16 text-center">
-          <p className="text-sm text-silver">Sign in to continue.</p>
+      <GateCanvas>
+        <p className="text-sm text-silver">Sign in to continue.</p>
+        <div className="mt-4">
           <ConnectWalletButton />
         </div>
-      </main>
-    );
-  }
-
-  if (view === "checking") {
-    return (
-      <main className="min-h-screen">
-        <div className="mx-auto max-w-md px-4 py-16 text-center text-sm text-silver">
-          Checking access…
-        </div>
-      </main>
+      </GateCanvas>
     );
   }
 
   if (view === "empty") {
     return (
-      <main className="min-h-screen">
-        <div className="mx-auto max-w-md px-4 py-16 text-center text-sm text-silver">
-          Nothing here.
-        </div>
-      </main>
+      <GateCanvas>
+        <h1 className="text-xl font-bold text-white">Nothing here.</h1>
+      </GateCanvas>
     );
   }
 
   if (view === "signin" || !session) {
     return (
-      <main className="min-h-screen">
-        <div className="mx-auto max-w-md space-y-4 px-4 py-16 text-center">
-          <div className="inline-flex items-center justify-center rounded-full bg-amber-400/10 p-3">
-            <ShieldAlert size={28} className="text-amber-300" />
-          </div>
-          <h1 className="text-xl font-bold text-white">Admin sign-in</h1>
-          <p className="text-sm text-silver">
-            You&apos;ll be asked to sign a session message in HashPack. The signature is kept on
-            this device for 24 hours.
-          </p>
-          {error && <p className="text-xs text-rose-300">{error}</p>}
-          <button
-            type="button"
-            onClick={() => void signIn()}
-            disabled={signing}
-            className="rounded-full bg-[#00ffa3] px-5 py-2.5 text-sm font-bold text-black disabled:opacity-60"
-          >
-            {signing ? "Waiting on wallet…" : "Sign in"}
-          </button>
-        </div>
-      </main>
+      <GateCanvas>
+        <h1 className="text-xl font-bold text-white">Admin sign-in</h1>
+        <p className="mt-2 text-sm text-silver">
+          Sign a session message in HashPack. The signature stays on this device for 24 hours.
+        </p>
+        {error && <p className="mt-2 text-xs text-rose-300">{error}</p>}
+        <button
+          type="button"
+          onClick={() => void signIn()}
+          disabled={signing}
+          className="mt-4 rounded-[14px] bg-[#00ffa3] px-5 py-2.5 text-sm font-bold text-on-chrome disabled:opacity-60"
+        >
+          {signing ? "Waiting on wallet…" : "Sign to continue"}
+        </button>
+      </GateCanvas>
     );
   }
 
   return (
     <AdminSessionContext.Provider value={session}>
-      <div className="min-h-screen md:flex">
+      <div className="min-h-[100dvh] bg-bg md:flex">
         <aside
-          className={`${material.regular} sticky top-0 z-10 shrink-0 border-b border-white/10 md:sticky md:top-14 md:h-[calc(100dvh-3.5rem)] md:w-56 md:border-b-0 md:border-r`}
+          className={`${material.thick} hidden w-[220px] shrink-0 border-r border-hairline md:flex md:flex-col`}
         >
-          <div className="flex items-center justify-between gap-3 px-4 py-3 md:block md:px-4 md:py-5">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-rose-300/80">
-                Restricted
-              </p>
-              <h1 className="text-lg font-extrabold tracking-tight text-white">Ops</h1>
-              <p className="hidden font-mono text-[11px] text-silver md:block">
-                {truncateAdminAddr(session.address)}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={session.signOut}
-              className="rounded-full border border-rose-500/60 bg-rose-500/10 px-3 py-1.5 text-[11px] font-semibold text-rose-300 hover:bg-rose-500/20 md:mt-3"
-            >
-              Sign out
-            </button>
+          <div className="px-4 py-5">
+            <p className="text-sm font-semibold text-white">Ops</p>
           </div>
-          <nav
-            className="flex gap-1 overflow-x-auto px-3 pb-3 md:flex-col md:overflow-visible md:px-3 md:pb-0"
-            aria-label="Admin"
-          >
+          <nav className="flex flex-col gap-1 px-3" aria-label="Admin">
             {ADMIN_NAV.map((item) => {
               if (item.comingSoon) {
                 return (
                   <span
                     key={item.id}
-                    className="flex shrink-0 items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs text-white/35"
-                    title={`${item.phase ?? "Later"} — not in this release`}
+                    className="flex items-center justify-between rounded-[12px] px-3 py-2 text-sm text-silver"
                   >
-                    <span>{item.label}</span>
-                    <span className="hidden text-[9px] uppercase tracking-wider md:inline">
-                      {item.phase ?? "Soon"}
+                    {item.label}
+                    <span className={`${material.regular} rounded-full px-2 py-0.5 text-[10px]`}>
+                      Soon
                     </span>
                   </span>
                 );
@@ -245,10 +232,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                 <Link
                   key={item.id}
                   href={item.href}
-                  className={`shrink-0 rounded-xl px-3 py-2 text-xs font-semibold transition-colors ${
-                    active
-                      ? "bg-[#00ffa3]/15 text-[#00ffa3]"
-                      : "text-white/70 hover:bg-white/5 hover:text-white"
+                  className={`rounded-[12px] px-3 py-2 text-sm font-medium ${
+                    active ? `${material.chrome} text-chrome` : "text-silver hover:bg-white/[0.04]"
                   }`}
                 >
                   {item.label}
@@ -257,13 +242,65 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
         </aside>
-        <div className="min-w-0 flex-1 px-4 py-5 sm:px-6">
-          {error && (
-            <div className="mb-4 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
-              {error}
-            </div>
-          )}
-          {children}
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header
+            className={`${material.regular} sticky top-0 z-20 flex h-12 items-center gap-3 border-b border-hairline px-4`}
+          >
+            <span className="text-sm font-semibold text-white">Ops</span>
+            <span className="text-silver">·</span>
+            <span className="font-mono text-xs text-silver">
+              {truncateAdminAddr(session.address)}
+            </span>
+            <div className="flex-1" />
+            <button
+              type="button"
+              onClick={session.signOut}
+              className="rounded-[12px] px-3 py-1.5 text-xs font-medium text-silver hover:bg-white/[0.04] hover:text-white"
+            >
+              Sign out
+            </button>
+          </header>
+
+          <nav
+            className="flex gap-1 overflow-x-auto border-b border-hairline px-3 py-2 md:hidden"
+            aria-label="Admin"
+          >
+            {ADMIN_NAV.map((item) => {
+              if (item.comingSoon) {
+                return (
+                  <span
+                    key={item.id}
+                    className="shrink-0 rounded-[12px] px-3 py-1.5 text-xs text-silver"
+                  >
+                    {item.label}
+                    <span className="ml-1 text-[10px] text-white/35">Soon</span>
+                  </span>
+                );
+              }
+              const active = item.id === activeTab;
+              return (
+                <Link
+                  key={item.id}
+                  href={item.href}
+                  className={`shrink-0 rounded-[12px] px-3 py-1.5 text-xs font-medium ${
+                    active ? `${material.chrome} text-chrome` : "text-silver"
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+
+          <div className="min-w-0 flex-1 px-4 py-4 sm:px-6">
+            {error && (
+              <div className="mb-3 rounded-[14px] border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+                {error}
+              </div>
+            )}
+            {children}
+          </div>
         </div>
       </div>
     </AdminSessionContext.Provider>

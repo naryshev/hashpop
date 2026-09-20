@@ -1,7 +1,5 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { AdminDeals } from "../../../components/admin/AdminDeals";
-
-export default function AdminDealsPage() {
-  return <AdminDeals />;
+export default function AdminDealsRedirect() {
+  redirect("/admin");
 }
