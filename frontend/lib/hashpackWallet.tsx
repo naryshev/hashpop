@@ -26,6 +26,11 @@ import {
   shouldRetryHashConnectInit,
   withTimeout,
 } from "./hashpackWalletInit";
+import {
+  buildHashPackDeepLink,
+  openHashPackDeepLinkIfMobile,
+  selectHashPackConnectChannel,
+} from "./hashpackConnectChannel";
 import { markAwaitingHashpackReturn } from "./hashpackRestore";
 
 type HederaNetwork = "mainnet" | "testnet";
@@ -102,31 +107,32 @@ function isFramed(): boolean {
 
 /**
  * Build the HashPack deep-link URI for the given WalletConnect pairing string.
- * On mobile, navigating to this URI will open (or prompt to install) HashPack.
+ * Mobile only — desktop Chrome has no hashpack:// handler.
  */
-export function buildHashPackDeepLink(pairingUri: string): string {
-  return `hashpack://wc?uri=${encodeURIComponent(pairingUri)}`;
-}
+export { buildHashPackDeepLink };
 
+/**
+ * Open HashPack via the mobile `hashpack://` OS handler.
+ * No-ops on desktop and inside a framed wallet browser. Desktop pairing goes
+ * through the extension relay (`connectToExtension`); a missing extension
+ * falls through to the notDetected install/QR state, not a deep link.
+ */
 export function openHashPackDeepLink(pairingUri: string): void {
   if (typeof window === "undefined" || !pairingUri) return;
-  if (isFramed()) return; // wallet dApp browser — iframe pairing handles it
-  markAwaitingHashpackReturn();
-  const deeplink = buildHashPackDeepLink(pairingUri);
-  try {
-    if (isMobileBrowser()) {
-      // location.href is the most reliable way to fire a custom-scheme deep link
-      // on mobile because it happens synchronously within the current document
-      // navigation, unlike window.open which browsers restrict post-promise.
-      window.location.href = deeplink;
-    } else {
-      // On desktop, window.open works fine and keeps the tab open.
-      const popup = window.open(deeplink, "_self");
-      if (popup === null) return;
-    }
-  } catch {
-    // Custom protocol not registered — browser extension will handle it.
-  }
+  openHashPackDeepLinkIfMobile({
+    pairingUri,
+    mobile: isMobileBrowser(),
+    framed: isFramed(),
+    navigation: {
+      // location.href fires a custom-scheme deep link synchronously inside
+      // the click. window.open is blocked after a promise and, with "_self",
+      // is what Chrome rejects as an unregistered hashpack:// handler.
+      assignHref: (href) => {
+        window.location.href = href;
+      },
+      markAwaitingReturn: markAwaitingHashpackReturn,
+    },
+  });
 }
 
 // WalletConnect pairing URIs expire ~5 minutes after creation. A stale URI
@@ -621,20 +627,32 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
       mobilePairingUriRef.current = pairingUri;
       mobilePairingUriAtRef.current = Date.now();
 
-      const framed = isFramed();
+      const channel = selectHashPackConnectChannel({
+        mobile: isMobileBrowser(),
+        framed: isFramed(),
+      });
 
-      // Direct HashPack deep-link first on both desktop and mobile — but
-      // never inside a wallet's dApp browser (see openHashPackDeepLink).
-      if (!framed) openHashPackDeepLink(pairingUri);
+      // hashpack:// only on mobile. Desktop Chrome has no protocol handler;
+      // navigating there fails the launch and drops the extension handshake.
+      if (channel === "deeplink") openHashPackDeepLink(pairingUri);
 
-      const maybeConnectToExtension = (
-        hc as unknown as { connectToExtension?: () => Promise<unknown> }
-      ).connectToExtension;
-      if (typeof maybeConnectToExtension === "function") {
-        void maybeConnectToExtension.call(hc).catch(() => {});
+      const extensionClient = hc as unknown as {
+        findLocalWallets?: () => Promise<unknown>;
+        connectToExtension?: () => Promise<unknown>;
+      };
+      // Desktop: ask the extension content script for metadata, then hand it
+      // the WalletConnect URI via postMessage. HashConnect's constructor
+      // listener calls connectToExtension again when the query response
+      // arrives. If neither message is answered, the detect timeout below
+      // sets notDetected — we do not fall back to hashpack://.
+      if (channel === "extension" && typeof extensionClient.findLocalWallets === "function") {
+        void extensionClient.findLocalWallets.call(hc).catch(() => {});
+      }
+      if (typeof extensionClient.connectToExtension === "function") {
+        void extensionClient.connectToExtension.call(hc).catch(() => {});
       }
 
-      if (framed) {
+      if (channel === "iframe") {
         // Wallet dApp browser: pair with the surrounding wallet over
         // hashconnect's iframe messaging. init() already sends a pairing
         // request on load; re-send it for this explicit user gesture, then
@@ -651,7 +669,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
           }
         }
         await waitForPairing(connectWaitRef, PAIRING_WAIT_MS);
-      } else if (isMobileBrowser()) {
+      } else if (channel === "deeplink") {
         // Mobile pairs via the deep link / QR; give the user time to approve
         // in the HashPack app and come back.
         await waitForPairing(connectWaitRef, PAIRING_WAIT_MS);

@@ -90,10 +90,17 @@ Hard requirements (these are the things that make it "smooth"):
      the in-flight client — do not wipe-and-retry.
    - If already connected, no-op.
    - Get the pre-cached `wc:` URI (or generate one).
-   - Fire the HashPack deep link: `hashpack://wc?uri=${encodeURIComponent(pairingUri)}`. On mobile use
-     `window.location.href`; on desktop `window.open(deeplink, "_self")`. Wrap in try/catch — if the
-     protocol isn't registered the extension handles pairing instead.
-   - Also call `hc.connectToExtension?.()` (fire-and-forget) for the desktop extension path.
+   - Mobile only: fire `hashpack://wc?uri=${encodeURIComponent(pairingUri)}` with `window.location.href`,
+     synchronously in the click handler. Do **not** open that scheme on desktop. Chrome has no
+     `hashpack://` handler, so `window.open(deeplink, "_self")` shows "Failed to launch … scheme does
+     not have a registered handler" and can unload the page before the extension handshake, which
+     makes WalletConnect pairing time out. try/catch does not catch that — it is not a JS exception.
+   - Desktop: pair through the HashPack extension relay. Call `findLocalWallets()` (posts
+     `hashconnect-query-extension`) and `connectToExtension()` (posts `hashconnect-connect-extension`
+     with the pairing URI). Both exist on the HashConnect instance at runtime (typed private).
+     If the extension never answers, the ~6s `notDetected` state is the fallback (install link + QR).
+     Do not fall back to `hashpack://` on desktop.
+   - Framed HashPack dApp browser: no deep link; re-send the iframe pairing request.
    - Desktop: race the `pairingEvent` against a ~6s timeout. If nothing responds, set
      `notDetected = true` (HashPack likely not installed) — DO NOT spin forever. Keep the pairing
      listener registered so a late approval still connects.
