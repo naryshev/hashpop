@@ -150,6 +150,12 @@ Hard requirements (these are the things that make it "smooth"):
 - Mirror node, not the wallet, is the source of truth for EVM address + balance; fall back to long-zero.
 - Persist/restore session so refreshes don't re-prompt.
 - Prune stale WalletConnect pairings before init.
+- HashPack 15 approves with `sessionProperties.alias = wallet.nickname || null`.
+  WalletConnect rejects a null alias (`Received: null for key alias`) and HashPack
+  then deletes the proposal (`Proposal not found` on retry). The dApp proposal
+  does not carry alias — set a non-empty wallet nickname in HashPack. Do not send
+  `https://hashpop.io/...` as the WalletConnect icon; the extension CSP blocks it.
+  Use the inline `data:` icon from `hashpackDappMetadata.ts`.
 
 Deliver: the provider file, the `useHashpackWallet` hook, `ConnectWalletButton`, `SignInCard`
 (with QR + not-detected states), and wire the provider near the root of the app tree.

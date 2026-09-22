@@ -31,7 +31,13 @@ import {
   openHashPackDeepLinkIfMobile,
   selectHashPackConnectChannel,
 } from "./hashpackConnectChannel";
+import { buildHashpackDappMetadata } from "./hashpackDappMetadata";
 import { markAwaitingHashpackReturn } from "./hashpackRestore";
+import {
+  HASHPACK_NICKNAME_REQUIRED_MESSAGE,
+  classifyDesktopConnectTimeout,
+  isHashPackExtensionAnnounce,
+} from "./hashpackSessionAlias";
 
 type HederaNetwork = "mainnet" | "testnet";
 
@@ -46,6 +52,12 @@ type HashpackWalletContextValue = {
   error: string | null;
   /** True when a desktop connect attempt elapsed without any wallet response — HashPack is likely not installed. */
   notDetected: boolean;
+  /**
+   * True when the HashPack extension answered but did not approve.
+   * HashPack sends `sessionProperties.alias` from the wallet nickname and
+   * WalletConnect rejects a null nickname. The next connect mints a new pairing URI.
+   */
+  nicknameRequired: boolean;
   network: HederaNetwork;
   /** Pre-cached WalletConnect pairing URI. Use this for synchronous deep-links in click handlers. */
   pairingUri: string | null;
@@ -337,12 +349,7 @@ async function getOrCreateHashConnect(
     ]);
     const ledgerId = network === "mainnet" ? sdk.LedgerId.MAINNET : sdk.LedgerId.TESTNET;
     const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
-    const metadata = {
-      name: "Hashpop",
-      description: "Hashpop — verifiable peer-to-peer marketplace on Hedera",
-      icons: [`${origin}/hashpop-cart-3d.PNG`],
-      url: origin,
-    };
+    const metadata = buildHashpackDappMetadata(origin);
     const hc = new HashConnect(ledgerId, projectId, metadata, false);
     await hc.init();
     sharedHashconnect = hc;
@@ -370,6 +377,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notDetected, setNotDetected] = useState(false);
+  const [nicknameRequired, setNicknameRequired] = useState(false);
   const [pairingUri, setPairingUri] = useState<string | null>(null);
   const network = getNetwork();
   const connectWaitRef = useRef<((value: void | PromiseLike<void>) => void) | null>(null);
@@ -390,6 +398,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
     setBalanceTinybar(null);
     setError(null);
     setNotDetected(false);
+    setNicknameRequired(false);
     clearWalletSessionStorage();
     if (clearConnectorData) clearWalletConnectorStorage();
   }, []);
@@ -433,6 +442,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
         setAccountId(first);
         setError(null);
         setNotDetected(false);
+        setNicknameRequired(false);
         if (first) {
           const mirrorData = await fetchMirrorAccount(first, network);
           if (!mounted) return;
@@ -570,6 +580,9 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
     connectInFlightRef.current = true;
     setIsConnecting(true);
     setNotDetected(false);
+    setNicknameRequired(false);
+    let extensionSeen = false;
+    let removeExtensionListener: (() => void) | null = null;
     try {
       const projectId = getWalletConnectProjectId();
       if (!projectId) {
@@ -640,6 +653,17 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
         findLocalWallets?: () => Promise<unknown>;
         connectToExtension?: () => Promise<unknown>;
       };
+      // Listen before the query so a fast content-script reply is not missed.
+      // HashPack posts hashconnect-query-extension-response (and the Hedera
+      // extension reply) when the extension is installed.
+      if (typeof window !== "undefined") {
+        const onWindowMessage = (event: MessageEvent) => {
+          if (event.source !== window) return;
+          if (isHashPackExtensionAnnounce(event.data)) extensionSeen = true;
+        };
+        window.addEventListener("message", onWindowMessage);
+        removeExtensionListener = () => window.removeEventListener("message", onWindowMessage);
+      }
       // Desktop: ask the extension content script for metadata, then hand it
       // the WalletConnect URI via postMessage. HashConnect's constructor
       // listener calls connectToExtension again when the query response
@@ -689,13 +713,26 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
             resolve(true);
           };
         });
-        if (!paired) setNotDetected(true);
+        if (!paired) {
+          // HashPack deletes the proposal after a failed approve, so the URI
+          // we just handed the extension cannot be approved on a retry.
+          mobilePairingUriRef.current = null;
+          mobilePairingUriAtRef.current = 0;
+          setPairingUri(null);
+          if (classifyDesktopConnectTimeout(extensionSeen) === "nickname-required") {
+            setNicknameRequired(true);
+            setError(HASHPACK_NICKNAME_REQUIRED_MESSAGE);
+          } else {
+            setNotDetected(true);
+          }
+        }
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Wallet connection failed.";
       setError(msg);
       return;
     } finally {
+      removeExtensionListener?.();
       setIsConnecting(false);
       connectInFlightRef.current = false;
     }
@@ -722,6 +759,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
       isConnecting,
       error,
       notDetected,
+      nicknameRequired,
       network,
       pairingUri,
       connect,
@@ -737,6 +775,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
       isConnecting,
       error,
       notDetected,
+      nicknameRequired,
       network,
       pairingUri,
       connect,
