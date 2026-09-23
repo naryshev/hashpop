@@ -123,13 +123,13 @@ function MediaTrustCard({
           <h2
             className={cn(
               "line-clamp-2 font-semibold leading-snug text-white",
-              compact ? "text-[13px]" : "text-[15px]",
+              compact ? "text-[13px]" : "text-[14px]",
             )}
           >
             {item.title || formatListingId(item.id) || "Untitled"}
           </h2>
           <p
-            className={cn("mt-0.5 font-bold text-chrome", compact ? "text-[15px]" : "text-[17px]")}
+            className={cn("mt-0.5 font-bold text-chrome", compact ? "text-[15px]" : "text-[16px]")}
           >
             {formatPriceForDisplay(item.price || "0")} <span className="italic">ℏ</span>
           </p>
@@ -141,8 +141,10 @@ function MediaTrustCard({
             <span
               data-testid="grid-trust-chip"
               className={cn(
-                material.thick,
-                "inline-flex h-[22px] max-w-[9rem] items-center rounded-full border border-white/10 px-2 text-[11px] font-semibold leading-none text-chrome",
+                "inline-flex h-[22px] max-w-[9rem] items-center rounded-full px-2 text-[11px] font-semibold leading-none",
+                chip.tone === "mint"
+                  ? "border border-[#00ffa3]/25 bg-[#00ffa3]/10 text-chrome backdrop-blur-material-thick"
+                  : cn(material.thick, "border border-white/10 text-silver"),
               )}
               aria-label={
                 chip.kind === "completion" ? `Seller completion ${chip.label}` : chip.label

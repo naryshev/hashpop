@@ -130,6 +130,11 @@ describe("ListingCard mediaTrust", () => {
     expect(document.querySelector('[data-testid="wishlist"]')).toBeTruthy();
     expect(document.querySelector('[data-testid="trust-strip"]')).toBeNull();
     expect(document.body.textContent).toContain("Meetup");
+    const meetup = document.querySelector('[data-testid="grid-trust-chip"]') as HTMLElement;
+    expect(meetup.className).toContain("text-silver");
+    expect(meetup.className).toContain("bg-material-thick");
+    expect(meetup.className).not.toContain("text-chrome");
+    expect(meetup.className).not.toContain("bg-[#00ffa3]/10");
     expect(document.body.textContent).not.toContain("Active");
     expect(document.body.textContent).not.toContain("KYC");
   });
@@ -150,9 +155,40 @@ describe("ListingCard mediaTrust", () => {
     });
     const card = document.querySelector('[data-variant="mediaTrust"]') as HTMLElement;
     expect(card.className).toContain("rounded-[14px]");
-    expect(document.body.textContent).toContain("98%");
+    const title = document.querySelector("h2") as HTMLElement;
+    const price = document.querySelector("p") as HTMLElement;
+    expect(title.className).toContain("text-[14px]");
+    expect(title.className).not.toContain("text-[15px]");
+    expect(price.className).toContain("text-[16px]");
+    expect(price.className).not.toContain("text-[17px]");
+    const completion = document.querySelector('[data-testid="grid-trust-chip"]') as HTMLElement;
+    expect(completion.textContent).toBe("98%");
+    expect(completion.className).toContain("bg-[#00ffa3]/10");
+    expect(completion.className).toContain("border-[#00ffa3]/25");
+    expect(completion.className).toContain("text-chrome");
+    expect(completion.className).not.toContain("text-silver");
     expect(document.body.textContent).not.toContain("Escrow");
     expect(document.body.textContent).not.toContain("Meetup");
+  });
+
+  it("keeps a low completion percent on silver glass", async () => {
+    loadedProfile(8, 10);
+    await renderCard({
+      variant: "mediaTrust",
+      item: {
+        id: "lst-low",
+        title: "Low completion",
+        price: "40",
+        seller,
+        status: "LISTED",
+        requireEscrow: true,
+      },
+    });
+    const chip = document.querySelector('[data-testid="grid-trust-chip"]') as HTMLElement;
+    expect(chip.textContent).toBe("80%");
+    expect(chip.className).toContain("text-silver");
+    expect(chip.className).not.toContain("text-chrome");
+    expect(chip.className).not.toContain("bg-[#00ffa3]/10");
   });
 
   it("omits the chip while the seller profile is still loading", async () => {

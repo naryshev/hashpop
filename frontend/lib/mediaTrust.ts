@@ -11,9 +11,15 @@
 
 export type GridTrustKind = "completion" | "meetup" | "escrow";
 
+/** Mint quiet fill starts here. Below this, a percent stays silver glass. */
+export const COMPLETION_HIGH_BAND = 90;
+
+export type GridTrustTone = "mint" | "silver";
+
 export type GridTrustChip = {
   kind: GridTrustKind;
   label: string;
+  tone: GridTrustTone;
 };
 
 export type GridTrustInput = {
@@ -56,9 +62,15 @@ export function gridTrustChip(input: GridTrustInput): GridTrustChip | null {
   if (gridStatusCapsule(input.status)) return null;
 
   const pct = completionPercent(input.successfulCompletions, input.totalSales);
-  if (pct != null) return { kind: "completion", label: `${pct}%` };
+  if (pct != null) {
+    return {
+      kind: "completion",
+      label: `${pct}%`,
+      tone: pct >= COMPLETION_HIGH_BAND ? "mint" : "silver",
+    };
+  }
 
-  if (input.requireEscrow === false) return { kind: "meetup", label: "Meetup" };
-  if (input.requireEscrow === true) return { kind: "escrow", label: "Escrow" };
+  if (input.requireEscrow === false) return { kind: "meetup", label: "Meetup", tone: "silver" };
+  if (input.requireEscrow === true) return { kind: "escrow", label: "Escrow", tone: "silver" };
   return null;
 }

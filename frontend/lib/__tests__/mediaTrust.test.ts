@@ -38,7 +38,7 @@ describe("gridTrustChip", () => {
         successfulCompletions: 49,
         totalSales: 50,
       }),
-    ).toEqual({ kind: "completion", label: "98%" });
+    ).toEqual({ kind: "completion", label: "98%", tone: "mint" });
 
     expect(
       gridTrustChip({
@@ -60,7 +60,7 @@ describe("gridTrustChip", () => {
         successfulCompletions: 0,
         totalSales: 0,
       }),
-    ).toEqual({ kind: "meetup", label: "Meetup" });
+    ).toEqual({ kind: "meetup", label: "Meetup", tone: "silver" });
 
     expect(
       gridTrustChip({
@@ -70,7 +70,7 @@ describe("gridTrustChip", () => {
         successfulCompletions: 0,
         totalSales: 0,
       }),
-    ).toEqual({ kind: "escrow", label: "Escrow" });
+    ).toEqual({ kind: "escrow", label: "Escrow", tone: "silver" });
 
     expect(
       gridTrustChip({
@@ -82,6 +82,25 @@ describe("gridTrustChip", () => {
         kycVerified: true,
       }),
     ).toBeNull();
+  });
+
+  it("keeps mint for the high completion band and silver below it", () => {
+    expect(
+      gridTrustChip({
+        loading: false,
+        status: "LISTED",
+        successfulCompletions: 9,
+        totalSales: 10,
+      })?.tone,
+    ).toBe("mint");
+    expect(
+      gridTrustChip({
+        loading: false,
+        status: "LISTED",
+        successfulCompletions: 8,
+        totalSales: 10,
+      }),
+    ).toEqual({ kind: "completion", label: "80%", tone: "silver" });
   });
 
   it("does not use KYC as the only grid chip", () => {
