@@ -791,7 +791,7 @@ export default function MarketplacePageClient({
                   key={`${item.itemType}-${item.id}`}
                   item={item}
                   density="compact"
-                  variant="softTrust"
+                  variant="mediaTrust"
                 />
               ))}
             </div>
@@ -813,7 +813,7 @@ export default function MarketplacePageClient({
                     key={`${item.itemType}-${item.id}`}
                     item={item}
                     density="regular"
-                    variant="softTrust"
+                    variant="mediaTrust"
                   />
                 ))}
               </div>
@@ -958,7 +958,7 @@ export default function MarketplacePageClient({
                               key={`${item.itemType}-${item.id}`}
                               item={item}
                               density="regular"
-                              variant="softTrust"
+                              variant="mediaTrust"
                             />
                           ))}
                         </div>

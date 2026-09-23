@@ -1,7 +1,7 @@
 export type ViewMode = "grid" | "feed" | "editorial";
 
 /**
- * Bare `/marketplace` (and any unknown `?view`) is the soft-trust grid.
+ * Bare `/marketplace` (and any unknown `?view`) is the mediaTrust grid.
  * Editorial and feed stay available as explicit toggles.
  */
 export function parseViewMode(value: string | null): ViewMode {

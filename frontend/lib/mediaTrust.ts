@@ -1,12 +1,12 @@
 /**
- * Marketplace grid trust chips (Concept C soft-trust).
+ * Marketplace grid trust chip (B+C hybrid).
  *
- * Up to three chips from the same seller fields TrustStrip already maps
- * (`successfulCompletions`, `totalSales`) plus the listing's fulfillment
- * flags. KYC, deal counts, and stars are never grid chips.
+ * One chip, chosen from the same seller fields TrustStrip already maps
+ * (`successfulCompletions`, `totalSales`) plus the listing's existing
+ * `requireEscrow` flag. KYC is never the grid chip.
  *
- * Order: completion % → Meetup → Escrow. Omit what does not apply.
- * Pending/Sold and an in-flight profile omit the whole row (no flicker).
+ * Priority: completion % → Meetup → Escrow → omit.
+ * Pending/Sold and an in-flight profile omit the chip (no flicker).
  */
 
 export type GridTrustKind = "completion" | "meetup" | "escrow";
@@ -26,16 +26,7 @@ export type GridTrustInput = {
   /** Profile batch still in flight. Omit every chip until it settles. */
   loading?: boolean;
   status?: string | null;
-  /**
-   * Existing listing flag. False = meetup. True = on-chain escrow.
-   * Omitted = no fulfillment chip (do not invent a default).
-   */
   requireEscrow?: boolean | null;
-  /**
-   * Explicit meetup capability. With `requireEscrow === true`, both
-   * Meetup and Escrow show (meetup-with-contract).
-   */
-  meetup?: boolean | null;
   successfulCompletions?: number | null;
   totalSales?: number | null;
   /** Accepted so callers can pass the profile flag; never rendered. */
@@ -56,7 +47,7 @@ export function completionPercent(
   return Math.min(100, Math.max(0, pct));
 }
 
-/** Pending/Sold replace the trust row. Active is not a capsule on this grid. */
+/** Pending/Sold replace the trust chip. Active is not a capsule on this grid. */
 export function gridStatusCapsule(status?: string | null): GridStatusCapsule | null {
   const value = String(status || "")
     .trim()
@@ -66,23 +57,20 @@ export function gridStatusCapsule(status?: string | null): GridStatusCapsule | n
   return null;
 }
 
-export function gridTrustChips(input: GridTrustInput): GridTrustChip[] {
-  if (input.loading) return [];
-  if (gridStatusCapsule(input.status)) return [];
+export function gridTrustChip(input: GridTrustInput): GridTrustChip | null {
+  if (input.loading) return null;
+  if (gridStatusCapsule(input.status)) return null;
 
-  const chips: GridTrustChip[] = [];
   const pct = completionPercent(input.successfulCompletions, input.totalSales);
   if (pct != null) {
-    chips.push({
+    return {
       kind: "completion",
       label: `${pct}%`,
       tone: pct >= COMPLETION_HIGH_BAND ? "mint" : "silver",
-    });
+    };
   }
 
-  const meetup = input.meetup === true || input.requireEscrow === false;
-  const escrow = input.requireEscrow === true;
-  if (meetup) chips.push({ kind: "meetup", label: "Meetup", tone: "silver" });
-  if (escrow) chips.push({ kind: "escrow", label: "Escrow", tone: "silver" });
-  return chips;
+  if (input.requireEscrow === false) return { kind: "meetup", label: "Meetup", tone: "silver" };
+  if (input.requireEscrow === true) return { kind: "escrow", label: "Escrow", tone: "silver" };
+  return null;
 }

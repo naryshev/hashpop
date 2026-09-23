@@ -7,7 +7,7 @@ import { WishlistButton } from "./WishlistButton";
 import { TrustStrip } from "./TrustStrip";
 import { formatListingId, listingHref } from "../lib/listingUrl";
 import { formatPriceForDisplay } from "../lib/formatPrice";
-import { gridStatusCapsule, gridTrustChips } from "../lib/mediaTrust";
+import { gridStatusCapsule, gridTrustChip } from "../lib/mediaTrust";
 import { material } from "../lib/materials";
 import { profileAvatarUrl, profileDisplayName, useProfile } from "../lib/profiles";
 import { cn } from "../lib/utils";
@@ -23,14 +23,10 @@ export type ListingCardItem = {
   watchlistCount?: number;
   /** Existing listing flag. False = meetup, true = escrow. Omitted = no fulfillment chip. */
   requireEscrow?: boolean | null;
-  /** Meetup-with-contract. With requireEscrow, both Meetup and Escrow chips show. */
-  meetup?: boolean | null;
-  /** Preformatted distance. Omitted when unknown — never invent km. */
-  distanceLabel?: string | null;
   itemType?: "listing";
 };
 
-export type ListingCardVariant = "glass" | "softTrust" | "mediaTrust";
+export type ListingCardVariant = "glass" | "mediaTrust";
 
 export function formatSellerDisplay(seller?: string): string {
   if (!seller) return "";
@@ -91,10 +87,10 @@ const statusLabel = {
 } as const;
 
 /**
- * Concept C soft-trust tile. Inset square photo, title and chip row under it.
- * Compact = mobile 2-up (20px radius); regular = desktop grid (18px).
+ * Photo tile: chrome is overlay only. One trust chip, or a Pending/Sold capsule.
+ * Compact = mobile 2-up (16px radius); regular = desktop grid (14px).
  */
-function SoftTrustCard({
+function MediaTrustCard({
   item,
   density,
 }: {
@@ -104,88 +100,72 @@ function SoftTrustCard({
   const compact = density === "compact";
   const profile = useProfile(item.seller);
   const capsule = gridStatusCapsule(item.status);
-  const chips = gridTrustChips({
+  const chip = gridTrustChip({
     loading: Boolean(item.seller) && profile === undefined,
     status: item.status,
     requireEscrow: item.requireEscrow,
-    meetup: item.meetup,
     successfulCompletions: profile?.successfulCompletions,
     totalSales: profile?.totalSales,
     kycVerified: profile?.kycVerified,
   });
-  const distance = item.distanceLabel?.trim() ?? "";
 
   return (
     <article
-      data-variant="softTrust"
+      data-variant="mediaTrust"
       className={cn(
-        material.regular,
-        "flex flex-col overflow-hidden border-white/12 shadow-[0_8px_24px_rgba(0,0,0,0.28)] transition-transform active:scale-[0.98]",
-        compact ? "rounded-[20px]" : "rounded-[18px]",
+        "relative overflow-hidden border border-white/10 bg-[#0b111b]",
+        compact ? "rounded-[16px]" : "rounded-[14px]",
       )}
     >
-      <div className="px-1.5 pt-1.5">
-        <div
-          data-testid="soft-trust-media"
-          className="relative aspect-square overflow-hidden rounded-[14px] bg-[#0b111b]"
-        >
-          <Link href={listingHref(item.id)} className="absolute inset-0 block">
-            <ListingMedia listing={item} bleed slideshow={compact ? undefined : "hover"} />
-          </Link>
-          <div className="absolute right-1.5 top-1.5 z-10">
-            <WishlistButton itemId={item.id} itemType="listing" compact />
-          </div>
-        </div>
-      </div>
-      <Link href={listingHref(item.id)} className="flex flex-col px-2.5 pb-[11px] pt-2">
-        <h2 className="line-clamp-2 text-[13px] font-semibold leading-snug text-white">
-          {item.title || formatListingId(item.id) || "Untitled"}
-        </h2>
-        {capsule ? (
-          <div className="mt-1.5 flex min-h-[22px] flex-wrap items-center gap-1">
-            <span className={statusCapsule[capsule]}>{statusLabel[capsule]}</span>
-          </div>
-        ) : chips.length > 0 ? (
-          <div className="mt-1.5 flex min-h-[22px] flex-wrap items-center gap-1">
-            {chips.map((chip) => (
-              <span
-                key={chip.kind}
-                data-testid="grid-trust-chip"
-                className={cn(
-                  "inline-flex h-[22px] items-center rounded-full px-2 text-[11px] font-semibold leading-none",
-                  chip.tone === "mint"
-                    ? "border border-[#00ffa3]/25 bg-[#00ffa3]/10 text-chrome"
-                    : cn(material.thick, "border border-white/10 text-silver"),
-                )}
-                aria-label={
-                  chip.kind === "completion" ? `Seller completion ${chip.label}` : chip.label
-                }
-              >
-                {chip.label}
-              </span>
-            ))}
-          </div>
-        ) : null}
-        <div className="mt-1.5 flex items-baseline justify-between gap-2">
-          <p className={cn("font-bold text-chrome", compact ? "text-[14px]" : "text-[15px]")}>
+      <Link href={listingHref(item.id)} className="relative block aspect-[3/4]">
+        <ListingMedia listing={item} bleed slideshow={compact ? undefined : "hover"} />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] bg-gradient-to-t from-black/85 via-black/40 to-transparent px-2.5 pb-2.5 pt-14">
+          <h2
+            className={cn(
+              "line-clamp-2 font-semibold leading-snug text-white",
+              compact ? "text-[13px]" : "text-[14px]",
+            )}
+          >
+            {item.title || formatListingId(item.id) || "Untitled"}
+          </h2>
+          <p
+            className={cn("mt-0.5 font-bold text-chrome", compact ? "text-[15px]" : "text-[16px]")}
+          >
             {formatPriceForDisplay(item.price || "0")} <span className="italic">ℏ</span>
           </p>
-          {distance ? (
-            <span data-testid="listing-distance" className="shrink-0 text-[11px] text-silver/60">
-              {distance}
+        </div>
+        <div className="absolute left-2 top-2 z-10">
+          {capsule ? (
+            <span className={statusCapsule[capsule]}>{statusLabel[capsule]}</span>
+          ) : chip ? (
+            <span
+              data-testid="grid-trust-chip"
+              className={cn(
+                "inline-flex h-[22px] max-w-[9rem] items-center rounded-full px-2 text-[11px] font-semibold leading-none",
+                chip.tone === "mint"
+                  ? "border border-[#00ffa3]/25 bg-[#00ffa3]/10 text-chrome backdrop-blur-material-thick"
+                  : cn(material.thick, "border border-white/10 text-silver"),
+              )}
+              aria-label={
+                chip.kind === "completion" ? `Seller completion ${chip.label}` : chip.label
+              }
+            >
+              {chip.label}
             </span>
           ) : null}
         </div>
       </Link>
+      <div className="absolute right-2 top-2 z-10">
+        <WishlistButton itemId={item.id} itemType="listing" compact />
+      </div>
     </article>
   );
 }
 
 /**
  * Shared marketplace listing cell. Compact = mobile 2-up; regular = desktop grid.
- * `softTrust` (and the `mediaTrust` alias) is the Concept C grid tile.
- * Default `glass` stays the body-slab card (profile grids and anything that
- * is not the marketplace grid).
+ * `mediaTrust` is the B+C hybrid grid tile. Default `glass` stays the body-slab card
+ * (profile grids and anything that is not the marketplace grid).
  */
 export function ListingCard({
   item,
@@ -196,8 +176,8 @@ export function ListingCard({
   density?: "compact" | "regular";
   variant?: ListingCardVariant;
 }) {
-  if (variant === "softTrust" || variant === "mediaTrust") {
-    return <SoftTrustCard item={item} density={density} />;
+  if (variant === "mediaTrust") {
+    return <MediaTrustCard item={item} density={density} />;
   }
 
   const compact = density === "compact";
