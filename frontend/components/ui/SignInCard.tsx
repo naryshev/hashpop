@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Wallet, Copy, Check, QrCode, ChevronUp, AlertTriangle, ArrowRight } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
+import { HASHPACK_NICKNAME_REQUIRED_MESSAGE } from "../../lib/hashpackSessionAlias";
 import { useHashpackWallet, openHashPackDeepLink } from "../../lib/hashpackWallet";
 
 type SignInCardProps = {
@@ -16,8 +17,16 @@ type SignInCardProps = {
  * and inside RequireWalletModal so both surfaces share connection logic.
  */
 export function SignInCard({ onConnected, className }: SignInCardProps) {
-  const { connect, isConnecting, isReady, error, isConnected, notDetected, pairingUri } =
-    useHashpackWallet();
+  const {
+    connect,
+    isConnecting,
+    isReady,
+    error,
+    isConnected,
+    notDetected,
+    nicknameRequired,
+    pairingUri,
+  } = useHashpackWallet();
   const lastPressAtRef = useRef(0);
   const [deepLinkFired, setDeepLinkFired] = useState(false);
   const [showQr, setShowQr] = useState(false);
@@ -108,7 +117,17 @@ export function SignInCard({ onConnected, className }: SignInCardProps) {
         {buttonLabel}
       </button>
 
-      {notDetected && !isConnecting && !isConnected && (
+      {nicknameRequired && !isConnecting && !isConnected && (
+        <div className="mt-4 rounded-2xl border border-amber-400/30 bg-amber-400/[0.06] p-4">
+          <p className="flex items-center gap-2 text-sm font-semibold text-amber-200">
+            <AlertTriangle size={15} />
+            HashPack could not approve
+          </p>
+          <p className="mt-1 text-xs text-slate-300/90">{HASHPACK_NICKNAME_REQUIRED_MESSAGE}</p>
+        </div>
+      )}
+
+      {notDetected && !nicknameRequired && !isConnecting && !isConnected && (
         <div className="mt-4 rounded-2xl border border-amber-400/30 bg-amber-400/[0.06] p-4">
           <p className="flex items-center gap-2 text-sm font-semibold text-amber-200">
             <AlertTriangle size={15} />
@@ -246,7 +265,9 @@ export function SignInCard({ onConnected, className }: SignInCardProps) {
         .
       </p>
 
-      {error ? <p className="mt-3 text-center text-xs text-amber-300">{error}</p> : null}
+      {error && !nicknameRequired ? (
+        <p className="mt-3 text-center text-xs text-amber-300">{error}</p>
+      ) : null}
     </div>
   );
 }

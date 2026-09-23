@@ -26,7 +26,18 @@ import {
   shouldRetryHashConnectInit,
   withTimeout,
 } from "./hashpackWalletInit";
+import {
+  buildHashPackDeepLink,
+  openHashPackDeepLinkIfMobile,
+  selectHashPackConnectChannel,
+} from "./hashpackConnectChannel";
+import { buildHashpackDappMetadata } from "./hashpackDappMetadata";
 import { markAwaitingHashpackReturn } from "./hashpackRestore";
+import {
+  HASHPACK_NICKNAME_REQUIRED_MESSAGE,
+  classifyDesktopConnectTimeout,
+  isHashPackExtensionAnnounce,
+} from "./hashpackSessionAlias";
 
 type HederaNetwork = "mainnet" | "testnet";
 
@@ -41,6 +52,14 @@ type HashpackWalletContextValue = {
   error: string | null;
   /** True when a desktop connect attempt elapsed without any wallet response — HashPack is likely not installed. */
   notDetected: boolean;
+  /**
+   * True when the HashPack extension answered but did not approve.
+   * The extension sets `sessionProperties.alias` from the selected account's
+   * wallet nickname (`account.nickname`), not the social profile username.
+   * The next connect mints a new pairing URI. Do not tell the user their
+   * nickname is empty — ask them to confirm Wallet Name on that account.
+   */
+  nicknameRequired: boolean;
   network: HederaNetwork;
   /** Pre-cached WalletConnect pairing URI. Use this for synchronous deep-links in click handlers. */
   pairingUri: string | null;
@@ -102,31 +121,32 @@ function isFramed(): boolean {
 
 /**
  * Build the HashPack deep-link URI for the given WalletConnect pairing string.
- * On mobile, navigating to this URI will open (or prompt to install) HashPack.
+ * Mobile only — desktop Chrome has no hashpack:// handler.
  */
-export function buildHashPackDeepLink(pairingUri: string): string {
-  return `hashpack://wc?uri=${encodeURIComponent(pairingUri)}`;
-}
+export { buildHashPackDeepLink };
 
+/**
+ * Open HashPack via the mobile `hashpack://` OS handler.
+ * No-ops on desktop and inside a framed wallet browser. Desktop pairing goes
+ * through the extension relay (`connectToExtension`); a missing extension
+ * falls through to the notDetected install/QR state, not a deep link.
+ */
 export function openHashPackDeepLink(pairingUri: string): void {
   if (typeof window === "undefined" || !pairingUri) return;
-  if (isFramed()) return; // wallet dApp browser — iframe pairing handles it
-  markAwaitingHashpackReturn();
-  const deeplink = buildHashPackDeepLink(pairingUri);
-  try {
-    if (isMobileBrowser()) {
-      // location.href is the most reliable way to fire a custom-scheme deep link
-      // on mobile because it happens synchronously within the current document
-      // navigation, unlike window.open which browsers restrict post-promise.
-      window.location.href = deeplink;
-    } else {
-      // On desktop, window.open works fine and keeps the tab open.
-      const popup = window.open(deeplink, "_self");
-      if (popup === null) return;
-    }
-  } catch {
-    // Custom protocol not registered — browser extension will handle it.
-  }
+  openHashPackDeepLinkIfMobile({
+    pairingUri,
+    mobile: isMobileBrowser(),
+    framed: isFramed(),
+    navigation: {
+      // location.href fires a custom-scheme deep link synchronously inside
+      // the click. window.open is blocked after a promise and, with "_self",
+      // is what Chrome rejects as an unregistered hashpack:// handler.
+      assignHref: (href) => {
+        window.location.href = href;
+      },
+      markAwaitingReturn: markAwaitingHashpackReturn,
+    },
+  });
 }
 
 // WalletConnect pairing URIs expire ~5 minutes after creation. A stale URI
@@ -331,12 +351,7 @@ async function getOrCreateHashConnect(
     ]);
     const ledgerId = network === "mainnet" ? sdk.LedgerId.MAINNET : sdk.LedgerId.TESTNET;
     const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
-    const metadata = {
-      name: "Hashpop",
-      description: "Hashpop — verifiable peer-to-peer marketplace on Hedera",
-      icons: [`${origin}/hashpop-cart-3d.PNG`],
-      url: origin,
-    };
+    const metadata = buildHashpackDappMetadata(origin);
     const hc = new HashConnect(ledgerId, projectId, metadata, false);
     await hc.init();
     sharedHashconnect = hc;
@@ -364,6 +379,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notDetected, setNotDetected] = useState(false);
+  const [nicknameRequired, setNicknameRequired] = useState(false);
   const [pairingUri, setPairingUri] = useState<string | null>(null);
   const network = getNetwork();
   const connectWaitRef = useRef<((value: void | PromiseLike<void>) => void) | null>(null);
@@ -384,6 +400,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
     setBalanceTinybar(null);
     setError(null);
     setNotDetected(false);
+    setNicknameRequired(false);
     clearWalletSessionStorage();
     if (clearConnectorData) clearWalletConnectorStorage();
   }, []);
@@ -427,6 +444,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
         setAccountId(first);
         setError(null);
         setNotDetected(false);
+        setNicknameRequired(false);
         if (first) {
           const mirrorData = await fetchMirrorAccount(first, network);
           if (!mounted) return;
@@ -564,6 +582,9 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
     connectInFlightRef.current = true;
     setIsConnecting(true);
     setNotDetected(false);
+    setNicknameRequired(false);
+    let extensionSeen = false;
+    let removeExtensionListener: (() => void) | null = null;
     try {
       const projectId = getWalletConnectProjectId();
       if (!projectId) {
@@ -621,20 +642,43 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
       mobilePairingUriRef.current = pairingUri;
       mobilePairingUriAtRef.current = Date.now();
 
-      const framed = isFramed();
+      const channel = selectHashPackConnectChannel({
+        mobile: isMobileBrowser(),
+        framed: isFramed(),
+      });
 
-      // Direct HashPack deep-link first on both desktop and mobile — but
-      // never inside a wallet's dApp browser (see openHashPackDeepLink).
-      if (!framed) openHashPackDeepLink(pairingUri);
+      // hashpack:// only on mobile. Desktop Chrome has no protocol handler;
+      // navigating there fails the launch and drops the extension handshake.
+      if (channel === "deeplink") openHashPackDeepLink(pairingUri);
 
-      const maybeConnectToExtension = (
-        hc as unknown as { connectToExtension?: () => Promise<unknown> }
-      ).connectToExtension;
-      if (typeof maybeConnectToExtension === "function") {
-        void maybeConnectToExtension.call(hc).catch(() => {});
+      const extensionClient = hc as unknown as {
+        findLocalWallets?: () => Promise<unknown>;
+        connectToExtension?: () => Promise<unknown>;
+      };
+      // Listen before the query so a fast content-script reply is not missed.
+      // HashPack posts hashconnect-query-extension-response (and the Hedera
+      // extension reply) when the extension is installed.
+      if (typeof window !== "undefined") {
+        const onWindowMessage = (event: MessageEvent) => {
+          if (event.source !== window) return;
+          if (isHashPackExtensionAnnounce(event.data)) extensionSeen = true;
+        };
+        window.addEventListener("message", onWindowMessage);
+        removeExtensionListener = () => window.removeEventListener("message", onWindowMessage);
+      }
+      // Desktop: ask the extension content script for metadata, then hand it
+      // the WalletConnect URI via postMessage. HashConnect's constructor
+      // listener calls connectToExtension again when the query response
+      // arrives. If neither message is answered, the detect timeout below
+      // sets notDetected — we do not fall back to hashpack://.
+      if (channel === "extension" && typeof extensionClient.findLocalWallets === "function") {
+        void extensionClient.findLocalWallets.call(hc).catch(() => {});
+      }
+      if (typeof extensionClient.connectToExtension === "function") {
+        void extensionClient.connectToExtension.call(hc).catch(() => {});
       }
 
-      if (framed) {
+      if (channel === "iframe") {
         // Wallet dApp browser: pair with the surrounding wallet over
         // hashconnect's iframe messaging. init() already sends a pairing
         // request on load; re-send it for this explicit user gesture, then
@@ -651,7 +695,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
           }
         }
         await waitForPairing(connectWaitRef, PAIRING_WAIT_MS);
-      } else if (isMobileBrowser()) {
+      } else if (channel === "deeplink") {
         // Mobile pairs via the deep link / QR; give the user time to approve
         // in the HashPack app and come back.
         await waitForPairing(connectWaitRef, PAIRING_WAIT_MS);
@@ -671,13 +715,26 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
             resolve(true);
           };
         });
-        if (!paired) setNotDetected(true);
+        if (!paired) {
+          // HashPack deletes the proposal after a failed approve, so the URI
+          // we just handed the extension cannot be approved on a retry.
+          mobilePairingUriRef.current = null;
+          mobilePairingUriAtRef.current = 0;
+          setPairingUri(null);
+          if (classifyDesktopConnectTimeout(extensionSeen) === "nickname-required") {
+            setNicknameRequired(true);
+            setError(HASHPACK_NICKNAME_REQUIRED_MESSAGE);
+          } else {
+            setNotDetected(true);
+          }
+        }
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Wallet connection failed.";
       setError(msg);
       return;
     } finally {
+      removeExtensionListener?.();
       setIsConnecting(false);
       connectInFlightRef.current = false;
     }
@@ -704,6 +761,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
       isConnecting,
       error,
       notDetected,
+      nicknameRequired,
       network,
       pairingUri,
       connect,
@@ -719,6 +777,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
       isConnecting,
       error,
       notDetected,
+      nicknameRequired,
       network,
       pairingUri,
       connect,
