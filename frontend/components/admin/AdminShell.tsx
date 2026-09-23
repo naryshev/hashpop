@@ -16,6 +16,7 @@ import {
   type AdminToken,
 } from "../../lib/adminSession";
 import { truncateAdminAddr } from "../../lib/adminFormat";
+import { signAdminSession } from "../../lib/hashpackSignature";
 
 type AdminSessionValue = {
   token: AdminToken;
@@ -120,20 +121,19 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     setError(null);
     try {
       const t = Date.now();
-      const message = `hashpop.admin.session:${t}`;
-      const signResult = await (
+      const signature = await signAdminSession(
         hashconnect as unknown as {
-          signMessages: (accountId: string, messages: string[]) => Promise<unknown>;
-        }
-      ).signMessages(accountId, [message]);
-      const signature = Array.isArray(signResult)
-        ? (signResult[0] as string)
-        : ((signResult as { signedMessages?: string[] })?.signedMessages?.[0] ??
-          (signResult as string));
-      if (!signature || typeof signature !== "string") {
-        throw new Error("Could not get a signature from your wallet.");
-      }
+          signMessages: (accountId: string, message: string) => Promise<unknown>;
+        },
+        accountId,
+        t,
+      );
       const tok: AdminToken = { address: address.toLowerCase(), t, signature };
+      const res = await fetch(`${getApiUrl()}/api/admin/session`, { headers: adminHeader(tok) });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error || "Admin sign-in was rejected.");
+      }
       saveAdminToken(tok);
       setToken(tok);
     } catch (e) {
