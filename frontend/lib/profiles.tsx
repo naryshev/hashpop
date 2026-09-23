@@ -22,6 +22,11 @@ export type PublicProfile = {
   kycVerified: boolean;
   ratingAverage: number | null;
   ratingCount: number;
+  /** TrustStrip field map, carried on the existing batch profile payload. */
+  successfulCompletions?: number;
+  totalSales?: number;
+  refunds?: number;
+  timeouts?: number;
 };
 
 type ProfilesContextValue = {
