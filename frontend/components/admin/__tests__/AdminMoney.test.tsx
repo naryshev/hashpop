@@ -142,10 +142,17 @@ describe("AdminMoney", () => {
 
     const dealsBadge = host?.querySelector("[data-money-badge='deals']");
     const disputesBadge = host?.querySelector("[data-money-badge='disputes']");
+    const releasedBadge = host?.querySelector("[data-money-badge='released']");
     expect(dealsBadge?.textContent).toBe("1");
     expect(dealsBadge?.getAttribute("data-tone")).toBe("mint");
     expect(disputesBadge?.textContent).toBe("1");
     expect(disputesBadge?.getAttribute("data-tone")).toBe("danger");
+    expect(releasedBadge?.textContent).toBe("1");
+    expect(releasedBadge?.getAttribute("data-tone")).toBe("silver");
+    expect(releasedBadge?.className).not.toContain("#00ffa3");
+    const openFigure = host?.querySelector("[data-money-kpi='open'] .tabular-nums");
+    expect(openFigure?.getAttribute("style")).toContain("rgb(255, 255, 255)");
+    expect(openFigure?.getAttribute("style")).not.toContain("0, 255, 163");
     expect(host?.querySelector("[data-money-kpi='disputed']")).toBeTruthy();
 
     const openCall = String(fetchMock.mock.calls[0]?.[0]);

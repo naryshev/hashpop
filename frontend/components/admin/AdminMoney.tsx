@@ -197,7 +197,7 @@ export function AdminMoney() {
           id="open"
           label="Open deals"
           value={String(kpis.open)}
-          accent="#00ffa3"
+          accent="#ffffff"
           selected={kpiSelected("open")}
           onSelect={() => selectKpi("open")}
           loading={showSkeleton}
@@ -255,7 +255,9 @@ export function AdminMoney() {
                   className={`ml-2 rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums ${
                     badge.tone === "danger"
                       ? "bg-danger/15 text-danger"
-                      : "bg-[#00ffa3]/15 text-[#00ffa3]"
+                      : badge.tone === "silver"
+                        ? "bg-white/5 text-silver"
+                        : "bg-[#00ffa3]/15 text-[#00ffa3]"
                   }`}
                 >
                   {badge.count}

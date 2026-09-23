@@ -112,7 +112,7 @@ describe("money queues", () => {
     expect(moneyKpis(inflight)).toEqual({ open: 3, locked: 1, disputed: 1, stuck: 2 });
     expect(moneyTabBadge("deals", moneyKpis(inflight), 2)).toEqual({ count: 3, tone: "mint" });
     expect(moneyTabBadge("disputes", moneyKpis(inflight), 2)).toEqual({ count: 1, tone: "danger" });
-    expect(moneyTabBadge("released", moneyKpis([]), 2)).toEqual({ count: 2, tone: "mint" });
+    expect(moneyTabBadge("released", moneyKpis([]), 2)).toEqual({ count: 2, tone: "silver" });
     expect(moneyTabBadge("disputes", moneyKpis([]), 0)).toBeNull();
   });
 

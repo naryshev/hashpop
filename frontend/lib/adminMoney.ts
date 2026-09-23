@@ -173,10 +173,12 @@ export function moneyTabBadge(
   tab: MoneyTabId,
   kpis: ReturnType<typeof moneyKpis>,
   releasedCount: number,
-): { count: number; tone: "mint" | "danger" } | null {
+): { count: number; tone: "mint" | "danger" | "silver" } | null {
   const count = tab === "deals" ? kpis.open : tab === "disputes" ? kpis.disputed : releasedCount;
   if (count <= 0) return null;
-  return { count, tone: tab === "disputes" ? "danger" : "mint" };
+  if (tab === "disputes") return { count, tone: "danger" };
+  if (tab === "released") return { count, tone: "silver" };
+  return { count, tone: "mint" };
 }
 
 /** View only. Release / refund / resolve wait for real admin mutation APIs. */
