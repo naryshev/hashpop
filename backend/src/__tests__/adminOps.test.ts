@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  adminDealsWhere,
   adminListingsWhere,
   computeAdminStats,
+  dealStage,
   fetchAdminActivity,
   fetchAdminDeals,
   fetchTrustQueue,
@@ -263,6 +265,72 @@ describe("fetchAdminDeals", () => {
       stuckOnly: true,
     });
     expect(deals).toEqual([]);
+  });
+
+  it("keeps settled escrow on the released scope and out of the open queue", async () => {
+    expect(dealStage({ status: "REFUNDED" })).toBe("Refunded");
+    expect(dealStage({ status: "SOLD" })).toBe("Complete");
+    expect(dealStage({ status: "REFUNDED", disputeStatus: "OPEN" })).toBe("Disputed");
+    expect(adminDealsWhere("open")).toEqual({
+      OR: [
+        { status: "LOCKED" },
+        { disputeStatus: "OPEN" },
+        {
+          AND: [{ buyer: { not: null } }, { status: { notIn: ["SOLD", "CANCELLED", "REFUNDED"] } }],
+        },
+      ],
+    });
+    expect(adminDealsWhere("released")).toEqual({
+      status: { in: ["SOLD", "REFUNDED"] },
+      NOT: { disputeStatus: "OPEN" },
+    });
+
+    const now = Date.parse("2026-09-20T00:00:00.000Z");
+    const prisma = {
+      listing: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: "refunded",
+            title: "Returned",
+            imageUrl: null,
+            seller: "0xseller",
+            buyer: "0xbuyer",
+            price: "3",
+            status: "REFUNDED",
+            disputeStatus: null,
+            disputeOpenedAt: null,
+            createdAt: iso(now - 4 * 86400000),
+            updatedAt: iso(now - 86400000),
+            sales: [],
+          },
+        ]),
+      },
+    };
+    const { deals } = await fetchAdminDeals(prisma as never, {
+      now,
+      scope: "released",
+      limit: 80,
+    });
+    expect(deals).toEqual([
+      expect.objectContaining({ listingId: "refunded", stage: "Refunded", stuck: false }),
+    ]);
+    expect(prisma.listing.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: adminDealsWhere("released"),
+        take: 80,
+      }),
+    );
+    const select = prisma.listing.findMany.mock.calls[0]?.[0]?.select as Record<string, unknown>;
+    expect(select).not.toHaveProperty("disputeReason");
+    expect(select).not.toHaveProperty("description");
+  });
+
+  it("caps the released scope at 100 rows", async () => {
+    const prisma = {
+      listing: { findMany: vi.fn().mockResolvedValue([]) },
+    };
+    await fetchAdminDeals(prisma as never, { scope: "released", limit: 500 });
+    expect(prisma.listing.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 100 }));
   });
 });
 
