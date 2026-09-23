@@ -48,8 +48,17 @@ describe("isHashPackExtensionAnnounce", () => {
 });
 
 describe("HASHPACK_NICKNAME_REQUIRED_MESSAGE", () => {
-  it("tells the user to set a wallet nickname and retry", () => {
-    expect(HASHPACK_NICKNAME_REQUIRED_MESSAGE.toLowerCase()).toContain("nickname");
-    expect(HASHPACK_NICKNAME_REQUIRED_MESSAGE.toLowerCase()).not.toContain("wc:");
+  it("asks the user to confirm the selected account wallet nickname without asserting it is empty", () => {
+    const message = HASHPACK_NICKNAME_REQUIRED_MESSAGE.toLowerCase();
+    expect(message).toContain("failed to approve");
+    expect(message).toContain("wallet nickname");
+    expect(message).toContain("social profile username");
+    expect(message).toContain("wallet name");
+    expect(message).toContain("new pairing");
+    expect(message).toContain("another account");
+    expect(message).toContain("contact hashpack");
+    expect(message).not.toContain("nickname is empty");
+    expect(message).not.toContain("that nickname is empty");
+    expect(message).not.toContain("wc:");
   });
 });
