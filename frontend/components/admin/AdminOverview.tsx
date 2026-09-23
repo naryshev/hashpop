@@ -7,6 +7,7 @@ import { useAdminSession } from "./AdminShell";
 import { AdminActivity, type ActivityEvent } from "./AdminActivity";
 import { AdminListings, type AdminListing, type ListingChip } from "./AdminListings";
 import { AdminDeals, type AdminDeal } from "./AdminDeals";
+import { AdminAllowlist, type AdminIdentity } from "./AdminAllowlist";
 
 type AdminStats = {
   listings: {
@@ -72,6 +73,7 @@ export function AdminOverview() {
   const [events, setEvents] = useState<ActivityEvent[]>([]);
   const [listings, setListings] = useState<AdminListing[]>([]);
   const [deals, setDeals] = useState<AdminDeal[]>([]);
+  const [admins, setAdmins] = useState<AdminIdentity[]>([]);
   const [search, setSearch] = useState("");
   const [statusChip, setStatusChip] = useState<ListingChip>("");
   const [stuckOnly, setStuckOnly] = useState(false);
@@ -89,25 +91,30 @@ export function AdminOverview() {
       const dealParams = new URLSearchParams();
       if (stuckOnly) dealParams.set("stuck", "1");
       dealParams.set("stuckDays", "7");
-      const [sRes, aRes, lRes, dRes] = await Promise.all([
+      const [sRes, aRes, lRes, dRes, adminRes] = await Promise.all([
         fetch(`${getApiUrl()}/api/admin/stats`, { headers }),
         fetch(`${getApiUrl()}/api/admin/activity?limit=20`, { headers }),
         fetch(`${getApiUrl()}/api/admin/listings?${params}`, { headers }),
         fetch(`${getApiUrl()}/api/admin/deals?${dealParams}`, { headers }),
+        fetch(`${getApiUrl()}/api/admin/admins`, { headers }),
       ]);
       if (
         handleAuthStatus(sRes.status) ||
         handleAuthStatus(aRes.status) ||
         handleAuthStatus(lRes.status) ||
-        handleAuthStatus(dRes.status)
+        handleAuthStatus(dRes.status) ||
+        handleAuthStatus(adminRes.status)
       ) {
         return;
       }
-      if (!sRes.ok || !aRes.ok || !lRes.ok || !dRes.ok) throw new Error("Failed to load overview");
+      if (!sRes.ok || !aRes.ok || !lRes.ok || !dRes.ok || !adminRes.ok) {
+        throw new Error("Failed to load overview");
+      }
       setStats((await sRes.json()) as AdminStats);
       setEvents(((await aRes.json()) as { events?: ActivityEvent[] }).events ?? []);
       setListings(((await lRes.json()) as { listings?: AdminListing[] }).listings ?? []);
       setDeals(((await dRes.json()) as { deals?: AdminDeal[] }).deals ?? []);
+      setAdmins(((await adminRes.json()) as { admins?: AdminIdentity[] }).admins ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load overview");
     } finally {
@@ -218,11 +225,10 @@ export function AdminOverview() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-3">
-        <AdminActivity
-          events={events}
-          loading={loading && events.length === 0}
-          className="xl:col-start-3 xl:row-span-2"
-        />
+        <div className="flex flex-col gap-4 xl:col-start-3 xl:row-span-2">
+          <AdminAllowlist admins={admins} loading={loading && admins.length === 0} />
+          <AdminActivity events={events} loading={loading && events.length === 0} />
+        </div>
         <AdminListings
           ref={listingsRef}
           listings={listings}

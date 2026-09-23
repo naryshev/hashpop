@@ -130,6 +130,22 @@ describe("TrustListingsTable", () => {
     expect(host?.textContent).toContain("Flagged");
   });
 
+  it("shows a read-only Admin pill when the seller wallet is allowlisted", () => {
+    renderTable([{ ...clean, sellerIsAdmin: true }]);
+    const pills = Array.from(host!.querySelectorAll("span")).filter(
+      (node) => node.textContent === "Admin",
+    );
+    expect(pills.length).toBeGreaterThan(0);
+    expect(
+      Array.from(host!.querySelectorAll("button")).some((button) => button.textContent === "Admin"),
+    ).toBe(false);
+
+    act(() => root?.unmount());
+    host?.remove();
+    renderTable([clean]);
+    expect(host?.textContent).not.toContain("Admin");
+  });
+
   it("offers view, hide, remove, and flag, and confirms hide before mutating", () => {
     const onHide = vi.fn();
     const onFlag = vi.fn();

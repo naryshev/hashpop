@@ -39,6 +39,8 @@ const locked = {
   attentionAt: "2026-09-20T00:00:00.000Z",
   ageDays: 2,
   stuck: false,
+  sellerIsAdmin: true,
+  buyerIsAdmin: false,
 };
 
 const disputed = {
@@ -131,6 +133,10 @@ describe("AdminMoney", () => {
     );
     expect(host?.textContent).toContain("Chrome watch");
     expect(host?.textContent).toContain("Locked");
+    expect(host?.textContent).toContain("Admin");
+    expect(
+      Array.from(host!.querySelectorAll("button")).some((button) => button.textContent === "Admin"),
+    ).toBe(false);
     expect(host?.textContent).not.toContain("Disputed bag");
     expect(host?.textContent).toContain("View");
     const actionLabels = Array.from(host!.querySelectorAll("button, a")).map((el) =>

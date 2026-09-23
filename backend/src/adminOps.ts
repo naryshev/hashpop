@@ -1,4 +1,5 @@
 import type { PrismaClient } from "./generated/prisma/client";
+import { isAdminAddress } from "./adminAuth";
 
 export const ADMIN_ACTIVITY_LIMIT = 100;
 const LISTING_UPDATE_MIN_GAP_MS = 2000;
@@ -18,6 +19,8 @@ export type AdminActivityEvent = {
   listingTitle?: string | null;
   actor?: string | null;
   counterparty?: string | null;
+  actorIsAdmin?: boolean;
+  counterpartyIsAdmin?: boolean;
   amountHbar?: string | null;
   status?: string | null;
 };
@@ -44,6 +47,8 @@ export type AdminDeal = {
   imageUrl: string | null;
   seller: string;
   buyer: string | null;
+  sellerIsAdmin: boolean;
+  buyerIsAdmin: boolean;
   amountHbar: string;
   status: string;
   stage: DealStage;
@@ -99,6 +104,17 @@ export function adminAmountToHbar(value: string | null | undefined): string {
     if (s.length > 8) return tinybarToHbar(n);
   }
   return s;
+}
+
+export function withWalletAdminFlags<T extends { seller?: string | null; buyer?: string | null }>(
+  row: T,
+  allowlist = process.env.ADMIN_ADDRESSES ?? "",
+): T & { sellerIsAdmin: boolean; buyerIsAdmin: boolean } {
+  return {
+    ...row,
+    sellerIsAdmin: isAdminAddress(row.seller, allowlist),
+    buyerIsAdmin: isAdminAddress(row.buyer, allowlist),
+  };
 }
 
 export function adminListingsWhere(q: string, status: string): Record<string, unknown> {
@@ -237,9 +253,10 @@ function iso(d: Date | string): string {
 
 export async function fetchAdminActivity(
   prisma: PrismaClient,
-  opts?: { limit?: number; now?: number },
+  opts?: { limit?: number; now?: number; allowlist?: string },
 ): Promise<{ events: AdminActivityEvent[] }> {
   const limit = Math.min(Math.max(opts?.limit ?? ADMIN_ACTIVITY_LIMIT, 1), ADMIN_ACTIVITY_LIMIT);
+  const allowlist = opts?.allowlist ?? process.env.ADMIN_ADDRESSES ?? "";
   const listingSelect = {
     id: true,
     title: true,
@@ -366,7 +383,13 @@ export async function fetchAdminActivity(
     });
   }
 
-  return { events: mergeAdminEvents(events, limit) };
+  return {
+    events: mergeAdminEvents(events, limit).map((event) => ({
+      ...event,
+      actorIsAdmin: isAdminAddress(event.actor, allowlist),
+      counterpartyIsAdmin: isAdminAddress(event.counterparty, allowlist),
+    })),
+  };
 }
 
 type DealListingRow = ListingRow & {
@@ -405,9 +428,11 @@ export async function fetchAdminDeals(
     stuckOnly?: boolean;
     limit?: number;
     scope?: AdminDealScope;
+    allowlist?: string;
   },
 ): Promise<{ deals: AdminDeal[] }> {
   const now = opts?.now ?? Date.now();
+  const allowlist = opts?.allowlist ?? process.env.ADMIN_ADDRESSES ?? "";
   const stuckDays = opts?.stuckDays ?? DEFAULT_STUCK_DAYS;
   const scope = opts?.scope ?? "open";
   const cap = scope === "released" ? 100 : 500;
@@ -448,6 +473,8 @@ export async function fetchAdminDeals(
       imageUrl: row.imageUrl ?? null,
       seller: row.seller ?? "",
       buyer: row.buyer ?? null,
+      sellerIsAdmin: isAdminAddress(row.seller, allowlist),
+      buyerIsAdmin: isAdminAddress(row.buyer, allowlist),
       amountHbar: adminAmountToHbar(saleAmount || row.price),
       status: row.status ?? "",
       stage: dealStage(row),
@@ -605,6 +632,7 @@ export type TrustListingRow = {
   moderationStatus: string | null;
   moderationReason: string | null;
   updatedAt: string;
+  sellerIsAdmin: boolean;
 };
 
 type TrustListingDbRow = {
@@ -620,7 +648,10 @@ type TrustListingDbRow = {
   updatedAt: Date | string;
 };
 
-export function toTrustListingRow(row: TrustListingDbRow): TrustListingRow {
+export function toTrustListingRow(
+  row: TrustListingDbRow,
+  allowlist = process.env.ADMIN_ADDRESSES ?? "",
+): TrustListingRow {
   return {
     id: row.id,
     title: row.title ?? null,
@@ -632,16 +663,18 @@ export function toTrustListingRow(row: TrustListingDbRow): TrustListingRow {
     moderationStatus: row.moderationStatus ?? null,
     moderationReason: row.moderationReason ?? null,
     updatedAt: new Date(row.updatedAt).toISOString(),
+    sellerIsAdmin: isAdminAddress(row.seller, allowlist),
   };
 }
 
 export async function fetchTrustQueue(
   prisma: PrismaClient,
-  opts?: { filter?: string; q?: string },
+  opts?: { filter?: string; q?: string; allowlist?: string },
 ): Promise<{
   listings: TrustListingRow[];
   counts: { listings: number; users: number; disputes: number };
 }> {
+  const allowlist = opts?.allowlist ?? process.env.ADMIN_ADDRESSES ?? "";
   const where = trustListingsWhere(opts?.filter ?? "", opts?.q ?? "");
   const [rows, flagged] = await Promise.all([
     prisma.listing.findMany({
@@ -664,7 +697,7 @@ export async function fetchTrustQueue(
     prisma.listing.count({ where: trustQueueCountWhere() as never }),
   ]);
   return {
-    listings: rows.map(toTrustListingRow),
+    listings: rows.map((row) => toTrustListingRow(row, allowlist)),
     // Users (2b) and disputes (2c) stay empty in this slice.
     counts: { listings: flagged, users: 0, disputes: 0 },
   };

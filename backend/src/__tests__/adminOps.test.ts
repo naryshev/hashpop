@@ -12,6 +12,7 @@ import {
   omitModerationFields,
   trustListingsWhere,
   visibleListingWhere,
+  withWalletAdminFlags,
   type AdminActivityEvent,
 } from "../adminOps";
 
@@ -179,6 +180,38 @@ describe("fetchAdminActivity", () => {
     expect(prisma.sale.findMany).toHaveBeenCalled();
     expect(prisma.offer.findMany).toHaveBeenCalled();
   });
+
+  it("flags actor and counterparty wallets that match the allowlist", async () => {
+    const now = Date.now();
+    const prisma = {
+      sale: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            listingId: "lst-1",
+            buyer: "0xbuyer",
+            seller: "0.0.9690555",
+            amount: "100000000",
+            createdAt: iso(now),
+            listing: { title: "Watch" },
+          },
+        ]),
+      },
+      listing: { findMany: vi.fn().mockResolvedValue([]) },
+      offer: { findMany: vi.fn().mockResolvedValue([]) },
+    };
+
+    const { events } = await fetchAdminActivity(prisma as never, {
+      limit: 10,
+      allowlist: "0x000000000000000000000000000000000093ddbb",
+    });
+    const sale = events.find((event) => event.type === "sale");
+    expect(sale).toMatchObject({
+      actor: "0xbuyer",
+      counterparty: "0.0.9690555",
+      actorIsAdmin: false,
+      counterpartyIsAdmin: true,
+    });
+  });
 });
 
 describe("fetchAdminDeals", () => {
@@ -332,6 +365,56 @@ describe("fetchAdminDeals", () => {
     await fetchAdminDeals(prisma as never, { scope: "released", limit: 500 });
     expect(prisma.listing.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 100 }));
   });
+
+  it("flags seller and buyer when the wallet matches the allowlist, including the EVM alias", async () => {
+    const now = Date.parse("2026-09-20T00:00:00.000Z");
+    const prisma = {
+      listing: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: "deal",
+            title: "Watch",
+            imageUrl: null,
+            seller: "0.0.9690555",
+            buyer: "0xbuyer",
+            price: "10",
+            status: "LOCKED",
+            disputeStatus: null,
+            disputeOpenedAt: null,
+            createdAt: iso(now),
+            updatedAt: iso(now),
+            sales: [],
+          },
+        ]),
+      },
+    };
+
+    const { deals } = await fetchAdminDeals(prisma as never, {
+      now,
+      stuckDays: 7,
+      allowlist: "0x000000000000000000000000000000000093ddbb",
+    });
+    expect(deals[0]).toMatchObject({
+      sellerIsAdmin: true,
+      buyerIsAdmin: false,
+    });
+  });
+});
+
+describe("withWalletAdminFlags", () => {
+  it("adds seller and buyer allowlist matches without dropping the row", () => {
+    const row = withWalletAdminFlags(
+      { id: "lst", seller: "0xaaa", buyer: "0xbbb" },
+      "0x0000000000000000000000000000000000000aaa",
+    );
+    expect(row).toEqual({
+      id: "lst",
+      seller: "0xaaa",
+      buyer: "0xbbb",
+      sellerIsAdmin: true,
+      buyerIsAdmin: false,
+    });
+  });
 });
 
 describe("trust queue moderation", () => {
@@ -430,7 +513,11 @@ describe("trust queue moderation", () => {
         ]),
       },
     };
-    const queue = await fetchTrustQueue(prisma as never, { filter: "needs_review", q: "" });
+    const queue = await fetchTrustQueue(prisma as never, {
+      filter: "needs_review",
+      q: "",
+      allowlist: "",
+    });
     expect(prisma.listing.count).toHaveBeenCalledWith({
       where: {
         moderationStatus: null,
@@ -450,7 +537,36 @@ describe("trust queue moderation", () => {
         moderationStatus: null,
         moderationReason: "FLAGGED",
         updatedAt: "2026-09-20T00:00:00.000Z",
+        sellerIsAdmin: false,
       },
     ]);
+  });
+
+  it("marks a trust listing seller when the wallet matches the allowlist", async () => {
+    const prisma = {
+      listing: {
+        count: vi.fn().mockResolvedValue(1),
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: "0xabc",
+            title: "Watch",
+            imageUrl: null,
+            seller: "0.0.9690555",
+            status: "LISTED",
+            onChainConfirmed: true,
+            disputeStatus: null,
+            moderationStatus: null,
+            moderationReason: "FLAGGED",
+            updatedAt: new Date("2026-09-20T00:00:00.000Z"),
+          },
+        ]),
+      },
+    };
+    const queue = await fetchTrustQueue(prisma as never, {
+      filter: "needs_review",
+      q: "",
+      allowlist: "0x000000000000000000000000000000000093ddbb",
+    });
+    expect(queue.listings[0]).toMatchObject({ seller: "0.0.9690555", sellerIsAdmin: true });
   });
 });
