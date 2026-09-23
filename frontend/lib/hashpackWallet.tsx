@@ -54,8 +54,10 @@ type HashpackWalletContextValue = {
   notDetected: boolean;
   /**
    * True when the HashPack extension answered but did not approve.
-   * HashPack sends `sessionProperties.alias` from the wallet nickname and
-   * WalletConnect rejects a null nickname. The next connect mints a new pairing URI.
+   * The extension sets `sessionProperties.alias` from the selected account's
+   * wallet nickname (`account.nickname`), not the social profile username.
+   * The next connect mints a new pairing URI. Do not tell the user their
+   * nickname is empty — ask them to confirm Wallet Name on that account.
    */
   nicknameRequired: boolean;
   network: HederaNetwork;

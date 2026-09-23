@@ -54,12 +54,14 @@ describe("SignInCard HashPack approval states", () => {
     root = undefined;
   });
 
-  it("explains the empty-nickname approval failure when the extension answered", async () => {
+  it("explains the session-alias approval failure without claiming the nickname is empty", async () => {
     wallet.nicknameRequired = true;
     wallet.error = HASHPACK_NICKNAME_REQUIRED_MESSAGE;
     await renderCard();
     expect(host?.textContent).toContain("HashPack could not approve");
     expect(host?.textContent).toContain("wallet nickname");
+    expect(host?.textContent).toContain("social profile username");
+    expect(host?.textContent).not.toContain("nickname is empty");
     expect(host?.textContent).not.toContain("HashPack not detected");
   });
 
