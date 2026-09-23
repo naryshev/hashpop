@@ -133,9 +133,13 @@ Hard requirements (these are the things that make it "smooth"):
   (fire an `onConnected` callback once `isConnected` flips true) instead of navigating to a /signin page.
 
 ## Signing & auth semantics
-- Message signing uses `hashconnect.signMessages(accountId, [message])`. Note the wallet returns a
-  Hedera-format signature; if your backend verifies with `ethers.verifyMessage`, keep the signed message
-  format consistent between client and server.
+- Message signing uses `hashconnect.signMessages(accountId, message)` with a plain string.
+  HashConnect 3 wraps that string and returns `SignerSignature[]` (`signature` is raw bytes),
+  not a hex string and not `{ signedMessages }`. Do not pass `[message]`. `Buffer.from` on that
+  array is a single `0x00` byte, so HashPack opens the sign prompt with a blank message.
+- The wallet signs the HIP-820 payload `\x19Hedera Signed Message:\n` + `message.length` + message
+  with the account's ED25519 or ECDSA key. Verify that on the server with the mirror-node public
+  key. `ethers.verifyMessage` expects an Ethereum personal_sign and will reject it.
 - For a plain "prove wallet ownership" login you generally DON'T need an on-chain transaction — a signed
   message (or just the paired accountId + mirror-resolved EVM address) is enough. Only prompt a wallet
   signature when you actually need it; never require signing just to open a page.

@@ -10,7 +10,7 @@ import { decodeEvents, EXPECTED_TOPIC0_ITEM_LISTED } from "../indexer/decoder";
 import { saveUpload } from "../storage";
 import { decryptJson, encryptJson, secretBoxConfigured } from "../lib/secretBox";
 import { listingVariantsForDb } from "../listingVariants";
-import { isAdminAddress, verifyAdminToken } from "../adminAuth";
+import { authenticateAdmin, isAdminAddress } from "../adminAuth";
 import {
   adminListingsWhere,
   computeAdminStats,
@@ -3007,8 +3007,14 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     return res.json({ isAdmin: isAdminAddress(address) });
   });
 
+  router.get("/admin/session", async (req, res) => {
+    const auth = await authenticateAdmin(req);
+    if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
+    return res.json({ ok: true, address: auth.address });
+  });
+
   router.get("/admin/stats", async (req, res) => {
-    const auth = verifyAdminToken(req);
+    const auth = await authenticateAdmin(req);
     if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
     try {
       const stats = await computeAdminStats(prisma);
@@ -3020,7 +3026,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
   });
 
   router.get("/admin/activity", async (req, res) => {
-    const auth = verifyAdminToken(req);
+    const auth = await authenticateAdmin(req);
     if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
     try {
       const limitRaw = Number(req.query.limit);
@@ -3034,7 +3040,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
   });
 
   router.get("/admin/deals", async (req, res) => {
-    const auth = verifyAdminToken(req);
+    const auth = await authenticateAdmin(req);
     if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
     try {
       const stuckOnly =
@@ -3057,7 +3063,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
   });
 
   router.get("/admin/listings", async (req, res) => {
-    const auth = verifyAdminToken(req);
+    const auth = await authenticateAdmin(req);
     if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
     try {
       const status = String(req.query.status ?? "").trim();
@@ -3086,7 +3092,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
   // intact. Used for moderation takedowns.
   router.delete("/admin/listing/:id", async (req, res) => {
     invalidateListingsCache();
-    const auth = verifyAdminToken(req);
+    const auth = await authenticateAdmin(req);
     if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
     try {
       const rawId = req.params.id ?? "";
