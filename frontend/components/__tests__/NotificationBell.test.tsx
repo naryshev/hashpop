@@ -116,14 +116,16 @@ describe("NotificationBell", () => {
     expect(badge.getAttribute("data-dock-badge-size")).toBe("compact");
   });
 
-  it("opens a deal-update list with frozen empty copy", async () => {
+  it("opens a deal-update list with notification empty copy", async () => {
     await renderBell();
     const btn = document.querySelector('button[aria-label="Notifications"]') as HTMLButtonElement;
     await act(async () => {
       btn.click();
     });
     expect(markSeen).toHaveBeenCalled();
-    expect(document.body.textContent).toContain(DEAL_UPDATES_EMPTY_TITLE);
+    expect(document.querySelector("h2")?.textContent).toBe("Notifications");
+    expect(document.body.textContent).toContain("No notifications yet.");
+    expect(document.body.textContent).not.toContain(DEAL_UPDATES_EMPTY_TITLE);
     expect(document.body.textContent).toContain(DEAL_UPDATES_EMPTY_BODY);
   });
 
@@ -170,8 +172,10 @@ describe("NotificationBell", () => {
     expect(Array.from(tabs).map((tab) => tab.textContent)).toEqual(["Inbox", "Action needed"]);
     expect(tabs[0]?.getAttribute("aria-selected")).toBe("true");
     expect(tabs[0]?.className).toContain("rounded-full");
-    expect(tabs[0]?.className).toContain("border-2");
-    expect(tabs[0]?.className).toContain("border-white/90");
+    expect(tabs[0]?.className).toContain("bg-material-chrome");
+    expect(tabs[0]?.className).toContain("border-hairline");
+    expect(tabs[0]?.className).not.toContain("border-2");
+    expect(tabs[0]?.className).not.toContain("border-white/90");
   });
 
   it("renders sentence-case title, one-line body, and relative time", async () => {

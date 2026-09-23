@@ -21,7 +21,6 @@ import { cn } from "@/lib/utils";
 import { material } from "@/lib/materials";
 import {
   DEAL_UPDATES_EMPTY_BODY,
-  DEAL_UPDATES_EMPTY_TITLE,
   formatRelativeTime,
   type DealNotification,
   type DealNotificationKind,
@@ -34,6 +33,8 @@ const FEATURED_LIMIT = 2;
 
 const ACTION_EMPTY_TITLE = "Nothing needs action.";
 const ACTION_EMPTY_BODY = "Offers and meetups that need you show up here.";
+/** Header stays “Notifications”; this is only the empty-state title. */
+const NOTIFICATIONS_EMPTY_TITLE = "No notifications yet.";
 
 const KIND_ICON: Record<DealNotificationKind, LucideIcon> = {
   offer: Tag,
@@ -334,8 +335,8 @@ function FilterPill({
         "min-h-9 rounded-full px-3.5 text-[13px] font-medium transition-colors",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-chrome",
         selected
-          ? "border-2 border-white/90 bg-white/[0.08] text-white"
-          : "border-2 border-transparent text-silver hover:text-white",
+          ? cn(material.chrome, "text-white")
+          : "border border-transparent text-silver hover:text-white",
       )}
     >
       {children}
@@ -456,7 +457,7 @@ function NotificationsDialog({
   const emptyCopy =
     !desktop && filter === "action"
       ? { title: ACTION_EMPTY_TITLE, body: ACTION_EMPTY_BODY }
-      : { title: DEAL_UPDATES_EMPTY_TITLE, body: DEAL_UPDATES_EMPTY_BODY };
+      : { title: NOTIFICATIONS_EMPTY_TITLE, body: DEAL_UPDATES_EMPTY_BODY };
 
   return (
     <div className="fixed inset-0 z-[130]">
@@ -494,7 +495,7 @@ function NotificationsDialog({
       >
         <header
           className={cn(
-            "relative z-20 shrink-0 pt-[max(0.75rem,env(safe-area-inset-top))]",
+            "relative z-20 shrink-0 bg-white/[0.04] backdrop-blur-material pt-[max(0.75rem,env(safe-area-inset-top))]",
             desktop ? "px-5" : "px-3",
           )}
         >
