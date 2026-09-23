@@ -2,6 +2,7 @@ import { createElement, act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NotificationBell } from "../NotificationBell";
+import { notificationsPanelMotion, splitNotificationFeed } from "../NotificationsPanel";
 import { DEAL_UPDATES_EMPTY_BODY, DEAL_UPDATES_EMPTY_TITLE } from "../../lib/dealNotifications";
 
 const markSeen = vi.fn();
@@ -126,18 +127,51 @@ describe("NotificationBell", () => {
     expect(document.body.textContent).toContain(DEAL_UPDATES_EMPTY_BODY);
   });
 
-  it("slides the Updates panel down from the top", async () => {
-    await renderBell();
+  it("slides a narrow desktop drawer in from the right", async () => {
+    await renderBell("desktop");
     const btn = document.querySelector('button[aria-label="Notifications"]') as HTMLButtonElement;
     await act(async () => {
       btn.click();
     });
     const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
-    expect(dialog?.getAttribute("data-sheet-edge")).toBe("top");
-    expect(dialog?.className).toContain("items-start");
-    expect(dialog?.className).not.toContain("items-end");
-    const panel = dialog.querySelector("[data-sheet-panel]") as HTMLElement;
-    expect(panel?.getAttribute("data-sheet-motion")).toBe("slide-down");
+    expect(dialog.getAttribute("aria-modal")).toBe("true");
+    expect(dialog.getAttribute("data-notifications-variant")).toBe("desktop");
+    expect(dialog.getAttribute("data-notifications-motion")).toBe("slide-right");
+    expect(dialog.className).toContain("right-0");
+    expect(dialog.className).toContain("w-[min(100vw,380px)]");
+    expect(dialog.className).toContain("border-hairline");
+    expect(dialog.getAttribute("data-sheet-edge")).toBeNull();
+    expect(document.querySelector("[data-notifications-backdrop]")).toBeTruthy();
+    expect(dialog.querySelector("h2")?.textContent).toBe("Notifications");
+    expect(dialog.querySelector('[aria-label="Notification options"]')).toBeTruthy();
+    expect(dialog.querySelector('[aria-label="Close notifications"]')).toBeTruthy();
+    expect(dialog.textContent).not.toContain("Inbox");
+    expect(document.activeElement).toBe(dialog);
+  });
+
+  it("opens a full-screen inbox on mobile", async () => {
+    await renderBell("mobile");
+    const btn = document.querySelector('button[aria-label="Notifications"]') as HTMLButtonElement;
+    await act(async () => {
+      btn.click();
+    });
+    const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
+    expect(dialog.getAttribute("data-notifications-variant")).toBe("mobile");
+    expect(dialog.getAttribute("data-notifications-motion")).toBe("slide-right");
+    expect(dialog.className).toContain("inset-0");
+    expect(dialog.className).not.toContain("w-[min(100vw,380px)]");
+    expect(document.querySelector("[data-notifications-backdrop]")).toBeNull();
+    const title = dialog.querySelector("h2") as HTMLElement;
+    expect(title.textContent).toBe("Notifications");
+    expect(title.className).toContain("text-center");
+    expect(dialog.querySelector('[aria-label="Back"]')).toBeTruthy();
+    expect(dialog.querySelector('[aria-label="Notification options"]')).toBeTruthy();
+    const tabs = dialog.querySelectorAll('[role="tab"]');
+    expect(Array.from(tabs).map((tab) => tab.textContent)).toEqual(["Inbox", "Action needed"]);
+    expect(tabs[0]?.getAttribute("aria-selected")).toBe("true");
+    expect(tabs[0]?.className).toContain("rounded-full");
+    expect(tabs[0]?.className).toContain("border-2");
+    expect(tabs[0]?.className).toContain("border-white/90");
   });
 
   it("renders sentence-case title, one-line body, and relative time", async () => {
@@ -150,11 +184,11 @@ describe("NotificationBell", () => {
           title: "New offer",
           body: "12 ℏ on Polaroid",
           href: "/listing/lst-1",
-          urgent: true,
+          urgent: false,
         },
       ],
       unseen: [],
-      tone: "red",
+      tone: null,
       loading: false,
     };
     await renderBell();
@@ -166,10 +200,193 @@ describe("NotificationBell", () => {
     expect(document.body.textContent).toContain("12 ℏ on Polaroid");
     expect(document.body.textContent).toContain("just now");
     expect(document.body.textContent).not.toContain("New message");
-    const row = document.querySelector("li");
+    const row = document.querySelector("[data-notification-row]") as HTMLElement;
     expect(row?.className).toContain("border-hairline");
     expect(row?.className).not.toContain("border-white/[0.06]");
-    expect(row?.querySelector("a")?.className).toContain("bg-material-regular");
-    expect(row?.querySelector("a")?.className).toContain("border-hairline");
+    expect(row?.querySelector("[data-notification-chevron]")).toBeTruthy();
+    expect(row?.querySelector("a")?.className).not.toContain("bg-material-regular");
+    const mark = row?.querySelector("[data-kind-mark]") as HTMLElement;
+    expect(mark?.className).toContain("bg-material-regular");
+    expect(mark?.className).toContain("border-hairline");
+    expect(document.querySelector("[data-notification-featured]")).toBeNull();
+  });
+
+  it("features urgent updates on mobile and keeps them as rows on desktop", async () => {
+    mockState = {
+      items: [
+        {
+          id: "urgent-1",
+          kind: "meetup",
+          when: new Date(),
+          title: "Confirm meetup",
+          body: "Meet the buyer for Polaroid",
+          href: "/listing/lst-1",
+          urgent: true,
+        },
+        {
+          id: "calm-1",
+          kind: "rating",
+          when: new Date(Date.now() - 60_000),
+          title: "New rating",
+          body: "5-star review",
+          href: "/profile/0.0.1",
+          urgent: false,
+        },
+      ],
+      unseen: [{ id: "urgent-1" }],
+      tone: "red",
+      loading: false,
+    };
+    await renderBell("mobile");
+    let btn = document.querySelector('button[aria-label="Notifications, 1"]') as HTMLButtonElement;
+    await act(async () => {
+      btn.click();
+    });
+    const featured = document.querySelector("[data-notification-featured]") as HTMLElement;
+    expect(featured?.textContent).toContain("Confirm meetup");
+    expect(featured?.querySelector("[data-notification-unread]")).toBeTruthy();
+    const row = document.querySelector("[data-notification-row]") as HTMLElement;
+    expect(row?.textContent).toContain("New rating");
+    expect(row?.querySelector("[data-notification-unread]")).toBeNull();
+
+    const action = document.querySelector(
+      '[role="tab"][aria-selected="false"]',
+    ) as HTMLButtonElement;
+    await act(async () => {
+      action.click();
+    });
+    expect(document.body.textContent).toContain("Confirm meetup");
+    expect(document.body.textContent).not.toContain("New rating");
+    expect(document.querySelector("[data-notification-featured]")).toBeNull();
+
+    await act(async () => {
+      root!.unmount();
+    });
+    host?.remove();
+    await renderBell("desktop");
+    btn = document.querySelector('button[aria-label="Notifications, 1"]') as HTMLButtonElement;
+    await act(async () => {
+      btn.click();
+    });
+    expect(document.querySelector("[data-notification-featured]")).toBeNull();
+    expect(document.querySelectorAll("[data-notification-row]")).toHaveLength(2);
+  });
+
+  it("closes from the scrim, the close button, and Escape, and traps tab", async () => {
+    await renderBell("desktop");
+    const btn = document.querySelector('button[aria-label="Notifications"]') as HTMLButtonElement;
+    await act(async () => {
+      btn.click();
+    });
+    const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
+    const close = dialog.querySelector('[aria-label="Close notifications"]') as HTMLButtonElement;
+    const options = dialog.querySelector(
+      '[aria-label="Notification options"]',
+    ) as HTMLButtonElement;
+    close.focus();
+    await act(async () => {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true }),
+      );
+    });
+    expect(document.activeElement).toBe(options);
+
+    options.focus();
+    await act(async () => {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "Tab",
+          bubbles: true,
+          cancelable: true,
+          shiftKey: true,
+        }),
+      );
+    });
+    expect(document.activeElement).toBe(close);
+
+    await act(async () => {
+      options.click();
+    });
+    expect(dialog.querySelector('[role="menu"]')?.textContent).toContain("View activity");
+    expect(dialog.querySelector('a[href="/activity"]')).toBeTruthy();
+    await act(async () => {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
+      );
+    });
+    expect(dialog.querySelector('[role="menu"]')).toBeNull();
+    expect(btn.getAttribute("aria-expanded")).toBe("true");
+
+    const backdrop = document.querySelector("[data-notifications-backdrop]") as HTMLElement;
+    await act(async () => {
+      backdrop.click();
+    });
+    expect(btn.getAttribute("aria-expanded")).toBe("false");
+  });
+});
+
+describe("notificationsPanelMotion", () => {
+  it("enters from the right and fades when reduced motion is requested", () => {
+    const motion = notificationsPanelMotion(false);
+    expect(motion.initial).toEqual({ x: "100%" });
+    expect(motion.animate).toEqual({ x: 0 });
+    expect(motion.exit).toMatchObject({ x: "100%" });
+    expect(motion.transition.duration).toBeGreaterThanOrEqual(0.2);
+    expect(motion.transition.duration).toBeLessThanOrEqual(0.28);
+
+    const reduced = notificationsPanelMotion(true);
+    expect(reduced.initial).toEqual({ opacity: 0 });
+    expect(reduced.animate).toEqual({ opacity: 1 });
+    expect(reduced.exit).toMatchObject({ opacity: 0 });
+    expect(reduced.initial).not.toHaveProperty("x");
+  });
+});
+
+describe("splitNotificationFeed", () => {
+  const items = [
+    {
+      id: "a",
+      kind: "offer" as const,
+      when: new Date("2026-09-01T12:00:00.000Z"),
+      title: "New offer",
+      body: "one",
+      urgent: true,
+    },
+    {
+      id: "b",
+      kind: "rating" as const,
+      when: new Date("2026-09-01T11:00:00.000Z"),
+      title: "New rating",
+      body: "two",
+      urgent: false,
+    },
+    {
+      id: "c",
+      kind: "meetup" as const,
+      when: new Date("2026-09-01T10:00:00.000Z"),
+      title: "Confirm meetup",
+      body: "three",
+      urgent: true,
+    },
+    {
+      id: "d",
+      kind: "escrow" as const,
+      when: new Date("2026-09-01T09:00:00.000Z"),
+      title: "Escrow locked",
+      body: "four",
+      urgent: true,
+    },
+  ];
+
+  it("features the two newest urgent inbox items and leaves the rest as rows", () => {
+    const split = splitNotificationFeed(items, "inbox", true);
+    expect(split.featured.map((item) => item.id)).toEqual(["a", "c"]);
+    expect(split.rows.map((item) => item.id)).toEqual(["b", "d"]);
+  });
+
+  it("keeps action-needed as urgent rows only", () => {
+    const split = splitNotificationFeed(items, "action", true);
+    expect(split.featured).toEqual([]);
+    expect(split.rows.map((item) => item.id)).toEqual(["a", "c", "d"]);
   });
 });
