@@ -33,7 +33,12 @@ let host: HTMLElement | undefined;
 
 function renderTable(
   listings: TrustListing[],
-  extra?: { onFlag?: () => void; onHide?: () => void },
+  extra?: {
+    onFlag?: () => void;
+    onHide?: () => void;
+    loading?: boolean;
+    appliedSearch?: string;
+  },
 ) {
   host = document.createElement("div");
   document.body.appendChild(host);
@@ -42,10 +47,11 @@ function renderTable(
     root!.render(
       createElement(TrustListingsTable, {
         listings,
-        loading: false,
-        search: "",
+        loading: extra?.loading ?? false,
+        search: extra?.appliedSearch ?? "",
         onSearch: () => {},
         onApplySearch: () => {},
+        appliedSearch: extra?.appliedSearch ?? "",
         filter: "needs_review",
         onFilter: () => {},
         busyId: null,
@@ -74,6 +80,54 @@ describe("TrustListingsTable", () => {
     renderTable([]);
     expect(host?.textContent).toContain("No listings in this queue.");
     expect(host?.textContent).toContain("Try another filter or clear search.");
+    expect(host?.querySelector("input")?.getAttribute("placeholder")).toBe(
+      "Search id, title, wallet…",
+    );
+  });
+
+  it("uses a skeleton while loading and a search-miss empty state", () => {
+    renderTable([], { loading: true });
+    expect(host?.querySelector("[data-trust-skeleton]")).toBeTruthy();
+    expect(host?.textContent).not.toContain("No listings in this queue.");
+
+    act(() => root?.unmount());
+    host?.remove();
+    renderTable([], { appliedSearch: "0xmissing" });
+    expect(host?.textContent).toContain("Nothing matches.");
+    expect(host?.textContent).toContain("Check the id or try another filter.");
+  });
+
+  it("shows Live or Hidden from moderation status, and a reason chip instead of free text", () => {
+    renderTable([
+      {
+        ...clean,
+        moderationStatus: "HIDDEN",
+        moderationReason: "counterfeit watch",
+        status: "LISTED",
+        onChainConfirmed: true,
+      },
+    ]);
+    expect(host?.textContent).toContain("Hidden");
+    expect(host?.textContent).not.toContain("Active");
+    expect(host?.textContent).toContain("Pending review");
+    expect(host?.textContent).not.toContain("counterfeit watch");
+  });
+
+  it("paints Flag silver until the listing is flagged", () => {
+    renderTable([clean]);
+    const idle = Array.from(host!.querySelectorAll("button")).find((b) => b.textContent === "Flag");
+    expect(idle?.className).toContain("text-silver");
+    expect(idle?.className).not.toContain("text-warning");
+
+    act(() => root?.unmount());
+    host?.remove();
+    renderTable([{ ...clean, moderationReason: "FLAGGED" }]);
+    const active = Array.from(host!.querySelectorAll("button")).find(
+      (b) => b.textContent === "Flag",
+    );
+    expect(active?.className).toContain("text-warning");
+    expect(host?.textContent).toContain("Live");
+    expect(host?.textContent).toContain("Flagged");
   });
 
   it("offers view, hide, remove, and flag, and confirms hide before mutating", () => {

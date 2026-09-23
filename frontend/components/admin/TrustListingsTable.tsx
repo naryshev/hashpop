@@ -3,19 +3,17 @@
 import { useState } from "react";
 import Link from "next/link";
 import { listingHref } from "../../lib/listingUrl";
-import {
-  formatRelativeAge,
-  listingStatusPill,
-  STATUS_PILL_CLASS,
-  truncateAdminAddr,
-} from "../../lib/adminFormat";
+import { formatRelativeAge, STATUS_PILL_CLASS, truncateAdminAddr } from "../../lib/adminFormat";
 import { material } from "../../lib/materials";
 import { Sheet } from "../ui/Sheet";
 import {
   TRUST_EMPTY,
   TRUST_LISTING_FILTERS,
+  TRUST_SEARCH_MISS,
+  TRUST_SEARCH_PLACEHOLDER,
   trustListingActions,
-  trustReasonLabel,
+  trustReasonChip,
+  trustStatusPill,
   type TrustListingFilter,
 } from "../../lib/adminTrust";
 
@@ -38,6 +36,52 @@ function listingTitle(listing: TrustListing): string {
   return listing.title?.trim() || `${listing.id.slice(0, 14)}…`;
 }
 
+function StatusPill({ moderationStatus }: { moderationStatus: string | null }) {
+  const pill = trustStatusPill(moderationStatus);
+  return (
+    <span
+      className={`${material.regular} ${STATUS_PILL_CLASS[pill.tone]} rounded-full px-2 py-0.5 text-[11px]`}
+    >
+      {pill.label}
+    </span>
+  );
+}
+
+function ReasonChip({ code }: { code: string | null }) {
+  const chip = trustReasonChip(code);
+  const tone =
+    chip.tone === "danger"
+      ? "bg-danger/15 text-danger"
+      : chip.tone === "silver"
+        ? "bg-white/5 text-silver"
+        : "bg-warning/15 text-warning";
+  return (
+    <span className={`${material.regular} ${tone} rounded-full px-2 py-0.5 text-[11px]`}>
+      {chip.label}
+    </span>
+  );
+}
+
+function QueueEmpty({ appliedSearch }: { appliedSearch: string }) {
+  const copy = appliedSearch.trim() ? TRUST_SEARCH_MISS : TRUST_EMPTY.listings;
+  return (
+    <>
+      <p className="text-sm text-white">{copy.title}</p>
+      <p className="mt-1 text-xs text-silver">{copy.sub}</p>
+    </>
+  );
+}
+
+function QueueSkeleton() {
+  return (
+    <div className="space-y-2 px-3 py-3" data-trust-skeleton="">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div key={index} className="h-8 animate-pulse rounded-[14px] bg-white/[0.04]" />
+      ))}
+    </div>
+  );
+}
+
 function RowActions({
   listing,
   busy,
@@ -53,7 +97,7 @@ function RowActions({
   onFlag: () => void;
   onClear: () => void;
 }) {
-  const actions = trustListingActions(listing.moderationStatus);
+  const actions = trustListingActions(listing.moderationStatus, listing.moderationReason);
   return (
     <span className="inline-flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
       {actions.view && (
@@ -90,7 +134,10 @@ function RowActions({
           type="button"
           onClick={onFlag}
           disabled={busy}
-          className="text-xs text-warning hover:underline disabled:opacity-60"
+          aria-pressed={actions.flagActive}
+          className={`text-xs hover:underline disabled:opacity-60 ${
+            actions.flagActive ? "text-warning" : "text-silver"
+          }`}
         >
           Flag
         </button>
@@ -115,6 +162,7 @@ export function TrustListingsTable({
   search,
   onSearch,
   onApplySearch,
+  appliedSearch = "",
   filter,
   onFilter,
   busyId,
@@ -128,6 +176,7 @@ export function TrustListingsTable({
   search: string;
   onSearch: (value: string) => void;
   onApplySearch: (next?: string) => void;
+  appliedSearch?: string;
   filter: TrustListingFilter;
   onFilter: (value: TrustListingFilter) => void;
   busyId: string | null;
@@ -162,7 +211,7 @@ export function TrustListingsTable({
           onKeyDown={(e) => {
             if (e.key === "Enter") onApplySearch();
           }}
-          placeholder="Search id, title, seller…"
+          placeholder={TRUST_SEARCH_PLACEHOLDER}
           aria-label="Search listings"
           className={`${material.regular} h-8 min-w-[200px] flex-1 rounded-[14px] px-3 text-sm text-white placeholder:text-silver/50 focus:outline-none`}
         />
@@ -213,24 +262,12 @@ export function TrustListingsTable({
           <tbody>
             {listings.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center">
-                  {loading ? (
-                    <p className="text-sm text-silver">Loading…</p>
-                  ) : (
-                    <>
-                      <p className="text-sm text-white">{TRUST_EMPTY.listings.title}</p>
-                      <p className="mt-1 text-xs text-silver">{TRUST_EMPTY.listings.sub}</p>
-                    </>
-                  )}
+                <td colSpan={7} className="px-3 py-3 text-center">
+                  {loading ? <QueueSkeleton /> : <QueueEmpty appliedSearch={appliedSearch} />}
                 </td>
               </tr>
             ) : (
               listings.map((listing) => {
-                const pill = listingStatusPill(
-                  listing.status,
-                  listing.onChainConfirmed,
-                  listing.disputeStatus,
-                );
                 return (
                   <tr
                     key={listing.id}
@@ -251,15 +288,11 @@ export function TrustListingsTable({
                     <td className="max-w-[220px] truncate px-3 text-white">
                       {listingTitle(listing)}
                     </td>
-                    <td className="max-w-[180px] truncate px-3 text-xs text-silver">
-                      {trustReasonLabel(listing.moderationReason)}
+                    <td className="px-3">
+                      <ReasonChip code={listing.moderationReason} />
                     </td>
                     <td className="px-3">
-                      <span
-                        className={`${material.regular} ${STATUS_PILL_CLASS[pill.tone]} rounded-full px-2 py-0.5 text-[11px]`}
-                      >
-                        {pill.label}
-                      </span>
+                      <StatusPill moderationStatus={listing.moderationStatus} />
                     </td>
                     <td className="px-3 font-mono text-xs text-silver">
                       {truncateAdminAddr(listing.seller)}
@@ -287,36 +320,20 @@ export function TrustListingsTable({
 
       <div className="divide-y divide-hairline md:hidden">
         {listings.length === 0 ? (
-          <div className="px-3 py-8 text-center">
-            {loading ? (
-              <p className="text-sm text-silver">Loading…</p>
-            ) : (
-              <>
-                <p className="text-sm text-white">{TRUST_EMPTY.listings.title}</p>
-                <p className="mt-1 text-xs text-silver">{TRUST_EMPTY.listings.sub}</p>
-              </>
-            )}
+          <div className="px-3 py-3 text-center">
+            {loading ? <QueueSkeleton /> : <QueueEmpty appliedSearch={appliedSearch} />}
           </div>
         ) : (
           listings.map((listing) => {
-            const pill = listingStatusPill(
-              listing.status,
-              listing.onChainConfirmed,
-              listing.disputeStatus,
-            );
             return (
               <div key={listing.id} className="px-3 py-2.5">
                 <div className="flex items-center justify-between gap-2">
                   <span className="truncate text-sm text-white">{listingTitle(listing)}</span>
-                  <span
-                    className={`${material.regular} ${STATUS_PILL_CLASS[pill.tone]} rounded-full px-2 py-0.5 text-[11px]`}
-                  >
-                    {pill.label}
-                  </span>
+                  <StatusPill moderationStatus={listing.moderationStatus} />
                 </div>
-                <p className="mt-1 truncate text-xs text-silver">
-                  {trustReasonLabel(listing.moderationReason)}
-                </p>
+                <div className="mt-1">
+                  <ReasonChip code={listing.moderationReason} />
+                </div>
                 <div className="mt-2 flex items-center justify-between gap-2 text-xs text-silver">
                   <span>{truncateAdminAddr(listing.seller)}</span>
                   <span>{formatRelativeAge(listing.updatedAt)}</span>

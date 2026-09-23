@@ -3,10 +3,13 @@ import {
   TRUST_EMPTY,
   TRUST_LISTING_FILTERS,
   TRUST_PAGE,
+  TRUST_SEARCH_MISS,
+  TRUST_SEARCH_PLACEHOLDER,
   TRUST_TABS,
   trustCountBadge,
   trustListingActions,
-  trustReasonLabel,
+  trustReasonChip,
+  trustStatusPill,
 } from "../adminTrust";
 
 describe("trust page copy", () => {
@@ -23,9 +26,14 @@ describe("trust page copy", () => {
       "Flagged",
       "All",
     ]);
+    expect(TRUST_SEARCH_PLACEHOLDER).toBe("Search id, title, wallet…");
     expect(TRUST_EMPTY.listings).toEqual({
       title: "No listings in this queue.",
       sub: "Try another filter or clear search.",
+    });
+    expect(TRUST_SEARCH_MISS).toEqual({
+      title: "Nothing matches.",
+      sub: "Check the id or try another filter.",
     });
     expect(TRUST_EMPTY.users).toEqual({
       title: "No users need review.",
@@ -44,27 +52,49 @@ describe("trust queue badges and actions", () => {
     expect(trustCountBadge(4)).toBe(4);
   });
 
-  it("offers hide, remove, and flag on a clean listing, and clear once moderated", () => {
-    expect(trustListingActions(null)).toEqual({
+  it("keeps Flag visible, silver until the flag is active", () => {
+    expect(trustListingActions(null, null)).toEqual({
       view: true,
       hide: true,
       remove: true,
       flag: true,
+      flagActive: false,
       clear: false,
     });
-    expect(trustListingActions("FLAGGED").flag).toBe(false);
-    expect(trustListingActions("FLAGGED").clear).toBe(true);
-    expect(trustListingActions("HIDDEN")).toEqual({
+    expect(trustListingActions(null, "FLAGGED").flagActive).toBe(true);
+    expect(trustListingActions(null, "FLAGGED").clear).toBe(true);
+    expect(trustListingActions("HIDDEN", "MANUAL")).toEqual({
       view: true,
       hide: false,
       remove: true,
-      flag: false,
+      flag: true,
+      flagActive: false,
       clear: true,
     });
+    expect(trustListingActions("REMOVED", "MANUAL").remove).toBe(false);
+  });
+});
+
+describe("trust column chips", () => {
+  it("maps moderation visibility to Live, Hidden, and Removed", () => {
+    expect(trustStatusPill(null)).toEqual({ label: "Live", tone: "mint" });
+    expect(trustStatusPill("FLAGGED")).toEqual({ label: "Live", tone: "mint" });
+    expect(trustStatusPill("HIDDEN")).toEqual({ label: "Hidden", tone: "silver" });
+    expect(trustStatusPill("REMOVED")).toEqual({ label: "Removed", tone: "danger" });
   });
 
-  it("shows an em dash when a listing has no moderation reason", () => {
-    expect(trustReasonLabel(null)).toBe("—");
-    expect(trustReasonLabel("  scam  ")).toBe("scam");
+  it("renders only the four reason chips and never free text", () => {
+    expect(trustReasonChip(null)).toEqual({ label: "Pending review", tone: "warning" });
+    expect(trustReasonChip("PENDING_REVIEW")).toEqual({
+      label: "Pending review",
+      tone: "warning",
+    });
+    expect(trustReasonChip("FLAGGED")).toEqual({ label: "Flagged", tone: "warning" });
+    expect(trustReasonChip("REPORT")).toEqual({ label: "Report", tone: "danger" });
+    expect(trustReasonChip("MANUAL")).toEqual({ label: "Manual", tone: "silver" });
+    expect(trustReasonChip("counterfeit watch")).toEqual({
+      label: "Pending review",
+      tone: "warning",
+    });
   });
 });

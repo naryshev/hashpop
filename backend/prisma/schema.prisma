@@ -41,10 +41,12 @@ model Listing {
   locationLng        Float?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
-  /// Ops moderation, separate from chain status so the indexer cannot unhide.
-  /// null = untouched, FLAGGED = trust queue, HIDDEN = off public feeds.
+  /// Visibility for ops. null = live, HIDDEN, REMOVED. Not chain status.
   moderationStatus   String?
+  /// Reason chip code: PENDING_REVIEW | FLAGGED | REPORT | MANUAL.
   moderationReason   String?
+  /// Hide-sheet note. Never rendered in the queue.
+  moderationNote     String?
   sales              Sale[]
 
   @@index([moderationStatus])

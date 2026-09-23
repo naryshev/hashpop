@@ -3093,7 +3093,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
   });
 
   router.get("/admin/trust/listings", async (req, res) => {
-    const auth = verifyAdminToken(req);
+    const auth = await authenticateAdmin(req);
     if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
     try {
       const filter = String(req.query.filter ?? "needs_review");
@@ -3114,18 +3114,18 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
 
   router.post("/admin/listing/:id/moderation", async (req, res) => {
     invalidateListingsCache();
-    const auth = verifyAdminToken(req);
+    const auth = await authenticateAdmin(req);
     if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
     const action = String((req.body as { action?: string } | undefined)?.action ?? "");
-    if (action !== "hide" && action !== "flag" && action !== "clear") {
-      return res.status(400).json({ error: "action must be hide, flag, or clear" });
+    if (action !== "hide" && action !== "flag" && action !== "clear" && action !== "remove") {
+      return res.status(400).json({ error: "action must be hide, flag, clear, or remove" });
     }
     try {
       const id = resolveListingIdParam(req.params.id ?? "");
       const listing = await prisma.listing.findUnique({ where: { id } });
       if (!listing) return res.status(404).json({ error: "Listing not found" });
       const reason = (req.body as { reason?: string } | undefined)?.reason;
-      const patch = moderationPatch(action as ModerationAction, reason);
+      const patch = moderationPatch(action as ModerationAction, reason, listing.moderationStatus);
       const updated = await prisma.listing.update({
         where: { id },
         data: patch,

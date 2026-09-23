@@ -138,6 +138,7 @@ export function AdminTrust() {
           search={search}
           onSearch={setSearch}
           onApplySearch={(next) => setAppliedSearch(next ?? search)}
+          appliedSearch={appliedSearch}
           filter={filter}
           onFilter={setFilter}
           busyId={busyId}
@@ -148,7 +149,13 @@ export function AdminTrust() {
               body: JSON.stringify({ action: "hide", reason }),
             })
           }
-          onRemove={(listing) => void mutate(listing, "", { method: "DELETE" })}
+          onRemove={(listing) =>
+            void mutate(listing, "/moderation", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "remove" }),
+            })
+          }
           onFlag={(listing) =>
             void mutate(listing, "/moderation", {
               method: "POST",

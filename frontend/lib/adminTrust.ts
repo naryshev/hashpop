@@ -20,6 +20,8 @@ export const TRUST_LISTING_FILTERS = [
 
 export type TrustListingFilter = (typeof TRUST_LISTING_FILTERS)[number]["id"];
 
+export const TRUST_SEARCH_PLACEHOLDER = "Search id, title, wallet…";
+
 export const TRUST_EMPTY = {
   listings: {
     title: "No listings in this queue.",
@@ -35,30 +37,76 @@ export const TRUST_EMPTY = {
   },
 } as const;
 
+export const TRUST_SEARCH_MISS = {
+  title: "Nothing matches.",
+  sub: "Check the id or try another filter.",
+} as const;
+
 export function trustCountBadge(count: number): number | null {
   return count > 0 ? count : null;
 }
 
-export function trustListingActions(moderationStatus: string | null | undefined): {
+export type TrustStatusTone = "mint" | "silver" | "danger";
+
+/** Queue status comes from moderation visibility, not the marketplace pill. */
+export function trustStatusPill(moderationStatus: string | null | undefined): {
+  label: "Live" | "Hidden" | "Removed";
+  tone: TrustStatusTone;
+} {
+  const status = (moderationStatus ?? "").toUpperCase();
+  if (status === "REMOVED") return { label: "Removed", tone: "danger" };
+  if (status === "HIDDEN") return { label: "Hidden", tone: "silver" };
+  return { label: "Live", tone: "mint" };
+}
+
+export type TrustReasonTone = "warning" | "danger" | "silver";
+
+/** Reason chips. Unknown or empty codes stay Pending review — never free text. */
+export function trustReasonChip(code: string | null | undefined): {
+  label: "Pending review" | "Flagged" | "Report" | "Manual";
+  tone: TrustReasonTone;
+} {
+  switch ((code ?? "").toUpperCase()) {
+    case "FLAGGED":
+      return { label: "Flagged", tone: "warning" };
+    case "REPORT":
+      return { label: "Report", tone: "danger" };
+    case "MANUAL":
+      return { label: "Manual", tone: "silver" };
+    default:
+      return { label: "Pending review", tone: "warning" };
+  }
+}
+
+export function trustListingActions(
+  moderationStatus: string | null | undefined,
+  moderationReason?: string | null,
+): {
   view: boolean;
   hide: boolean;
   remove: boolean;
   flag: boolean;
+  flagActive: boolean;
   clear: boolean;
 } {
   const status = (moderationStatus ?? "").toUpperCase();
+  const reason = (moderationReason ?? "").toUpperCase();
   const hidden = status === "HIDDEN";
-  const flagged = status === "FLAGGED";
+  const removed = status === "REMOVED";
+  const flagged = reason === "FLAGGED";
+  const marked =
+    hidden ||
+    removed ||
+    flagged ||
+    reason === "MANUAL" ||
+    reason === "REPORT" ||
+    reason === "PENDING_REVIEW";
   return {
     view: true,
-    hide: !hidden,
-    remove: true,
-    flag: !hidden && !flagged,
-    clear: hidden || flagged,
+    hide: !hidden && !removed,
+    remove: !removed,
+    flag: true,
+    flagActive: flagged,
+    clear: marked,
   };
-}
-
-export function trustReasonLabel(reason: string | null | undefined): string {
-  const trimmed = (reason ?? "").trim();
-  return trimmed || "—";
 }

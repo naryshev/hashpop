@@ -278,18 +278,23 @@ describe("trust queue moderation", () => {
     ).toEqual({ id: "1", title: "Watch" });
   });
 
-  it("keeps hidden listings out of public marketplace queries", () => {
+  it("keeps hidden and removed listings out of public marketplace queries", () => {
     expect(visibleListingWhere({ status: "LISTED", onChainConfirmed: true })).toEqual({
       AND: [
         { status: "LISTED", onChainConfirmed: true },
-        { OR: [{ moderationStatus: null }, { moderationStatus: { not: "HIDDEN" } }] },
+        {
+          OR: [{ moderationStatus: null }, { moderationStatus: { notIn: ["HIDDEN", "REMOVED"] } }],
+        },
       ],
     });
   });
 
-  it("maps queue filters onto moderation status without touching chain status", () => {
-    expect(trustListingsWhere("needs_review", "")).toEqual({ moderationStatus: "FLAGGED" });
-    expect(trustListingsWhere("flagged", "")).toEqual({ moderationStatus: "FLAGGED" });
+  it("maps queue filters onto moderation codes without touching chain status", () => {
+    expect(trustListingsWhere("needs_review", "")).toEqual({
+      moderationStatus: null,
+      moderationReason: { in: ["PENDING_REVIEW", "FLAGGED", "REPORT"] },
+    });
+    expect(trustListingsWhere("flagged", "")).toEqual({ moderationReason: "FLAGGED" });
     expect(trustListingsWhere("hidden", "")).toEqual({ moderationStatus: "HIDDEN" });
     expect(trustListingsWhere("all", "Watch")).toEqual({
       OR: [
@@ -299,7 +304,8 @@ describe("trust queue moderation", () => {
       ],
     });
     expect(trustListingsWhere("needs review", "abc")).toEqual({
-      moderationStatus: "FLAGGED",
+      moderationStatus: null,
+      moderationReason: { in: ["PENDING_REVIEW", "FLAGGED", "REPORT"] },
       OR: [
         { id: { contains: "abc" } },
         { title: { contains: "abc", mode: "insensitive" } },
@@ -308,18 +314,31 @@ describe("trust queue moderation", () => {
     });
   });
 
-  it("hides, flags, and clears with a stored reason", () => {
+  it("stores hide notes separately from the reason chip code", () => {
     expect(moderationPatch("hide", "  counterfeit  ")).toEqual({
       moderationStatus: "HIDDEN",
-      moderationReason: "counterfeit",
+      moderationReason: "MANUAL",
+      moderationNote: "counterfeit",
+    });
+    expect(moderationPatch("flag", "", "HIDDEN")).toEqual({
+      moderationStatus: "HIDDEN",
+      moderationReason: "FLAGGED",
+      moderationNote: null,
     });
     expect(moderationPatch("flag", "")).toEqual({
-      moderationStatus: "FLAGGED",
-      moderationReason: "Flagged for review",
+      moderationStatus: null,
+      moderationReason: "FLAGGED",
+      moderationNote: null,
+    });
+    expect(moderationPatch("remove", "ignored")).toEqual({
+      moderationStatus: "REMOVED",
+      moderationReason: "MANUAL",
+      moderationNote: null,
     });
     expect(moderationPatch("clear", "ignored")).toEqual({
       moderationStatus: null,
       moderationReason: null,
+      moderationNote: null,
     });
   });
 
@@ -336,15 +355,20 @@ describe("trust queue moderation", () => {
             status: "LISTED",
             onChainConfirmed: true,
             disputeStatus: null,
-            moderationStatus: "FLAGGED",
-            moderationReason: "Flagged for review",
+            moderationStatus: null,
+            moderationReason: "FLAGGED",
             updatedAt: new Date("2026-09-20T00:00:00.000Z"),
           },
         ]),
       },
     };
     const queue = await fetchTrustQueue(prisma as never, { filter: "needs_review", q: "" });
-    expect(prisma.listing.count).toHaveBeenCalledWith({ where: { moderationStatus: "FLAGGED" } });
+    expect(prisma.listing.count).toHaveBeenCalledWith({
+      where: {
+        moderationStatus: null,
+        moderationReason: { in: ["PENDING_REVIEW", "FLAGGED", "REPORT"] },
+      },
+    });
     expect(queue.counts).toEqual({ listings: 3, users: 0, disputes: 0 });
     expect(queue.listings).toEqual([
       {
@@ -355,8 +379,8 @@ describe("trust queue moderation", () => {
         status: "LISTED",
         onChainConfirmed: true,
         disputeStatus: null,
-        moderationStatus: "FLAGGED",
-        moderationReason: "Flagged for review",
+        moderationStatus: null,
+        moderationReason: "FLAGGED",
         updatedAt: "2026-09-20T00:00:00.000Z",
       },
     ]);
