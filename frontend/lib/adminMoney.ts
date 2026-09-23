@@ -58,6 +58,8 @@ export type MoneyDeal = {
   title: string | null;
   seller: string;
   buyer: string | null;
+  sellerIsAdmin?: boolean;
+  buyerIsAdmin?: boolean;
   amountHbar: string;
   status: string;
   stage?: string | null;

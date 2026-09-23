@@ -10,7 +10,7 @@ import { decodeEvents, EXPECTED_TOPIC0_ITEM_LISTED } from "../indexer/decoder";
 import { saveUpload } from "../storage";
 import { decryptJson, encryptJson, secretBoxConfigured } from "../lib/secretBox";
 import { listingVariantsForDb } from "../listingVariants";
-import { authenticateAdmin, isAdminAddress } from "../adminAuth";
+import { authenticateAdmin, isAdminAddress, listAdminIdentities } from "../adminAuth";
 import {
   adminListingsWhere,
   computeAdminStats,
@@ -20,6 +20,7 @@ import {
   moderationPatch,
   omitModerationFields,
   visibleListingWhere,
+  withWalletAdminFlags,
   type ModerationAction,
 } from "../adminOps";
 
@@ -3031,6 +3032,12 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     return res.json({ ok: true, address: auth.address });
   });
 
+  router.get("/admin/admins", async (req, res) => {
+    const auth = await authenticateAdmin(req);
+    if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
+    return res.json({ admins: listAdminIdentities() });
+  });
+
   router.get("/admin/stats", async (req, res) => {
     const auth = await authenticateAdmin(req);
     if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
@@ -3101,12 +3108,14 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         take: 500,
       });
       return res.json({
-        listings: listings.map((l) => ({
-          ...l,
-          imageUrl: rewriteMediaUrlForClient((l as any).imageUrl),
-          mediaUrls: rewriteMediaUrlsForClient((l as any).mediaUrls) ?? (l as any).mediaUrls,
-          price: toHbarForClient(l.price),
-        })),
+        listings: listings.map((l) =>
+          withWalletAdminFlags({
+            ...l,
+            imageUrl: rewriteMediaUrlForClient((l as any).imageUrl),
+            mediaUrls: rewriteMediaUrlsForClient((l as any).mediaUrls) ?? (l as any).mediaUrls,
+            price: toHbarForClient(l.price),
+          }),
+        ),
       });
     } catch (err) {
       log.error({ err }, "Admin: failed to list listings");

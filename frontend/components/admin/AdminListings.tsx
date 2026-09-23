@@ -3,13 +3,9 @@
 import { forwardRef } from "react";
 import Link from "next/link";
 import { listingHref } from "../../lib/listingUrl";
-import {
-  formatRelativeAge,
-  listingStatusPill,
-  STATUS_PILL_CLASS,
-  truncateAdminAddr,
-} from "../../lib/adminFormat";
+import { formatRelativeAge, listingStatusPill, STATUS_PILL_CLASS } from "../../lib/adminFormat";
 import { material } from "../../lib/materials";
+import { AdminWallet } from "./AdminBadge";
 
 export type ListingChip = "" | "ACTIVE" | "PENDING" | "LOCKED" | "SOLD";
 
@@ -17,6 +13,8 @@ export type AdminListing = {
   id: string;
   seller: string;
   buyer: string | null;
+  sellerIsAdmin?: boolean;
+  buyerIsAdmin?: boolean;
   price: string;
   status: string;
   title: string | null;
@@ -157,8 +155,8 @@ export const AdminListings = forwardRef<
                         {pill.label}
                       </span>
                     </td>
-                    <td className="px-3 font-mono text-xs text-silver">
-                      {truncateAdminAddr(l.seller)}
+                    <td className="px-3">
+                      <AdminWallet address={l.seller} isAdmin={l.sellerIsAdmin} />
                     </td>
                     <td className="px-3 font-mono text-xs tabular-nums text-white">{l.price}</td>
                     <td className="px-3 text-xs text-silver">
@@ -218,7 +216,7 @@ export const AdminListings = forwardRef<
                   <span className="font-mono text-xs tabular-nums text-white">{l.price} ℏ</span>
                 </summary>
                 <div className="mt-2 flex items-center justify-between text-xs text-silver">
-                  <span>{truncateAdminAddr(l.seller)}</span>
+                  <AdminWallet address={l.seller} isAdmin={l.sellerIsAdmin} />
                   <span className="flex gap-3">
                     <Link href={listingHref(l.id)} target="_blank" className="hover:text-white">
                       View

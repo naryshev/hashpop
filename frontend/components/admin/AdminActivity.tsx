@@ -4,6 +4,7 @@ import Link from "next/link";
 import { listingHref } from "../../lib/listingUrl";
 import { activitySentence, formatRelativeAge } from "../../lib/adminFormat";
 import { material } from "../../lib/materials";
+import { AdminWallet } from "./AdminBadge";
 
 export type ActivityEvent = {
   type: string;
@@ -12,6 +13,8 @@ export type ActivityEvent = {
   listingTitle?: string | null;
   actor?: string | null;
   counterparty?: string | null;
+  actorIsAdmin?: boolean;
+  counterpartyIsAdmin?: boolean;
   amountHbar?: string | null;
   status?: string | null;
 };
@@ -58,6 +61,10 @@ export function AdminActivity({
                     line
                   )}
                 </div>
+                {event.actorIsAdmin && <AdminWallet address={event.actor} isAdmin />}
+                {event.counterpartyIsAdmin && event.counterparty !== event.actor && (
+                  <AdminWallet address={event.counterparty} isAdmin />
+                )}
                 <time className="shrink-0 text-[11px] text-silver" dateTime={event.at}>
                   {formatRelativeAge(event.at)}
                 </time>

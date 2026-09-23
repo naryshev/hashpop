@@ -15,7 +15,7 @@ import {
   saveAdminToken,
   type AdminToken,
 } from "../../lib/adminSession";
-import { truncateAdminAddr } from "../../lib/adminFormat";
+import { AdminWallet } from "./AdminBadge";
 import { signAdminSession } from "../../lib/hashpackSignature";
 
 type AdminSessionValue = {
@@ -265,9 +265,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           >
             <span className="text-sm font-semibold text-white">Ops</span>
             <span className="text-silver">·</span>
-            <span className="font-mono text-xs text-silver">
-              {truncateAdminAddr(session.address)}
-            </span>
+            <AdminWallet address={session.address} isAdmin />
             <div className="flex-1" />
             <button
               type="button"

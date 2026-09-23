@@ -56,6 +56,35 @@ export function isAdminAddress(
   return adminIdentityAliases(addr).some((id) => allowed.has(id));
 }
 
+export type AdminIdentity = {
+  /** Hedera `0.0.x` when that was configured, otherwise the lowercase 0x-padded EVM form. */
+  address: string;
+};
+
+function canonicalAdminAddress(raw: string): string | null {
+  const trimmed = raw.trim().toLowerCase();
+  if (!trimmed) return null;
+  if (HEDERA_ACCOUNT_RE.test(trimmed)) return trimmed;
+  return normalizeEvmHex(trimmed);
+}
+
+/** Normalized allowlist identities for a signed admin session. Aliases of one wallet collapse to one row. */
+export function listAdminIdentities(
+  allowlist = process.env.ADMIN_ADDRESSES ?? "",
+): AdminIdentity[] {
+  const seen = new Set<string>();
+  const admins: AdminIdentity[] = [];
+  for (const part of allowlist.split(",")) {
+    const address = canonicalAdminAddress(part);
+    if (!address) continue;
+    const aliases = adminIdentityAliases(address);
+    if (aliases.some((alias) => seen.has(alias))) continue;
+    for (const alias of aliases) seen.add(alias);
+    admins.push({ address });
+  }
+  return admins;
+}
+
 function headerValue(value: string | string[] | undefined): string | null {
   if (!value) return null;
   if (Array.isArray(value)) return value[0] ?? null;

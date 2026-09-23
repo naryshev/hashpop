@@ -7,10 +7,10 @@ import {
   dealStageFromRow,
   formatRelativeAge,
   STATUS_PILL_CLASS,
-  truncateAdminAddr,
   type ListingStatusTone,
 } from "../../lib/adminFormat";
 import { material } from "../../lib/materials";
+import { AdminWallet } from "./AdminBadge";
 
 export type AdminDeal = {
   listingId: string;
@@ -18,6 +18,8 @@ export type AdminDeal = {
   imageUrl: string | null;
   seller: string;
   buyer: string | null;
+  sellerIsAdmin?: boolean;
+  buyerIsAdmin?: boolean;
   amountHbar: string;
   status: string;
   stage?: string;
@@ -112,11 +114,11 @@ export const AdminDeals = forwardRef<
                       {d.title || d.listingId.slice(0, 14) + "…"}
                       {d.stuck && <span className="ml-2 text-[10px] text-danger">Stuck</span>}
                     </td>
-                    <td className="px-3 font-mono text-xs text-silver">
-                      {truncateAdminAddr(d.buyer)}
+                    <td className="px-3">
+                      <AdminWallet address={d.buyer} isAdmin={d.buyerIsAdmin} />
                     </td>
-                    <td className="px-3 font-mono text-xs text-silver">
-                      {truncateAdminAddr(d.seller)}
+                    <td className="px-3">
+                      <AdminWallet address={d.seller} isAdmin={d.sellerIsAdmin} />
                     </td>
                     <td className="px-3 font-mono text-xs tabular-nums text-white">
                       {d.amountHbar}
@@ -175,6 +177,10 @@ export const AdminDeals = forwardRef<
                   >
                     {stage}
                   </span>
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <AdminWallet address={d.buyer} isAdmin={d.buyerIsAdmin} />
+                  <AdminWallet address={d.seller} isAdmin={d.sellerIsAdmin} />
                 </div>
                 <div className="mt-1 flex items-center justify-between text-xs text-silver">
                   <span className="tabular-nums text-white">{d.amountHbar} ℏ</span>

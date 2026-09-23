@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { listingHref } from "../../lib/listingUrl";
-import { formatRelativeAge, STATUS_PILL_CLASS, truncateAdminAddr } from "../../lib/adminFormat";
+import { formatRelativeAge, STATUS_PILL_CLASS } from "../../lib/adminFormat";
+import { AdminWallet } from "./AdminBadge";
 import { material } from "../../lib/materials";
 import { Sheet } from "../ui/Sheet";
 import {
@@ -28,6 +29,7 @@ export type TrustListing = {
   moderationStatus: string | null;
   moderationReason: string | null;
   updatedAt: string;
+  sellerIsAdmin?: boolean;
 };
 
 type ConfirmKind = "hide" | "remove";
@@ -294,8 +296,8 @@ export function TrustListingsTable({
                     <td className="px-3">
                       <StatusPill moderationStatus={listing.moderationStatus} />
                     </td>
-                    <td className="px-3 font-mono text-xs text-silver">
-                      {truncateAdminAddr(listing.seller)}
+                    <td className="px-3">
+                      <AdminWallet address={listing.seller} isAdmin={listing.sellerIsAdmin} />
                     </td>
                     <td className="px-3 text-xs text-silver">
                       {formatRelativeAge(listing.updatedAt)}
@@ -335,7 +337,7 @@ export function TrustListingsTable({
                   <ReasonChip code={listing.moderationReason} />
                 </div>
                 <div className="mt-2 flex items-center justify-between gap-2 text-xs text-silver">
-                  <span>{truncateAdminAddr(listing.seller)}</span>
+                  <AdminWallet address={listing.seller} isAdmin={listing.sellerIsAdmin} />
                   <span>{formatRelativeAge(listing.updatedAt)}</span>
                 </div>
                 <div className="mt-2">

@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getApiUrl } from "../../lib/apiUrl";
-import { formatRelativeAge, STATUS_PILL_CLASS, truncateAdminAddr } from "../../lib/adminFormat";
+import { formatRelativeAge, STATUS_PILL_CLASS } from "../../lib/adminFormat";
+import { AdminWallet } from "./AdminBadge";
 import { listingHref } from "../../lib/listingUrl";
 import {
   MONEY_DEAL_FILTERS,
@@ -353,11 +354,11 @@ export function AdminMoney() {
                       {listingTitle(deal)}
                       {deal.stuck && <span className="ml-2 text-[10px] text-danger">Stuck</span>}
                     </td>
-                    <td className="px-3 font-mono text-xs text-silver">
-                      {truncateAdminAddr(deal.buyer)}
+                    <td className="px-3">
+                      <AdminWallet address={deal.buyer} isAdmin={deal.buyerIsAdmin} />
                     </td>
-                    <td className="px-3 font-mono text-xs text-silver">
-                      {truncateAdminAddr(deal.seller)}
+                    <td className="px-3">
+                      <AdminWallet address={deal.seller} isAdmin={deal.sellerIsAdmin} />
                     </td>
                     <td className="px-3 font-mono text-xs tabular-nums text-white">
                       {deal.amountHbar}
@@ -396,8 +397,10 @@ export function AdminMoney() {
                   <StagePill deal={deal} />
                 </div>
                 <div className="mt-1 flex items-center justify-between gap-2 text-xs text-silver">
-                  <span className="truncate font-mono">
-                    {truncateAdminAddr(deal.buyer)} · {truncateAdminAddr(deal.seller)}
+                  <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                    <AdminWallet address={deal.buyer} isAdmin={deal.buyerIsAdmin} />
+                    <span aria-hidden>·</span>
+                    <AdminWallet address={deal.seller} isAdmin={deal.sellerIsAdmin} />
                   </span>
                   <span className="shrink-0 tabular-nums text-white">{deal.amountHbar} ℏ</span>
                 </div>

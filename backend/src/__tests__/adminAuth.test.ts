@@ -4,6 +4,7 @@ import { SigningKey, Wallet, getBytes, hexlify, keccak256 } from "ethers";
 import {
   authenticateAdmin,
   isAdminAddress,
+  listAdminIdentities,
   parseMirrorAccountKey,
   prefixHederaMessage,
   verifyAdminToken,
@@ -60,6 +61,28 @@ describe("isAdminAddress", () => {
     expect(isAdminAddress(evm, evm)).toBe(true);
     expect(isAdminAddress("0x93ddbb", evm)).toBe(true);
     expect(isAdminAddress(evm, "0x93DDBB")).toBe(true);
+  });
+});
+
+describe("listAdminIdentities", () => {
+  it("returns an empty list for a blank allowlist", () => {
+    expect(listAdminIdentities("")).toEqual([]);
+    expect(listAdminIdentities(" , ")).toEqual([]);
+  });
+
+  it("normalizes entries and collapses a Hedera id with its EVM alias", () => {
+    const evm = "0x000000000000000000000000000000000093ddbb";
+    expect(listAdminIdentities(` 0.0.9690555, ${evm.toUpperCase()}, 0xAAA, , 0xaaa `)).toEqual([
+      { address: "0.0.9690555" },
+      { address: "0x0000000000000000000000000000000000000aaa" },
+    ]);
+  });
+
+  it("drops entries that are neither Hedera account ids nor EVM addresses", () => {
+    expect(listAdminIdentities("0.0.1, nope, 0xabc")).toEqual([
+      { address: "0.0.1" },
+      { address: "0x0000000000000000000000000000000000000abc" },
+    ]);
   });
 });
 
