@@ -1,19 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { material } from "@/lib/materials";
 import { formatDockBadgeCount } from "@/lib/dockBadge";
-import { Sheet } from "./ui/Sheet";
 import { DockBadge } from "./ui/DockBadge";
+import { NotificationsPanel } from "./NotificationsPanel";
 import { useDealNotifications, markDealUpdatesSeen } from "../hooks/useDealNotifications";
-import {
-  DEAL_UPDATES_EMPTY_BODY,
-  DEAL_UPDATES_EMPTY_TITLE,
-  formatRelativeTime,
-} from "../lib/dealNotifications";
 
 export type NotificationBellProps = {
   className?: string;
@@ -29,11 +22,20 @@ export function NotificationBell({
 }: NotificationBellProps) {
   const { items, unseen, loading } = useDealNotifications();
   const [open, setOpen] = useState(false);
+  // Snapshot of ids that were unread at open. Marking seen clears the bell
+  // immediately; the dots stay until this panel visit ends or mark-all-read.
+  const [unreadIds, setUnreadIds] = useState<ReadonlySet<string>>(() => new Set());
   const badgeLabel = formatDockBadgeCount(unseen.length);
 
-  const openSheet = () => {
+  const openPanel = () => {
+    setUnreadIds(new Set(unseen.map((item) => item.id)));
     markDealUpdatesSeen();
     setOpen(true);
+  };
+
+  const markAllRead = () => {
+    markDealUpdatesSeen();
+    setUnreadIds(new Set());
   };
 
   const hit =
@@ -50,7 +52,7 @@ export function NotificationBell({
             setOpen(false);
             return;
           }
-          openSheet();
+          openPanel();
         }}
         aria-expanded={open}
         aria-label={badgeLabel ? `Notifications, ${badgeLabel}` : "Notifications"}
@@ -61,50 +63,15 @@ export function NotificationBell({
           <DockBadge count={unseen.length} size="compact" />
         </span>
       </button>
-      <Sheet open={open} onClose={() => setOpen(false)} title="Updates" detent="medium" edge="top">
-        {loading && items.length === 0 ? (
-          <p className="py-6 text-sm text-silver">Loading updates…</p>
-        ) : items.length === 0 ? (
-          <div className="py-8 text-center">
-            <p className="text-[15px] font-semibold text-white">{DEAL_UPDATES_EMPTY_TITLE}</p>
-            <p className="mt-1 text-[13px] text-silver">{DEAL_UPDATES_EMPTY_BODY}</p>
-          </div>
-        ) : (
-          <ul className="pb-3">
-            {items.map((item) => {
-              const row = (
-                <div className="flex items-start gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13px] font-semibold text-white">
-                      {item.title}
-                    </div>
-                    <div className="mt-0.5 line-clamp-1 text-[12px] text-silver">{item.body}</div>
-                  </div>
-                  <div className="shrink-0 font-mono text-[11px] tabular-nums text-silver">
-                    {formatRelativeTime(item.when)}
-                  </div>
-                </div>
-              );
-              const chrome = cn(material.regular, "block rounded-[14px] px-3 py-2.5");
-              return (
-                <li key={item.id} className="border-b border-hairline py-1.5 last:border-0">
-                  {item.href ? (
-                    <Link
-                      href={item.href}
-                      className={cn(chrome, "hover:opacity-90")}
-                      onClick={() => setOpen(false)}
-                    >
-                      {row}
-                    </Link>
-                  ) : (
-                    <div className={chrome}>{row}</div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </Sheet>
+      <NotificationsPanel
+        open={open}
+        onClose={() => setOpen(false)}
+        variant={variant}
+        items={items}
+        loading={loading}
+        unreadIds={unreadIds}
+        onMarkAllRead={markAllRead}
+      />
     </>
   );
 }
