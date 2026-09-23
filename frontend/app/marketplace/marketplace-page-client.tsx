@@ -100,6 +100,7 @@ export type ListingItem = {
   createdAt?: string;
   status?: string;
   onChainConfirmed?: boolean;
+  requireEscrow?: boolean | null;
   itemType: "listing";
 };
 
@@ -788,10 +789,15 @@ export default function MarketplacePageClient({
           </p>
         ) : (
           <>
-            {/* Mobile 2-up: shared ListingCard, compact density. */}
-            <div className="grid grid-cols-2 gap-3 sm:hidden">
+            {/* Mobile 2-up: media-first tiles, 10px gap. */}
+            <div className="grid grid-cols-2 gap-2.5 sm:hidden">
               {filteredItems.map((item) => (
-                <ListingCard key={`${item.itemType}-${item.id}`} item={item} density="compact" />
+                <ListingCard
+                  key={`${item.itemType}-${item.id}`}
+                  item={item}
+                  density="compact"
+                  variant="mediaTrust"
+                />
               ))}
             </div>
             {viewMode !== "editorial" && (
@@ -806,9 +812,14 @@ export default function MarketplacePageClient({
             )}
 
             {viewMode === "grid" && (
-              <div className="hidden gap-5 sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+              <div className="hidden gap-4 sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                 {filteredItems.map((item) => (
-                  <ListingCard key={`${item.itemType}-${item.id}`} item={item} density="regular" />
+                  <ListingCard
+                    key={`${item.itemType}-${item.id}`}
+                    item={item}
+                    density="regular"
+                    variant="mediaTrust"
+                  />
                 ))}
               </div>
             )}

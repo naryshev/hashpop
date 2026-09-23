@@ -24,6 +24,11 @@ type ListingMediaProps = {
   cardSize?: boolean;
   /** Override height when cardSize (e.g. "88px" for compact carousel) */
   compactHeight?: string;
+  /**
+   * Fill the parent with the photo only — no glass frame, radius, or fixed
+   * height. The parent owns the aspect ratio (marketplace media-first tiles).
+   */
+  bleed?: boolean;
 };
 
 export function ListingMedia({
@@ -35,6 +40,7 @@ export function ListingMedia({
   slideshow,
   cardSize = false,
   compactHeight,
+  bleed = false,
 }: ListingMediaProps) {
   const [failed, setFailed] = useState<Set<number>>(new Set());
   const [index, setIndex] = useState(0);
@@ -71,6 +77,50 @@ export function ListingMedia({
     tick(firstDelay);
     return () => clearTimeout(timer);
   }, [isSlideshow, slideshow, hovering, urls.length]);
+
+  if (bleed) {
+    const frame = `absolute inset-0 h-full w-full overflow-hidden ${className}`;
+    if (urls.length === 0) {
+      return <div className={`${frame} bg-[#0b111b]`} role="img" aria-label="No media" />;
+    }
+    if (isSlideshow) {
+      const current = index % urls.length;
+      return (
+        <div
+          className={frame}
+          onMouseEnter={slideshow === "hover" ? () => setHovering(true) : undefined}
+          onMouseLeave={slideshow === "hover" ? () => setHovering(false) : undefined}
+        >
+          {urls.map((url, i) =>
+            failed.has(i) ? null : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={i}
+                src={url}
+                alt={`Listing ${i + 1}`}
+                className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ease-in-out ${
+                  i === current ? "opacity-100" : "opacity-0"
+                }`}
+                onError={() => setFailed((prev) => new Set([...prev, i]))}
+              />
+            ),
+          )}
+        </div>
+      );
+    }
+    if (failed.has(0)) {
+      return <div className={`${frame} bg-[#0b111b]`} role="img" aria-label="No media" />;
+    }
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={urls[0]}
+        alt="Listing"
+        className="absolute inset-0 h-full w-full object-cover"
+        onError={() => setFailed(new Set([0]))}
+      />
+    );
+  }
 
   if (urls.length === 0) {
     return (

@@ -2909,7 +2909,8 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
   }
 
   // Batch public-profile lookup used to render display names, avatars, KYC
-  // badges and ratings on listing cards / detail pages without N round-trips.
+  // badges, ratings, and the existing seller trust counts (TrustStrip field
+  // map) on listing cards without N round-trips or a separate reputation API.
   router.get("/users/profiles", async (req, res) => {
     try {
       const raw = String(req.query.addresses ?? "");
@@ -2931,6 +2932,10 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
             displayName: true,
             avatarUrl: true,
             kycStatus: true,
+            successfulCompletions: true,
+            totalSales: true,
+            refunds: true,
+            timeouts: true,
           },
         }),
         prisma.rating.groupBy({
@@ -2971,6 +2976,10 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           kycVerified: boolean;
           ratingAverage: number | null;
           ratingCount: number;
+          successfulCompletions: number;
+          totalSales: number;
+          refunds: number;
+          timeouts: number;
         }
       > = {};
       for (const addr of addresses) {
@@ -2987,6 +2996,10 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           kycVerified: u?.kycStatus === "VERIFIED",
           ratingAverage: r?.average ?? null,
           ratingCount: r?.count ?? 0,
+          successfulCompletions: u?.successfulCompletions ?? 0,
+          totalSales: u?.totalSales ?? 0,
+          refunds: u?.refunds ?? 0,
+          timeouts: u?.timeouts ?? 0,
         };
       }
       res.json({ profiles });
