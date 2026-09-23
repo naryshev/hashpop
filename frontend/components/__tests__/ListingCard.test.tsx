@@ -83,7 +83,7 @@ async function renderCard(props: React.ComponentProps<typeof ListingCard>) {
   });
 }
 
-describe("ListingCard mediaTrust", () => {
+describe("ListingCard softTrust", () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     profileState.current = undefined;
@@ -101,10 +101,10 @@ describe("ListingCard mediaTrust", () => {
     host = undefined;
   });
 
-  it("renders a 3:4 photo tile with overlay title and mint price, not a glass body", async () => {
+  it("renders an inset square photo with title, chip row, and mint price under it", async () => {
     loadedProfile(0, 0);
     await renderCard({
-      variant: "mediaTrust",
+      variant: "softTrust",
       density: "compact",
       item: {
         id: "lst-1",
@@ -116,33 +116,41 @@ describe("ListingCard mediaTrust", () => {
       },
     });
 
-    const card = document.querySelector('[data-variant="mediaTrust"]') as HTMLElement;
+    const card = document.querySelector('[data-variant="softTrust"]') as HTMLElement;
     expect(card).toBeTruthy();
-    expect(card.className).not.toContain("bg-material-regular");
-    expect(card.className).toContain("rounded-[16px]");
-    expect(card.className).toContain("border-white/10");
-    expect(document.querySelector(".aspect-\\[3\\/4\\]")).toBeTruthy();
+    expect(card.className).toContain("bg-material-regular");
+    expect(card.className).toContain("rounded-[20px]");
+    expect(card.className).toContain("border-hairline");
+    const media = document.querySelector('[data-testid="soft-trust-media"]') as HTMLElement;
+    expect(media.className).toContain("aspect-square");
+    expect(media.className).toContain("rounded-[14px]");
+    expect(media.querySelector("h2")).toBeNull();
+    expect(document.querySelector(".aspect-\\[3\\/4\\]")).toBeNull();
+    expect(document.querySelector(".bg-gradient-to-t")).toBeNull();
     expect(document.body.textContent).toContain("Sony A7 III body + kit");
     expect(document.body.textContent).toContain("1240");
     expect(document.body.textContent).toContain("ℏ");
-    const title = document.querySelector("h2");
-    expect(title?.className).toContain("line-clamp-2");
+    const title = document.querySelector("h2") as HTMLElement;
+    expect(title.className).toContain("line-clamp-2");
+    expect(title.compareDocumentPosition(media) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(0);
+    expect(media.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(document.querySelector('[data-testid="wishlist"]')).toBeTruthy();
+    expect(media.compareDocumentPosition(document.querySelector('[data-testid="wishlist"]')!) & Node.DOCUMENT_POSITION_CONTAINED_BY).toBeTruthy();
     expect(document.querySelector('[data-testid="trust-strip"]')).toBeNull();
-    expect(document.body.textContent).toContain("Meetup");
-    const meetup = document.querySelector('[data-testid="grid-trust-chip"]') as HTMLElement;
-    expect(meetup.className).toContain("text-silver");
-    expect(meetup.className).toContain("bg-material-thick");
-    expect(meetup.className).not.toContain("text-chrome");
-    expect(meetup.className).not.toContain("bg-[#00ffa3]/10");
+    const chips = [...document.querySelectorAll('[data-testid="grid-trust-chip"]')];
+    expect(chips.map((chip) => chip.textContent)).toEqual(["Meetup"]);
+    expect((chips[0] as HTMLElement).className).toContain("text-silver");
+    expect((chips[0] as HTMLElement).className).not.toContain("text-chrome");
+    expect(document.querySelector('[data-testid="listing-distance"]')).toBeNull();
     expect(document.body.textContent).not.toContain("Active");
     expect(document.body.textContent).not.toContain("KYC");
+    expect(document.body.textContent).not.toContain("ETH");
   });
 
-  it("uses the tighter desktop radius on regular density", async () => {
+  it("shows completion, Meetup, and Escrow together on the desktop card", async () => {
     loadedProfile(49, 50);
     await renderCard({
-      variant: "mediaTrust",
+      variant: "softTrust",
       density: "regular",
       item: {
         id: "lst-2",
@@ -151,30 +159,33 @@ describe("ListingCard mediaTrust", () => {
         seller,
         status: "LISTED",
         requireEscrow: true,
+        meetup: true,
+        distanceLabel: "1.2 km",
       },
     });
-    const card = document.querySelector('[data-variant="mediaTrust"]') as HTMLElement;
-    expect(card.className).toContain("rounded-[14px]");
+    const card = document.querySelector('[data-variant="softTrust"]') as HTMLElement;
+    expect(card.className).toContain("rounded-[18px]");
+    expect(card.className).toContain("bg-material-regular");
     const title = document.querySelector("h2") as HTMLElement;
     const price = document.querySelector("p") as HTMLElement;
-    expect(title.className).toContain("text-[14px]");
-    expect(title.className).not.toContain("text-[15px]");
-    expect(price.className).toContain("text-[16px]");
-    expect(price.className).not.toContain("text-[17px]");
-    const completion = document.querySelector('[data-testid="grid-trust-chip"]') as HTMLElement;
-    expect(completion.textContent).toBe("98%");
-    expect(completion.className).toContain("bg-[#00ffa3]/10");
-    expect(completion.className).toContain("border-[#00ffa3]/25");
-    expect(completion.className).toContain("text-chrome");
-    expect(completion.className).not.toContain("text-silver");
-    expect(document.body.textContent).not.toContain("Escrow");
-    expect(document.body.textContent).not.toContain("Meetup");
+    expect(title.className).toContain("text-[13px]");
+    expect(price.className).toContain("text-[15px]");
+    expect(price.className).toContain("text-chrome");
+    const chips = [...document.querySelectorAll('[data-testid="grid-trust-chip"]')];
+    expect(chips.map((chip) => chip.textContent)).toEqual(["98%", "Meetup", "Escrow"]);
+    expect((chips[0] as HTMLElement).className).toContain("bg-[#00ffa3]/10");
+    expect((chips[0] as HTMLElement).className).toContain("text-chrome");
+    expect((chips[1] as HTMLElement).className).toContain("text-silver");
+    expect((chips[2] as HTMLElement).className).toContain("text-silver");
+    const distance = document.querySelector('[data-testid="listing-distance"]') as HTMLElement;
+    expect(distance.textContent).toBe("1.2 km");
+    expect(distance.className).toContain("text-silver/60");
   });
 
-  it("keeps a low completion percent on silver glass", async () => {
+  it("keeps a low completion percent on silver glass and still shows Escrow", async () => {
     loadedProfile(8, 10);
     await renderCard({
-      variant: "mediaTrust",
+      variant: "softTrust",
       item: {
         id: "lst-low",
         title: "Low completion",
@@ -184,17 +195,17 @@ describe("ListingCard mediaTrust", () => {
         requireEscrow: true,
       },
     });
-    const chip = document.querySelector('[data-testid="grid-trust-chip"]') as HTMLElement;
-    expect(chip.textContent).toBe("80%");
-    expect(chip.className).toContain("text-silver");
-    expect(chip.className).not.toContain("text-chrome");
-    expect(chip.className).not.toContain("bg-[#00ffa3]/10");
+    const chips = [...document.querySelectorAll('[data-testid="grid-trust-chip"]')];
+    expect(chips.map((chip) => chip.textContent)).toEqual(["80%", "Escrow"]);
+    expect((chips[0] as HTMLElement).className).toContain("text-silver");
+    expect((chips[0] as HTMLElement).className).not.toContain("text-chrome");
+    expect((chips[0] as HTMLElement).className).not.toContain("bg-[#00ffa3]/10");
   });
 
-  it("omits the chip while the seller profile is still loading", async () => {
+  it("omits the chip row while the seller profile is still loading", async () => {
     profileState.current = undefined;
     await renderCard({
-      variant: "mediaTrust",
+      variant: "softTrust",
       item: {
         id: "lst-3",
         title: "Trek FX",
@@ -207,12 +218,13 @@ describe("ListingCard mediaTrust", () => {
     expect(document.querySelector('[data-testid="grid-trust-chip"]')).toBeNull();
     expect(document.body.textContent).not.toContain("Meetup");
     expect(document.body.textContent).not.toContain("Active");
+    expect(document.body.textContent).toContain("Trek FX");
   });
 
-  it("replaces the trust chip with Pending or Sold", async () => {
+  it("replaces the trust row with Pending or Sold", async () => {
     loadedProfile(49, 50);
     await renderCard({
-      variant: "mediaTrust",
+      variant: "softTrust",
       item: {
         id: "lst-4",
         title: "Locked bike",
@@ -220,14 +232,33 @@ describe("ListingCard mediaTrust", () => {
         seller,
         status: "LOCKED",
         requireEscrow: true,
+        meetup: true,
       },
     });
-    expect(document.querySelector('[data-variant="mediaTrust"]')).toBeTruthy();
+    expect(document.querySelector('[data-variant="softTrust"]')).toBeTruthy();
     expect(document.querySelector('[data-testid="trust-strip"]')).toBeNull();
     expect(document.body.textContent).toContain("Pending");
     expect(document.querySelector('[data-testid="grid-trust-chip"]')).toBeNull();
     expect(document.body.textContent).not.toContain("98%");
+    expect(document.body.textContent).not.toContain("Meetup");
     expect(document.body.textContent).not.toContain("Active");
+  });
+
+  it("still renders soft-trust when the old mediaTrust variant name is passed", async () => {
+    loadedProfile(0, 0);
+    await renderCard({
+      variant: "mediaTrust",
+      item: {
+        id: "lst-alias",
+        title: "Alias",
+        price: "1",
+        seller,
+        status: "LISTED",
+        requireEscrow: false,
+      },
+    });
+    expect(document.querySelector('[data-variant="softTrust"]')).toBeTruthy();
+    expect(document.querySelector(".aspect-square")).toBeTruthy();
   });
 
   it("keeps the glass body and TrustStrip on the default variant", async () => {
@@ -244,6 +275,7 @@ describe("ListingCard mediaTrust", () => {
     const card = document.querySelector("article") as HTMLElement;
     expect(card.className).toContain("bg-material-regular");
     expect(document.querySelector('[data-testid="trust-strip"]')).toBeTruthy();
+    expect(document.querySelector('[data-variant="softTrust"]')).toBeNull();
     expect(document.querySelector('[data-variant="mediaTrust"]')).toBeNull();
     expect(document.body.textContent).toContain("Active");
   });
