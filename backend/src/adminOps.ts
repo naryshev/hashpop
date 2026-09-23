@@ -36,7 +36,7 @@ export type AdminStats = {
   deals: { locked: number; openDisputes: number; sold: number; withBuyer: number };
 };
 
-export type DealStage = "Offered" | "Locked" | "Meetup" | "Complete" | "Disputed";
+export type DealStage = "Offered" | "Locked" | "Meetup" | "Complete" | "Disputed" | "Refunded";
 
 export type AdminDeal = {
   listingId: string;
@@ -65,6 +65,7 @@ export function dealStage(row: {
   if (row.disputeStatus === "OPEN") return "Disputed";
   const s = (row.status ?? "").toUpperCase();
   if (s === "SOLD") return "Complete";
+  if (s === "REFUNDED") return "Refunded";
   if (s === "LOCKED" && (row.shippedAt || row.exchangeConfirmedAt)) return "Meetup";
   if (s === "LOCKED") return "Locked";
   return "Offered";
@@ -375,22 +376,46 @@ type DealListingRow = ListingRow & {
   sales?: Array<{ amount?: string | null }>;
 };
 
+export type AdminDealScope = "open" | "released";
+
+/** Open queue excludes settled escrow. Released is the view-only Complete/Refunded slice. */
+export function adminDealsWhere(scope: AdminDealScope = "open") {
+  if (scope === "released") {
+    return {
+      status: { in: ["SOLD", "REFUNDED"] },
+      NOT: { disputeStatus: "OPEN" },
+    };
+  }
+  return {
+    OR: [
+      { status: "LOCKED" },
+      { disputeStatus: "OPEN" },
+      {
+        AND: [{ buyer: { not: null } }, { status: { notIn: ["SOLD", "CANCELLED", "REFUNDED"] } }],
+      },
+    ],
+  };
+}
+
 export async function fetchAdminDeals(
   prisma: PrismaClient,
-  opts?: { now?: number; stuckDays?: number; stuckOnly?: boolean; limit?: number },
+  opts?: {
+    now?: number;
+    stuckDays?: number;
+    stuckOnly?: boolean;
+    limit?: number;
+    scope?: AdminDealScope;
+  },
 ): Promise<{ deals: AdminDeal[] }> {
   const now = opts?.now ?? Date.now();
   const stuckDays = opts?.stuckDays ?? DEFAULT_STUCK_DAYS;
-  const limit = Math.min(Math.max(opts?.limit ?? 200, 1), 500);
+  const scope = opts?.scope ?? "open";
+  const cap = scope === "released" ? 100 : 500;
+  const fallback = scope === "released" ? 80 : 200;
+  const limit = Math.min(Math.max(opts?.limit ?? fallback, 1), cap);
 
   const rows = (await prisma.listing.findMany({
-    where: {
-      OR: [
-        { status: "LOCKED" },
-        { disputeStatus: "OPEN" },
-        { AND: [{ buyer: { not: null } }, { status: { notIn: ["SOLD", "CANCELLED"] } }] },
-      ],
-    },
+    where: adminDealsWhere(scope),
     orderBy: { updatedAt: "desc" },
     take: limit,
     select: {
@@ -436,10 +461,14 @@ export async function fetchAdminDeals(
     };
   });
 
-  deals.sort((a, b) => {
-    if (a.stuck !== b.stuck) return a.stuck ? -1 : 1;
-    return b.ageDays - a.ageDays;
-  });
+  if (scope === "released") {
+    deals.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+  } else {
+    deals.sort((a, b) => {
+      if (a.stuck !== b.stuck) return a.stuck ? -1 : 1;
+      return b.ageDays - a.ageDays;
+    });
+  }
 
   return { deals: opts?.stuckOnly ? deals.filter((d) => d.stuck) : deals };
 }

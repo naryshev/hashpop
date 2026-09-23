@@ -36,7 +36,7 @@ export function listingStatusPill(
   return { label: status ? status.charAt(0) + status.slice(1).toLowerCase() : "—", tone: "silver" };
 }
 
-export type DealStage = "Offered" | "Locked" | "Meetup" | "Complete" | "Disputed";
+export type DealStage = "Offered" | "Locked" | "Meetup" | "Complete" | "Disputed" | "Refunded";
 
 export function dealStageFromRow(row: {
   status?: string | null;
@@ -47,6 +47,7 @@ export function dealStageFromRow(row: {
   if (row.disputeStatus === "OPEN") return "Disputed";
   const s = (row.status ?? "").toUpperCase();
   if (s === "SOLD") return "Complete";
+  if (s === "REFUNDED") return "Refunded";
   if (s === "LOCKED" && (row.shippedAt || row.exchangeConfirmedAt)) return "Meetup";
   if (s === "LOCKED") return "Locked";
   return "Offered";

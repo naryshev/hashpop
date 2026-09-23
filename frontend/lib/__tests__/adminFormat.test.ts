@@ -45,6 +45,8 @@ describe("dealStageFromRow", () => {
   it("maps Hedera escrow signals to stage pills", () => {
     expect(dealStageFromRow({ disputeStatus: "OPEN", status: "LOCKED" })).toBe("Disputed");
     expect(dealStageFromRow({ status: "SOLD" })).toBe("Complete");
+    expect(dealStageFromRow({ status: "REFUNDED" })).toBe("Refunded");
+    expect(dealStageFromRow({ status: "REFUNDED", disputeStatus: "OPEN" })).toBe("Disputed");
     expect(dealStageFromRow({ status: "LOCKED", shippedAt: "2026-01-01" })).toBe("Meetup");
     expect(dealStageFromRow({ status: "LOCKED" })).toBe("Locked");
     expect(dealStageFromRow({ status: "LISTED", buyer: "0x1" } as { status: string })).toBe(

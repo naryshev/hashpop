@@ -3054,7 +3054,16 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       const stuckDaysRaw = Number(req.query.stuckDays);
       const stuckDays =
         Number.isFinite(stuckDaysRaw) && stuckDaysRaw > 0 ? stuckDaysRaw : undefined;
-      const { deals } = await fetchAdminDeals(prisma, { stuckOnly, stuckDays });
+      const scope =
+        String(req.query.scope ?? "").toLowerCase() === "released" ? "released" : "open";
+      const limitRaw = Number(req.query.limit);
+      const limit =
+        scope === "released"
+          ? Math.min(Number.isFinite(limitRaw) && limitRaw > 0 ? limitRaw : 80, 100)
+          : Number.isFinite(limitRaw) && limitRaw > 0
+            ? limitRaw
+            : undefined;
+      const { deals } = await fetchAdminDeals(prisma, { stuckOnly, stuckDays, scope, limit });
       return res.json({
         deals: deals.map((d) => ({
           ...d,
