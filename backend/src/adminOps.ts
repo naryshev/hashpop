@@ -443,3 +443,200 @@ export async function fetchAdminDeals(
 
   return { deals: opts?.stuckOnly ? deals.filter((d) => d.stuck) : deals };
 }
+
+/** Drop ops-only columns before a listing is returned on a public route. */
+export function omitModerationFields<
+  T extends {
+    moderationStatus?: unknown;
+    moderationReason?: unknown;
+    moderationNote?: unknown;
+  },
+>(row: T): Omit<T, "moderationStatus" | "moderationReason" | "moderationNote"> {
+  const {
+    moderationStatus: _status,
+    moderationReason: _reason,
+    moderationNote: _note,
+    ...rest
+  } = row;
+  return rest;
+}
+
+/** Public feeds omit hidden and removed listings. Chain `status` stays untouched. */
+export function visibleListingWhere(where: Record<string, unknown>): Record<string, unknown> {
+  return {
+    AND: [
+      where,
+      {
+        OR: [{ moderationStatus: null }, { moderationStatus: { notIn: ["HIDDEN", "REMOVED"] } }],
+      },
+    ],
+  };
+}
+
+export type TrustListingFilter = "needs_review" | "hidden" | "flagged" | "all";
+
+export function parseTrustListingFilter(raw: string): TrustListingFilter {
+  const normalized = raw
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+  if (normalized === "hidden") return "hidden";
+  if (normalized === "flagged") return "flagged";
+  if (normalized === "all") return "all";
+  return "needs_review";
+}
+
+const OPEN_REASON_CODES = ["PENDING_REVIEW", "FLAGGED", "REPORT"] as const;
+
+/** Live rows still waiting on a decision. Hidden and removed are already acted on. */
+export function trustQueueCountWhere(): Record<string, unknown> {
+  return {
+    moderationStatus: null,
+    moderationReason: { in: [...OPEN_REASON_CODES] },
+  };
+}
+
+export function trustListingsWhere(filter: string, q: string): Record<string, unknown> {
+  const where: Record<string, unknown> = {};
+  const queue = parseTrustListingFilter(filter);
+  if (queue === "needs_review") {
+    Object.assign(where, trustQueueCountWhere());
+  } else if (queue === "flagged") {
+    where.moderationReason = "FLAGGED";
+  } else if (queue === "hidden") {
+    where.moderationStatus = "HIDDEN";
+  }
+  const query = q.trim();
+  if (query) {
+    where.OR = [
+      { id: { contains: query } },
+      { title: { contains: query, mode: "insensitive" } },
+      { seller: { contains: query.toLowerCase() } },
+    ];
+  }
+  return where;
+}
+
+export type ModerationAction = "hide" | "flag" | "clear" | "remove";
+
+export type ModerationPatch = {
+  moderationStatus: string | null;
+  moderationReason: string | null;
+  moderationNote: string | null;
+};
+
+function moderationNoteText(reason: string | null | undefined): string | null {
+  const trimmed = (reason ?? "").trim().slice(0, 500);
+  return trimmed || null;
+}
+
+function keptVisibility(currentStatus: string | null | undefined): string | null {
+  const status = (currentStatus ?? "").toUpperCase();
+  if (status === "HIDDEN" || status === "REMOVED") return status;
+  return null;
+}
+
+/**
+ * Visibility lives on moderationStatus (null live, HIDDEN, REMOVED).
+ * The reason column is a code, never the hide-sheet note.
+ */
+export function moderationPatch(
+  action: ModerationAction,
+  reason?: string | null,
+  currentStatus?: string | null,
+): ModerationPatch {
+  if (action === "clear") {
+    return { moderationStatus: null, moderationReason: null, moderationNote: null };
+  }
+  if (action === "flag") {
+    return {
+      moderationStatus: keptVisibility(currentStatus),
+      moderationReason: "FLAGGED",
+      moderationNote: null,
+    };
+  }
+  if (action === "remove") {
+    return { moderationStatus: "REMOVED", moderationReason: "MANUAL", moderationNote: null };
+  }
+  return {
+    moderationStatus: "HIDDEN",
+    moderationReason: "MANUAL",
+    moderationNote: moderationNoteText(reason),
+  };
+}
+
+export type TrustListingRow = {
+  id: string;
+  title: string | null;
+  imageUrl: string | null;
+  seller: string;
+  status: string;
+  onChainConfirmed: boolean;
+  disputeStatus: string | null;
+  moderationStatus: string | null;
+  moderationReason: string | null;
+  updatedAt: string;
+};
+
+type TrustListingDbRow = {
+  id: string;
+  title?: string | null;
+  imageUrl?: string | null;
+  seller?: string | null;
+  status?: string | null;
+  onChainConfirmed?: boolean | null;
+  disputeStatus?: string | null;
+  moderationStatus?: string | null;
+  moderationReason?: string | null;
+  updatedAt: Date | string;
+};
+
+export function toTrustListingRow(row: TrustListingDbRow): TrustListingRow {
+  return {
+    id: row.id,
+    title: row.title ?? null,
+    imageUrl: row.imageUrl ?? null,
+    seller: row.seller ?? "",
+    status: row.status ?? "",
+    onChainConfirmed: !!row.onChainConfirmed,
+    disputeStatus: row.disputeStatus ?? null,
+    moderationStatus: row.moderationStatus ?? null,
+    moderationReason: row.moderationReason ?? null,
+    updatedAt: new Date(row.updatedAt).toISOString(),
+  };
+}
+
+export async function fetchTrustQueue(
+  prisma: PrismaClient,
+  opts?: { filter?: string; q?: string },
+): Promise<{
+  listings: TrustListingRow[];
+  counts: { listings: number; users: number; disputes: number };
+}> {
+  const where = trustListingsWhere(opts?.filter ?? "", opts?.q ?? "");
+  const [rows, flagged] = await Promise.all([
+    prisma.listing.findMany({
+      where: where as never,
+      orderBy: { updatedAt: "desc" },
+      take: 200,
+      select: {
+        id: true,
+        title: true,
+        imageUrl: true,
+        seller: true,
+        status: true,
+        onChainConfirmed: true,
+        disputeStatus: true,
+        moderationStatus: true,
+        moderationReason: true,
+        updatedAt: true,
+      },
+    }) as Promise<TrustListingDbRow[]>,
+    prisma.listing.count({ where: trustQueueCountWhere() as never }),
+  ]);
+  return {
+    listings: rows.map(toTrustListingRow),
+    // Users (2b) and disputes (2c) stay empty in this slice.
+    counts: { listings: flagged, users: 0, disputes: 0 },
+  };
+}

@@ -212,8 +212,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           <div className="px-4 py-5">
             <p className="text-sm font-semibold text-white">Ops</p>
           </div>
-          <nav className="flex flex-col gap-1 px-3" aria-label="Admin">
-            {ADMIN_NAV.map((item) => {
+          <nav className="flex flex-1 flex-col gap-1 px-3 pb-4" aria-label="Admin">
+            {ADMIN_NAV.filter((item) => !item.secondary).map((item) => {
               if (item.comingSoon) {
                 return (
                   <span
@@ -240,6 +240,22 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                 </Link>
               );
             })}
+            <div className="mt-auto border-t border-hairline pt-3">
+              {ADMIN_NAV.filter((item) => item.secondary).map((item) => {
+                const active = item.id === activeTab;
+                return (
+                  <Link
+                    key={item.id}
+                    href={item.href}
+                    className={`block rounded-[12px] px-3 py-2 text-[13px] ${
+                      active ? "text-white/70" : "text-white/35 hover:text-white/55"
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
           </nav>
         </aside>
 
@@ -279,13 +295,14 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                 );
               }
               const active = item.id === activeTab;
+              const tone = item.secondary
+                ? `text-[11px] ${active ? "text-white/70" : "text-white/35"}`
+                : `text-xs ${active ? `${material.chrome} text-chrome` : "text-silver"}`;
               return (
                 <Link
                   key={item.id}
                   href={item.href}
-                  className={`shrink-0 rounded-[12px] px-3 py-1.5 text-xs font-medium ${
-                    active ? `${material.chrome} text-chrome` : "text-silver"
-                  }`}
+                  className={`shrink-0 rounded-[12px] px-3 py-1.5 font-medium ${tone}`}
                 >
                   {item.label}
                 </Link>

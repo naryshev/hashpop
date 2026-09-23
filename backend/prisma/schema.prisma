@@ -41,7 +41,15 @@ model Listing {
   locationLng        Float?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+  /// Visibility for ops. null = live, HIDDEN, REMOVED. Not chain status.
+  moderationStatus   String?
+  /// Reason chip code: PENDING_REVIEW | FLAGGED | REPORT | MANUAL.
+  moderationReason   String?
+  /// Hide-sheet note. Never rendered in the queue.
+  moderationNote     String?
   sales              Sale[]
+
+  @@index([moderationStatus])
 }
 
 model Auction {
@@ -184,6 +192,6 @@ model Offer {
   @@unique([listingId, buyer])
 }
 
-// Phase 2 (Trust & Safety): reports inbox / user-risk models are intentionally
-// not added in this schema. Phase 3 money/escrow admin resolve is also later.
+// Phase 2a stores listing moderation on Listing.moderationStatus.
+// User watch/restrict (2b) and populated escrow disputes (2c) stay out.
 
