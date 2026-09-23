@@ -1,6 +1,6 @@
 import path from "path";
 import fs from "fs";
-import { Router, type Request as ExpressRequest } from "express";
+import { Router } from "express";
 import multer from "multer";
 import { PrismaClient } from "../generated/prisma/client";
 import type { Logger } from "pino";
@@ -10,6 +10,13 @@ import { decodeEvents, EXPECTED_TOPIC0_ITEM_LISTED } from "../indexer/decoder";
 import { saveUpload } from "../storage";
 import { decryptJson, encryptJson, secretBoxConfigured } from "../lib/secretBox";
 import { listingVariantsForDb } from "../listingVariants";
+import { isAdminAddress, verifyAdminToken } from "../adminAuth";
+import {
+  adminListingsWhere,
+  computeAdminStats,
+  fetchAdminActivity,
+  fetchAdminDeals,
+} from "../adminOps";
 
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB
 const MAX_MEDIA_SIZE = 15 * 1024 * 1024; // 15MB for video
@@ -2985,64 +2992,9 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
   });
 
   // ---------------------------------------------------------------------------
-  // /area51 admin portal
+  // /admin ops portal (Phase 1). Same signed session as Area 51:
+  // ADMIN_ADDRESSES allowlist + `hashpop.admin.session:<unix-ms>` in x-admin-token.
   // ---------------------------------------------------------------------------
-  // Admin addresses are configured via the ADMIN_ADDRESSES env var (a
-  // comma-separated list of lowercased EVM addresses). To access the portal,
-  // an admin signs `hashpop.admin.session:<unix-ms>` with their wallet; the
-  // resulting token (base64-encoded JSON of {address, t, signature}) is sent
-  // in the `x-admin-token` header on every admin request and verified server
-  // side. Tokens are valid for 24h.
-
-  function isAdminAddress(addr: string | null | undefined): boolean {
-    if (!addr) return false;
-    const raw = process.env.ADMIN_ADDRESSES || "";
-    const set = new Set(
-      raw
-        .split(",")
-        .map((s) => s.trim().toLowerCase())
-        .filter(Boolean),
-    );
-    return set.has(addr.toLowerCase());
-  }
-
-  function verifyAdminToken(
-    req: ExpressRequest,
-  ): { ok: true; address: string } | { ok: false; error: string; status: number } {
-    const raw = req.headers["x-admin-token"];
-    if (!raw || typeof raw !== "string") {
-      return { ok: false, error: "Missing admin token", status: 401 };
-    }
-    let parsed: { address?: unknown; t?: unknown; signature?: unknown };
-    try {
-      parsed = JSON.parse(Buffer.from(raw, "base64").toString("utf8"));
-    } catch {
-      return { ok: false, error: "Malformed admin token", status: 401 };
-    }
-    const { address, t, signature } = parsed;
-    if (typeof address !== "string" || typeof t !== "number" || typeof signature !== "string") {
-      return { ok: false, error: "Malformed admin token", status: 401 };
-    }
-    const ageMs = Date.now() - t;
-    if (ageMs < 0 || ageMs > 24 * 60 * 60 * 1000) {
-      return { ok: false, error: "Admin session expired", status: 401 };
-    }
-    const message = `hashpop.admin.session:${t}`;
-    let recovered: string;
-    try {
-      recovered = ethers.verifyMessage(message, signature).toLowerCase();
-    } catch {
-      return { ok: false, error: "Invalid admin signature", status: 401 };
-    }
-    const normalized = address.toLowerCase();
-    if (recovered !== normalized) {
-      return { ok: false, error: "Admin signature mismatch", status: 401 };
-    }
-    if (!isAdminAddress(normalized)) {
-      return { ok: false, error: "Not authorised", status: 403 };
-    }
-    return { ok: true, address: normalized };
-  }
 
   // Tells the frontend whether the given address is in the admin allowlist.
   // This is the only admin endpoint that doesn't require a signed session —
@@ -3059,33 +3011,47 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     const auth = verifyAdminToken(req);
     if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
     try {
-      const [total, active, pending, sold, locked, salesCount, salesAgg, usersCount] =
-        await Promise.all([
-          prisma.listing.count(),
-          prisma.listing.count({ where: { status: "LISTED", onChainConfirmed: true } }),
-          prisma.listing.count({ where: { status: "LISTED", onChainConfirmed: false } }),
-          prisma.listing.count({ where: { status: "SOLD" } }),
-          prisma.listing.count({ where: { status: "LOCKED" } }),
-          prisma.sale.count(),
-          prisma.sale.findMany({ select: { amount: true } }),
-          prisma.user.count(),
-        ]);
-      const volumeTinybar = salesAgg.reduce((sum, s) => {
-        try {
-          return sum + BigInt(s.amount || "0");
-        } catch {
-          return sum;
-        }
-      }, 0n);
-      // 1 HBAR = 1e8 tinybar; report a string to avoid number precision loss.
-      const volumeHbar = (Number(volumeTinybar) / 1e8).toFixed(2);
-      return res.json({
-        listings: { total, active, pending, sold, locked },
-        sales: { count: salesCount, volumeHbar },
-        users: { count: usersCount },
-      });
+      const stats = await computeAdminStats(prisma);
+      return res.json(stats);
     } catch (err) {
       log.error({ err }, "Admin: failed to compute stats");
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  router.get("/admin/activity", async (req, res) => {
+    const auth = verifyAdminToken(req);
+    if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
+    try {
+      const limitRaw = Number(req.query.limit);
+      const limit = Number.isFinite(limitRaw) ? limitRaw : undefined;
+      const { events } = await fetchAdminActivity(prisma, { limit });
+      return res.json({ events });
+    } catch (err) {
+      log.error({ err }, "Admin: failed to load activity");
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  router.get("/admin/deals", async (req, res) => {
+    const auth = verifyAdminToken(req);
+    if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
+    try {
+      const stuckOnly =
+        String(req.query.stuck ?? req.query.stuckOnly ?? "").toLowerCase() === "1" ||
+        String(req.query.stuck ?? req.query.stuckOnly ?? "").toLowerCase() === "true";
+      const stuckDaysRaw = Number(req.query.stuckDays);
+      const stuckDays =
+        Number.isFinite(stuckDaysRaw) && stuckDaysRaw > 0 ? stuckDaysRaw : undefined;
+      const { deals } = await fetchAdminDeals(prisma, { stuckOnly, stuckDays });
+      return res.json({
+        deals: deals.map((d) => ({
+          ...d,
+          imageUrl: rewriteMediaUrlForClient(d.imageUrl),
+        })),
+      });
+    } catch (err) {
+      log.error({ err }, "Admin: failed to load deals");
       return res.status(500).json({ error: "Internal server error" });
     }
   });
@@ -3094,22 +3060,10 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     const auth = verifyAdminToken(req);
     if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
     try {
-      const status = String(req.query.status ?? "")
-        .trim()
-        .toUpperCase();
+      const status = String(req.query.status ?? "").trim();
       const q = String(req.query.q ?? "").trim();
-      const where: Record<string, unknown> = {};
-      if (status) where.status = status;
-      if (q) {
-        where.OR = [
-          { id: { contains: q } },
-          { title: { contains: q, mode: "insensitive" } },
-          { seller: { contains: q.toLowerCase() } },
-          { buyer: { contains: q.toLowerCase() } },
-        ];
-      }
       const listings = await prisma.listing.findMany({
-        where,
+        where: adminListingsWhere(q, status) as never,
         orderBy: { createdAt: "desc" },
         take: 500,
       });

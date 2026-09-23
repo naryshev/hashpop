@@ -61,7 +61,7 @@ function pathnameTitle(pathname: string): string {
   if (pathname.startsWith("/profile")) return "Profile";
   if (pathname.startsWith("/listing")) return "";
   if (pathname.startsWith("/purchase-success")) return "Purchase";
-  if (pathname.startsWith("/admin")) return "Admin";
+  if (pathname.startsWith("/admin") || pathname.startsWith("/area51")) return "Admin";
   return "";
 }
 
@@ -185,6 +185,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
     "/create",
   ];
   const showMobileHeader = MOBILE_HEADER_ROUTES.includes(pathname);
+  const isAdminRoute = pathname.startsWith("/admin") || pathname.startsWith("/area51");
   // Full-screen surfaces (open message thread) hide all chrome.
   const [immersive, setImmersive] = useState(false);
   useEffect(() => {
@@ -192,6 +193,12 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
     window.addEventListener("hashpop:immersive", onImmersive);
     return () => window.removeEventListener("hashpop:immersive", onImmersive);
   }, []);
+
+  // Admin owns its own rail + top bar. Consumer marketplace chrome (and the
+  // floating dock) must not leak onto /admin — especially the non-admin stub.
+  if (isAdminRoute) {
+    return <div className="min-h-[100dvh] bg-bg">{children}</div>;
+  }
 
   return (
     <div className="flex min-h-screen flex-col">

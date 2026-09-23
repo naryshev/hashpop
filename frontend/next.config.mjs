@@ -13,6 +13,9 @@ const nextConfig = {
   // @hashgraph/sdk and @hashgraph/proto (protobuf Long.js patterns).
   // Terser handles these edge cases correctly.
   swcMinify: false,
+  async redirects() {
+    return [{ source: "/area51", destination: "/admin", permanent: false }];
+  },
   transpilePackages: [
     "@hashgraph/sdk",
     "@hashgraph/proto",
