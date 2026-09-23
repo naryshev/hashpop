@@ -135,7 +135,10 @@ describe("ListingCard softTrust", () => {
     expect(title.compareDocumentPosition(media) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(0);
     expect(media.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(document.querySelector('[data-testid="wishlist"]')).toBeTruthy();
-    expect(media.compareDocumentPosition(document.querySelector('[data-testid="wishlist"]')!) & Node.DOCUMENT_POSITION_CONTAINED_BY).toBeTruthy();
+    expect(
+      media.compareDocumentPosition(document.querySelector('[data-testid="wishlist"]')!) &
+        Node.DOCUMENT_POSITION_CONTAINED_BY,
+    ).toBeTruthy();
     expect(document.querySelector('[data-testid="trust-strip"]')).toBeNull();
     const chips = [...document.querySelectorAll('[data-testid="grid-trust-chip"]')];
     expect(chips.map((chip) => chip.textContent)).toEqual(["Meetup"]);
