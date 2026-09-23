@@ -16,6 +16,11 @@ import {
   computeAdminStats,
   fetchAdminActivity,
   fetchAdminDeals,
+  fetchTrustQueue,
+  moderationPatch,
+  omitModerationFields,
+  visibleListingWhere,
+  type ModerationAction,
 } from "../adminOps";
 
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB
@@ -414,7 +419,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       // on-chain. PENDING / unconfirmed listings stay out of the public
       // marketplace so buyers don't see items that may never actually appear.
       const listings = await prisma.listing.findMany({
-        where: { status: "LISTED", onChainConfirmed: true },
+        where: visibleListingWhere({ status: "LISTED", onChainConfirmed: true }) as never,
         orderBy: { createdAt: "desc" },
         take: 100,
       });
@@ -479,7 +484,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       }
       const payload = {
         listings: listings.map((l) => ({
-          ...l,
+          ...omitModerationFields(l),
           imageUrl: rewriteMediaUrlForClient(l.imageUrl),
           mediaUrls: rewriteMediaUrlsForClient((l as any).mediaUrls) ?? (l as any).mediaUrls,
           status: listingStatusOverrides.get(l.id) ?? l.status,
@@ -1543,7 +1548,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
 
       res.json({
         listing: {
-          ...listing,
+          ...omitModerationFields(listing),
           imageUrl: rewriteMediaUrlForClient((listing as any).imageUrl),
           mediaUrls:
             rewriteMediaUrlsForClient((listing as any).mediaUrls) ?? (listing as any).mediaUrls,
@@ -2028,7 +2033,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       });
       res.json({
         listing: {
-          ...updated,
+          ...omitModerationFields(updated),
           imageUrl: rewriteMediaUrlForClient((updated as any).imageUrl),
           mediaUrls:
             rewriteMediaUrlsForClient((updated as any).mediaUrls) ?? (updated as any).mediaUrls,
@@ -2141,7 +2146,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       const [activeListings, archivedListings, activeAuctions, archivedAuctions] =
         await Promise.all([
           prisma.listing.findMany({
-            where: { seller: addrLower, status: "LISTED" },
+            where: visibleListingWhere({ seller: addrLower, status: "LISTED" }) as never,
             orderBy: { createdAt: "desc" },
           }),
           prisma.listing.findMany({
@@ -2165,14 +2170,14 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         ]);
       res.json({
         active: activeListings.map((l) => ({
-          ...l,
+          ...omitModerationFields(l),
           imageUrl: rewriteMediaUrlForClient((l as any).imageUrl),
           mediaUrls: rewriteMediaUrlsForClient((l as any).mediaUrls) ?? (l as any).mediaUrls,
           price: toHbarForClient(l.price),
           itemType: "listing" as const,
         })),
         archived: archivedListings.map((l) => ({
-          ...l,
+          ...omitModerationFields(l),
           imageUrl: rewriteMediaUrlForClient((l as any).imageUrl),
           mediaUrls: rewriteMediaUrlsForClient((l as any).mediaUrls) ?? (l as any).mediaUrls,
           price: toHbarForClient(l.price),
@@ -2653,7 +2658,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
 
       const [activeListings, totalSalesFromSales, ratingAgg, completedBuys] = await Promise.all([
         prisma.listing.count({
-          where: { status: "LISTED", seller: addrLower },
+          where: visibleListingWhere({ status: "LISTED", seller: addrLower }) as never,
         }),
         prisma.sale.count({
           where: { seller: addrLower },
@@ -3083,6 +3088,56 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       });
     } catch (err) {
       log.error({ err }, "Admin: failed to list listings");
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  router.get("/admin/trust/listings", async (req, res) => {
+    const auth = verifyAdminToken(req);
+    if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
+    try {
+      const filter = String(req.query.filter ?? "needs_review");
+      const q = String(req.query.q ?? "");
+      const queue = await fetchTrustQueue(prisma, { filter, q });
+      return res.json({
+        ...queue,
+        listings: queue.listings.map((listing) => ({
+          ...listing,
+          imageUrl: rewriteMediaUrlForClient(listing.imageUrl),
+        })),
+      });
+    } catch (err) {
+      log.error({ err }, "Admin: failed to load trust queue");
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  router.post("/admin/listing/:id/moderation", async (req, res) => {
+    invalidateListingsCache();
+    const auth = verifyAdminToken(req);
+    if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
+    const action = String((req.body as { action?: string } | undefined)?.action ?? "");
+    if (action !== "hide" && action !== "flag" && action !== "clear") {
+      return res.status(400).json({ error: "action must be hide, flag, or clear" });
+    }
+    try {
+      const id = resolveListingIdParam(req.params.id ?? "");
+      const listing = await prisma.listing.findUnique({ where: { id } });
+      if (!listing) return res.status(404).json({ error: "Listing not found" });
+      const reason = (req.body as { reason?: string } | undefined)?.reason;
+      const patch = moderationPatch(action as ModerationAction, reason);
+      const updated = await prisma.listing.update({
+        where: { id },
+        data: patch,
+      });
+      log.info({ admin: auth.address, listingId: id, action }, "Admin moderated listing");
+      return res.json({
+        ok: true,
+        moderationStatus: updated.moderationStatus,
+        moderationReason: updated.moderationReason,
+      });
+    } catch (err) {
+      log.error({ err }, "Admin: failed to moderate listing");
       return res.status(500).json({ error: "Internal server error" });
     }
   });

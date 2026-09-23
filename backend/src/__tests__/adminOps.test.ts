@@ -4,7 +4,12 @@ import {
   computeAdminStats,
   fetchAdminActivity,
   fetchAdminDeals,
+  fetchTrustQueue,
   mergeAdminEvents,
+  moderationPatch,
+  omitModerationFields,
+  trustListingsWhere,
+  visibleListingWhere,
   type AdminActivityEvent,
 } from "../adminOps";
 
@@ -258,5 +263,102 @@ describe("fetchAdminDeals", () => {
       stuckOnly: true,
     });
     expect(deals).toEqual([]);
+  });
+});
+
+describe("trust queue moderation", () => {
+  it("strips moderation fields from public listing payloads", () => {
+    expect(
+      omitModerationFields({
+        id: "1",
+        title: "Watch",
+        moderationStatus: "FLAGGED",
+        moderationReason: "Flagged for review",
+      }),
+    ).toEqual({ id: "1", title: "Watch" });
+  });
+
+  it("keeps hidden listings out of public marketplace queries", () => {
+    expect(visibleListingWhere({ status: "LISTED", onChainConfirmed: true })).toEqual({
+      AND: [
+        { status: "LISTED", onChainConfirmed: true },
+        { OR: [{ moderationStatus: null }, { moderationStatus: { not: "HIDDEN" } }] },
+      ],
+    });
+  });
+
+  it("maps queue filters onto moderation status without touching chain status", () => {
+    expect(trustListingsWhere("needs_review", "")).toEqual({ moderationStatus: "FLAGGED" });
+    expect(trustListingsWhere("flagged", "")).toEqual({ moderationStatus: "FLAGGED" });
+    expect(trustListingsWhere("hidden", "")).toEqual({ moderationStatus: "HIDDEN" });
+    expect(trustListingsWhere("all", "Watch")).toEqual({
+      OR: [
+        { id: { contains: "Watch" } },
+        { title: { contains: "Watch", mode: "insensitive" } },
+        { seller: { contains: "watch" } },
+      ],
+    });
+    expect(trustListingsWhere("needs review", "abc")).toEqual({
+      moderationStatus: "FLAGGED",
+      OR: [
+        { id: { contains: "abc" } },
+        { title: { contains: "abc", mode: "insensitive" } },
+        { seller: { contains: "abc" } },
+      ],
+    });
+  });
+
+  it("hides, flags, and clears with a stored reason", () => {
+    expect(moderationPatch("hide", "  counterfeit  ")).toEqual({
+      moderationStatus: "HIDDEN",
+      moderationReason: "counterfeit",
+    });
+    expect(moderationPatch("flag", "")).toEqual({
+      moderationStatus: "FLAGGED",
+      moderationReason: "Flagged for review",
+    });
+    expect(moderationPatch("clear", "ignored")).toEqual({
+      moderationStatus: null,
+      moderationReason: null,
+    });
+  });
+
+  it("counts only flagged listings for the 2a queue badge and leaves users and disputes empty", async () => {
+    const prisma = {
+      listing: {
+        count: vi.fn().mockResolvedValue(3),
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: "0xabc",
+            title: "Watch",
+            imageUrl: "/img.png",
+            seller: "0xseller",
+            status: "LISTED",
+            onChainConfirmed: true,
+            disputeStatus: null,
+            moderationStatus: "FLAGGED",
+            moderationReason: "Flagged for review",
+            updatedAt: new Date("2026-09-20T00:00:00.000Z"),
+          },
+        ]),
+      },
+    };
+    const queue = await fetchTrustQueue(prisma as never, { filter: "needs_review", q: "" });
+    expect(prisma.listing.count).toHaveBeenCalledWith({ where: { moderationStatus: "FLAGGED" } });
+    expect(queue.counts).toEqual({ listings: 3, users: 0, disputes: 0 });
+    expect(queue.listings).toEqual([
+      {
+        id: "0xabc",
+        title: "Watch",
+        imageUrl: "/img.png",
+        seller: "0xseller",
+        status: "LISTED",
+        onChainConfirmed: true,
+        disputeStatus: null,
+        moderationStatus: "FLAGGED",
+        moderationReason: "Flagged for review",
+        updatedAt: "2026-09-20T00:00:00.000Z",
+      },
+    ]);
   });
 });

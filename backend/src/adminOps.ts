@@ -443,3 +443,148 @@ export async function fetchAdminDeals(
 
   return { deals: opts?.stuckOnly ? deals.filter((d) => d.stuck) : deals };
 }
+
+/** Drop ops-only columns before a listing is returned on a public route. */
+export function omitModerationFields<
+  T extends { moderationStatus?: unknown; moderationReason?: unknown },
+>(row: T): Omit<T, "moderationStatus" | "moderationReason"> {
+  const { moderationStatus: _status, moderationReason: _reason, ...rest } = row;
+  return rest;
+}
+
+/** Public feeds omit ops-hidden listings. Chain `status` stays untouched. */
+export function visibleListingWhere(where: Record<string, unknown>): Record<string, unknown> {
+  return {
+    AND: [where, { OR: [{ moderationStatus: null }, { moderationStatus: { not: "HIDDEN" } }] }],
+  };
+}
+
+export type TrustListingFilter = "needs_review" | "hidden" | "flagged" | "all";
+
+export function parseTrustListingFilter(raw: string): TrustListingFilter {
+  const normalized = raw
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+  if (normalized === "hidden") return "hidden";
+  if (normalized === "flagged") return "flagged";
+  if (normalized === "all") return "all";
+  return "needs_review";
+}
+
+export function trustListingsWhere(filter: string, q: string): Record<string, unknown> {
+  const where: Record<string, unknown> = {};
+  const queue = parseTrustListingFilter(filter);
+  if (queue === "needs_review" || queue === "flagged") where.moderationStatus = "FLAGGED";
+  else if (queue === "hidden") where.moderationStatus = "HIDDEN";
+  const query = q.trim();
+  if (query) {
+    where.OR = [
+      { id: { contains: query } },
+      { title: { contains: query, mode: "insensitive" } },
+      { seller: { contains: query.toLowerCase() } },
+    ];
+  }
+  return where;
+}
+
+export type ModerationAction = "hide" | "flag" | "clear";
+
+function moderationReasonText(reason: string | null | undefined, fallback: string): string {
+  const trimmed = (reason ?? "").trim().slice(0, 500);
+  return trimmed || fallback;
+}
+
+/** Smallest real mutation: a column the indexer does not rewrite. */
+export function moderationPatch(
+  action: ModerationAction,
+  reason?: string | null,
+): { moderationStatus: string | null; moderationReason: string | null } {
+  if (action === "clear") return { moderationStatus: null, moderationReason: null };
+  if (action === "hide") {
+    return {
+      moderationStatus: "HIDDEN",
+      moderationReason: moderationReasonText(reason, "Hidden by ops"),
+    };
+  }
+  return {
+    moderationStatus: "FLAGGED",
+    moderationReason: moderationReasonText(reason, "Flagged for review"),
+  };
+}
+
+export type TrustListingRow = {
+  id: string;
+  title: string | null;
+  imageUrl: string | null;
+  seller: string;
+  status: string;
+  onChainConfirmed: boolean;
+  disputeStatus: string | null;
+  moderationStatus: string | null;
+  moderationReason: string | null;
+  updatedAt: string;
+};
+
+type TrustListingDbRow = {
+  id: string;
+  title?: string | null;
+  imageUrl?: string | null;
+  seller?: string | null;
+  status?: string | null;
+  onChainConfirmed?: boolean | null;
+  disputeStatus?: string | null;
+  moderationStatus?: string | null;
+  moderationReason?: string | null;
+  updatedAt: Date | string;
+};
+
+export function toTrustListingRow(row: TrustListingDbRow): TrustListingRow {
+  return {
+    id: row.id,
+    title: row.title ?? null,
+    imageUrl: row.imageUrl ?? null,
+    seller: row.seller ?? "",
+    status: row.status ?? "",
+    onChainConfirmed: !!row.onChainConfirmed,
+    disputeStatus: row.disputeStatus ?? null,
+    moderationStatus: row.moderationStatus ?? null,
+    moderationReason: row.moderationReason ?? null,
+    updatedAt: new Date(row.updatedAt).toISOString(),
+  };
+}
+
+export async function fetchTrustQueue(
+  prisma: PrismaClient,
+  opts?: { filter?: string; q?: string },
+): Promise<{
+  listings: TrustListingRow[];
+  counts: { listings: number; users: number; disputes: number };
+}> {
+  const where = trustListingsWhere(opts?.filter ?? "", opts?.q ?? "");
+  const [rows, flagged] = await Promise.all([
+    prisma.listing.findMany({
+      where: where as never,
+      orderBy: { updatedAt: "desc" },
+      take: 200,
+      select: {
+        id: true,
+        title: true,
+        imageUrl: true,
+        seller: true,
+        status: true,
+        onChainConfirmed: true,
+        disputeStatus: true,
+        moderationStatus: true,
+        moderationReason: true,
+        updatedAt: true,
+      },
+    }) as Promise<TrustListingDbRow[]>,
+    prisma.listing.count({ where: { moderationStatus: "FLAGGED" } }),
+  ]);
+  return {
+    listings: rows.map(toTrustListingRow),
+    // Users (2b) and disputes (2c) stay empty in this slice.
+    counts: { listings: flagged, users: 0, disputes: 0 },
+  };
+}

@@ -68,7 +68,7 @@ describe("resolveAdminGateView", () => {
 });
 
 describe("adminNav", () => {
-  it("locks Phase 1 rail to Overview, Trust & safety, Money, Contracts", () => {
+  it("locks the rail to Overview, live Trust & safety, Money soon, quieter Contracts", () => {
     expect(ADMIN_NAV.map((item) => item.id)).toEqual(["overview", "trust", "money", "contracts"]);
     expect(ADMIN_NAV.map((item) => item.label)).toEqual([
       "Overview",
@@ -76,14 +76,15 @@ describe("adminNav", () => {
       "Money",
       "Contracts",
     ]);
-    expect(ADMIN_NAV.filter((item) => item.comingSoon).map((item) => item.id)).toEqual([
-      "trust",
-      "money",
-    ]);
+    expect(ADMIN_NAV.find((item) => item.id === "trust")?.href).toBe("/admin/trust");
+    expect(ADMIN_NAV.find((item) => item.id === "trust")?.comingSoon).toBeUndefined();
+    expect(ADMIN_NAV.filter((item) => item.comingSoon).map((item) => item.id)).toEqual(["money"]);
+    expect(ADMIN_NAV.find((item) => item.id === "contracts")?.secondary).toBe(true);
   });
 
   it("maps admin routes to the locked tabs", () => {
     expect(adminTabFromPath("/admin")).toBe("overview");
+    expect(adminTabFromPath("/admin/trust")).toBe("trust");
     expect(adminTabFromPath("/admin/contracts")).toBe("contracts");
     expect(adminTabFromPath("/admin/listings")).toBe("overview");
     expect(adminTabFromPath("/admin/deals")).toBe("overview");
