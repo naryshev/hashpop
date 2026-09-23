@@ -20,6 +20,7 @@ import { useProfiles } from "../../lib/profiles";
 import { TopBarSlot } from "../../lib/topBar";
 import { listingCta, material } from "../../lib/materials";
 import { cn } from "../../lib/utils";
+import { parseViewMode, viewModeQueryValue, type ViewMode } from "../../lib/marketplaceView";
 import { ChevronDown, Search as SearchIcon, SlidersHorizontal } from "lucide-react";
 
 function normalizeListingStatus(status?: string): string {
@@ -42,7 +43,6 @@ function parsePostedWithinDays(value: string): number | null {
   return daysMap[value] ?? null;
 }
 
-type ViewMode = "grid" | "feed" | "editorial";
 type SortMode = "recent" | "price-asc" | "price-desc" | "trending";
 type ListingType = "all" | "physical" | "digital";
 
@@ -55,11 +55,6 @@ const ALL_CATEGORIES = CATEGORY_GROUPS.flatMap((g) => g.categories);
 
 function parseListingType(value: string | null): ListingType {
   return value === "physical" || value === "digital" ? value : "all";
-}
-
-function parseViewMode(value: string | null): ViewMode {
-  if (value === "feed" || value === "grid") return value;
-  return "editorial";
 }
 
 function parseSortMode(value: string | null): SortMode {
@@ -590,7 +585,7 @@ export default function MarketplacePageClient({
               type="button"
               onClick={() => {
                 setViewMenuOpen(false);
-                setParam("view", v.id === "editorial" ? null : v.id);
+                setParam("view", viewModeQueryValue(v.id));
               }}
               className={`block w-full rounded-lg px-3 py-1.5 text-left text-xs transition-colors duration-300 ${
                 viewMode === v.id ? "bg-[#00ffa3]/10 text-[#00ffa3]" : "text-white hover:bg-white/5"
@@ -957,43 +952,15 @@ export default function MarketplacePageClient({
                             {rest.length.toLocaleString()} more
                           </span>
                         </div>
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6 gap-4 auto-rows-[120px]">
-                          {rest.map((item, i) => {
-                            const tall = i % 5 === 1 || i % 5 === 4;
-                            return (
-                              <Link
-                                key={`${item.itemType}-${item.id}`}
-                                href={listingHref(item.id)}
-                                className={`group relative block overflow-hidden rounded-[16px] border border-hairline ${
-                                  tall ? "row-span-2" : ""
-                                }`}
-                                style={{ minHeight: tall ? 256 : 120 }}
-                              >
-                                <ListingMedia
-                                  listing={item}
-                                  className="absolute inset-0 w-full h-full"
-                                  aspectRatio="square"
-                                  slideshow="auto"
-                                  cardSize
-                                  compactHeight={tall ? "256px" : "120px"}
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
-                                <div className="absolute left-3 right-3 bottom-2 text-white">
-                                  <div className="text-xs font-semibold line-clamp-1">
-                                    {item.title || formatListingId(item.id) || "Untitled"}
-                                  </div>
-                                  <div className="flex items-baseline justify-between mt-0.5">
-                                    <span className="text-sm font-bold text-chrome">
-                                      {formatHbarWithUsd(
-                                        formatPriceForDisplay(item.price || "0"),
-                                        usdRate,
-                                      )}
-                                    </span>
-                                  </div>
-                                </div>
-                              </Link>
-                            );
-                          })}
+                        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                          {rest.map((item) => (
+                            <ListingCard
+                              key={`${item.itemType}-${item.id}`}
+                              item={item}
+                              density="regular"
+                              variant="mediaTrust"
+                            />
+                          ))}
                         </div>
                       </div>
                     </>
