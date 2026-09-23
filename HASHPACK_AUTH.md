@@ -135,8 +135,8 @@ Hard requirements (these are the things that make it "smooth"):
 ## Signing & auth semantics
 - Message signing uses `hashconnect.signMessages(accountId, message)` with a plain string.
   HashConnect 3 wraps that string and returns `SignerSignature[]` (`signature` is raw bytes),
-  not a hex string and not `{ signedMessages }`. Do not pass `[message]` — `Buffer.from` on that
-  array signs a single `0x00` byte.
+  not a hex string and not `{ signedMessages }`. Do not pass `[message]`. `Buffer.from` on that
+  array is a single `0x00` byte, so HashPack opens the sign prompt with a blank message.
 - The wallet signs the HIP-820 payload `\x19Hedera Signed Message:\n` + `message.length` + message
   with the account's ED25519 or ECDSA key. Verify that on the server with the mirror-node public
   key. `ethers.verifyMessage` expects an Ethereum personal_sign and will reject it.

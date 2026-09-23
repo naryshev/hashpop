@@ -1,5 +1,20 @@
+export const MISSING_CHALLENGE_ERROR =
+  "Admin sign-in challenge was missing. Refresh the page and try again.";
+
 export function adminSessionMessage(t: number): string {
-  return `hashpop.admin.session:${t}`;
+  if (!Number.isFinite(t)) {
+    throw new Error(MISSING_CHALLENGE_ERROR);
+  }
+  const message = `hashpop.admin.session:${t}`;
+  assertSignableChallenge(message);
+  return message;
+}
+
+/** Refuse blank, missing, or NUL challenges before HashPack is asked to sign. */
+export function assertSignableChallenge(message: unknown): asserts message is string {
+  if (typeof message !== "string" || message.trim().length === 0 || message.includes("\0")) {
+    throw new Error(MISSING_CHALLENGE_ERROR);
+  }
 }
 
 function bytesToHex(bytes: ArrayLike<number>): string {
@@ -54,7 +69,8 @@ type HashpackMessageSigner = {
 
 /**
  * `signMessages(accountId, message)` takes a plain string. Passing `[message]`
- * makes hashconnect `Buffer.from` the array, which signs a single 0x00 byte.
+ * makes HashConnect `Buffer.from` the array, which is a single 0x00 byte.
+ * HashPack still opens the prompt and renders that byte as a blank message.
  */
 export async function signAdminSession(
   signer: HashpackMessageSigner,
@@ -62,6 +78,7 @@ export async function signAdminSession(
   t: number,
 ): Promise<string> {
   const message = adminSessionMessage(t);
+  assertSignableChallenge(message);
   const signResult = await signer.signMessages(accountId, message);
   const signature = extractHashpackSignature(signResult);
   if (!signature) {

@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { extractHashpackSignature, signAdminSession } from "../hashpackSignature";
+import {
+  MISSING_CHALLENGE_ERROR,
+  extractHashpackSignature,
+  signAdminSession,
+} from "../hashpackSignature";
 
 describe("extractHashpackSignature", () => {
   it("reads raw signature bytes from a HashConnect SignerSignature", () => {
@@ -34,5 +38,25 @@ describe("signAdminSession", () => {
     await expect(signAdminSession({ signMessages }, "0.0.1", 1)).rejects.toThrow(
       "Could not get a signature from your wallet.",
     );
+  });
+
+  it("does not open HashPack when the challenge timestamp is missing", async () => {
+    const signMessages = vi.fn();
+    await expect(signAdminSession({ signMessages }, "0.0.1", Number.NaN)).rejects.toThrow(
+      MISSING_CHALLENGE_ERROR,
+    );
+    await expect(
+      signAdminSession({ signMessages }, "0.0.1", undefined as unknown as number),
+    ).rejects.toThrow(MISSING_CHALLENGE_ERROR);
+    expect(signMessages).not.toHaveBeenCalled();
+  });
+});
+
+describe("HashConnect message payload", () => {
+  it("turns a one-element string array into a NUL byte, which HashPack shows as a blank prompt", () => {
+    const challenge = "hashpop.admin.session:1700000000000";
+    // hashconnect signMessages does Buffer.from(argument) and sends that UTF-8 string.
+    expect(Buffer.from(challenge).toString()).toBe(challenge);
+    expect(Buffer.from([challenge] as unknown as number[]).toString()).toBe("\0");
   });
 });
