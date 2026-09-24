@@ -14,8 +14,9 @@ type WishlistButtonProps = {
   /** When true, show compact icon only (e.g. on cards) */
   compact?: boolean;
   /**
-   * Soft-trust photo heart: translucent glass when off.
-   * Wishlist-on stays the mint fill. Default keeps the solid disc.
+   * Soft-trust photo heart: darker glass when off so bright photos
+   * don't tint the circle. Wishlist-on stays the mint fill.
+   * Default keeps the solid disc.
    */
   surface?: "default" | "glass";
 };
@@ -77,7 +78,7 @@ export function WishlistButton({
           inWishlist
             ? "bg-chrome text-[#04150f]"
             : surface === "glass"
-              ? cn(material.chrome, "text-white")
+              ? "backdrop-blur-material border border-hairline bg-black/40 bg-[linear-gradient(var(--material-chrome),var(--material-chrome))] text-white"
               : cn(material.thick, "border border-hairline text-white hover:border-white/30"),
           className,
         )}
