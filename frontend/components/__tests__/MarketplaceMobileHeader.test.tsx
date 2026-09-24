@@ -320,8 +320,14 @@ describe("MarketplaceMobileHeader", () => {
     await act(async () => {
       filterButton.click();
     });
-    expect(document.querySelector('[role="dialog"][aria-label="Filters"]')).toBeTruthy();
+    const filtersDialog = document.querySelector(
+      '[role="dialog"][aria-label="Filters"]',
+    ) as HTMLElement;
+    expect(filtersDialog).toBeTruthy();
+    expect(filtersDialog.getAttribute("data-sheet-edge")).toBe("bottom");
+    expect(document.querySelector('[data-testid="marketplace-filter-drawer"]')).toBeNull();
     await waitForAbsent('[role="dialog"][aria-label="Sort"]');
+    expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
     expect(document.querySelector('[data-testid="sort-recent"]')).toBeNull();
     expect(document.querySelector('[data-testid="listing-type-all"]')).toBeTruthy();
     expect(document.querySelector('[data-testid="listing-category-Watches"]')).toBeNull();
