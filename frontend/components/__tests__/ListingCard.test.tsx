@@ -306,9 +306,11 @@ describe("ListingCard softTrust", () => {
     expect((chips[2] as HTMLElement).className).toContain("text-silver");
     const distance = document.querySelector('[data-testid="listing-distance"]') as HTMLElement;
     expect(distance.textContent).toContain("1.2 km");
-    expect(distance.className).toContain("text-chrome");
-    expect(distance.className).not.toContain("text-white/60");
-    expect(distance.querySelector("svg")).toBeTruthy();
+    expect(distance.className).toContain("text-white/70");
+    expect(distance.className).not.toContain("text-chrome");
+    expect(distance.querySelector("svg")?.getAttribute("class")).toContain("text-chrome");
+    const heart = document.querySelector('[data-testid="wishlist"]') as HTMLElement;
+    expect(heart.dataset.surface).toBe("neutral");
   });
 
   it("keeps a low completion percent on silver glass and still shows Escrow", async () => {

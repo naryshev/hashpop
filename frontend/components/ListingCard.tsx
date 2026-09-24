@@ -224,12 +224,7 @@ function SoftTrustCard({
             <ListingMedia listing={item} bleed slideshow={compact ? undefined : "hover"} />
           </Link>
           <div className="absolute right-1.5 top-1.5 z-10">
-            <WishlistButton
-              itemId={item.id}
-              itemType="listing"
-              compact
-              surface={compact ? "neutral" : "glass"}
-            />
+            <WishlistButton itemId={item.id} itemType="listing" compact surface="neutral" />
           </div>
         </div>
       </div>
@@ -257,12 +252,9 @@ function SoftTrustCard({
           {distance ? (
             <span
               data-testid="listing-distance"
-              className={cn(
-                "inline-flex shrink-0 items-center gap-0.5 text-[11px]",
-                compact ? "text-white/70" : "text-chrome",
-              )}
+              className="inline-flex shrink-0 items-center gap-0.5 text-[11px] text-white/70"
             >
-              <MapPin size={12} aria-hidden className={cn("shrink-0", compact && "text-chrome")} />
+              <MapPin size={12} aria-hidden className="shrink-0 text-chrome" />
               {distance}
             </span>
           ) : null}

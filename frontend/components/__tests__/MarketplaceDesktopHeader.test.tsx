@@ -133,6 +133,11 @@ describe("MarketplaceDesktopHeader", () => {
       'input[aria-label="Search marketplace"]',
     ) as HTMLInputElement;
     expect(input.placeholder).toBe("Search marketplace…");
+    const magnifier = search.querySelector("svg") as SVGElement;
+    expect(magnifier).toBeTruthy();
+    expect(
+      magnifier.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     const create = document.querySelector(
       '[data-testid="marketplace-desktop-create"]',
     ) as HTMLAnchorElement;

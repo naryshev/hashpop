@@ -97,6 +97,7 @@ export function MarketplaceDesktopHeader({
           data-testid="marketplace-desktop-search"
           className="mx-auto flex h-11 w-full max-w-[560px] items-center rounded-full border border-white/10 bg-white/[0.06] px-4 backdrop-blur-md"
         >
+          <SearchIcon size={18} className="shrink-0 text-white/55" aria-hidden />
           <input
             ref={searchInputRef}
             type="text"
@@ -104,9 +105,8 @@ export function MarketplaceDesktopHeader({
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Search marketplace…"
             aria-label="Search marketplace"
-            className="min-w-0 flex-1 bg-transparent text-[15px] text-white placeholder:text-white/45 focus:outline-none"
+            className="min-w-0 flex-1 bg-transparent pl-2 text-[15px] text-white placeholder:text-white/45 focus:outline-none"
           />
-          <SearchIcon size={18} className="shrink-0 text-white/55" aria-hidden />
         </div>
       </form>
 

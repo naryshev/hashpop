@@ -14,8 +14,8 @@ type WishlistButtonProps = {
   /** When true, show compact icon only (e.g. on cards) */
   compact?: boolean;
   /**
-   * Soft-trust photo heart. `glass` keeps the chrome tint (desktop).
-   * `neutral` is black/50 with no mint fill so bright photos stay dark.
+   * Soft-trust photo heart. `neutral` is black/50 + blur + white/15
+   * so bright photos stay dark. `glass` keeps a chrome tint elsewhere.
    * Wishlist-on stays the mint fill. Default keeps the solid disc.
    */
   surface?: "default" | "glass" | "neutral";
