@@ -311,11 +311,9 @@ describe("MarketplaceMobileHeader", () => {
     expect(document.querySelector('[role="dialog"][aria-label="Filters"]')).toBeTruthy();
     expect(document.querySelector('[role="dialog"][aria-label="Sort"]')).toBeNull();
     expect(document.querySelector('[data-testid="sort-recent"]')).toBeNull();
-    const selected = document.querySelector(
-      '[data-testid="listing-category-Watches"]',
-    ) as HTMLElement;
-    expect(selected.className).toContain("bg-material-chrome");
-    expect(selected.className).toContain("text-chrome");
+    expect(document.querySelector('[data-testid="listing-type-all"]')).toBeTruthy();
+    expect(document.querySelector('[data-testid="listing-category-Watches"]')).toBeNull();
+    expect(document.body.textContent).not.toContain("Category");
 
     await act(async () => {
       (

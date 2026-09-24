@@ -16,21 +16,18 @@ const TYPES: ListingType[] = ["all", "physical", "digital"];
 
 /**
  * Shared sort + filter controls. Desktop keeps this inside the search dropdown.
- * Mobile extends it with listing type and category (the old pill rows) inside
- * the same panel, opened as a sheet.
+ * Mobile adds listing type inside the sheet. Category stays a URL param and
+ * is not shown here.
  */
 export function MarketplaceFilterPanel({
   browse,
   sortMode,
   type,
-  category,
-  categories,
   cities,
   draft,
   onDraft,
   onSort,
   onType,
-  onCategory,
   onReset,
   onApply,
   showSort = true,
@@ -78,30 +75,6 @@ export function MarketplaceFilterPanel({
                   )}
                 >
                   {listingType}
-                </button>
-              );
-            })}
-          </div>
-          <p className="mt-4 text-xs font-semibold uppercase tracking-widest text-silver">
-            Category
-          </p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {categories.map((name) => {
-              const active = category === name;
-              return (
-                <button
-                  key={name}
-                  type="button"
-                  data-testid={`listing-category-${name}`}
-                  onClick={() => onCategory(name)}
-                  className={cn(
-                    "rounded-full px-3 py-1 text-xs",
-                    active
-                      ? cn(material.chrome, "text-chrome")
-                      : "border border-white/10 text-silver",
-                  )}
-                >
-                  {name}
                 </button>
               );
             })}
