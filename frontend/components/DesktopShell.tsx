@@ -98,11 +98,9 @@ function TopNavBtn({
 }
 
 /**
- * Desktop chrome: everything lives in a single top bar — logo, nav icons,
- * page slots, alerts, and the account chip. There is no left rail; the page
- * card below takes the full width so the marketplace stays the focus and
- * content only swaps when a listing (or other route) is opened. Messages and
- * profile open as overlays instead of navigating away.
+ * Desktop chrome for routes other than the marketplace home. Marketplace
+ * (≥768) owns its slim header and browse rail. Messages and profile open as
+ * overlays instead of navigating away.
  */
 export function DesktopShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -170,6 +168,10 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
 
   const fallbackTitle = pathnameTitle(pathname);
   const showFooter = pathname === "/marketplace" || pathname.startsWith("/marketplace");
+  // Marketplace home renders its own slim header (cart mark + wordmark, glass
+  // search, Create / cart / bell / profile). Keep this shell bar off that route
+  // so the icon row, Connect chip, and Sign in pill do not stack on top.
+  const marketplaceHome = pathname === "/marketplace";
 
   // Mobile page header (logo, bell, wallet pill) lives here in the shell —
   // OUTSIDE the route-keyed fade wrapper below — so it stays put on page
@@ -202,115 +204,120 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col">
-      {/* Top bar — desktop only. Sticky with a blurred backdrop so page
-          content scrolls beneath it seamlessly. */}
-      <header className="sticky top-0 z-20 hidden h-14 shrink-0 items-center gap-3 border-b border-white/5 bg-[#0b111b]/90 px-3 backdrop-blur-xl md:flex">
-        {/* Logo, then the page's search (center slot), then the nav strip. */}
-        <Link
-          href="/marketplace"
-          className="flex h-10 w-10 shrink-0 items-center justify-center"
-          aria-label="Hashpop home"
-          title="Hashpop"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/hashpop-cart-3d.PNG" alt="" className="h-7 w-auto object-contain" />
-        </Link>
-        <div ref={centerSlotRef} className="flex items-center" data-topbar-slot="center" />
-        {!centerFilled && (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              const q = fallbackQuery.trim();
-              router.push(q ? `/marketplace?q=${encodeURIComponent(q)}` : "/marketplace");
-              setFallbackQuery("");
-            }}
-          >
-            <div className="flex w-64 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.06] py-1.5 pl-3 pr-2 transition-colors duration-300 focus-within:border-[#00ffa3]/40">
-              <SearchIcon size={14} className="shrink-0 text-silver" />
-              <input
-                type="text"
-                value={fallbackQuery}
-                onChange={(e) => setFallbackQuery(e.target.value)}
-                placeholder="Search listings"
-                className="flex-1 bg-transparent text-sm text-white placeholder:text-silver/50 focus:outline-none"
-              />
-            </div>
-          </form>
-        )}
-        <nav className="flex items-center gap-0.5" aria-label="Primary navigation">
-          {items.map((item) => {
-            const active =
-              !!item.href &&
-              (pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href)));
-            return (
-              <TopNavBtn
-                key={item.label}
-                label={item.label}
-                active={active}
-                href={item.href}
-                onClick={item.onClick}
-              >
-                {item.icon}
-              </TopNavBtn>
-            );
-          })}
-        </nav>
-
-        {/* Page context label — a hairline divider + muted title anchors it
-            to the nav instead of floating loose in the bar. */}
-        <div className="flex min-w-0 items-center gap-3">
-          <span aria-hidden className="h-5 w-px shrink-0 bg-white/10" />
-          <div ref={titleSlotRef} className="flex min-w-0 items-center" />
-          {!titleFilled && fallbackTitle && (
-            <span className="truncate text-sm font-medium text-silver">{fallbackTitle}</span>
-          )}
-        </div>
-
-        <div className="flex-1" />
-
-        {/* Right cluster: page actions slot, alerts, account chip. */}
-        <div className="flex items-center gap-2">
-          <div
-            ref={actionsSlotRef}
-            className="flex items-center gap-2"
-            data-topbar-slot="actions"
-          />
+      {/* Top bar — desktop only, and not on marketplace home (that route
+          paints MarketplaceDesktopHeader). Sticky so page content scrolls
+          beneath it. */}
+      {!marketplaceHome && (
+        <header className="sticky top-0 z-20 hidden h-14 shrink-0 items-center gap-3 border-b border-white/5 bg-[#0b111b]/90 px-3 backdrop-blur-xl md:flex">
+          {/* Logo, then the page's search (center slot), then the nav strip. */}
           <Link
-            href="/cart"
-            className="relative flex h-9 w-9 items-center justify-center rounded-glass text-neutral-300 hover:bg-white/5 hover:text-white"
-            aria-label={
-              formatDockBadgeCount(cartCount) ? `Cart, ${formatDockBadgeCount(cartCount)}` : "Cart"
-            }
+            href="/marketplace"
+            className="flex h-10 w-10 shrink-0 items-center justify-center"
+            aria-label="Hashpop home"
+            title="Hashpop"
           >
-            <span className="relative inline-flex">
-              <ShoppingCart className="h-4 w-4" />
-              <DockBadge count={cartCount} size="compact" />
-            </span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/hashpop-cart-3d.PNG" alt="" className="h-7 w-auto object-contain" />
           </Link>
-          <NotificationBell variant="desktop" />
-          {effectiveConnected ? (
-            <button
-              type="button"
-              onClick={() => setProfileOpen(true)}
-              className="flex items-center gap-2 rounded-glass border border-white/10 bg-white/5 px-3 py-1.5 text-xs hover:bg-white/10"
-              aria-label="Open profile"
+          <div ref={centerSlotRef} className="flex items-center" data-topbar-slot="center" />
+          {!centerFilled && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const q = fallbackQuery.trim();
+                router.push(q ? `/marketplace?q=${encodeURIComponent(q)}` : "/marketplace");
+                setFallbackQuery("");
+              }}
             >
-              <Wallet className="h-3.5 w-3.5 text-chrome" />
-              <span className="font-mono text-white/80">
-                {shortAccount(accountId ?? address ?? "")}
-              </span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => openSignIn()}
-              className="rounded-glass border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
-            >
-              Sign in
-            </button>
+              <div className="flex w-64 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.06] py-1.5 pl-3 pr-2 transition-colors duration-300 focus-within:border-[#00ffa3]/40">
+                <SearchIcon size={14} className="shrink-0 text-silver" />
+                <input
+                  type="text"
+                  value={fallbackQuery}
+                  onChange={(e) => setFallbackQuery(e.target.value)}
+                  placeholder="Search listings"
+                  className="flex-1 bg-transparent text-sm text-white placeholder:text-silver/50 focus:outline-none"
+                />
+              </div>
+            </form>
           )}
-        </div>
-      </header>
+          <nav className="flex items-center gap-0.5" aria-label="Primary navigation">
+            {items.map((item) => {
+              const active =
+                !!item.href &&
+                (pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href)));
+              return (
+                <TopNavBtn
+                  key={item.label}
+                  label={item.label}
+                  active={active}
+                  href={item.href}
+                  onClick={item.onClick}
+                >
+                  {item.icon}
+                </TopNavBtn>
+              );
+            })}
+          </nav>
+
+          {/* Page context label — a hairline divider + muted title anchors it
+            to the nav instead of floating loose in the bar. */}
+          <div className="flex min-w-0 items-center gap-3">
+            <span aria-hidden className="h-5 w-px shrink-0 bg-white/10" />
+            <div ref={titleSlotRef} className="flex min-w-0 items-center" />
+            {!titleFilled && fallbackTitle && (
+              <span className="truncate text-sm font-medium text-silver">{fallbackTitle}</span>
+            )}
+          </div>
+
+          <div className="flex-1" />
+
+          {/* Right cluster: page actions slot, alerts, account chip. */}
+          <div className="flex items-center gap-2">
+            <div
+              ref={actionsSlotRef}
+              className="flex items-center gap-2"
+              data-topbar-slot="actions"
+            />
+            <Link
+              href="/cart"
+              className="relative flex h-9 w-9 items-center justify-center rounded-glass text-neutral-300 hover:bg-white/5 hover:text-white"
+              aria-label={
+                formatDockBadgeCount(cartCount)
+                  ? `Cart, ${formatDockBadgeCount(cartCount)}`
+                  : "Cart"
+              }
+            >
+              <span className="relative inline-flex">
+                <ShoppingCart className="h-4 w-4" />
+                <DockBadge count={cartCount} size="compact" />
+              </span>
+            </Link>
+            <NotificationBell variant="desktop" />
+            {effectiveConnected ? (
+              <button
+                type="button"
+                onClick={() => setProfileOpen(true)}
+                className="flex items-center gap-2 rounded-glass border border-white/10 bg-white/5 px-3 py-1.5 text-xs hover:bg-white/10"
+                aria-label="Open profile"
+              >
+                <Wallet className="h-3.5 w-3.5 text-chrome" />
+                <span className="font-mono text-white/80">
+                  {shortAccount(accountId ?? address ?? "")}
+                </span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => openSignIn()}
+                className="rounded-glass border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
+              >
+                Sign in
+              </button>
+            )}
+          </div>
+        </header>
+      )}
 
       {/* Content area: seamless full-bleed page on both viewports — no
           bordered center card. Mobile gets bottom padding so content clears

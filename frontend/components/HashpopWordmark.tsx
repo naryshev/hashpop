@@ -1,7 +1,16 @@
 import { cn } from "../lib/utils";
 
-/** Mobile brand mark. 124px wide keeps it near 31% of a 390px screen. */
-export function HashpopWordmark({ className }: { className?: string }) {
+/**
+ * Mint ring-o wordmark. `mobile` is 124px wide (~31% of a 390px screen).
+ * `header` is the desktop slim-bar size beside the cart mark.
+ */
+export function HashpopWordmark({
+  className,
+  size = "mobile",
+}: {
+  className?: string;
+  size?: "mobile" | "header";
+}) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -10,7 +19,11 @@ export function HashpopWordmark({ className }: { className?: string }) {
       role="img"
       aria-label="Hashpop"
       data-testid="marketplace-logo"
-      className={cn("h-auto w-[124px] shrink-0 text-white", className)}
+      className={cn(
+        "shrink-0 text-white",
+        size === "header" ? "h-8 w-auto" : "h-auto w-[124px]",
+        className,
+      )}
     >
       <title>Hashpop</title>
       <path

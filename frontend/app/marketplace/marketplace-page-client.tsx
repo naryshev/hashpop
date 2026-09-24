@@ -8,15 +8,12 @@ import Fuse from "fuse.js";
 import { ListingMedia } from "../../components/ListingMedia";
 import { ListingCard, formatSellerDisplay } from "../../components/ListingCard";
 import { TrustStrip } from "../../components/TrustStrip";
-import { StatusBadge } from "../../components/ui/status-badge-beautiful-accessible-status-indicators";
 import { formatPriceForDisplay } from "../../lib/formatPrice";
 import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { canonicalizeCategory, CATEGORY_GROUPS } from "../../lib/categories";
-import { useHashpackWallet } from "../../lib/hashpackWallet";
 import { getApiUrl } from "../../lib/apiUrl";
 import { useProfiles } from "../../lib/profiles";
-import { TopBarSlot } from "../../lib/topBar";
 import { listingCta, material } from "../../lib/materials";
 import { cn } from "../../lib/utils";
 import { parseViewMode, viewModeQueryValue, type ViewMode } from "../../lib/marketplaceView";
@@ -26,7 +23,6 @@ import {
   marketplaceHref,
   resetMarketplaceFilters,
   withAdvancedFilters,
-  withCategory,
   withListingType,
   withSort,
   type AdvancedFilterDraft,
@@ -38,7 +34,14 @@ import {
   MarketplaceSortPanel,
 } from "../../components/MarketplaceFilterPanel";
 import { MarketplaceMobileHeader } from "../../components/MarketplaceMobileHeader";
-import { ChevronDown, Search as SearchIcon, SlidersHorizontal } from "lucide-react";
+import { MarketplaceDesktopHeader } from "../../components/MarketplaceDesktopHeader";
+import { MarketplaceDesktopToolbar } from "../../components/MarketplaceDesktopToolbar";
+import {
+  MarketplaceBrowseRail,
+  MarketplaceFilterDrawer,
+  RAIL_PRICE_CEILING,
+} from "../../components/MarketplaceBrowseRail";
+import { ChevronDown } from "lucide-react";
 
 function normalizeListingStatus(status?: string): string {
   return String(status || "")
@@ -120,11 +123,11 @@ export default function MarketplacePageClient({
   initialItems: ListingItem[];
   initialError: string | null;
 }) {
-  const { isConnected } = useHashpackWallet();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [searchInput, setSearchInput] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
+  const [desktopFilterOpen, setDesktopFilterOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
   const [viewMenuOpen, setViewMenuOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -136,7 +139,8 @@ export default function MarketplacePageClient({
       const tag = (document.activeElement?.tagName ?? "").toLowerCase();
       if (tag === "input" || tag === "textarea" || tag === "select") return;
       e.preventDefault();
-      searchInputRef.current?.focus();
+      const input = searchInputRef.current;
+      if (input && input.offsetParent !== null) input.focus();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -319,24 +323,6 @@ export default function MarketplacePageClient({
     sortMode,
   ]);
 
-  // Desktop header chrome is hoisted into the global top bar via portals.
-  // Below `sm`, the marketplace page renders its own header and search row.
-  const headerCluster = (
-    <div className="flex items-center gap-2">
-      <span className="text-base font-semibold tracking-tight text-white">Marketplace</span>
-      {isConnected ? (
-        <span className="inline-flex items-center gap-1 h-5 px-2 text-[10px] font-medium border border-[#00ffa3]/40 bg-[#00ffa3]/10 text-[#00ffa3] shadow-[0_0_8px_rgba(0,255,163,0.2)]">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#00ffa3] shadow-[0_0_4px_rgba(0,255,163,0.8)]" />
-          Authenticated
-        </span>
-      ) : (
-        <StatusBadge status="error" className="h-5 px-2 text-[10px]">
-          Connect
-        </StatusBadge>
-      )}
-    </div>
-  );
-
   const submitSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const q = searchInput.trim();
@@ -366,15 +352,6 @@ export default function MarketplacePageClient({
     setFilterOpen(false);
     setSortOpen((o) => !o);
   };
-
-  const hasActiveFilter = !!(
-    minPriceQuery ||
-    maxPriceQuery ||
-    postedWithinQuery ||
-    conditionQuery ||
-    locationQuery ||
-    sortMode !== "recent"
-  );
 
   // Distinct cities present in the current listing set, used to populate the
   // location dropdown. Cap to 50 to keep the panel manageable.
@@ -417,7 +394,6 @@ export default function MarketplacePageClient({
       }}
       onSort={(sort) => router.push(marketplaceHref(withSort(searchParams, sort)))}
       onType={(type) => router.push(marketplaceHref(withListingType(searchParams, type)))}
-      onCategory={(category) => router.push(marketplaceHref(withCategory(searchParams, category)))}
       onReset={() => {
         setFilterOpen(false);
         router.push(marketplaceHref(resetMarketplaceFilters(searchParams)));
@@ -439,47 +415,62 @@ export default function MarketplacePageClient({
     location: locationQuery,
   });
 
-  // Top-bar search — rectangular rounded "Find…" field with an F shortcut
-  // hint, hosted in the global top bar's center slot next to the logo/nav.
-  const topBarSearch = (
-    <div className="relative">
-      <form onSubmit={submitSearch}>
-        <div className="flex w-80 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.06] py-1 pl-3 pr-1 transition-colors duration-300 focus-within:border-[#00ffa3]/40">
-          <SearchIcon size={14} className="shrink-0 text-silver" />
-          <input
-            ref={searchInputRef}
-            type="text"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Find..."
-            className="flex-1 bg-transparent text-sm text-white placeholder:text-silver/50 focus:outline-none"
-          />
-          <button
-            type="button"
-            onClick={openFilterPanel}
-            aria-label="Filters & sort"
-            className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors duration-300 ${
-              filterOpen || hasActiveFilter
-                ? "bg-[#00ffa3]/10 text-[#00ffa3]"
-                : "text-silver hover:bg-white/10 hover:text-white"
-            }`}
-          >
-            <SlidersHorizontal size={14} />
-          </button>
-        </div>
-      </form>
-      {filterOpen && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-white/10 bg-[#0a0a0a] p-4 shadow-2xl">
-          {renderFilterSortPanel(false)}
-        </div>
-      )}
-    </div>
-  );
+  const priceCeiling = useMemo(() => {
+    let highest = 0;
+    for (const item of items) {
+      const n = Number(formatPriceForDisplay(item.price || "0"));
+      if (!Number.isNaN(n)) highest = Math.max(highest, n);
+    }
+    if (highest <= RAIL_PRICE_CEILING) return RAIL_PRICE_CEILING;
+    return Math.ceil(highest / 50) * 50;
+  }, [items]);
 
-  const actionsCluster = (
-    <Link href="/create" className="text-sm text-chrome hover:text-white font-medium">
-      Create Listing
-    </Link>
+  const urlDraft: AdvancedFilterDraft = {
+    minPrice: minPriceQuery,
+    maxPrice: maxPriceQuery,
+    postedWithin: postedWithinQuery,
+    condition: conditionQuery,
+    location: locationQuery,
+  };
+
+  const pushDraft = (partial: Partial<AdvancedFilterDraft>) => {
+    router.push(marketplaceHref(withAdvancedFilters(searchParams, { ...urlDraft, ...partial })));
+  };
+
+  const commitPrice = (min: string, max: string) => {
+    const next = new URLSearchParams(searchParams.toString());
+    if (min) next.set("minPrice", min);
+    else next.delete("minPrice");
+    if (max) next.set("maxPrice", max);
+    else next.delete("maxPrice");
+    router.replace(marketplaceHref(next));
+  };
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const query = window.matchMedia("(min-width: 1024px)");
+    const closeDrawer = () => {
+      if (query.matches) setDesktopFilterOpen(false);
+    };
+    query.addEventListener("change", closeDrawer);
+    return () => query.removeEventListener("change", closeDrawer);
+  }, []);
+
+  const renderBrowseRail = () => (
+    <MarketplaceBrowseRail
+      type={typeQuery}
+      location={locationQuery}
+      condition={conditionQuery}
+      minPrice={minPriceQuery}
+      maxPrice={maxPriceQuery}
+      cities={knownCities}
+      priceCeiling={priceCeiling}
+      onType={(type) => router.push(marketplaceHref(withListingType(searchParams, type)))}
+      onLocation={(location) => pushDraft({ location })}
+      onCondition={(condition) => pushDraft({ condition })}
+      onPrice={commitPrice}
+      onClear={() => router.push(marketplaceHref(clearListingFilters(searchParams)))}
+    />
   );
 
   // View-mode dropdown (Editorial / Feed / Grid) — triggered by a carat next
@@ -529,12 +520,13 @@ export default function MarketplacePageClient({
 
   return (
     <main className="min-h-screen">
-      <TopBarSlot name="title">{headerCluster}</TopBarSlot>
-      <TopBarSlot name="center">
-        <div className="hidden md:block">{topBarSearch}</div>
-      </TopBarSlot>
-      <TopBarSlot name="actions">{actionsCluster}</TopBarSlot>
-      <div className="px-3 pb-4 md:px-4 md:py-4">
+      <MarketplaceDesktopHeader
+        searchValue={searchInput}
+        onSearchChange={setSearchInput}
+        onSearchSubmit={submitSearch}
+        searchInputRef={searchInputRef}
+      />
+      <div className="px-3 pb-4 md:px-5 md:pb-6 md:pt-4">
         <MarketplaceMobileHeader
           searchValue={searchInput}
           onSearchChange={setSearchInput}
@@ -570,291 +562,227 @@ export default function MarketplacePageClient({
           }
         />
 
-        {(() => {
-          const removeFilter = (keys: string[]) => {
-            const p = new URLSearchParams(searchParams.toString());
-            keys.forEach((k) => p.delete(k));
-            const qs = p.toString();
-            router.push(qs ? `/marketplace?${qs}` : "/marketplace");
-          };
-
-          const pills: { label: string; keys: string[] }[] = [];
-          if (query) pills.push({ label: `"${query}"`, keys: ["q"] });
-          if (categoryQuery) pills.push({ label: categoryQuery, keys: ["category"] });
-          if (minPriceQuery && maxPriceQuery)
-            pills.push({
-              label: `${minPriceQuery}–${maxPriceQuery} HBAR`,
-              keys: ["minPrice", "maxPrice"],
-            });
-          else if (minPriceQuery)
-            pills.push({ label: `\u2265 ${minPriceQuery} HBAR`, keys: ["minPrice"] });
-          else if (maxPriceQuery)
-            pills.push({ label: `\u2264 ${maxPriceQuery} HBAR`, keys: ["maxPrice"] });
-          if (postedWithinQuery) {
-            const labelMap: Record<string, string> = {
-              "1d": "Last day",
-              "1w": "Last week",
-              "1m": "Last month",
-              "3m": "Last 3 months",
-              "6m": "Last 6 months",
-              "1y": "Last year",
-              "2y": "Last 2 years",
-            };
-            pills.push({
-              label: labelMap[postedWithinQuery] ?? postedWithinQuery,
-              keys: ["postedWithin"],
-            });
-          }
-          if (conditionQuery) pills.push({ label: conditionQuery, keys: ["condition"] });
-          if (locationQuery) pills.push({ label: `📍 ${locationQuery}`, keys: ["location"] });
-
-          if (!pills.length) return null;
-          return (
-            <div className="mb-6 hidden rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 md:block">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold tracking-widest text-silver uppercase">
-                  Active Filters{" "}
-                  <span className="text-[#00ffa3]">
-                    · {filteredItems.length} Result{filteredItems.length !== 1 ? "s" : ""}
-                  </span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => router.push("/marketplace")}
-                  className="text-sm text-silver hover:text-white transition-colors"
+        <div className="lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start lg:gap-5">
+          <aside className="sticky top-[72px] z-10 hidden self-start lg:block">
+            <div className="max-h-[calc(100dvh-5.5rem)] overflow-y-auto">{renderBrowseRail()}</div>
+          </aside>
+          <div className="min-w-0">
+            <MarketplaceDesktopToolbar
+              resultCount={filteredItems.length}
+              sortMode={sortMode}
+              viewMode={viewMode}
+              filterCount={filterCount}
+              onSort={(sort) => router.push(marketplaceHref(withSort(searchParams, sort)))}
+              onView={(view) => setParam("view", viewModeQueryValue(view))}
+              onOpenFilters={() => setDesktopFilterOpen(true)}
+            />
+            {listingsError ? (
+              <p className="text-amber-400/90 text-sm">
+                {listingsError} Ensure the backend is running and PostgreSQL is up (e.g.{" "}
+                <code className="text-chrome">docker compose up -d db</code>).
+              </p>
+            ) : filteredItems.length === 0 ? (
+              <p className="text-silver">
+                {query && categoryQuery
+                  ? `No listings matched "${query}" in ${categoryQuery}.`
+                  : query
+                    ? `No listings matched "${query}".`
+                    : categoryQuery
+                      ? `No listings found in ${categoryQuery}.`
+                      : minPriceQuery || maxPriceQuery || postedWithinQuery
+                        ? "No listings matched your advanced filters."
+                        : "No listings found. Create one to get started!"}
+              </p>
+            ) : (
+              <>
+                {/* Mobile 2-up: 12px page margins, 8px gutter. */}
+                <div
+                  className={cn(
+                    "grid-cols-2 gap-2 md:hidden",
+                    viewMode === "editorial" ? "hidden" : "grid",
+                  )}
                 >
-                  Clear all
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {pills.map(({ label, keys }) => (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() => removeFilter(keys)}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-[#00ffa3]/60 bg-[#00ffa3]/10 px-3 py-1 text-sm text-[#00ffa3] hover:bg-[#00ffa3]/20 transition-colors"
-                  >
-                    {label}
-                    <span aria-hidden className="text-[#00ffa3]/70 text-base leading-none">
-                      ×
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
-        {listingsError ? (
-          <p className="text-amber-400/90 text-sm">
-            {listingsError} Ensure the backend is running and PostgreSQL is up (e.g.{" "}
-            <code className="text-chrome">docker compose up -d db</code>).
-          </p>
-        ) : filteredItems.length === 0 ? (
-          <p className="text-silver">
-            {query && categoryQuery
-              ? `No listings matched "${query}" in ${categoryQuery}.`
-              : query
-                ? `No listings matched "${query}".`
-                : categoryQuery
-                  ? `No listings found in ${categoryQuery}.`
-                  : minPriceQuery || maxPriceQuery || postedWithinQuery
-                    ? "No listings matched your advanced filters."
-                    : "No listings found. Create one to get started!"}
-          </p>
-        ) : (
-          <>
-            {/* Mobile 2-up: 12px page margins, 8px gutter. */}
-            <div
-              className={cn(
-                "grid-cols-2 gap-2 md:hidden",
-                viewMode === "editorial" ? "hidden" : "grid",
-              )}
-            >
-              {filteredItems.map((item) => (
-                <ListingCard
-                  key={`${item.itemType}-${item.id}`}
-                  item={item}
-                  density="compact"
-                  variant="softTrust"
-                />
-              ))}
-            </div>
-            {viewMode !== "editorial" && (
-              <div className="mb-3 hidden items-center gap-2 md:flex">
-                <h3 className="text-lg font-bold tracking-tight text-white">Recently listed</h3>
-                {viewDropdown}
-                <span className="ml-1 text-xs text-silver/60">
-                  {filteredItems.length.toLocaleString()} result
-                  {filteredItems.length === 1 ? "" : "s"}
-                </span>
-              </div>
-            )}
-
-            {viewMode === "grid" && (
-              <div className="hidden gap-4 md:grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                {filteredItems.map((item) => (
-                  <ListingCard
-                    key={`${item.itemType}-${item.id}`}
-                    item={item}
-                    density="regular"
-                    variant="softTrust"
-                  />
-                ))}
-              </div>
-            )}
-
-            {viewMode === "feed" && (
-              <div
-                className={cn(
-                  material.regular,
-                  "hidden divide-y divide-hairline rounded-[16px] md:block",
-                )}
-              >
-                {filteredItems.map((item) => {
-                  return (
-                    <Link
+                  {filteredItems.map((item) => (
+                    <ListingCard
                       key={`${item.itemType}-${item.id}`}
-                      href={listingHref(item.id)}
-                      className="grid grid-cols-[88px_minmax(0,1fr)_140px_120px] gap-4 items-center px-4 py-3 hover:bg-white/[0.03] transition-colors"
-                    >
-                      <div className="relative h-[88px] w-[88px] overflow-hidden rounded-lg bg-white/5">
-                        <ListingMedia
-                          listing={{
-                            imageUrl: item.imageUrl,
-                            mediaUrls: item.mediaUrls?.slice(0, 1) ?? null,
-                          }}
-                          className="w-full"
-                          aspectRatio="square"
-                          cardSize
-                          compactHeight="88px"
-                        />
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="text-sm font-semibold text-white truncate">
-                          {item.title || formatListingId(item.id) || "Untitled"}
-                        </h3>
-                        <div className="mt-1 flex items-center gap-3 text-[11px] text-silver/70 flex-wrap">
-                          {item.category && (
-                            <span className="rounded-full bg-white/5 px-2 py-0.5 text-silver/80">
-                              {item.category}
-                            </span>
-                          )}
-                          {item.condition && (
-                            <span className="text-silver/60">{item.condition}</span>
-                          )}
-                          {item.seller && (
-                            <TrustStrip
-                              density="inline"
-                              address={item.seller}
-                              linkToProfile={false}
-                            />
-                          )}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-base font-bold text-chrome">
-                          {formatHbarWithUsd(formatPriceForDisplay(item.price || "0"), usdRate)}
-                        </div>
-                      </div>
-                      <div className="text-right text-[11px] text-silver/70 leading-relaxed">
-                        {item.createdAt && (
-                          <div>Listed {relativeTimeShort(item.createdAt)} ago</div>
-                        )}
-                        {(item.watchlistCount ?? 0) > 0 && (
-                          <div className="text-silver/50">♡ {item.watchlistCount} watching</div>
-                        )}
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
+                      item={item}
+                      density="compact"
+                      variant="softTrust"
+                    />
+                  ))}
+                </div>
+                {viewMode === "grid" && (
+                  <div className="hidden gap-4 md:grid md:grid-cols-2 xl:grid-cols-3">
+                    {filteredItems.map((item) => (
+                      <ListingCard
+                        key={`${item.itemType}-${item.id}`}
+                        item={item}
+                        density="regular"
+                        variant="softTrust"
+                      />
+                    ))}
+                  </div>
+                )}
 
-            {viewMode === "editorial" && (
-              <div className="space-y-6">
-                {(() => {
-                  const hero =
-                    filteredItems.find((i) => normalizeListingStatus(i.status) === "LISTED") ||
-                    filteredItems[0];
-                  const rest = filteredItems.filter((i) => i.id !== hero?.id);
-                  return (
-                    <>
-                      {hero && (
+                {viewMode === "feed" && (
+                  <div
+                    className={cn(
+                      material.regular,
+                      "hidden divide-y divide-hairline rounded-[16px] md:block",
+                    )}
+                  >
+                    {filteredItems.map((item) => {
+                      return (
                         <Link
-                          href={listingHref(hero.id)}
-                          className="group relative block overflow-hidden rounded-[20px] border border-hairline"
+                          key={`${item.itemType}-${item.id}`}
+                          href={listingHref(item.id)}
+                          className="grid grid-cols-[88px_minmax(0,1fr)_140px_120px] gap-4 items-center px-4 py-3 hover:bg-white/[0.03] transition-colors"
                         >
-                          <div className="relative h-[280px] sm:h-[320px] bg-gradient-to-br from-[#1b2940] to-[#0b111b]">
+                          <div className="relative h-[88px] w-[88px] overflow-hidden rounded-lg bg-white/5">
                             <ListingMedia
-                              listing={hero}
-                              className="absolute inset-0 w-full h-full"
-                              aspectRatio="video"
-                              slideshow="auto"
+                              listing={{
+                                imageUrl: item.imageUrl,
+                                mediaUrls: item.mediaUrls?.slice(0, 1) ?? null,
+                              }}
+                              className="w-full"
+                              aspectRatio="square"
                               cardSize
-                              compactHeight="320px"
+                              compactHeight="88px"
                             />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
                           </div>
-                          <div className="absolute left-6 top-6">
-                            <span className="rounded-full bg-chrome px-3 py-1 text-[10px] font-bold text-on-chrome">
-                              Editor&apos;s pick
-                            </span>
-                          </div>
-                          <div className="absolute left-6 right-6 bottom-6 max-w-2xl">
-                            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
-                              {hero.title || formatListingId(hero.id) || "Featured listing"}
-                            </h2>
-                            {hero.subtitle && (
-                              <p className="mt-2 text-sm text-white/75 line-clamp-2">
-                                {hero.subtitle}
-                              </p>
-                            )}
-                            <div className="mt-4 flex items-center gap-3 flex-wrap">
-                              <span className={cn(listingCta.filled, "w-auto px-5")}>
-                                Buy for{" "}
-                                {formatHbarWithUsd(
-                                  formatPriceForDisplay(hero.price || "0"),
-                                  usdRate,
-                                )}
-                              </span>
-                              {hero.seller && (
-                                <span className="text-xs font-mono text-white/60">
-                                  Seller {formatSellerDisplay(hero.seller)}
+                          <div className="min-w-0">
+                            <h3 className="text-sm font-semibold text-white truncate">
+                              {item.title || formatListingId(item.id) || "Untitled"}
+                            </h3>
+                            <div className="mt-1 flex items-center gap-3 text-[11px] text-silver/70 flex-wrap">
+                              {item.category && (
+                                <span className="rounded-full bg-white/5 px-2 py-0.5 text-silver/80">
+                                  {item.category}
                                 </span>
+                              )}
+                              {item.condition && (
+                                <span className="text-silver/60">{item.condition}</span>
+                              )}
+                              {item.seller && (
+                                <TrustStrip
+                                  density="inline"
+                                  address={item.seller}
+                                  linkToProfile={false}
+                                />
                               )}
                             </div>
                           </div>
-                        </Link>
-                      )}
-                      <div>
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-lg font-bold tracking-tight">Recently listed</h3>
-                            {viewDropdown}
+                          <div>
+                            <div className="text-base font-bold text-chrome">
+                              {formatHbarWithUsd(formatPriceForDisplay(item.price || "0"), usdRate)}
+                            </div>
                           </div>
-                          <span className="text-xs text-silver/60">
-                            {rest.length.toLocaleString()} more
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                          {rest.map((item) => (
-                            <ListingCard
-                              key={`${item.itemType}-${item.id}`}
-                              item={item}
-                              density="regular"
-                              variant="softTrust"
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
+                          <div className="text-right text-[11px] text-silver/70 leading-relaxed">
+                            {item.createdAt && (
+                              <div>Listed {relativeTimeShort(item.createdAt)} ago</div>
+                            )}
+                            {(item.watchlistCount ?? 0) > 0 && (
+                              <div className="text-silver/50">♡ {item.watchlistCount} watching</div>
+                            )}
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {viewMode === "editorial" && (
+                  <div className="space-y-6">
+                    {(() => {
+                      const hero =
+                        filteredItems.find((i) => normalizeListingStatus(i.status) === "LISTED") ||
+                        filteredItems[0];
+                      const rest = filteredItems.filter((i) => i.id !== hero?.id);
+                      return (
+                        <>
+                          {hero && (
+                            <Link
+                              href={listingHref(hero.id)}
+                              className="group relative block overflow-hidden rounded-[20px] border border-hairline"
+                            >
+                              <div className="relative h-[280px] sm:h-[320px] bg-gradient-to-br from-[#1b2940] to-[#0b111b]">
+                                <ListingMedia
+                                  listing={hero}
+                                  className="absolute inset-0 w-full h-full"
+                                  aspectRatio="video"
+                                  slideshow="auto"
+                                  cardSize
+                                  compactHeight="320px"
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+                              </div>
+                              <div className="absolute left-6 top-6">
+                                <span className="rounded-full bg-chrome px-3 py-1 text-[10px] font-bold text-on-chrome">
+                                  Editor&apos;s pick
+                                </span>
+                              </div>
+                              <div className="absolute left-6 right-6 bottom-6 max-w-2xl">
+                                <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+                                  {hero.title || formatListingId(hero.id) || "Featured listing"}
+                                </h2>
+                                {hero.subtitle && (
+                                  <p className="mt-2 text-sm text-white/75 line-clamp-2">
+                                    {hero.subtitle}
+                                  </p>
+                                )}
+                                <div className="mt-4 flex items-center gap-3 flex-wrap">
+                                  <span className={cn(listingCta.filled, "w-auto px-5")}>
+                                    Buy for{" "}
+                                    {formatHbarWithUsd(
+                                      formatPriceForDisplay(hero.price || "0"),
+                                      usdRate,
+                                    )}
+                                  </span>
+                                  {hero.seller && (
+                                    <span className="text-xs font-mono text-white/60">
+                                      Seller {formatSellerDisplay(hero.seller)}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </Link>
+                          )}
+                          <div>
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-2">
+                                <h3 className="text-lg font-bold tracking-tight">
+                                  Recently listed
+                                </h3>
+                                <div className="md:hidden">{viewDropdown}</div>
+                              </div>
+                              <span className="text-xs text-silver/60">
+                                {rest.length.toLocaleString()} more
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 xl:grid-cols-3">
+                              {rest.map((item) => (
+                                <ListingCard
+                                  key={`${item.itemType}-${item.id}`}
+                                  item={item}
+                                  density="regular"
+                                  variant="softTrust"
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
+              </>
             )}
-          </>
-        )}
+          </div>
+        </div>
       </div>
+      <MarketplaceFilterDrawer open={desktopFilterOpen} onClose={() => setDesktopFilterOpen(false)}>
+        {renderBrowseRail()}
+      </MarketplaceFilterDrawer>
     </main>
   );
 }

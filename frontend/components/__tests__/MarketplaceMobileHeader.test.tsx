@@ -72,6 +72,19 @@ vi.mock("../ProfileCardSheet", () => ({
 let root: Root | undefined;
 let host: HTMLElement | undefined;
 
+/** Sheet exit keeps the dialog mounted for ~220ms. Poll until AnimatePresence unmounts it. */
+async function waitForAbsent(selector: string) {
+  const deadline = Date.now() + 1000;
+  while (document.querySelector(selector)) {
+    if (Date.now() > deadline) {
+      throw new Error(`Timed out waiting for ${selector} to unmount`);
+    }
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+  }
+}
+
 const emptyDraft: AdvancedFilterDraft = {
   minPrice: "",
   maxPrice: "",
@@ -254,7 +267,6 @@ describe("MarketplaceMobileHeader", () => {
           onDraft: setDraft,
           onSort: () => {},
           onType: (type) => pushes.push(marketplaceHref(withListingType(params, type))),
-          onCategory: (category) => pushes.push(marketplaceHref(withCategory(params, category))),
           onReset: () => {},
           onApply: () => {},
         }),
@@ -308,8 +320,14 @@ describe("MarketplaceMobileHeader", () => {
     await act(async () => {
       filterButton.click();
     });
-    expect(document.querySelector('[role="dialog"][aria-label="Filters"]')).toBeTruthy();
-    expect(document.querySelector('[role="dialog"][aria-label="Sort"]')).toBeNull();
+    const filtersDialog = document.querySelector(
+      '[role="dialog"][aria-label="Filters"]',
+    ) as HTMLElement;
+    expect(filtersDialog).toBeTruthy();
+    expect(filtersDialog.getAttribute("data-sheet-edge")).toBe("bottom");
+    expect(document.querySelector('[data-testid="marketplace-filter-drawer"]')).toBeNull();
+    await waitForAbsent('[role="dialog"][aria-label="Sort"]');
+    expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
     expect(document.querySelector('[data-testid="sort-recent"]')).toBeNull();
     expect(document.querySelector('[data-testid="listing-type-all"]')).toBeTruthy();
     expect(document.querySelector('[data-testid="listing-category-Watches"]')).toBeNull();
