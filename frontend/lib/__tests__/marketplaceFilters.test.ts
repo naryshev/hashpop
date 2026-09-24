@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  activeFilterCount,
+  clearListingFilters,
   marketplaceHref,
   resetMarketplaceFilters,
   withAdvancedFilters,
@@ -64,5 +66,26 @@ describe("marketplace filter params", () => {
     expect(reset.get("sort")).toBeNull();
     expect(reset.get("postedWithin")).toBeNull();
     expect(marketplaceHref(reset)).toBe("/marketplace?q=sony&view=feed");
+  });
+
+  it("counts active filters and clear leaves sort in place", () => {
+    expect(
+      activeFilterCount({
+        type: "physical",
+        category: "Watches",
+        minPrice: "",
+        maxPrice: "9",
+        postedWithin: "",
+        condition: "",
+        location: "",
+      }),
+    ).toBe(3);
+    const cleared = clearListingFilters(
+      new URLSearchParams("q=sony&sort=price-asc&type=physical&minPrice=1"),
+    );
+    expect(cleared.get("q")).toBe("sony");
+    expect(cleared.get("sort")).toBe("price-asc");
+    expect(cleared.get("type")).toBeNull();
+    expect(cleared.get("minPrice")).toBeNull();
   });
 });

@@ -84,6 +84,8 @@ export type SheetProps = {
   children?: React.ReactNode;
   className?: string;
   ariaLabel?: string;
+  /** Snap points. The first is the resting size; drag moves between them. */
+  detents?: SheetDetent[];
 };
 
 /**
@@ -94,6 +96,7 @@ export function Sheet({
   open,
   onClose,
   detent = "medium",
+  detents,
   edge = "bottom",
   dismissible = true,
   title,
@@ -105,10 +108,20 @@ export function Sheet({
   ariaLabel,
 }: SheetProps) {
   const [mounted, setMounted] = useState(false);
+  const detentKey = detents?.join(",") ?? "";
+  const snapPoints = detentKey.includes(",") ? (detentKey.split(",") as SheetDetent[]) : null;
+  const [snap, setSnap] = useState<SheetDetent>(snapPoints?.[0] ?? detent);
+  const activeDetent = snapPoints ? snap : detent;
   const dragControls = useDragControls();
   const reduceMotion = useReducedMotion() === true;
   const panelMotion = sheetPanelMotion(edge, reduceMotion);
   const fromTop = edge === "top";
+
+  useEffect(() => {
+    if (open) setSnap(snapPoints?.[0] ?? detent);
+    // detentKey is the stable identity of `detents`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, detent, detentKey]);
 
   useEffect(() => setMounted(true), []);
 
@@ -129,9 +142,17 @@ export function Sheet({
       }
       return;
     }
-    if (info.offset.y > DRAG_CLOSE_OFFSET || info.velocity.y > DRAG_CLOSE_VELOCITY) {
-      onClose();
+    const draggedUp = info.offset.y < -DRAG_CLOSE_OFFSET || info.velocity.y < -DRAG_CLOSE_VELOCITY;
+    const draggedDown = info.offset.y > DRAG_CLOSE_OFFSET || info.velocity.y > DRAG_CLOSE_VELOCITY;
+    if (snapPoints && activeDetent === "medium" && draggedUp && snapPoints.includes("large")) {
+      setSnap("large");
+      return;
     }
+    if (snapPoints && activeDetent === "large" && draggedDown && snapPoints.includes("medium")) {
+      setSnap("medium");
+      return;
+    }
+    if (draggedDown) onClose();
   };
 
   if (!mounted) return null;
@@ -163,6 +184,7 @@ export function Sheet({
           aria-modal="true"
           aria-label={labelled}
           data-sheet-edge={edge}
+          data-sheet-detent={activeDetent}
         >
           <motion.div
             className={cn("absolute inset-0", material.scrim)}
@@ -173,7 +195,11 @@ export function Sheet({
             onClick={dismissible ? onClose : undefined}
           />
           <motion.div
-            className={cn(sheetPanel({ detent, edge }), className)}
+            className={cn(
+              sheetPanel({ detent: activeDetent, edge }),
+              snapPoints && "transition-[max-height] duration-300",
+              className,
+            )}
             data-sheet-panel=""
             data-sheet-motion={reduceMotion ? "fade" : fromTop ? "slide-down" : "slide-up"}
             initial={panelMotion.initial}
@@ -184,7 +210,13 @@ export function Sheet({
             dragControls={dragControls}
             dragListener={false}
             dragConstraints={{ top: 0, bottom: 0 }}
-            dragElastic={fromTop ? { top: 0.45, bottom: 0 } : { top: 0, bottom: 0.45 }}
+            dragElastic={
+              fromTop
+                ? { top: 0.45, bottom: 0 }
+                : snapPoints && activeDetent === "medium"
+                  ? { top: 0.45, bottom: 0.45 }
+                  : { top: 0, bottom: 0.45 }
+            }
             onDragEnd={onDragEnd}
           >
             {!fromTop && grabber}

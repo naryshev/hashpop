@@ -21,6 +21,8 @@ import { listingCta, material } from "../../lib/materials";
 import { cn } from "../../lib/utils";
 import { parseViewMode, viewModeQueryValue, type ViewMode } from "../../lib/marketplaceView";
 import {
+  activeFilterCount,
+  clearListingFilters,
   marketplaceHref,
   resetMarketplaceFilters,
   withAdvancedFilters,
@@ -31,7 +33,10 @@ import {
   type ListingType,
   type SortMode,
 } from "../../lib/marketplaceFilters";
-import { MarketplaceFilterPanel } from "../../components/MarketplaceFilterPanel";
+import {
+  MarketplaceFilterPanel,
+  MarketplaceSortPanel,
+} from "../../components/MarketplaceFilterPanel";
 import { MarketplaceMobileHeader } from "../../components/MarketplaceMobileHeader";
 import { ChevronDown, Search as SearchIcon, SlidersHorizontal } from "lucide-react";
 
@@ -120,6 +125,7 @@ export default function MarketplacePageClient({
   const searchParams = useSearchParams();
   const [searchInput, setSearchInput] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
+  const [sortOpen, setSortOpen] = useState(false);
   const [viewMenuOpen, setViewMenuOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -342,13 +348,23 @@ export default function MarketplacePageClient({
     setFilterOpen(false);
   };
 
-  const openFilterPanel = () => {
-    setFilterOpen((o) => !o);
+  const syncFilterDraft = () => {
     setFilterMinPrice(minPriceQuery);
     setFilterMaxPrice(maxPriceQuery);
     setFilterPostedWithin(postedWithinQuery);
     setFilterCondition(conditionQuery);
     setFilterLocation(locationQuery);
+  };
+
+  const openFilterPanel = () => {
+    setSortOpen(false);
+    setFilterOpen((o) => !o);
+    syncFilterDraft();
+  };
+
+  const openSortSheet = () => {
+    setFilterOpen(false);
+    setSortOpen((o) => !o);
   };
 
   const hasActiveFilter = !!(
@@ -381,9 +397,11 @@ export default function MarketplacePageClient({
     location: filterLocation,
   };
 
-  const renderFilterSortPanel = (browse: boolean) => (
+  const renderFilterSortPanel = (browse: boolean, sheet = false) => (
     <MarketplaceFilterPanel
       browse={browse}
+      showSort={!sheet}
+      showActions={!sheet}
       sortMode={sortMode}
       type={typeQuery}
       category={categoryQuery}
@@ -410,6 +428,16 @@ export default function MarketplacePageClient({
       }}
     />
   );
+
+  const filterCount = activeFilterCount({
+    type: typeQuery,
+    category: categoryQuery,
+    minPrice: minPriceQuery,
+    maxPrice: maxPriceQuery,
+    postedWithin: postedWithinQuery,
+    condition: conditionQuery,
+    location: locationQuery,
+  });
 
   // Top-bar search — rectangular rounded "Find…" field with an F shortcut
   // hint, hosted in the global top bar's center slot next to the logo/nav.
@@ -506,7 +534,7 @@ export default function MarketplacePageClient({
         <div className="hidden md:block">{topBarSearch}</div>
       </TopBarSlot>
       <TopBarSlot name="actions">{actionsCluster}</TopBarSlot>
-      <div className="px-3 py-4 sm:px-4">
+      <div className="px-4 pb-4 pt-[calc(env(safe-area-inset-top)+8px)] md:py-4">
         <MarketplaceMobileHeader
           searchValue={searchInput}
           onSearchChange={setSearchInput}
@@ -514,7 +542,32 @@ export default function MarketplacePageClient({
           filterOpen={filterOpen}
           onOpenFilters={openFilterPanel}
           onCloseFilters={() => setFilterOpen(false)}
-          filterSheet={renderFilterSortPanel(true)}
+          filterCount={filterCount}
+          resultCount={filteredItems.length}
+          onClearFilters={() => {
+            setFilterMinPrice("");
+            setFilterMaxPrice("");
+            setFilterPostedWithin("");
+            setFilterCondition("");
+            setFilterLocation("");
+            router.push(marketplaceHref(clearListingFilters(searchParams)));
+          }}
+          onShowResults={() => {
+            setFilterOpen(false);
+            router.push(marketplaceHref(withAdvancedFilters(searchParams, filterDraft)));
+          }}
+          filterSheet={renderFilterSortPanel(true, true)}
+          sortOpen={sortOpen}
+          onOpenSort={openSortSheet}
+          onCloseSort={() => setSortOpen(false)}
+          sortSheet={
+            <MarketplaceSortPanel
+              sortMode={sortMode}
+              viewMode={viewMode}
+              onSort={(sort) => router.push(marketplaceHref(withSort(searchParams, sort)))}
+              onView={(view) => setParam("view", viewModeQueryValue(view))}
+            />
+          }
         />
 
         {(() => {
@@ -557,7 +610,7 @@ export default function MarketplacePageClient({
 
           if (!pills.length) return null;
           return (
-            <div className="mb-6 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3">
+            <div className="mb-6 hidden rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 md:block">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-semibold tracking-widest text-silver uppercase">
                   Active Filters{" "}
@@ -611,7 +664,12 @@ export default function MarketplacePageClient({
         ) : (
           <>
             {/* Mobile 2-up: media-first tiles, 10px gap. */}
-            <div className="grid grid-cols-2 gap-2.5 sm:hidden">
+            <div
+              className={cn(
+                "grid-cols-2 gap-3 md:hidden",
+                viewMode === "editorial" ? "hidden" : "grid",
+              )}
+            >
               {filteredItems.map((item) => (
                 <ListingCard
                   key={`${item.itemType}-${item.id}`}
@@ -622,7 +680,7 @@ export default function MarketplacePageClient({
               ))}
             </div>
             {viewMode !== "editorial" && (
-              <div className="hidden sm:flex items-center gap-2 mb-3">
+              <div className="mb-3 hidden items-center gap-2 md:flex">
                 <h3 className="text-lg font-bold tracking-tight text-white">Recently listed</h3>
                 {viewDropdown}
                 <span className="ml-1 text-xs text-silver/60">
@@ -633,7 +691,7 @@ export default function MarketplacePageClient({
             )}
 
             {viewMode === "grid" && (
-              <div className="hidden gap-4 sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+              <div className="hidden gap-4 md:grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                 {filteredItems.map((item) => (
                   <ListingCard
                     key={`${item.itemType}-${item.id}`}
@@ -649,7 +707,7 @@ export default function MarketplacePageClient({
               <div
                 className={cn(
                   material.regular,
-                  "hidden divide-y divide-hairline rounded-[16px] sm:block",
+                  "hidden divide-y divide-hairline rounded-[16px] md:block",
                 )}
               >
                 {filteredItems.map((item) => {
@@ -713,7 +771,7 @@ export default function MarketplacePageClient({
             )}
 
             {viewMode === "editorial" && (
-              <div className="hidden sm:block space-y-6">
+              <div className="space-y-6">
                 {(() => {
                   const hero =
                     filteredItems.find((i) => normalizeListingStatus(i.status) === "LISTED") ||

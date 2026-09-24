@@ -11,8 +11,11 @@ import { useDealNotifications, markDealUpdatesSeen } from "../hooks/useDealNotif
 export type NotificationBellProps = {
   className?: string;
   iconClassName?: string;
-  /** Desktop header uses a 36px hit target; mobile top bar is a padded icon. */
-  variant?: "mobile" | "desktop";
+  /**
+   * Desktop header uses a 36px hit target. Mobile top bar is a padded icon.
+   * Marketplace is the bare 24px bell (40px hit, mint unread dot).
+   */
+  variant?: "mobile" | "desktop" | "marketplace";
 };
 
 export function NotificationBell({
@@ -41,7 +44,10 @@ export function NotificationBell({
   const hit =
     variant === "desktop"
       ? "relative flex h-9 w-9 items-center justify-center rounded-glass text-neutral-300 hover:bg-white/5 hover:text-white"
-      : "relative rounded-full p-2 text-silver hover:text-white";
+      : variant === "marketplace"
+        ? "relative flex h-10 w-10 items-center justify-center text-white/90 hover:text-white"
+        : "relative rounded-full p-2 text-silver hover:text-white";
+  const iconSize = variant === "desktop" ? 16 : variant === "marketplace" ? 24 : 18;
 
   return (
     <>
@@ -59,14 +65,23 @@ export function NotificationBell({
         className={cn(hit, className)}
       >
         <span className="relative inline-flex">
-          <Bell className={iconClassName} size={variant === "desktop" ? 16 : 18} />
-          <DockBadge count={unseen.length} size="compact" />
+          <Bell className={iconClassName} size={iconSize} />
+          {variant === "marketplace" ? (
+            unseen.length > 0 ? (
+              <span
+                data-bell-dot=""
+                className="pointer-events-none absolute -right-px -top-px h-2 w-2 rounded-full bg-[#00ffa3] ring-2 ring-[#0b111b]"
+              />
+            ) : null
+          ) : (
+            <DockBadge count={unseen.length} size="compact" />
+          )}
         </span>
       </button>
       <NotificationsPanel
         open={open}
         onClose={() => setOpen(false)}
-        variant={variant}
+        variant={variant === "desktop" ? "desktop" : "mobile"}
         items={items}
         loading={loading}
         unreadIds={unreadIds}

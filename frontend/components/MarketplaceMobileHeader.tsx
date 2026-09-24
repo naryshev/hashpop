@@ -12,7 +12,9 @@ import { NotificationBell } from "./NotificationBell";
 import { ProfileCardSheet } from "./ProfileCardSheet";
 import { Sheet } from "./ui/Sheet";
 
-/** Sheet portals to document.body, so gate it to the mobile breakpoint. */
+const FILTER_DETENTS = ["medium", "large"] as const;
+
+/** Sheet portals to document.body, so gate it to viewports below 768px. */
 function useMobileSheet() {
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -20,13 +22,25 @@ function useMobileSheet() {
       setIsMobile(true);
       return;
     }
-    const query = window.matchMedia("(max-width: 639px)");
+    const query = window.matchMedia("(max-width: 767px)");
     const apply = () => setIsMobile(query.matches);
     apply();
     query.addEventListener("change", apply);
     return () => query.removeEventListener("change", apply);
   }, []);
   return isMobile;
+}
+
+/**
+ * Interim mint letter for the second "o" in Hashpop.
+ * Replace this node with the ring-o SVG when it arrives.
+ */
+export function HashpopRingO() {
+  return (
+    <span data-testid="hashpop-ring-o" className="text-[#00ffa3]">
+      o
+    </span>
+  );
 }
 
 function ProfileAvatarButton() {
@@ -49,14 +63,14 @@ function ProfileAvatarButton() {
         onClick={() => (signedIn ? setProfileOpen(true) : openSignIn())}
         className={cn(
           material.chrome,
-          "flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full text-silver",
+          "flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full text-white/90",
         )}
       >
         {avatar ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={avatar} alt="" className="h-full w-full object-cover" />
         ) : (
-          <User size={18} aria-hidden />
+          <User size={20} aria-hidden />
         )}
       </button>
       <ProfileCardSheet open={profileOpen} onClose={() => setProfileOpen(false)} />
@@ -65,9 +79,8 @@ function ProfileAvatarButton() {
 }
 
 /**
- * Marketplace-only mobile chrome (below `sm`). Centered Hashpop wordmark,
- * bell + glass profile, and one search/Filter row. The Filter button and the
- * sliders inside the search field open the same sheet.
+ * Marketplace chrome below 768px. Brand row is a 3-column grid so the
+ * wordmark is centered on the screen. Sliders open Sort; Filter opens the sheet.
  */
 export function MarketplaceMobileHeader({
   searchValue,
@@ -76,7 +89,15 @@ export function MarketplaceMobileHeader({
   filterOpen,
   onOpenFilters,
   onCloseFilters,
+  filterCount,
+  resultCount,
+  onClearFilters,
+  onShowResults,
   filterSheet,
+  sortOpen,
+  onOpenSort,
+  onCloseSort,
+  sortSheet,
 }: {
   searchValue: string;
   onSearchChange: (value: string) => void;
@@ -84,61 +105,71 @@ export function MarketplaceMobileHeader({
   filterOpen: boolean;
   onOpenFilters: () => void;
   onCloseFilters: () => void;
+  filterCount: number;
+  resultCount: number;
+  onClearFilters: () => void;
+  onShowResults: () => void;
   filterSheet: ReactNode;
+  sortOpen: boolean;
+  onOpenSort: () => void;
+  onCloseSort: () => void;
+  sortSheet: ReactNode;
 }) {
   const mobileSheet = useMobileSheet();
+  const filtersActive = filterCount > 0;
   return (
-    <div data-testid="marketplace-mobile-header" className="mb-3 sm:hidden">
-      <div className="relative flex min-h-[52px] items-center justify-end">
-        <Link
-          href="/marketplace"
-          aria-label="Hashpop home"
-          className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
-        >
+    <div data-testid="marketplace-mobile-header" className="mb-3 md:hidden">
+      <div className="grid h-14 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center">
+        <div aria-hidden />
+        <Link href="/marketplace" aria-label="Hashpop home" className="flex flex-col items-center">
           <span
             data-testid="marketplace-logo"
-            className="text-[26px] font-extrabold leading-none tracking-tight text-white"
+            className="text-[28px] font-semibold leading-none tracking-[-0.01em] text-white"
           >
             <span className="sr-only">Hashpop</span>
             <span aria-hidden>
               Hashp
-              <span className="mx-px inline-block h-[0.62em] w-[0.62em] translate-y-[0.02em] rounded-full bg-[#00ffa3] align-middle shadow-[0_0_8px_rgba(0,255,163,0.55)]" />
-              p
+              <HashpopRingO />p
             </span>
           </span>
           <span
             data-testid="marketplace-wordmark"
-            className="mt-1 pl-[0.28em] text-[10px] font-medium lowercase tracking-[0.28em] text-silver"
+            className="mt-0.5 text-[12px] font-medium lowercase tracking-[0.12em] text-white/60"
           >
             marketplace
           </span>
         </Link>
-        <div className="relative z-10 flex items-center gap-1.5">
-          <NotificationBell variant="mobile" />
+        <div className="flex items-center justify-end gap-2">
+          <NotificationBell variant="marketplace" />
           <ProfileAvatarButton />
         </div>
       </div>
 
-      <div className="mt-3 flex items-center gap-2">
+      <div className="mt-3 flex h-11 items-center gap-2">
         <form onSubmit={onSearchSubmit} className="min-w-0 flex-1">
-          <div className="flex h-11 items-center gap-2 rounded-full border border-white/15 bg-[#141c27] pl-3.5 pr-1.5">
-            <SearchIcon size={16} className="shrink-0 text-silver/80" aria-hidden />
+          <div
+            className={cn(
+              material.chrome,
+              "flex h-11 items-center rounded-[22px] pl-[14px] focus-within:ring-1 focus-within:ring-[#00ffa3]/50",
+            )}
+          >
+            <SearchIcon size={20} className="shrink-0 text-white/60" aria-hidden />
             <input
               type="text"
               value={searchValue}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Search Hashpop..."
+              placeholder="Search Hashpop…"
               aria-label="Search Hashpop"
-              className="min-w-0 flex-1 bg-transparent text-sm text-white placeholder:text-silver/50 focus:outline-none"
+              className="min-w-0 flex-1 bg-transparent px-2 text-[16px] text-white placeholder:text-white/50 focus:outline-none"
             />
             <button
               type="button"
-              data-testid="marketplace-filter-sliders"
-              onClick={onOpenFilters}
-              aria-label="Filters and sort"
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#00ffa3]"
+              data-testid="marketplace-sort-button"
+              onClick={onOpenSort}
+              aria-label="Sort"
+              className="flex h-11 w-11 shrink-0 items-center justify-end pr-[14px] text-[#00ffa3]"
             >
-              <SlidersHorizontal size={16} aria-hidden />
+              <SlidersHorizontal size={20} aria-hidden />
             </button>
           </div>
         </form>
@@ -146,21 +177,55 @@ export function MarketplaceMobileHeader({
           type="button"
           data-testid="marketplace-filter-button"
           onClick={onOpenFilters}
-          className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full border border-[#00ffa3]/70 bg-transparent px-3.5 text-sm font-medium text-[#00ffa3]"
+          className={cn(
+            "inline-flex h-11 shrink-0 items-center gap-1.5 rounded-[22px] border bg-material-chrome px-[14px] text-[15px] font-semibold text-[#00ffa3] backdrop-blur-material",
+            filtersActive ? "border-[#00ffa3]" : "border-[#00ffa3]/40",
+          )}
         >
-          <Funnel size={15} aria-hidden />
-          Filter
+          <Funnel size={18} aria-hidden />
+          {filtersActive ? `Filter · ${filterCount}` : "Filter"}
         </button>
       </div>
 
       <Sheet
         open={filterOpen && mobileSheet}
         onClose={onCloseFilters}
-        detent="large"
+        detent="medium"
+        detents={[...FILTER_DETENTS]}
         title="Filters"
         ariaLabel="Filters"
+        footer={
+          <div className="flex items-center justify-between gap-3">
+            <button
+              type="button"
+              data-testid="filter-clear"
+              onClick={onClearFilters}
+              className="text-[15px] font-medium text-white/80"
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              data-testid="filter-show"
+              onClick={onShowResults}
+              className="btn-mint rounded-full px-4 py-2.5 text-[15px] font-semibold"
+            >
+              Show {resultCount} results
+            </button>
+          </div>
+        }
       >
         {filterSheet}
+      </Sheet>
+
+      <Sheet
+        open={sortOpen && mobileSheet}
+        onClose={onCloseSort}
+        detent="medium"
+        title="Sort"
+        ariaLabel="Sort"
+      >
+        {sortSheet}
       </Sheet>
     </div>
   );

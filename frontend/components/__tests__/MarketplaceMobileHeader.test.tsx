@@ -2,12 +2,10 @@ import { createElement, act, useState, type FormEvent } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MarketplaceMobileHeader } from "../MarketplaceMobileHeader";
-import { MarketplaceFilterPanel } from "../MarketplaceFilterPanel";
+import { MarketplaceFilterPanel, MarketplaceSortPanel } from "../MarketplaceFilterPanel";
 import {
   marketplaceHref,
-  resetMarketplaceFilters,
   withAdvancedFilters,
-  withCategory,
   withListingType,
   withSort,
   type AdvancedFilterDraft,
@@ -97,7 +95,15 @@ async function renderHeader(
         filterOpen: false,
         onOpenFilters: () => {},
         onCloseFilters: () => {},
+        filterCount: 0,
+        resultCount: 2,
+        onClearFilters: () => {},
+        onShowResults: () => {},
         filterSheet: null,
+        sortOpen: false,
+        onOpenSort: () => {},
+        onCloseSort: () => {},
+        sortSheet: null,
         ...props,
       }),
     );
@@ -137,31 +143,37 @@ describe("MarketplaceMobileHeader", () => {
     const header = document.querySelector(
       '[data-testid="marketplace-mobile-header"]',
     ) as HTMLElement;
-    expect(header.className).toContain("sm:hidden");
-    expect(document.querySelector('[data-testid="marketplace-logo"]')?.textContent).toContain(
-      "Hashpop",
-    );
+    expect(header.className).toContain("md:hidden");
+    const logo = document.querySelector('[data-testid="marketplace-logo"]') as HTMLElement;
+    expect(logo.textContent).toContain("Hashpop");
+    expect(logo.className).toContain("text-[28px]");
+    expect(logo.className).toContain("font-semibold");
+    const ring = document.querySelector('[data-testid="hashpop-ring-o"]') as HTMLElement;
+    expect(ring.textContent).toBe("o");
+    expect(ring.className).toContain("text-[#00ffa3]");
     const wordmark = document.querySelector('[data-testid="marketplace-wordmark"]') as HTMLElement;
     expect(wordmark.textContent).toBe("marketplace");
-    expect(wordmark.className).toContain("tracking-[0.28em]");
-    expect(wordmark.className).toContain("text-silver");
-    expect(wordmark.className).toContain("lowercase");
+    expect(wordmark.className).toContain("tracking-[0.12em]");
+    expect(wordmark.className).toContain("text-white/60");
+    expect(wordmark.className).toContain("text-[12px]");
     const home = document.querySelector('a[aria-label="Hashpop home"]') as HTMLElement;
-    expect(home.className).toContain("left-1/2");
+    expect(home.parentElement?.className).toContain("grid-cols-");
     expect(document.body.textContent).not.toContain("Sign in");
     const profileButton = document.querySelector(
       '[data-testid="marketplace-profile"]',
     ) as HTMLButtonElement;
     expect(profileButton.getAttribute("aria-label")).toBe("Sign in");
+    expect(profileButton.className).toContain("h-10");
+    expect(profileButton.className).toContain("w-10");
     expect(profileButton.className).toContain("rounded-full");
     await act(async () => {
       profileButton.click();
     });
     expect(openSignIn).toHaveBeenCalledOnce();
     const bell = document.querySelector('[aria-label="Notifications"]') as HTMLElement;
-    expect(bell.dataset.variant).toBe("mobile");
+    expect(bell.dataset.variant).toBe("marketplace");
     const search = document.querySelector('input[aria-label="Search Hashpop"]') as HTMLInputElement;
-    expect(search.placeholder).toBe("Search Hashpop...");
+    expect(search.placeholder).toBe("Search Hashpop…");
     expect(
       document.querySelector('[data-testid="marketplace-filter-button"]')?.textContent,
     ).toContain("Filter");
@@ -186,33 +198,55 @@ describe("MarketplaceMobileHeader", () => {
     expect(openSignIn).not.toHaveBeenCalled();
   });
 
-  it("opens one filter sheet from the sliders and the Filter button and writes params", async () => {
+  it("opens Sort from the sliders and the filter sheet from Filter", async () => {
     const pushes: string[] = [];
     function Harness() {
-      const [open, setOpen] = useState(false);
+      const [filters, setFilters] = useState(false);
+      const [sort, setSort] = useState(false);
       const [draft, setDraft] = useState<AdvancedFilterDraft>(emptyDraft);
       const params = new URLSearchParams("q=sony");
       return createElement(MarketplaceMobileHeader, {
         searchValue: "",
         onSearchChange: () => {},
         onSearchSubmit: (event: FormEvent) => event.preventDefault(),
-        filterOpen: open,
-        onOpenFilters: () => setOpen(true),
-        onCloseFilters: () => setOpen(false),
+        filterOpen: filters,
+        onOpenFilters: () => {
+          setSort(false);
+          setFilters(true);
+        },
+        onCloseFilters: () => setFilters(false),
+        filterCount: 2,
+        resultCount: 4,
+        onClearFilters: () => pushes.push("clear"),
+        onShowResults: () => pushes.push(marketplaceHref(withAdvancedFilters(params, draft))),
         filterSheet: createElement(MarketplaceFilterPanel, {
           browse: true,
+          showSort: false,
+          showActions: false,
           sortMode: "recent",
           type: "all",
-          category: "",
+          category: "Watches",
           categories: ["Watches"],
           cities: ["Austin"],
           draft,
           onDraft: setDraft,
-          onSort: (sort) => pushes.push(marketplaceHref(withSort(params, sort))),
+          onSort: () => {},
           onType: (type) => pushes.push(marketplaceHref(withListingType(params, type))),
           onCategory: (category) => pushes.push(marketplaceHref(withCategory(params, category))),
-          onReset: () => pushes.push(marketplaceHref(resetMarketplaceFilters(params))),
-          onApply: () => pushes.push(marketplaceHref(withAdvancedFilters(params, draft))),
+          onReset: () => {},
+          onApply: () => {},
+        }),
+        sortOpen: sort,
+        onOpenSort: () => {
+          setFilters(false);
+          setSort(true);
+        },
+        onCloseSort: () => setSort(false),
+        sortSheet: createElement(MarketplaceSortPanel, {
+          sortMode: "recent",
+          viewMode: "grid",
+          onSort: (mode) => pushes.push(marketplaceHref(withSort(params, mode))),
+          onView: (view) => pushes.push(view),
         }),
       });
     }
@@ -225,14 +259,41 @@ describe("MarketplaceMobileHeader", () => {
     });
 
     expect(document.querySelector('[role="dialog"]')).toBeNull();
+    const filterButton = document.querySelector(
+      '[data-testid="marketplace-filter-button"]',
+    ) as HTMLButtonElement;
+    expect(filterButton.textContent).toContain("Filter · 2");
+    expect(filterButton.className).toContain("border-[#00ffa3]");
+    expect(filterButton.className).not.toContain("border-[#00ffa3]/40");
+
     const sliders = document.querySelector(
-      '[data-testid="marketplace-filter-sliders"]',
+      '[data-testid="marketplace-sort-button"]',
     ) as HTMLButtonElement;
     await act(async () => {
       sliders.click();
     });
+    expect(document.querySelector('[role="dialog"][aria-label="Sort"]')).toBeTruthy();
+    expect(document.querySelector('[role="dialog"][aria-label="Filters"]')).toBeNull();
+    await act(async () => {
+      (document.querySelector('[data-testid="sort-price-asc"]') as HTMLButtonElement).click();
+    });
+    expect(pushes.at(-1)).toContain("sort=price-asc");
+    await act(async () => {
+      (document.querySelector('[data-testid="view-editorial"]') as HTMLButtonElement).click();
+    });
+    expect(pushes.at(-1)).toBe("editorial");
+
+    await act(async () => {
+      filterButton.click();
+    });
     expect(document.querySelector('[role="dialog"][aria-label="Filters"]')).toBeTruthy();
-    expect(document.body.textContent).not.toContain("Search listings");
+    expect(document.querySelector('[role="dialog"][aria-label="Sort"]')).toBeNull();
+    expect(document.querySelector('[data-testid="sort-recent"]')).toBeNull();
+    const selected = document.querySelector(
+      '[data-testid="listing-category-Watches"]',
+    ) as HTMLElement;
+    expect(selected.className).toContain("bg-material-chrome");
+    expect(selected.className).toContain("text-chrome");
 
     await act(async () => {
       (
@@ -243,18 +304,6 @@ describe("MarketplaceMobileHeader", () => {
     expect(pushes.at(-1)).toContain("q=sony");
     expect(pushes.at(-1)).not.toContain("category=");
 
-    await act(async () => {
-      (
-        document.querySelector('[data-testid="listing-category-Watches"]') as HTMLButtonElement
-      ).click();
-    });
-    expect(pushes.at(-1)).toContain("category=Watches");
-
-    await act(async () => {
-      (document.querySelector('[data-testid="sort-price-asc"]') as HTMLButtonElement).click();
-    });
-    expect(pushes.at(-1)).toContain("sort=price-asc");
-
     const min = document.querySelector('[data-testid="filter-min-price"]') as HTMLInputElement;
     await act(async () => {
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
@@ -263,16 +312,9 @@ describe("MarketplaceMobileHeader", () => {
       min.dispatchEvent(new Event("change", { bubbles: true }));
     });
     await act(async () => {
-      (document.querySelector('[data-testid="filter-apply"]') as HTMLButtonElement).click();
+      (document.querySelector('[data-testid="filter-show"]') as HTMLButtonElement).click();
     });
     expect(pushes.at(-1)).toContain("minPrice=1.5");
-    expect(pushes.at(-1)).toContain("q=sony");
-
-    await act(async () => {
-      (
-        document.querySelector('[data-testid="marketplace-filter-button"]') as HTMLButtonElement
-      ).click();
-    });
-    expect(document.querySelectorAll('[role="dialog"]').length).toBe(1);
+    expect(document.body.textContent).toContain("Show 4 results");
   });
 });

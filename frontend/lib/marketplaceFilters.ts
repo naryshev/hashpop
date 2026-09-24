@@ -62,6 +62,43 @@ export function withAdvancedFilters(
   return next;
 }
 
+/** Filter-sheet Clear. Leaves search, sort, and view alone. */
+export function clearListingFilters(params: ParamSource): URLSearchParams {
+  const next = copyParams(params);
+  for (const key of [
+    "minPrice",
+    "maxPrice",
+    "postedWithin",
+    "condition",
+    "location",
+    "type",
+    "category",
+  ]) {
+    next.delete(key);
+  }
+  return next;
+}
+
+export function activeFilterCount(input: {
+  type: ListingType;
+  category: string;
+  minPrice: string;
+  maxPrice: string;
+  postedWithin: string;
+  condition: string;
+  location: string;
+}): number {
+  let count = 0;
+  if (input.type !== "all") count += 1;
+  if (input.category) count += 1;
+  if (input.minPrice) count += 1;
+  if (input.maxPrice) count += 1;
+  if (input.postedWithin) count += 1;
+  if (input.condition) count += 1;
+  if (input.location) count += 1;
+  return count;
+}
+
 /** Clears the sheet controls. Leaves the search query (`q`) and view mode alone. */
 export function resetMarketplaceFilters(params: ParamSource): URLSearchParams {
   const next = copyParams(params);

@@ -1,6 +1,9 @@
 "use client";
 
 import type { AdvancedFilterDraft, ListingType, SortMode } from "../lib/marketplaceFilters";
+import type { ViewMode } from "../lib/marketplaceView";
+import { material } from "../lib/materials";
+import { cn } from "../lib/utils";
 
 const SORTS: { id: SortMode; label: string }[] = [
   { id: "recent", label: "Recent" },
@@ -30,6 +33,8 @@ export function MarketplaceFilterPanel({
   onCategory,
   onReset,
   onApply,
+  showSort = true,
+  showActions = true,
 }: {
   browse: boolean;
   sortMode: SortMode;
@@ -44,13 +49,21 @@ export function MarketplaceFilterPanel({
   onCategory: (category: string) => void;
   onReset: () => void;
   onApply: () => void;
+  /** Mobile sort lives in its own sheet. */
+  showSort?: boolean;
+  /** Mobile sheet uses a sticky Clear / Show footer instead. */
+  showActions?: boolean;
 }) {
   return (
     <div data-testid="marketplace-filter-panel">
       {browse && (
         <>
           <p className="text-xs font-semibold uppercase tracking-widest text-silver">Type</p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
+          <div
+            className="mt-2 grid grid-cols-3 gap-1 rounded-[14px] bg-white/5 p-1"
+            role="group"
+            aria-label="Type"
+          >
             {TYPES.map((listingType) => {
               const active = type === listingType;
               return (
@@ -59,11 +72,10 @@ export function MarketplaceFilterPanel({
                   type="button"
                   data-testid={`listing-type-${listingType}`}
                   onClick={() => onType(listingType)}
-                  className={`rounded-full border px-3 py-1 text-xs capitalize transition-colors ${
-                    active
-                      ? "border-[#00ffa3]/40 bg-[#00ffa3]/10 text-[#00ffa3]"
-                      : "border-white/10 text-silver hover:border-white/20 hover:text-white"
-                  }`}
+                  className={cn(
+                    "h-9 rounded-[10px] text-sm font-semibold capitalize",
+                    active ? cn(material.chrome, "text-chrome") : "text-white/70",
+                  )}
                 >
                   {listingType}
                 </button>
@@ -73,7 +85,7 @@ export function MarketplaceFilterPanel({
           <p className="mt-4 text-xs font-semibold uppercase tracking-widest text-silver">
             Category
           </p>
-          <div className="mt-2 flex max-h-36 flex-wrap gap-1.5 overflow-y-auto">
+          <div className="mt-2 flex flex-wrap gap-1.5">
             {categories.map((name) => {
               const active = category === name;
               return (
@@ -82,11 +94,12 @@ export function MarketplaceFilterPanel({
                   type="button"
                   data-testid={`listing-category-${name}`}
                   onClick={() => onCategory(name)}
-                  className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                  className={cn(
+                    "rounded-full px-3 py-1 text-xs",
                     active
-                      ? "border-[#00ffa3]/40 bg-[#00ffa3]/10 text-[#00ffa3]"
-                      : "border-white/10 text-silver hover:border-white/20 hover:text-white"
-                  }`}
+                      ? cn(material.chrome, "text-chrome")
+                      : "border border-white/10 text-silver",
+                  )}
                 >
                   {name}
                 </button>
@@ -95,31 +108,35 @@ export function MarketplaceFilterPanel({
           </div>
         </>
       )}
-      <p
-        className={`${browse ? "mt-4" : ""} text-xs font-semibold uppercase tracking-widest text-silver`}
-      >
-        Sort
-      </p>
-      <div className="mt-2 grid grid-cols-2 gap-1.5">
-        {SORTS.map((sort) => {
-          const active = sortMode === sort.id;
-          return (
-            <button
-              key={sort.id}
-              type="button"
-              data-testid={`sort-${sort.id}`}
-              onClick={() => onSort(sort.id)}
-              className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-                active
-                  ? "border-[#00ffa3]/40 bg-[#00ffa3]/10 text-[#00ffa3]"
-                  : "border-white/10 text-silver hover:border-white/20 hover:text-white"
-              }`}
-            >
-              {sort.label}
-            </button>
-          );
-        })}
-      </div>
+      {showSort && (
+        <>
+          <p
+            className={`${browse ? "mt-4" : ""} text-xs font-semibold uppercase tracking-widest text-silver`}
+          >
+            Sort
+          </p>
+          <div className="mt-2 grid grid-cols-2 gap-1.5">
+            {SORTS.map((sort) => {
+              const active = sortMode === sort.id;
+              return (
+                <button
+                  key={sort.id}
+                  type="button"
+                  data-testid={`sort-${sort.id}`}
+                  onClick={() => onSort(sort.id)}
+                  className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                    active
+                      ? "border-[#00ffa3]/40 bg-[#00ffa3]/10 text-[#00ffa3]"
+                      : "border-white/10 text-silver hover:border-white/20 hover:text-white"
+                  }`}
+                >
+                  {sort.label}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
       <p className="mt-4 text-xs font-semibold uppercase tracking-widest text-silver">Filters</p>
       <div className="mt-2 space-y-3">
         <div>
@@ -198,24 +215,90 @@ export function MarketplaceFilterPanel({
             <option value="For parts or repair">For parts or repair</option>
           </select>
         </div>
-        <div className="flex gap-2 pt-1">
-          <button
-            type="button"
-            data-testid="filter-reset"
-            onClick={onReset}
-            className="flex-1 rounded-lg border border-white/15 py-1.5 text-xs text-silver transition-colors hover:text-white"
-          >
-            Reset
-          </button>
-          <button
-            type="button"
-            data-testid="filter-apply"
-            onClick={onApply}
-            className="btn-frost-cta flex-1 py-1.5 text-xs"
-          >
-            Apply
-          </button>
-        </div>
+        {showActions && (
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              data-testid="filter-reset"
+              onClick={onReset}
+              className="flex-1 rounded-lg border border-white/15 py-1.5 text-xs text-silver transition-colors hover:text-white"
+            >
+              Reset
+            </button>
+            <button
+              type="button"
+              data-testid="filter-apply"
+              onClick={onApply}
+              className="btn-frost-cta flex-1 py-1.5 text-xs"
+            >
+              Apply
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Sort order plus the Grid / Editorial view toggle. Opened from the search sliders. */
+export function MarketplaceSortPanel({
+  sortMode,
+  viewMode,
+  onSort,
+  onView,
+}: {
+  sortMode: SortMode;
+  viewMode: ViewMode;
+  onSort: (sort: SortMode) => void;
+  onView: (view: ViewMode) => void;
+}) {
+  return (
+    <div data-testid="marketplace-sort-panel">
+      <p className="text-xs font-semibold uppercase tracking-widest text-silver">Sort</p>
+      <div className="mt-2 grid grid-cols-2 gap-1.5">
+        {SORTS.map((sort) => {
+          const active = sortMode === sort.id;
+          return (
+            <button
+              key={sort.id}
+              type="button"
+              data-testid={`sort-${sort.id}`}
+              onClick={() => onSort(sort.id)}
+              className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                active
+                  ? "border-[#00ffa3]/40 bg-[#00ffa3]/10 text-[#00ffa3]"
+                  : "border-white/10 text-silver hover:border-white/20 hover:text-white"
+              }`}
+            >
+              {sort.label}
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-4 text-xs font-semibold uppercase tracking-widest text-silver">View</p>
+      <div className="mt-2 grid grid-cols-2 gap-1 rounded-[14px] bg-white/5 p-1" role="group">
+        {(
+          [
+            { id: "grid", label: "Grid" },
+            { id: "editorial", label: "Editorial" },
+          ] as { id: ViewMode; label: string }[]
+        ).map((view) => {
+          const active = viewMode === view.id;
+          return (
+            <button
+              key={view.id}
+              type="button"
+              data-testid={`view-${view.id}`}
+              onClick={() => onView(view.id)}
+              className={cn(
+                "h-9 rounded-[10px] text-sm font-semibold",
+                active ? cn(material.chrome, "text-chrome") : "text-white/70",
+              )}
+            >
+              {view.label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
