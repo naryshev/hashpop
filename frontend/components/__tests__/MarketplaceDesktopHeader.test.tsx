@@ -104,7 +104,11 @@ describe("MarketplaceDesktopHeader", () => {
     const cart = brand.querySelector('[data-testid="marketplace-cart-mark"]') as HTMLImageElement;
     const logo = brand.querySelector('[data-testid="marketplace-logo"]') as SVGElement;
     expect(cart.tagName.toLowerCase()).toBe("img");
-    expect(cart.getAttribute("src")).toContain("hashpop-cart-3d.PNG");
+    expect(cart.getAttribute("src")).toBe("/hashpop-cart-3d.PNG");
+    expect(brand.querySelectorAll("svg")).toHaveLength(1);
+    expect(brand.contains(document.querySelector('[data-testid="marketplace-desktop-cart"]'))).toBe(
+      false,
+    );
     expect(cart.compareDocumentPosition(logo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(logo.className.baseVal).toContain("h-8");
     expect(logo.className.baseVal).toContain("text-white");

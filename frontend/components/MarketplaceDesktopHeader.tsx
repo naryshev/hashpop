@@ -81,6 +81,7 @@ export function MarketplaceDesktopHeader({
         aria-label="Hashpop home"
         className="flex shrink-0 items-center gap-2.5"
       >
+        {/* Product cart-H (same asset as the shell and splash). Not the outline cart. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/hashpop-cart-3d.PNG"
