@@ -132,7 +132,7 @@ export function MarketplaceMobileHeader({
         <form onSubmit={onSearchSubmit} className="min-w-0 flex-1">
           <div
             data-testid="marketplace-search-field"
-            className="flex h-11 items-center rounded-[22px] border border-white/10 bg-material-chrome pl-[14px] backdrop-blur-material"
+            className="flex h-11 items-center rounded-[22px] border border-white/10 bg-white/[0.06] pl-[14px] backdrop-blur-md"
           >
             <SearchIcon size={20} className="shrink-0 text-white/60" aria-hidden />
             <input
@@ -159,7 +159,7 @@ export function MarketplaceMobileHeader({
           data-testid="marketplace-filter-button"
           onClick={onOpenFilters}
           className={cn(
-            "inline-flex h-11 shrink-0 items-center gap-1.5 rounded-[22px] border bg-material-chrome px-[14px] text-[15px] font-semibold text-[#00ffa3] backdrop-blur-material",
+            "inline-flex h-11 shrink-0 items-center gap-1.5 rounded-[22px] border bg-white/[0.06] px-[14px] text-[15px] font-semibold text-[#00ffa3] backdrop-blur-md",
             filtersActive ? "border-[#00ffa3]" : "border-[#00ffa3]/40",
           )}
         >
