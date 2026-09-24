@@ -145,7 +145,8 @@ describe("ListingCard softTrust", () => {
     const chipRow = document.querySelector('[data-testid="trust-chip-row"]') as HTMLElement;
     expect(chipRow.className).toContain("flex-nowrap");
     expect(chipRow.className).not.toContain("overflow-hidden");
-    expect(chipRow.className).toContain("h-6");
+    expect(chipRow.className).toContain("h-5");
+    expect(chipRow.className).toContain("w-full");
     expect(chipRow.className).not.toContain("flex-wrap");
     expect(title.compareDocumentPosition(media) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(0);
     expect(media.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -160,8 +161,9 @@ describe("ListingCard softTrust", () => {
     const chips = [...document.querySelectorAll('[data-testid="grid-trust-chip"]')];
     expect(chips.map((chip) => chip.textContent)).toEqual(["Meetup"]);
     expect(chips[0].querySelector("svg")).toBeTruthy();
-    expect((chips[0] as HTMLElement).className).toContain("h-6");
-    expect((chips[0] as HTMLElement).className).toContain("px-2");
+    expect((chips[0] as HTMLElement).className).toContain("h-5");
+    expect((chips[0] as HTMLElement).className).toContain("px-0.5");
+    expect((chips[0] as HTMLElement).className).toContain("text-[10px]");
     expect((chips[0] as HTMLElement).className).toContain("text-silver");
     expect((chips[0] as HTMLElement).className).not.toContain("text-chrome");
     expect(document.querySelector('[data-testid="listing-distance"]')).toBeNull();
@@ -170,9 +172,9 @@ describe("ListingCard softTrust", () => {
     expect(document.body.textContent).not.toContain("ETH");
   });
 
-  it("does not mount a third chip on mobile, so Escrow cannot clip", async () => {
+  it("mounts all three compact chips when the row is wide enough", async () => {
     loadedProfile(49, 50);
-    expect(chipCapForDensity(true, 3)).toBe(2);
+    expect(chipCapForDensity(true, 3)).toBe(3);
     expect(chipCapForDensity(false, 3)).toBe(3);
     await renderCard({
       variant: "softTrust",
@@ -188,9 +190,77 @@ describe("ListingCard softTrust", () => {
       },
     });
     const chips = [...document.querySelectorAll('[data-testid="grid-trust-chip"]')];
-    expect(chips.map((chip) => chip.textContent)).toEqual(["98%", "Meetup"]);
-    expect(document.body.textContent).not.toContain("Escrow");
+    expect(chips.map((chip) => chip.textContent)).toEqual(["98%", "Meetup", "Escrow"]);
     expect(chips.every((chip) => !chip.hidden)).toBe(true);
+  });
+
+  it("drops a whole chip that overflows the row and never clips it", async () => {
+    loadedProfile(49, 50);
+    const rect = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockImplementation(function (this: HTMLElement) {
+        if (this.dataset.testid === "trust-chip-row") {
+          return {
+            x: 0,
+            y: 0,
+            top: 0,
+            left: 0,
+            right: 120,
+            bottom: 20,
+            width: 120,
+            height: 20,
+            toJSON() {},
+          } as DOMRect;
+        }
+        if (this.dataset.testid === "grid-trust-chip") {
+          const label = this.textContent ?? "";
+          const right = label.includes("Escrow") ? 180 : label.includes("Meetup") ? 90 : 36;
+          return {
+            x: 0,
+            y: 0,
+            top: 0,
+            left: 0,
+            right,
+            bottom: 20,
+            width: right,
+            height: 20,
+            toJSON() {},
+          } as DOMRect;
+        }
+        return {
+          x: 0,
+          y: 0,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: 0,
+          height: 0,
+          toJSON() {},
+        } as DOMRect;
+      });
+    try {
+      await renderCard({
+        variant: "softTrust",
+        density: "compact",
+        item: {
+          id: "lst-sony",
+          title: "Sony WH-1000XM5",
+          price: "85",
+          seller,
+          status: "LISTED",
+          requireEscrow: true,
+          meetup: true,
+        },
+      });
+      const chips = [...document.querySelectorAll('[data-testid="grid-trust-chip"]')];
+      expect(chips.map((chip) => chip.textContent)).toEqual(["98%", "Meetup"]);
+      expect(document.body.textContent).not.toContain("Escrow");
+      const row = document.querySelector('[data-testid="trust-chip-row"]') as HTMLElement;
+      expect(row.className).not.toContain("overflow-hidden");
+    } finally {
+      rect.mockRestore();
+    }
   });
 
   it("shows completion, Meetup, and Escrow together on the desktop card", async () => {
@@ -229,8 +299,8 @@ describe("ListingCard softTrust", () => {
     expect((chips[2] as HTMLElement).className).toContain("text-silver");
     const distance = document.querySelector('[data-testid="listing-distance"]') as HTMLElement;
     expect(distance.textContent).toContain("1.2 km");
-    expect(distance.className).toContain("text-white/60");
-    expect(distance.className).not.toContain("text-silver/60");
+    expect(distance.className).toContain("text-chrome");
+    expect(distance.className).not.toContain("text-white/60");
     expect(distance.querySelector("svg")).toBeTruthy();
   });
 

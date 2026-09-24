@@ -14,13 +14,25 @@ import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { canonicalizeCategory, CATEGORY_GROUPS } from "../../lib/categories";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
-import { useSignInModal } from "../../lib/signInModal";
 import { getApiUrl } from "../../lib/apiUrl";
 import { useProfiles } from "../../lib/profiles";
 import { TopBarSlot } from "../../lib/topBar";
 import { listingCta, material } from "../../lib/materials";
 import { cn } from "../../lib/utils";
 import { parseViewMode, viewModeQueryValue, type ViewMode } from "../../lib/marketplaceView";
+import {
+  marketplaceHref,
+  resetMarketplaceFilters,
+  withAdvancedFilters,
+  withCategory,
+  withListingType,
+  withSort,
+  type AdvancedFilterDraft,
+  type ListingType,
+  type SortMode,
+} from "../../lib/marketplaceFilters";
+import { MarketplaceFilterPanel } from "../../components/MarketplaceFilterPanel";
+import { MarketplaceMobileHeader } from "../../components/MarketplaceMobileHeader";
 import { ChevronDown, Search as SearchIcon, SlidersHorizontal } from "lucide-react";
 
 function normalizeListingStatus(status?: string): string {
@@ -42,9 +54,6 @@ function parsePostedWithinDays(value: string): number | null {
   };
   return daysMap[value] ?? null;
 }
-
-type SortMode = "recent" | "price-asc" | "price-desc" | "trending";
-type ListingType = "all" | "physical" | "digital";
 
 // Digital goods = the "Digital & Software" category group (software, digital
 // downloads, access codes & gift cards, NFTs). Everything else is physical.
@@ -106,8 +115,7 @@ export default function MarketplacePageClient({
   initialItems: ListingItem[];
   initialError: string | null;
 }) {
-  const { isConnected, address, accountId } = useHashpackWallet();
-  const { openSignIn } = useSignInModal();
+  const { isConnected } = useHashpackWallet();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [searchInput, setSearchInput] = useState("");
@@ -305,11 +313,8 @@ export default function MarketplacePageClient({
     sortMode,
   ]);
 
-  // Header chrome is hoisted into the global top bar via portals so the page
-  // body holds only content. Title, search-with-filters, and the Create
-  // Listing CTA each live in their own named slot. On mobile the slots
-  // aren't rendered (no DesktopShell), so the search-with-filter block is
-  // duplicated below as a fallback header inside the page body.
+  // Desktop header chrome is hoisted into the global top bar via portals.
+  // Below `sm`, the marketplace page renders its own header and search row.
   const headerCluster = (
     <div className="flex items-center gap-2">
       <span className="text-base font-semibold tracking-tight text-white">Marketplace</span>
@@ -368,152 +373,43 @@ export default function MarketplacePageClient({
       .slice(0, 50);
   }, [items]);
 
-  const renderFilterSortPanel = () => (
-    <div className="absolute right-0 top-full mt-2 w-72 rounded-xl border border-white/10 bg-[#0a0a0a] p-4 shadow-2xl z-50">
-      <p className="text-xs font-semibold uppercase tracking-widest text-silver">Sort</p>
-      <div className="mt-2 grid grid-cols-2 gap-1.5">
-        {(
-          [
-            { id: "recent", label: "Recent" },
-            { id: "trending", label: "Trending" },
-            { id: "price-asc", label: "Price ↑" },
-            { id: "price-desc", label: "Price ↓" },
-          ] as { id: SortMode; label: string }[]
-        ).map((s) => {
-          const active = sortMode === s.id;
-          return (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => setParam("sort", s.id === "recent" ? null : s.id)}
-              className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-                active
-                  ? "border-[#00ffa3]/40 bg-[#00ffa3]/10 text-[#00ffa3]"
-                  : "border-white/10 text-silver hover:border-white/20 hover:text-white"
-              }`}
-            >
-              {s.label}
-            </button>
-          );
-        })}
-      </div>
-      <p className="mt-4 text-xs font-semibold uppercase tracking-widest text-silver">Filters</p>
-      <div className="mt-2 space-y-3">
-        <div>
-          <span className="mb-1 block text-xs text-silver/70">Location</span>
-          <select
-            value={filterLocation}
-            onChange={(e) => setFilterLocation(e.target.value)}
-            className="input-frost w-full py-1.5 text-sm"
-          >
-            <option value="">All locations</option>
-            {knownCities.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <span className="mb-1 block text-xs text-silver/70">Price (HBAR)</span>
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              min="0"
-              step="any"
-              value={filterMinPrice}
-              onChange={(e) => setFilterMinPrice(e.target.value)}
-              placeholder="Min"
-              className="input-frost w-full py-1.5 text-sm"
-            />
-            <span className="shrink-0 text-xs text-silver/40">to</span>
-            <input
-              type="number"
-              min="0"
-              step="any"
-              value={filterMaxPrice}
-              onChange={(e) => setFilterMaxPrice(e.target.value)}
-              placeholder="Max"
-              className="input-frost w-full py-1.5 text-sm"
-            />
-          </div>
-        </div>
-        <div>
-          <span className="mb-1 block text-xs text-silver/70">Date listed</span>
-          <select
-            value={filterPostedWithin}
-            onChange={(e) => setFilterPostedWithin(e.target.value)}
-            className="input-frost w-full py-1.5 text-sm"
-          >
-            <option value="">Any time</option>
-            <option value="1d">Last 24 hours</option>
-            <option value="1w">Last week</option>
-            <option value="1m">Last month</option>
-            <option value="3m">Last 3 months</option>
-            <option value="6m">Last 6 months</option>
-            <option value="1y">Last year</option>
-          </select>
-        </div>
-        <div>
-          <span className="mb-1 block text-xs text-silver/70">Condition</span>
-          <select
-            value={filterCondition}
-            onChange={(e) => setFilterCondition(e.target.value)}
-            className="input-frost w-full py-1.5 text-sm"
-          >
-            <option value="">Any condition</option>
-            <option value="Like new">Like new</option>
-            <option value="Used">Used</option>
-            <option value="Refurbished">Refurbished</option>
-            <option value="For parts or repair">For parts or repair</option>
-          </select>
-        </div>
-        <div className="flex gap-2 pt-1">
-          <button
-            type="button"
-            onClick={() => {
-              const p = new URLSearchParams(searchParams.toString());
-              p.delete("minPrice");
-              p.delete("maxPrice");
-              p.delete("postedWithin");
-              p.delete("condition");
-              p.delete("location");
-              p.delete("sort");
-              setFilterOpen(false);
-              router.push(p.toString() ? `/marketplace?${p.toString()}` : "/marketplace");
-            }}
-            className="flex-1 rounded-lg border border-white/15 py-1.5 text-xs text-silver transition-colors hover:text-white"
-          >
-            Reset
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              const p = new URLSearchParams(searchParams.toString());
-              if (filterMinPrice) p.set("minPrice", filterMinPrice);
-              else p.delete("minPrice");
-              if (filterMaxPrice) p.set("maxPrice", filterMaxPrice);
-              else p.delete("maxPrice");
-              if (filterPostedWithin) p.set("postedWithin", filterPostedWithin);
-              else p.delete("postedWithin");
-              if (filterCondition) p.set("condition", filterCondition);
-              else p.delete("condition");
-              if (filterLocation) p.set("location", filterLocation);
-              else p.delete("location");
-              setFilterOpen(false);
-              router.push(p.toString() ? `/marketplace?${p.toString()}` : "/marketplace");
-            }}
-            className="btn-frost-cta flex-1 py-1.5 text-xs"
-          >
-            Apply
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+  const filterDraft: AdvancedFilterDraft = {
+    minPrice: filterMinPrice,
+    maxPrice: filterMaxPrice,
+    postedWithin: filterPostedWithin,
+    condition: filterCondition,
+    location: filterLocation,
+  };
 
-  // Wallet chip shown top-left of the mobile header — account number only
-  // (no avatar) with a carat that slides up the profile card sheet.
+  const renderFilterSortPanel = (browse: boolean) => (
+    <MarketplaceFilterPanel
+      browse={browse}
+      sortMode={sortMode}
+      type={typeQuery}
+      category={categoryQuery}
+      categories={typeCategories}
+      cities={knownCities}
+      draft={filterDraft}
+      onDraft={(next) => {
+        setFilterMinPrice(next.minPrice);
+        setFilterMaxPrice(next.maxPrice);
+        setFilterPostedWithin(next.postedWithin);
+        setFilterCondition(next.condition);
+        setFilterLocation(next.location);
+      }}
+      onSort={(sort) => router.push(marketplaceHref(withSort(searchParams, sort)))}
+      onType={(type) => router.push(marketplaceHref(withListingType(searchParams, type)))}
+      onCategory={(category) => router.push(marketplaceHref(withCategory(searchParams, category)))}
+      onReset={() => {
+        setFilterOpen(false);
+        router.push(marketplaceHref(resetMarketplaceFilters(searchParams)));
+      }}
+      onApply={() => {
+        setFilterOpen(false);
+        router.push(marketplaceHref(withAdvancedFilters(searchParams, filterDraft)));
+      }}
+    />
+  );
 
   // Top-bar search — rectangular rounded "Find…" field with an F shortcut
   // hint, hosted in the global top bar's center slot next to the logo/nav.
@@ -544,7 +440,11 @@ export default function MarketplacePageClient({
           </button>
         </div>
       </form>
-      {filterOpen && renderFilterSortPanel()}
+      {filterOpen && (
+        <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-white/10 bg-[#0a0a0a] p-4 shadow-2xl">
+          {renderFilterSortPanel(false)}
+        </div>
+      )}
     </div>
   );
 
@@ -607,89 +507,15 @@ export default function MarketplacePageClient({
       </TopBarSlot>
       <TopBarSlot name="actions">{actionsCluster}</TopBarSlot>
       <div className="px-3 py-4 sm:px-4">
-        {/* Mobile-only top section, matching the demo video: shared header
-            (logo, bell, wallet pill), a green-tinted "Search listings" bar,
-            then two layers of filter pills — All/Physical/Digital on top,
-            categories for the selected type underneath. */}
-        <div className="sm:hidden mb-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <form onSubmit={submitSearch} className="flex-1">
-              <div className="flex items-center gap-2.5 rounded-xl border border-[#00ffa3]/25 bg-[#0c1622] px-3.5 py-3 transition-colors focus-within:border-[#00ffa3]/60">
-                <SearchIcon size={16} className="text-silver/70" />
-                <input
-                  type="text"
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="Search listings"
-                  className="flex-1 bg-transparent text-sm text-white placeholder:text-silver/60 focus:outline-none"
-                />
-              </div>
-            </form>
-            <div className="relative">
-              <button
-                type="button"
-                onClick={openFilterPanel}
-                aria-label="Filters & sort"
-                className={`inline-flex h-11 w-11 items-center justify-center rounded-xl border transition-colors ${
-                  filterOpen || hasActiveFilter
-                    ? "border-[#00ffa3]/40 bg-[#00ffa3]/10 text-[#00ffa3]"
-                    : "border-white/10 bg-[#0c1622] text-silver hover:text-white"
-                }`}
-              >
-                <SlidersHorizontal size={16} />
-              </button>
-              {filterOpen && renderFilterSortPanel()}
-            </div>
-          </div>
-          {/* Layer 1: listing type. Switching type clears any category pick. */}
-          <div className="flex gap-2">
-            {(["all", "physical", "digital"] as ListingType[]).map((t) => {
-              const isActive = typeQuery === t;
-              return (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => {
-                    const p = new URLSearchParams(searchParams.toString());
-                    if (t === "all") p.delete("type");
-                    else p.set("type", t);
-                    p.delete("category");
-                    router.push(p.toString() ? `/marketplace?${p.toString()}` : "/marketplace");
-                  }}
-                  className={`inline-flex shrink-0 items-center rounded-full border px-4 py-1.5 text-[13px] capitalize transition-colors ${
-                    isActive
-                      ? "border-[#00ffa3]/70 bg-[#00ffa3]/[0.08] font-semibold text-[#00ffa3]"
-                      : "border-white/10 bg-[#151c29] font-medium text-[#c9cfdb] hover:text-white"
-                  }`}
-                >
-                  {t}
-                </button>
-              );
-            })}
-          </div>
-          {/* Layer 2: categories within the selected type. */}
-          <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 scrollbar-none">
-            {typeCategories.map((c) => {
-              const isActive = c === categoryQuery;
-              return (
-                <Link
-                  key={c}
-                  href={`/marketplace?${new URLSearchParams({
-                    ...(typeQuery !== "all" ? { type: typeQuery } : {}),
-                    category: c,
-                  }).toString()}`}
-                  className={`inline-flex shrink-0 items-center rounded-full border px-3.5 py-1.5 text-[12px] transition-colors ${
-                    isActive
-                      ? "border-[#00ffa3]/70 bg-[#00ffa3]/[0.08] font-semibold text-[#00ffa3]"
-                      : "border-white/10 bg-[#151c29] font-medium text-[#c9cfdb] hover:text-white"
-                  }`}
-                >
-                  {c}
-                </Link>
-              );
-            })}
-          </div>
-        </div>
+        <MarketplaceMobileHeader
+          searchValue={searchInput}
+          onSearchChange={setSearchInput}
+          onSearchSubmit={submitSearch}
+          filterOpen={filterOpen}
+          onOpenFilters={openFilterPanel}
+          onCloseFilters={() => setFilterOpen(false)}
+          filterSheet={renderFilterSortPanel(true)}
+        />
 
         {(() => {
           const removeFilter = (keys: string[]) => {

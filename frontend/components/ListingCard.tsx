@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { BadgeCheck, CircleCheck, MapPin, Shield } from "lucide-react";
 import { ListingMedia } from "./ListingMedia";
@@ -98,13 +98,13 @@ const chipGlyph = {
 } as const;
 
 /**
- * Mobile 2-up cannot fit completion + Meetup + Escrow. Cap at two so the
- * third chip is never mounted (a clipped sliver is not a dropped chip).
- * Wider cards start with the full row and drop any chip that still overflows.
+ * How many chips to mount before measuring. Compact cards use tighter chips
+ * so three can fit at 390px; anything that still overflows is dropped whole
+ * in layout (never clipped).
  */
-export function chipCapForDensity(compact: boolean, total: number): number {
+export function chipCapForDensity(_compact: boolean, total: number): number {
   if (total <= 0) return 0;
-  return compact ? Math.min(2, total) : total;
+  return total;
 }
 
 /** One line of chips. Only whole chips that fit are rendered. */
@@ -122,16 +122,29 @@ function TrustChipRow({ chips, compact }: { chips: GridTrustChip[]; compact: boo
 
   useLayoutEffect(() => {
     const row = rowRef.current;
-    if (!row || row.clientWidth <= 0) return;
-    const rowRight = row.getBoundingClientRect().right;
+    if (!row) return;
+    const bounds = row.getBoundingClientRect();
+    if (bounds.width <= 0) return;
     let fit = 0;
     for (const child of row.children) {
       const right = (child as HTMLElement).getBoundingClientRect().right;
-      if (right > rowRight - 0.5) break;
+      if (right > bounds.right - 0.5) break;
       fit += 1;
     }
     if (fit < count) setCount(fit);
   }, [count, chipKey]);
+
+  useEffect(() => {
+    const fonts = document.fonts;
+    if (!fonts) return;
+    let cancel = false;
+    fonts.ready.then(() => {
+      if (!cancel) setCount(cap);
+    });
+    return () => {
+      cancel = true;
+    };
+  }, [cap, chipKey]);
 
   const shown = chips.slice(0, count);
 
@@ -139,7 +152,10 @@ function TrustChipRow({ chips, compact }: { chips: GridTrustChip[]; compact: boo
     <div
       ref={rowRef}
       data-testid="trust-chip-row"
-      className="mt-1.5 flex h-6 min-w-0 flex-nowrap items-center gap-1"
+      className={cn(
+        "mt-1.5 flex w-full min-w-0 flex-nowrap items-center",
+        compact ? "h-5 gap-px" : "h-6 gap-1",
+      )}
     >
       {shown.map((chip) => {
         const Glyph = chipGlyph[chip.kind];
@@ -148,14 +164,17 @@ function TrustChipRow({ chips, compact }: { chips: GridTrustChip[]; compact: boo
             key={chip.kind}
             data-testid="grid-trust-chip"
             className={cn(
-              "inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 text-[11px] font-semibold leading-none",
+              "inline-flex shrink-0 items-center whitespace-nowrap rounded-full font-semibold leading-none",
+              compact
+                ? "h-5 gap-px px-0.5 text-[10px] tracking-tight"
+                : "h-6 gap-1 px-2 text-[11px]",
               chip.tone === "mint"
                 ? "border border-[#00ffa3]/25 bg-[#00ffa3]/10 text-chrome"
                 : cn(material.thick, "border border-white/10 text-silver"),
             )}
             aria-label={chip.kind === "completion" ? `Seller completion ${chip.label}` : chip.label}
           >
-            <Glyph size={12} aria-hidden className="shrink-0" />
+            <Glyph size={compact ? 9 : 12} aria-hidden className="shrink-0" />
             {chip.label}
           </span>
         );
@@ -211,7 +230,13 @@ function SoftTrustCard({
           </div>
         </div>
       </div>
-      <Link href={listingHref(item.id)} className="flex flex-1 flex-col px-2.5 pb-[11px] pt-2">
+      <Link
+        href={listingHref(item.id)}
+        className={cn(
+          "flex w-full min-w-0 flex-1 flex-col pb-[11px] pt-2",
+          compact ? "px-2" : "px-2.5",
+        )}
+      >
         <h2 className="line-clamp-2 min-h-9 text-[13px] font-semibold leading-snug text-white">
           {item.title || formatListingId(item.id) || "Untitled"}
         </h2>
@@ -229,7 +254,7 @@ function SoftTrustCard({
           {distance ? (
             <span
               data-testid="listing-distance"
-              className="inline-flex shrink-0 items-center gap-0.5 text-[11px] text-white/60"
+              className="inline-flex shrink-0 items-center gap-0.5 text-[11px] text-chrome"
             >
               <MapPin size={12} aria-hidden className="shrink-0" />
               {distance}

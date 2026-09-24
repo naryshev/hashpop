@@ -173,9 +173,9 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
 
   // Mobile page header (logo, bell, wallet pill) lives here in the shell —
   // OUTSIDE the route-keyed fade wrapper below — so it stays put on page
-  // switches while the content still eases in. Shown on the top-level
-  // navigation pages; focused screens (listing, order, activity…) keep
-  // their own back-button chrome.
+  // switches while the content still eases in. Marketplace renders its own
+  // mobile header. Focused screens (listing, order, activity…) keep their
+  // own back-button chrome.
   const MOBILE_HEADER_ROUTES = [
     "/marketplace",
     "/cart",
@@ -316,7 +316,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
           bordered center card. Mobile gets bottom padding so content clears
           the floating BottomNav; the document itself scrolls. */}
       <main className="flex min-h-[100dvh] flex-1 flex-col pb-24 md:min-h-0 md:pb-0">
-        {showMobileHeader && !immersive && (
+        {showMobileHeader && !immersive && pathname !== "/marketplace" && (
           <div className="px-3 pt-4">
             <MobileTopBar />
           </div>
