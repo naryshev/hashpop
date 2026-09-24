@@ -154,7 +154,7 @@ function TrustChipRow({ chips, compact }: { chips: GridTrustChip[]; compact: boo
       data-testid="trust-chip-row"
       className={cn(
         "mt-1.5 flex w-full min-w-0 flex-nowrap items-center",
-        compact ? "h-5 gap-px" : "h-6 gap-1",
+        compact ? "h-5 gap-1" : "h-6 gap-1",
       )}
     >
       {shown.map((chip) => {
@@ -165,16 +165,14 @@ function TrustChipRow({ chips, compact }: { chips: GridTrustChip[]; compact: boo
             data-testid="grid-trust-chip"
             className={cn(
               "inline-flex shrink-0 items-center whitespace-nowrap rounded-full font-semibold leading-none",
-              compact
-                ? "h-5 gap-px px-0.5 text-[10px] tracking-tight"
-                : "h-6 gap-1 px-2 text-[11px]",
+              compact ? "h-5 gap-0.5 px-1 text-[10px]" : "h-6 gap-1 px-2 text-[11px]",
               chip.tone === "mint"
                 ? "border border-[#00ffa3]/25 bg-[#00ffa3]/10 text-chrome"
                 : cn(material.thick, "border border-white/10 text-silver"),
             )}
             aria-label={chip.kind === "completion" ? `Seller completion ${chip.label}` : chip.label}
           >
-            <Glyph size={compact ? 9 : 12} aria-hidden className="shrink-0" />
+            <Glyph size={compact ? 10 : 12} aria-hidden className="shrink-0" />
             {chip.label}
           </span>
         );
@@ -226,7 +224,12 @@ function SoftTrustCard({
             <ListingMedia listing={item} bleed slideshow={compact ? undefined : "hover"} />
           </Link>
           <div className="absolute right-1.5 top-1.5 z-10">
-            <WishlistButton itemId={item.id} itemType="listing" compact surface="glass" />
+            <WishlistButton
+              itemId={item.id}
+              itemType="listing"
+              compact
+              surface={compact ? "neutral" : "glass"}
+            />
           </div>
         </div>
       </div>
@@ -254,9 +257,12 @@ function SoftTrustCard({
           {distance ? (
             <span
               data-testid="listing-distance"
-              className="inline-flex shrink-0 items-center gap-0.5 text-[11px] text-chrome"
+              className={cn(
+                "inline-flex shrink-0 items-center gap-0.5 text-[11px]",
+                compact ? "text-white/70" : "text-chrome",
+              )}
             >
-              <MapPin size={12} aria-hidden className="shrink-0" />
+              <MapPin size={12} aria-hidden className={cn("shrink-0", compact && "text-chrome")} />
               {distance}
             </span>
           ) : null}

@@ -107,7 +107,10 @@ export function MarketplaceMobileHeader({
   const mobileSheet = useMobileSheet();
   const filtersActive = filterCount > 0;
   return (
-    <div data-testid="marketplace-mobile-header" className="mb-3 md:hidden">
+    <div
+      data-testid="marketplace-mobile-header"
+      className="mb-3 pt-[calc(env(safe-area-inset-top)+12px)] md:hidden"
+    >
       <div className="grid h-14 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center">
         <div aria-hidden />
         <Link href="/marketplace" aria-label="Hashpop home" className="flex flex-col items-center">
@@ -128,10 +131,8 @@ export function MarketplaceMobileHeader({
       <div className="mt-3 flex h-11 items-center gap-2">
         <form onSubmit={onSearchSubmit} className="min-w-0 flex-1">
           <div
-            className={cn(
-              material.chrome,
-              "flex h-11 items-center rounded-[22px] pl-[14px] focus-within:ring-1 focus-within:ring-[#00ffa3]/50",
-            )}
+            data-testid="marketplace-search-field"
+            className="flex h-11 items-center rounded-[22px] border border-white/10 bg-material-chrome pl-[14px] backdrop-blur-material"
           >
             <SearchIcon size={20} className="shrink-0 text-white/60" aria-hidden />
             <input

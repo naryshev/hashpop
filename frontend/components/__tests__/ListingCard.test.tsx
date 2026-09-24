@@ -152,7 +152,7 @@ describe("ListingCard softTrust", () => {
     expect(media.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const heart = document.querySelector('[data-testid="wishlist"]') as HTMLElement;
     expect(heart).toBeTruthy();
-    expect(heart.dataset.surface).toBe("glass");
+    expect(heart.dataset.surface).toBe("neutral");
     expect(
       media.compareDocumentPosition(document.querySelector('[data-testid="wishlist"]')!) &
         Node.DOCUMENT_POSITION_CONTAINED_BY,
@@ -162,8 +162,10 @@ describe("ListingCard softTrust", () => {
     expect(chips.map((chip) => chip.textContent)).toEqual(["Meetup"]);
     expect(chips[0].querySelector("svg")).toBeTruthy();
     expect((chips[0] as HTMLElement).className).toContain("h-5");
-    expect((chips[0] as HTMLElement).className).toContain("px-0.5");
+    expect((chips[0] as HTMLElement).className).toContain("px-1");
     expect((chips[0] as HTMLElement).className).toContain("text-[10px]");
+    expect((chips[0] as HTMLElement).className).toContain("font-semibold");
+    expect((chips[0].querySelector("svg") as SVGElement).getAttribute("width")).toBe("10");
     expect((chips[0] as HTMLElement).className).toContain("text-silver");
     expect((chips[0] as HTMLElement).className).not.toContain("text-chrome");
     expect(document.querySelector('[data-testid="listing-distance"]')).toBeNull();
@@ -187,11 +189,16 @@ describe("ListingCard softTrust", () => {
         status: "LISTED",
         requireEscrow: true,
         meetup: true,
+        distanceLabel: "1.2 km",
       },
     });
     const chips = [...document.querySelectorAll('[data-testid="grid-trust-chip"]')];
     expect(chips.map((chip) => chip.textContent)).toEqual(["98%", "Meetup", "Escrow"]);
     expect(chips.every((chip) => !chip.hidden)).toBe(true);
+    const distance = document.querySelector('[data-testid="listing-distance"]') as HTMLElement;
+    expect(distance.className).toContain("text-white/70");
+    expect(distance.className).not.toContain("text-chrome");
+    expect(distance.querySelector("svg")?.getAttribute("class")).toContain("text-chrome");
   });
 
   it("drops a whole chip that overflows the row and never clips it", async () => {

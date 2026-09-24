@@ -1,12 +1,6 @@
 import { cn } from "../lib/utils";
 
-/**
- * Cap height of the H in the wordmark viewBox is 28 units.
- * The viewBox is 36.36 tall (descenders included), so a 36.36px
- * render height makes the letters exactly 28px.
- */
-const WORDMARK_HEIGHT_PX = 36.36;
-
+/** Mobile brand mark. 124px wide keeps it near 31% of a 390px screen. */
 export function HashpopWordmark({ className }: { className?: string }) {
   return (
     <svg
@@ -16,8 +10,7 @@ export function HashpopWordmark({ className }: { className?: string }) {
       role="img"
       aria-label="Hashpop"
       data-testid="marketplace-logo"
-      height={WORDMARK_HEIGHT_PX}
-      className={cn("h-[36.36px] w-auto shrink-0 text-white", className)}
+      className={cn("h-auto w-[124px] shrink-0 text-white", className)}
     >
       <title>Hashpop</title>
       <path

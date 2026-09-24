@@ -14,11 +14,11 @@ type WishlistButtonProps = {
   /** When true, show compact icon only (e.g. on cards) */
   compact?: boolean;
   /**
-   * Soft-trust photo heart: darker glass when off so bright photos
-   * don't tint the circle. Wishlist-on stays the mint fill.
-   * Default keeps the solid disc.
+   * Soft-trust photo heart. `glass` keeps the chrome tint (desktop).
+   * `neutral` is black/50 with no mint fill so bright photos stay dark.
+   * Wishlist-on stays the mint fill. Default keeps the solid disc.
    */
-  surface?: "default" | "glass";
+  surface?: "default" | "glass" | "neutral";
 };
 
 export function WishlistButton({
@@ -77,9 +77,11 @@ export function WishlistButton({
           "flex h-11 w-11 shrink-0 items-center justify-center rounded-full",
           inWishlist
             ? "bg-chrome text-[#04150f]"
-            : surface === "glass"
-              ? "backdrop-blur-material border border-hairline bg-black/40 bg-[linear-gradient(var(--material-chrome),var(--material-chrome))] text-white"
-              : cn(material.thick, "border border-hairline text-white hover:border-white/30"),
+            : surface === "neutral"
+              ? "border border-white/15 bg-black/50 text-white backdrop-blur-md"
+              : surface === "glass"
+                ? "backdrop-blur-material border border-hairline bg-black/40 bg-[linear-gradient(var(--material-chrome),var(--material-chrome))] text-white"
+                : cn(material.thick, "border border-hairline text-white hover:border-white/30"),
           className,
         )}
         aria-label={inWishlist ? "In wishlist" : "Add to wishlist"}

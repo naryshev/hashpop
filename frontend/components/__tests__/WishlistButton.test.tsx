@@ -10,7 +10,7 @@ vi.mock("../../lib/hashpackWallet", () => ({
 let root: Root | undefined;
 let host: HTMLElement | undefined;
 
-async function renderButton(surface?: "default" | "glass") {
+async function renderButton(surface?: "default" | "glass" | "neutral") {
   host = document.createElement("div");
   document.body.appendChild(host);
   root = createRoot(host);
@@ -61,6 +61,19 @@ describe("WishlistButton glass heart", () => {
     expect(button.className).toContain("bg-black/40");
     expect(button.className).toContain("var(--material-chrome)");
     expect(button.className).not.toContain("bg-material-chrome");
+    expect(button.className).not.toContain("bg-chrome");
+  });
+
+  it("stays a neutral dark circle on bright photos", async () => {
+    await renderButton("neutral");
+    const button = document.querySelector("button") as HTMLButtonElement;
+    expect(button.className).toContain("h-11");
+    expect(button.className).toContain("w-11");
+    expect(button.className).toContain("bg-black/50");
+    expect(button.className).toContain("backdrop-blur-md");
+    expect(button.className).toContain("border-white/15");
+    expect(button.className).not.toContain("bg-black/40");
+    expect(button.className).not.toContain("var(--material-chrome)");
     expect(button.className).not.toContain("bg-chrome");
   });
 

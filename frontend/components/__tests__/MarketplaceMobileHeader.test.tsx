@@ -147,8 +147,22 @@ describe("MarketplaceMobileHeader", () => {
     const logo = document.querySelector('[data-testid="marketplace-logo"]') as SVGElement;
     expect(logo.tagName.toLowerCase()).toBe("svg");
     expect(logo.getAttribute("aria-label")).toBe("Hashpop");
-    expect(logo.className.baseVal).toContain("h-[36.36px]");
+    expect(logo.className.baseVal).toContain("w-[124px]");
+    expect(logo.className.baseVal).toContain("h-auto");
     expect(logo.className.baseVal).toContain("text-white");
+    expect(header.className).toContain("pt-[calc(env(safe-area-inset-top)+12px)]");
+    const searchField = document.querySelector(
+      '[data-testid="marketplace-search-field"]',
+    ) as HTMLElement;
+    expect(searchField.className).toContain("bg-material-chrome");
+    expect(searchField.className).toContain("border-white/10");
+    expect(searchField.className).not.toContain("border-[#00ffa3]");
+    const filterButton = document.querySelector(
+      '[data-testid="marketplace-filter-button"]',
+    ) as HTMLElement;
+    expect(filterButton.className).toContain("bg-material-chrome");
+    expect(filterButton.className).toContain("border-[#00ffa3]/40");
+    expect(filterButton.className).toContain("text-[#00ffa3]");
     expect(logo.querySelector("path")?.getAttribute("fill")).toBe("currentColor");
     const ring = document.querySelector('[data-testid="hashpop-ring-o"]') as SVGGElement;
     expect(ring.tagName.toLowerCase()).toBe("g");

@@ -534,7 +534,7 @@ export default function MarketplacePageClient({
         <div className="hidden md:block">{topBarSearch}</div>
       </TopBarSlot>
       <TopBarSlot name="actions">{actionsCluster}</TopBarSlot>
-      <div className="px-4 pb-4 pt-[calc(env(safe-area-inset-top)+8px)] md:py-4">
+      <div className="px-3 pb-4 md:px-4 md:py-4">
         <MarketplaceMobileHeader
           searchValue={searchInput}
           onSearchChange={setSearchInput}
@@ -663,10 +663,10 @@ export default function MarketplacePageClient({
           </p>
         ) : (
           <>
-            {/* Mobile 2-up: media-first tiles, 10px gap. */}
+            {/* Mobile 2-up: 12px page margins, 8px gutter. */}
             <div
               className={cn(
-                "grid-cols-2 gap-3 md:hidden",
+                "grid-cols-2 gap-2 md:hidden",
                 viewMode === "editorial" ? "hidden" : "grid",
               )}
             >
