@@ -144,13 +144,17 @@ describe("MarketplaceMobileHeader", () => {
       '[data-testid="marketplace-mobile-header"]',
     ) as HTMLElement;
     expect(header.className).toContain("md:hidden");
-    const logo = document.querySelector('[data-testid="marketplace-logo"]') as HTMLElement;
-    expect(logo.textContent).toContain("Hashpop");
-    expect(logo.className).toContain("text-[28px]");
-    expect(logo.className).toContain("font-semibold");
-    const ring = document.querySelector('[data-testid="hashpop-ring-o"]') as HTMLElement;
-    expect(ring.textContent).toBe("o");
-    expect(ring.className).toContain("text-[#00ffa3]");
+    const logo = document.querySelector('[data-testid="marketplace-logo"]') as SVGElement;
+    expect(logo.tagName.toLowerCase()).toBe("svg");
+    expect(logo.getAttribute("aria-label")).toBe("Hashpop");
+    expect(logo.className.baseVal).toContain("h-[36.36px]");
+    expect(logo.className.baseVal).toContain("text-white");
+    expect(logo.querySelector("path")?.getAttribute("fill")).toBe("currentColor");
+    const ring = document.querySelector('[data-testid="hashpop-ring-o"]') as SVGGElement;
+    expect(ring.tagName.toLowerCase()).toBe("g");
+    expect(ring.id).toBe("ring-o");
+    expect(ring.getAttribute("fill")).toBe("var(--color-chrome)");
+    expect(ring.textContent).not.toBe("o");
     const wordmark = document.querySelector('[data-testid="marketplace-wordmark"]') as HTMLElement;
     expect(wordmark.textContent).toBe("marketplace");
     expect(wordmark.className).toContain("tracking-[0.12em]");

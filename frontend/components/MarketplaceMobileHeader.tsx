@@ -8,6 +8,7 @@ import { useSignInModal } from "../lib/signInModal";
 import { profileAvatarUrl, useProfile } from "../lib/profiles";
 import { material } from "../lib/materials";
 import { cn } from "../lib/utils";
+import { HashpopWordmark } from "./HashpopWordmark";
 import { NotificationBell } from "./NotificationBell";
 import { ProfileCardSheet } from "./ProfileCardSheet";
 import { Sheet } from "./ui/Sheet";
@@ -29,18 +30,6 @@ function useMobileSheet() {
     return () => query.removeEventListener("change", apply);
   }, []);
   return isMobile;
-}
-
-/**
- * Interim mint letter for the second "o" in Hashpop.
- * Replace this node with the ring-o SVG when it arrives.
- */
-export function HashpopRingO() {
-  return (
-    <span data-testid="hashpop-ring-o" className="text-[#00ffa3]">
-      o
-    </span>
-  );
 }
 
 function ProfileAvatarButton() {
@@ -122,19 +111,10 @@ export function MarketplaceMobileHeader({
       <div className="grid h-14 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center">
         <div aria-hidden />
         <Link href="/marketplace" aria-label="Hashpop home" className="flex flex-col items-center">
-          <span
-            data-testid="marketplace-logo"
-            className="text-[28px] font-semibold leading-none tracking-[-0.01em] text-white"
-          >
-            <span className="sr-only">Hashpop</span>
-            <span aria-hidden>
-              Hashp
-              <HashpopRingO />p
-            </span>
-          </span>
+          <HashpopWordmark />
           <span
             data-testid="marketplace-wordmark"
-            className="mt-0.5 text-[12px] font-medium lowercase tracking-[0.12em] text-white/60"
+            className="mt-0.5 text-[12px] font-medium lowercase leading-none tracking-[0.12em] text-white/60"
           >
             marketplace
           </span>
