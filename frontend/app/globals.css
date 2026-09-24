@@ -272,6 +272,56 @@ a,
   select.input-frost option:checked {
     background-color: rgb(82 82 91);
   }
+
+  /* Dual-handle ℏ slider. The track is drawn by the rail; thumbs sit on top. */
+  .hashpop-dual-range {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    appearance: none;
+    background: transparent;
+  }
+  .hashpop-dual-range::-webkit-slider-runnable-track {
+    height: 4px;
+    background: transparent;
+  }
+  .hashpop-dual-range::-moz-range-track {
+    height: 4px;
+    background: transparent;
+  }
+  .hashpop-dual-range::-webkit-slider-thumb {
+    pointer-events: auto;
+    appearance: none;
+    height: 16px;
+    width: 16px;
+    margin-top: -6px;
+    border-radius: 9999px;
+    border: 2px solid #0b111b;
+    background: #00ffa3;
+    box-shadow: 0 0 0 1px rgba(0, 255, 163, 0.45);
+    cursor: pointer;
+  }
+  .hashpop-dual-range::-moz-range-thumb {
+    pointer-events: auto;
+    height: 16px;
+    width: 16px;
+    border-radius: 9999px;
+    border: 2px solid #0b111b;
+    background: #00ffa3;
+    box-shadow: 0 0 0 1px rgba(0, 255, 163, 0.45);
+    cursor: pointer;
+  }
+  .hashpop-dual-range.is-max::-webkit-slider-thumb {
+    background: #8b9bb4;
+    box-shadow: none;
+  }
+  .hashpop-dual-range.is-max::-moz-range-thumb {
+    background: #8b9bb4;
+    box-shadow: none;
+  }
 }
 
 @layer utilities {
