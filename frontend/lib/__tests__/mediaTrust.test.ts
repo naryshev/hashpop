@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { completionPercent, gridStatusCapsule, gridTrustChip } from "../mediaTrust";
+import { completionPercent, gridStatusCapsule, gridTrustChips } from "../mediaTrust";
 
 describe("completionPercent", () => {
   it("is null until the seller has sales to measure", () => {
@@ -16,64 +16,72 @@ describe("completionPercent", () => {
   });
 });
 
-describe("gridTrustChip", () => {
-  it("omits the chip while seller trust is loading so Meetup cannot flash before a percent", () => {
+describe("gridTrustChips", () => {
+  it("omits the row while seller trust is loading", () => {
     expect(
-      gridTrustChip({
+      gridTrustChips({
         loading: true,
         requireEscrow: false,
         successfulCompletions: 49,
         totalSales: 50,
         status: "LISTED",
       }),
-    ).toBeNull();
+    ).toEqual([]);
   });
 
-  it("prefers completion percent over Meetup and Escrow", () => {
+  it("returns completion and every fulfillment chip that applies", () => {
     expect(
-      gridTrustChip({
+      gridTrustChips({
         loading: false,
         status: "LISTED",
         requireEscrow: false,
         successfulCompletions: 49,
         totalSales: 50,
       }),
-    ).toEqual({ kind: "completion", label: "98%", tone: "mint" });
+    ).toEqual([
+      { kind: "completion", label: "98%", tone: "mint" },
+      { kind: "meetup", label: "Meetup", tone: "silver" },
+    ]);
 
     expect(
-      gridTrustChip({
+      gridTrustChips({
         loading: false,
         status: "LISTED",
         requireEscrow: true,
-        successfulCompletions: 9,
-        totalSales: 10,
-      })?.kind,
-    ).toBe("completion");
+        meetup: true,
+        successfulCompletions: 49,
+        totalSales: 50,
+      }),
+    ).toEqual([
+      { kind: "completion", label: "98%", tone: "mint" },
+      { kind: "meetup", label: "Meetup", tone: "silver" },
+      { kind: "escrow", label: "Escrow", tone: "silver" },
+    ]);
   });
 
-  it("falls through to Meetup, then Escrow, then nothing", () => {
+  it("shows only the fulfillment mode that applies when there is no completion", () => {
     expect(
-      gridTrustChip({
+      gridTrustChips({
         loading: false,
         status: "LISTED",
         requireEscrow: false,
         successfulCompletions: 0,
         totalSales: 0,
       }),
-    ).toEqual({ kind: "meetup", label: "Meetup", tone: "silver" });
+    ).toEqual([{ kind: "meetup", label: "Meetup", tone: "silver" }]);
 
     expect(
-      gridTrustChip({
+      gridTrustChips({
         loading: false,
         status: "LISTED",
         requireEscrow: true,
         successfulCompletions: 0,
         totalSales: 0,
       }),
-    ).toEqual({ kind: "escrow", label: "Escrow", tone: "silver" });
+    ).toEqual([{ kind: "escrow", label: "Escrow", tone: "silver" }]);
 
     expect(
-      gridTrustChip({
+      gridTrustChips({
         loading: false,
         status: "LISTED",
         requireEscrow: null,
@@ -81,62 +89,63 @@ describe("gridTrustChip", () => {
         totalSales: 0,
         kycVerified: true,
       }),
-    ).toBeNull();
+    ).toEqual([]);
   });
 
   it("keeps mint for the high completion band and silver below it", () => {
     expect(
-      gridTrustChip({
+      gridTrustChips({
         loading: false,
         status: "LISTED",
         successfulCompletions: 9,
         totalSales: 10,
-      })?.tone,
-    ).toBe("mint");
+      })[0],
+    ).toEqual({ kind: "completion", label: "90%", tone: "mint" });
     expect(
-      gridTrustChip({
+      gridTrustChips({
         loading: false,
         status: "LISTED",
         successfulCompletions: 8,
         totalSales: 10,
       }),
-    ).toEqual({ kind: "completion", label: "80%", tone: "silver" });
+    ).toEqual([{ kind: "completion", label: "80%", tone: "silver" }]);
   });
 
-  it("does not use KYC as the only grid chip", () => {
+  it("does not invent a KYC chip", () => {
     expect(
-      gridTrustChip({
+      gridTrustChips({
         loading: false,
         status: "LISTED",
         kycVerified: true,
       }),
-    ).toBeNull();
+    ).toEqual([]);
   });
 
-  it("omits trust when Pending or Sold will occupy the corner", () => {
+  it("omits the trust row when Pending or Sold replaces it", () => {
     expect(
-      gridTrustChip({
+      gridTrustChips({
         loading: false,
         status: "LOCKED",
         requireEscrow: false,
+        meetup: true,
         successfulCompletions: 49,
         totalSales: 50,
       }),
-    ).toBeNull();
+    ).toEqual([]);
     expect(
-      gridTrustChip({
+      gridTrustChips({
         loading: false,
         status: "SOLD",
         requireEscrow: true,
         successfulCompletions: 10,
         totalSales: 10,
       }),
-    ).toBeNull();
+    ).toEqual([]);
   });
 });
 
 describe("gridStatusCapsule", () => {
-  it("shows Pending and Sold only — Active is not doubled with the trust chip", () => {
+  it("shows Pending and Sold only — Active is not doubled with the trust row", () => {
     expect(gridStatusCapsule("LOCKED")).toBe("pending");
     expect(gridStatusCapsule("SOLD")).toBe("sold");
     expect(gridStatusCapsule("LISTED")).toBeNull();
