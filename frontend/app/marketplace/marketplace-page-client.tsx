@@ -23,7 +23,6 @@ import {
   marketplaceHref,
   resetMarketplaceFilters,
   withAdvancedFilters,
-  withCategory,
   withListingType,
   withSort,
   type AdvancedFilterDraft,
@@ -395,7 +394,6 @@ export default function MarketplacePageClient({
       }}
       onSort={(sort) => router.push(marketplaceHref(withSort(searchParams, sort)))}
       onType={(type) => router.push(marketplaceHref(withListingType(searchParams, type)))}
-      onCategory={(category) => router.push(marketplaceHref(withCategory(searchParams, category)))}
       onReset={() => {
         setFilterOpen(false);
         router.push(marketplaceHref(resetMarketplaceFilters(searchParams)));

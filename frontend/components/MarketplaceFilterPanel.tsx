@@ -43,7 +43,6 @@ export function MarketplaceFilterPanel({
   onDraft: (draft: AdvancedFilterDraft) => void;
   onSort: (sort: SortMode) => void;
   onType: (type: ListingType) => void;
-  onCategory: (category: string) => void;
   onReset: () => void;
   onApply: () => void;
   /** Mobile sort lives in its own sheet. */
