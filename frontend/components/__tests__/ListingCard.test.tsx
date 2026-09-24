@@ -35,10 +35,15 @@ vi.mock("next/link", () => ({
 }));
 
 vi.mock("../WishlistButton", () => ({
-  WishlistButton: () =>
+  WishlistButton: (props: { surface?: string }) =>
     createElement(
       "button",
-      { type: "button", "aria-label": "Add to wishlist", "data-testid": "wishlist" },
+      {
+        type: "button",
+        "aria-label": "Add to wishlist",
+        "data-testid": "wishlist",
+        "data-surface": props.surface ?? "default",
+      },
       "♡",
     ),
 }));
@@ -101,7 +106,7 @@ describe("ListingCard softTrust", () => {
     host = undefined;
   });
 
-  it("renders an inset square photo with title, chip row, and mint price under it", async () => {
+  it("renders an inset 4:3 photo with a one-line chip row and mint price under it", async () => {
     loadedProfile(0, 0);
     await renderCard({
       variant: "softTrust",
@@ -122,7 +127,8 @@ describe("ListingCard softTrust", () => {
     expect(card.className).toContain("rounded-[20px]");
     expect(card.className).toContain("border-hairline");
     const media = document.querySelector('[data-testid="soft-trust-media"]') as HTMLElement;
-    expect(media.className).toContain("aspect-square");
+    expect(media.className).toContain("aspect-[4/3]");
+    expect(media.className).not.toContain("aspect-square");
     expect(media.className).toContain("rounded-[14px]");
     expect(media.querySelector("h2")).toBeNull();
     expect(document.querySelector(".aspect-\\[3\\/4\\]")).toBeNull();
@@ -132,9 +138,20 @@ describe("ListingCard softTrust", () => {
     expect(document.body.textContent).toContain("ℏ");
     const title = document.querySelector("h2") as HTMLElement;
     expect(title.className).toContain("line-clamp-2");
+    expect(title.className).toContain("min-h-9");
+    expect(card.className).toContain("flex-col");
+    const priceRow = document.querySelector("p")?.parentElement as HTMLElement;
+    expect(priceRow.className).toContain("mt-auto");
+    const chipRow = document.querySelector('[data-testid="trust-chip-row"]') as HTMLElement;
+    expect(chipRow.className).toContain("flex-nowrap");
+    expect(chipRow.className).toContain("overflow-hidden");
+    expect(chipRow.className).toContain("h-6");
+    expect(chipRow.className).not.toContain("flex-wrap");
     expect(title.compareDocumentPosition(media) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(0);
     expect(media.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(document.querySelector('[data-testid="wishlist"]')).toBeTruthy();
+    const heart = document.querySelector('[data-testid="wishlist"]') as HTMLElement;
+    expect(heart).toBeTruthy();
+    expect(heart.dataset.surface).toBe("glass");
     expect(
       media.compareDocumentPosition(document.querySelector('[data-testid="wishlist"]')!) &
         Node.DOCUMENT_POSITION_CONTAINED_BY,
@@ -142,6 +159,9 @@ describe("ListingCard softTrust", () => {
     expect(document.querySelector('[data-testid="trust-strip"]')).toBeNull();
     const chips = [...document.querySelectorAll('[data-testid="grid-trust-chip"]')];
     expect(chips.map((chip) => chip.textContent)).toEqual(["Meetup"]);
+    expect(chips[0].querySelector("svg")).toBeTruthy();
+    expect((chips[0] as HTMLElement).className).toContain("h-6");
+    expect((chips[0] as HTMLElement).className).toContain("px-2");
     expect((chips[0] as HTMLElement).className).toContain("text-silver");
     expect((chips[0] as HTMLElement).className).not.toContain("text-chrome");
     expect(document.querySelector('[data-testid="listing-distance"]')).toBeNull();
@@ -176,13 +196,19 @@ describe("ListingCard softTrust", () => {
     expect(price.className).toContain("text-chrome");
     const chips = [...document.querySelectorAll('[data-testid="grid-trust-chip"]')];
     expect(chips.map((chip) => chip.textContent)).toEqual(["98%", "Meetup", "Escrow"]);
+    expect(chips.every((chip) => chip.querySelector("svg"))).toBe(true);
+    const row = document.querySelector('[data-testid="trust-chip-row"]') as HTMLElement;
+    expect(row.className).toContain("flex-nowrap");
+    expect(row.className).not.toContain("flex-wrap");
     expect((chips[0] as HTMLElement).className).toContain("bg-[#00ffa3]/10");
     expect((chips[0] as HTMLElement).className).toContain("text-chrome");
     expect((chips[1] as HTMLElement).className).toContain("text-silver");
     expect((chips[2] as HTMLElement).className).toContain("text-silver");
     const distance = document.querySelector('[data-testid="listing-distance"]') as HTMLElement;
-    expect(distance.textContent).toBe("1.2 km");
-    expect(distance.className).toContain("text-silver/60");
+    expect(distance.textContent).toContain("1.2 km");
+    expect(distance.className).toContain("text-white/60");
+    expect(distance.className).not.toContain("text-silver/60");
+    expect(distance.querySelector("svg")).toBeTruthy();
   });
 
   it("keeps a low completion percent on silver glass and still shows Escrow", async () => {
@@ -261,7 +287,8 @@ describe("ListingCard softTrust", () => {
       },
     });
     expect(document.querySelector('[data-variant="softTrust"]')).toBeTruthy();
-    expect(document.querySelector(".aspect-square")).toBeTruthy();
+    expect(document.querySelector(".aspect-\\[4\\/3\\]")).toBeTruthy();
+    expect(document.querySelector(".aspect-square")).toBeNull();
   });
 
   it("keeps the glass body and TrustStrip on the default variant", async () => {

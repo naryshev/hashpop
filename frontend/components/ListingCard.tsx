@@ -1,13 +1,14 @@
 "use client";
 
+import { useLayoutEffect, useRef } from "react";
 import Link from "next/link";
-import { BadgeCheck } from "lucide-react";
+import { BadgeCheck, CircleCheck, MapPin, Shield } from "lucide-react";
 import { ListingMedia } from "./ListingMedia";
 import { WishlistButton } from "./WishlistButton";
 import { TrustStrip } from "./TrustStrip";
 import { formatListingId, listingHref } from "../lib/listingUrl";
 import { formatPriceForDisplay } from "../lib/formatPrice";
-import { gridStatusCapsule, gridTrustChips } from "../lib/mediaTrust";
+import { gridStatusCapsule, gridTrustChips, type GridTrustChip } from "../lib/mediaTrust";
 import { material } from "../lib/materials";
 import { profileAvatarUrl, profileDisplayName, useProfile } from "../lib/profiles";
 import { cn } from "../lib/utils";
@@ -90,8 +91,66 @@ const statusLabel = {
   sold: "Sold",
 } as const;
 
+const chipGlyph = {
+  completion: CircleCheck,
+  meetup: MapPin,
+  escrow: Shield,
+} as const;
+
+/** One line of chips. Chips that do not fit are dropped, not wrapped. */
+function TrustChipRow({ chips }: { chips: GridTrustChip[] }) {
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const row = rowRef.current;
+    if (!row) return;
+    const fit = () => {
+      const max = row.clientWidth;
+      const children = [...row.children] as HTMLElement[];
+      for (const child of children) child.hidden = false;
+      if (max <= 0) return;
+      for (const child of children) {
+        child.hidden = child.offsetLeft + child.offsetWidth > max + 1;
+      }
+    };
+    fit();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(fit);
+    observer.observe(row);
+    return () => observer.disconnect();
+  }, [chips]);
+
+  return (
+    <div
+      ref={rowRef}
+      data-testid="trust-chip-row"
+      className="mt-1.5 flex h-6 min-w-0 flex-nowrap items-center gap-1 overflow-hidden"
+    >
+      {chips.map((chip) => {
+        const Glyph = chipGlyph[chip.kind];
+        return (
+          <span
+            key={chip.kind}
+            data-testid="grid-trust-chip"
+            className={cn(
+              "inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 text-[11px] font-semibold leading-none",
+              chip.tone === "mint"
+                ? "border border-[#00ffa3]/25 bg-[#00ffa3]/10 text-chrome"
+                : cn(material.thick, "border border-white/10 text-silver"),
+            )}
+            aria-label={chip.kind === "completion" ? `Seller completion ${chip.label}` : chip.label}
+          >
+            <Glyph size={12} aria-hidden className="shrink-0" />
+            {chip.label}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 /**
- * Concept C soft-trust tile. Inset square photo, title and chip row under it.
+ * Concept C soft-trust tile. Inset 4:3 photo, title and one chip row under it.
  * Compact = mobile 2-up (20px radius); regular = desktop grid (18px).
  */
 function SoftTrustCard({
@@ -120,58 +179,44 @@ function SoftTrustCard({
       data-variant="softTrust"
       className={cn(
         material.regular,
-        "flex flex-col overflow-hidden border-white/12 shadow-[0_8px_24px_rgba(0,0,0,0.28)] transition-transform active:scale-[0.98]",
+        "flex h-full flex-col overflow-hidden border-white/12 shadow-[0_8px_24px_rgba(0,0,0,0.28)] transition-transform active:scale-[0.98]",
         compact ? "rounded-[20px]" : "rounded-[18px]",
       )}
     >
       <div className="px-1.5 pt-1.5">
         <div
           data-testid="soft-trust-media"
-          className="relative aspect-square overflow-hidden rounded-[14px] bg-[#0b111b]"
+          className="relative aspect-[4/3] overflow-hidden rounded-[14px] bg-[#0b111b]"
         >
           <Link href={listingHref(item.id)} className="absolute inset-0 block">
             <ListingMedia listing={item} bleed slideshow={compact ? undefined : "hover"} />
           </Link>
           <div className="absolute right-1.5 top-1.5 z-10">
-            <WishlistButton itemId={item.id} itemType="listing" compact />
+            <WishlistButton itemId={item.id} itemType="listing" compact surface="glass" />
           </div>
         </div>
       </div>
-      <Link href={listingHref(item.id)} className="flex flex-col px-2.5 pb-[11px] pt-2">
-        <h2 className="line-clamp-2 text-[13px] font-semibold leading-snug text-white">
+      <Link href={listingHref(item.id)} className="flex flex-1 flex-col px-2.5 pb-[11px] pt-2">
+        <h2 className="line-clamp-2 min-h-9 text-[13px] font-semibold leading-snug text-white">
           {item.title || formatListingId(item.id) || "Untitled"}
         </h2>
         {capsule ? (
-          <div className="mt-1.5 flex min-h-[22px] flex-wrap items-center gap-1">
+          <div className="mt-1.5 flex h-6 items-center">
             <span className={statusCapsule[capsule]}>{statusLabel[capsule]}</span>
           </div>
         ) : chips.length > 0 ? (
-          <div className="mt-1.5 flex min-h-[22px] flex-wrap items-center gap-1">
-            {chips.map((chip) => (
-              <span
-                key={chip.kind}
-                data-testid="grid-trust-chip"
-                className={cn(
-                  "inline-flex h-[22px] items-center rounded-full px-2 text-[11px] font-semibold leading-none",
-                  chip.tone === "mint"
-                    ? "border border-[#00ffa3]/25 bg-[#00ffa3]/10 text-chrome"
-                    : cn(material.thick, "border border-white/10 text-silver"),
-                )}
-                aria-label={
-                  chip.kind === "completion" ? `Seller completion ${chip.label}` : chip.label
-                }
-              >
-                {chip.label}
-              </span>
-            ))}
-          </div>
+          <TrustChipRow chips={chips} />
         ) : null}
-        <div className="mt-1.5 flex items-baseline justify-between gap-2">
+        <div className="mt-auto flex items-baseline justify-between gap-2 pt-1.5">
           <p className={cn("font-bold text-chrome", compact ? "text-[14px]" : "text-[15px]")}>
             {formatPriceForDisplay(item.price || "0")} <span className="italic">ℏ</span>
           </p>
           {distance ? (
-            <span data-testid="listing-distance" className="shrink-0 text-[11px] text-silver/60">
+            <span
+              data-testid="listing-distance"
+              className="inline-flex shrink-0 items-center gap-0.5 text-[11px] text-white/60"
+            >
+              <MapPin size={12} aria-hidden className="shrink-0" />
               {distance}
             </span>
           ) : null}

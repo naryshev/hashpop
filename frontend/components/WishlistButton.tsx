@@ -13,6 +13,11 @@ type WishlistButtonProps = {
   className?: string;
   /** When true, show compact icon only (e.g. on cards) */
   compact?: boolean;
+  /**
+   * Soft-trust photo heart: translucent glass when off.
+   * Wishlist-on stays the mint fill. Default keeps the solid disc.
+   */
+  surface?: "default" | "glass";
 };
 
 export function WishlistButton({
@@ -20,6 +25,7 @@ export function WishlistButton({
   itemType,
   className = "",
   compact = true,
+  surface = "default",
 }: WishlistButtonProps) {
   const { address } = useHashpackWallet();
   const [inWishlist, setInWishlist] = useState(false);
@@ -70,7 +76,9 @@ export function WishlistButton({
           "flex h-11 w-11 shrink-0 items-center justify-center rounded-full",
           inWishlist
             ? "bg-chrome text-[#04150f]"
-            : cn(material.thick, "border border-hairline text-white hover:border-white/30"),
+            : surface === "glass"
+              ? cn(material.chrome, "text-white")
+              : cn(material.thick, "border border-hairline text-white hover:border-white/30"),
           className,
         )}
         aria-label={inWishlist ? "In wishlist" : "Add to wishlist"}
