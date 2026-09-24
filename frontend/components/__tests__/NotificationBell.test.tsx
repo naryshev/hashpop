@@ -46,7 +46,7 @@ function unseenStubs(count: number) {
   return Array.from({ length: count }, (_, i) => ({ id: `u${i}` }));
 }
 
-async function renderBell(variant: "mobile" | "desktop" = "mobile") {
+async function renderBell(variant: "mobile" | "desktop" | "marketplace" = "mobile") {
   host = document.createElement("div");
   document.body.appendChild(host);
   const next = createRoot(host);
@@ -107,6 +107,24 @@ describe("NotificationBell", () => {
     btn = document.querySelector('button[aria-label="Notifications, 9+"]') as HTMLButtonElement;
     expect(btn.querySelector("[data-dock-badge]")?.textContent).toBe("9+");
     expect(btn.querySelector("[data-bell-dot]")).toBeNull();
+  });
+
+  it("uses an 8px mint dot for the marketplace bell and keeps the unread count", async () => {
+    mockState = { items: [], unseen: unseenStubs(2), tone: "mint", loading: false };
+    await renderBell("marketplace");
+    const btn = document.querySelector(
+      'button[aria-label="Notifications, 2"]',
+    ) as HTMLButtonElement;
+    expect(btn.className).toContain("h-10");
+    expect(btn.className).toContain("w-10");
+    const dot = btn.querySelector("[data-bell-dot]") as HTMLElement;
+    expect(dot).toBeTruthy();
+    expect(dot.className).toContain("h-2");
+    expect(dot.className).toContain("bg-[#00ffa3]");
+    expect(dot.className).toContain("ring-2");
+    expect(btn.querySelector("[data-dock-badge]")).toBeNull();
+    const icon = btn.querySelector("svg") as SVGElement;
+    expect(icon.getAttribute("width")).toBe("24");
   });
 
   it("uses compact DockBadge on the smaller desktop header bell", async () => {
