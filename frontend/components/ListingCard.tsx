@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { BadgeCheck, CircleCheck, MapPin, Shield } from "lucide-react";
 import { ListingMedia } from "./ListingMedia";
@@ -97,36 +97,51 @@ const chipGlyph = {
   escrow: Shield,
 } as const;
 
-/** One line of chips. Chips that do not fit are dropped, not wrapped. */
-function TrustChipRow({ chips }: { chips: GridTrustChip[] }) {
+/**
+ * Mobile 2-up cannot fit completion + Meetup + Escrow. Cap at two so the
+ * third chip is never mounted (a clipped sliver is not a dropped chip).
+ * Wider cards start with the full row and drop any chip that still overflows.
+ */
+export function chipCapForDensity(compact: boolean, total: number): number {
+  if (total <= 0) return 0;
+  return compact ? Math.min(2, total) : total;
+}
+
+/** One line of chips. Only whole chips that fit are rendered. */
+function TrustChipRow({ chips, compact }: { chips: GridTrustChip[]; compact: boolean }) {
+  const cap = chipCapForDensity(compact, chips.length);
+  const chipKey = chips.map((chip) => `${chip.kind}:${chip.label}`).join("|");
+  const [count, setCount] = useState(cap);
+  const [prevKey, setPrevKey] = useState(chipKey);
   const rowRef = useRef<HTMLDivElement>(null);
+
+  if (chipKey !== prevKey || count > cap) {
+    setPrevKey(chipKey);
+    setCount(cap);
+  }
 
   useLayoutEffect(() => {
     const row = rowRef.current;
-    if (!row) return;
-    const fit = () => {
-      const max = row.clientWidth;
-      const children = [...row.children] as HTMLElement[];
-      for (const child of children) child.hidden = false;
-      if (max <= 0) return;
-      for (const child of children) {
-        child.hidden = child.offsetLeft + child.offsetWidth > max + 1;
-      }
-    };
-    fit();
-    if (typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(fit);
-    observer.observe(row);
-    return () => observer.disconnect();
-  }, [chips]);
+    if (!row || row.clientWidth <= 0) return;
+    const rowRight = row.getBoundingClientRect().right;
+    let fit = 0;
+    for (const child of row.children) {
+      const right = (child as HTMLElement).getBoundingClientRect().right;
+      if (right > rowRight - 0.5) break;
+      fit += 1;
+    }
+    if (fit < count) setCount(fit);
+  }, [count, chipKey]);
+
+  const shown = chips.slice(0, count);
 
   return (
     <div
       ref={rowRef}
       data-testid="trust-chip-row"
-      className="mt-1.5 flex h-6 min-w-0 flex-nowrap items-center gap-1 overflow-hidden"
+      className="mt-1.5 flex h-6 min-w-0 flex-nowrap items-center gap-1"
     >
-      {chips.map((chip) => {
+      {shown.map((chip) => {
         const Glyph = chipGlyph[chip.kind];
         return (
           <span
@@ -205,7 +220,7 @@ function SoftTrustCard({
             <span className={statusCapsule[capsule]}>{statusLabel[capsule]}</span>
           </div>
         ) : chips.length > 0 ? (
-          <TrustChipRow chips={chips} />
+          <TrustChipRow chips={chips} compact={compact} />
         ) : null}
         <div className="mt-auto flex items-baseline justify-between gap-2 pt-1.5">
           <p className={cn("font-bold text-chrome", compact ? "text-[14px]" : "text-[15px]")}>

@@ -1,7 +1,7 @@
 import { createElement, act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ListingCard } from "../ListingCard";
+import { ListingCard, chipCapForDensity } from "../ListingCard";
 
 const { profileState } = vi.hoisted(() => ({
   profileState: {
@@ -144,7 +144,7 @@ describe("ListingCard softTrust", () => {
     expect(priceRow.className).toContain("mt-auto");
     const chipRow = document.querySelector('[data-testid="trust-chip-row"]') as HTMLElement;
     expect(chipRow.className).toContain("flex-nowrap");
-    expect(chipRow.className).toContain("overflow-hidden");
+    expect(chipRow.className).not.toContain("overflow-hidden");
     expect(chipRow.className).toContain("h-6");
     expect(chipRow.className).not.toContain("flex-wrap");
     expect(title.compareDocumentPosition(media) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(0);
@@ -168,6 +168,29 @@ describe("ListingCard softTrust", () => {
     expect(document.body.textContent).not.toContain("Active");
     expect(document.body.textContent).not.toContain("KYC");
     expect(document.body.textContent).not.toContain("ETH");
+  });
+
+  it("does not mount a third chip on mobile, so Escrow cannot clip", async () => {
+    loadedProfile(49, 50);
+    expect(chipCapForDensity(true, 3)).toBe(2);
+    expect(chipCapForDensity(false, 3)).toBe(3);
+    await renderCard({
+      variant: "softTrust",
+      density: "compact",
+      item: {
+        id: "lst-sony",
+        title: "Sony WH-1000XM5",
+        price: "85",
+        seller,
+        status: "LISTED",
+        requireEscrow: true,
+        meetup: true,
+      },
+    });
+    const chips = [...document.querySelectorAll('[data-testid="grid-trust-chip"]')];
+    expect(chips.map((chip) => chip.textContent)).toEqual(["98%", "Meetup"]);
+    expect(document.body.textContent).not.toContain("Escrow");
+    expect(chips.every((chip) => !chip.hidden)).toBe(true);
   });
 
   it("shows completion, Meetup, and Escrow together on the desktop card", async () => {
