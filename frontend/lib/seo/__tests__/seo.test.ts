@@ -73,6 +73,8 @@ describe("marketplace metadata", () => {
     expect(meta.openGraph?.title).toBe("Marketplace · Hashpop");
     expect(meta.openGraph?.description).toBe(SEO_COPY.marketplaceOgDescription);
     expect(meta.openGraph?.url).toBe("https://hashpop.io/marketplace");
+    expect(FALLBACK_OG_IMAGE.url).toBe("https://hashpop.io/opengraph-image");
+    expect(FALLBACK_TWITTER_IMAGE).toBe("https://hashpop.io/twitter-image");
     expect(meta.openGraph?.images).toEqual([{ ...FALLBACK_OG_IMAGE }]);
     expect(meta.twitter && "card" in meta.twitter ? meta.twitter.card : undefined).toBe(
       "summary_large_image",

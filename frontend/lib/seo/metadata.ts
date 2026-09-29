@@ -12,21 +12,22 @@ function primaryListingImage(listing: {
   return getListingMediaUrls(listing).find((url) => /^https?:\/\//i.test(url));
 }
 
-/** Vertical lock-crop card. Served by app/opengraph-image.png. */
+/**
+ * Brand cards already live on the apex. Listing photos replace these.
+ * Do not point this at a new share-card file.
+ */
 export const FALLBACK_OG_IMAGE = {
-  url: "/opengraph-image.png",
+  url: "https://hashpop.io/opengraph-image",
   width: 1200,
   height: 630,
-  alt: "Hashpop marketplace",
+  alt: "Hashpop - Community marketplace on Hedera",
 } as const;
 
-/** Same art as the Open Graph card. Served by app/twitter-image.png. */
-export const FALLBACK_TWITTER_IMAGE = "/twitter-image.png";
+export const FALLBACK_TWITTER_IMAGE = "https://hashpop.io/twitter-image";
 
 /**
  * Listing media replaces the site card. Pages that set their own openGraph
- * must pass images explicitly — a child openGraph object replaces the parent,
- * and the file-based image is not filled in once openGraph is set.
+ * must pass images explicitly — a child openGraph object replaces the parent.
  */
 export function socialImages(primary?: string): {
   openGraph: NonNullable<Metadata["openGraph"]>["images"];

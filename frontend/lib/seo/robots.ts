@@ -3,8 +3,8 @@ import { CANONICAL_ORIGIN } from "./host";
 
 /**
  * Public prefixes. `/listing/` and `/profile/` are prefix allows so dynamic
- * ids stay crawlable. OG/Twitter images live at `/opengraph-image.png` and
- * `/twitter-image.png`, not under `/api/`.
+ * ids stay crawlable. Brand cards are `/opengraph-image` and `/twitter-image`,
+ * not under `/api/`.
  */
 export const ROBOTS_ALLOW = [
   "/",
