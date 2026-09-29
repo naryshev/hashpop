@@ -1,9 +1,13 @@
 import Link from "next/link";
+import type { Metadata } from "next";
+import { SEO_COPY } from "../../lib/seo/copy";
+import { staticPageMetadata } from "../../lib/seo/metadata";
 
-export const metadata = {
-  title: "Terms of Service | Hashpop",
-  description: "Terms of Service for Hashpop marketplace.",
-};
+export const metadata: Metadata = staticPageMetadata({
+  title: SEO_COPY.termsTitle,
+  description: SEO_COPY.termsDescription,
+  path: "/terms",
+});
 
 export default function TermsPage() {
   return (

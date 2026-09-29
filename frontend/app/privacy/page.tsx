@@ -1,9 +1,13 @@
 import Link from "next/link";
+import type { Metadata } from "next";
+import { SEO_COPY } from "../../lib/seo/copy";
+import { staticPageMetadata } from "../../lib/seo/metadata";
 
-export const metadata = {
-  title: "Privacy Policy | Hashpop",
-  description: "Privacy Policy for Hashpop marketplace.",
-};
+export const metadata: Metadata = staticPageMetadata({
+  title: SEO_COPY.privacyTitle,
+  description: SEO_COPY.privacyDescription,
+  path: "/privacy",
+});
 
 export default function PrivacyPage() {
   return (

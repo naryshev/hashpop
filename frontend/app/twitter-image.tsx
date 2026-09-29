@@ -1,5 +1,4 @@
-// Re-export the OpenGraph image for Twitter cards.
-// `runtime` must be a string literal in this file — Next.js can't statically
-// analyze a re-exported value and falls back to the default runtime.
-export const runtime = "edge";
+// Same v2 PNG as /opengraph-image. `runtime` must be a string literal here —
+// Next.js can't statically analyze a re-exported value.
+export const runtime = "nodejs";
 export { default, alt, size, contentType } from "./opengraph-image";

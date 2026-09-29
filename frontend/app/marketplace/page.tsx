@@ -1,6 +1,12 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import { getApiUrl } from "../../lib/apiUrl";
+import { marketplaceMetadata } from "../../lib/seo/metadata";
 import MarketplacePageClient, { type ListingItem } from "./marketplace-page-client";
+
+export function generateMetadata(): Metadata {
+  return marketplaceMetadata();
+}
 
 function normalizeListingStatus(status?: string): string {
   return String(status || "")

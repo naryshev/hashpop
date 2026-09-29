@@ -4,10 +4,13 @@ import { BootSplash } from "../components/BootSplash";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
 import type { Metadata, Viewport } from "next";
+import { SEO_COPY } from "../lib/seo/copy";
+import { serializeJsonLd, siteJsonLd } from "../lib/seo/jsonld";
+import { socialImages } from "../lib/seo/metadata";
 
 export const metadata: Metadata = {
-  title: "Hashpop",
-  description: "Buy and sell on the Hedera network with Hashpop - The community marketplace.",
+  title: SEO_COPY.rootTitle,
+  description: SEO_COPY.rootDescription,
   icons: {
     icon: "/hashpop-cart-3d.PNG",
     shortcut: "/hashpop-cart-3d.PNG",
@@ -18,16 +21,18 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "Hashpop",
-    title: "Hashpop",
-    description: "Buy and sell on the Hedera network with Hashpop - The community marketplace.",
-    url: "https://hashpop.io",
+    title: SEO_COPY.rootTitle,
+    description: SEO_COPY.rootDescription,
+    url: SEO_COPY.canonicalOrigin,
+    images: socialImages().openGraph,
   },
   twitter: {
     card: "summary_large_image",
     site: "@hashpop",
     creator: "@hashpop",
-    title: "Hashpop",
-    description: "Buy and sell on the Hedera network with Hashpop - The community marketplace.",
+    title: SEO_COPY.rootTitle,
+    description: SEO_COPY.rootDescription,
+    images: socialImages().twitter,
   },
 };
 
@@ -69,6 +74,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <body suppressHydrationWarning>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(siteJsonLd()) }}
+        />
         <script dangerouslySetInnerHTML={{ __html: BOOT_ERROR_CATCHER }} />
         <BootSplash />
         <ClientProviders>{children}</ClientProviders>
