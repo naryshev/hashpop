@@ -1,27 +1,29 @@
 /**
- * Hashpop SEO copy (positioning v2).
- *
- * Swap strings here. Page metadata, Open Graph, and JSON-LD read these
- * constants so Eng can update wording without hunting through routes.
- *
- * Positioning drawn from the product: peer-to-peer marketplace on Hedera,
- * meetup or on-chain escrow, settlement in HBAR.
+ * Paste-ready SEO P0 strings. Swap wording here only.
+ * Research copy is verbatim — do not paraphrase in routes.
  */
 export const SEO_COPY = {
   siteName: "Hashpop",
   canonicalOrigin: "https://hashpop.io",
-  defaultDescription:
-    "Peer-to-peer marketplace on Hedera. Meet up or lock escrow, then settle in HBAR.",
+  rootTitle: "Hashpop — Reputation, chat & escrow on your wallet",
+  rootDescription:
+    "Buy and sell real stuff on Hedera with wallet reputation, encrypted deal chat, and HBAR escrow. Meetups with a contract.",
   marketplaceTitle: "Marketplace · Hashpop",
   marketplaceDescription:
-    "Peer-to-peer marketplace on Hedera with meetup and escrow trust. Buy and sell, then settle in HBAR.",
-  listingTitle: (title: string) => `${title} · Hashpop`,
+    "Browse listings settled in HBAR — escrow, wallet chat, and portable reputation. Meet locally with a contract or ship.",
+  marketplaceOgDescription:
+    "P2P marketplace on Hedera: escrow, chat, and reputation on your wallet.",
+  /** `{title} · {price} ℏ · Hashpop` */
+  listingTitle: (title: string, priceHbar: string) => `${title} · ${priceHbar} ℏ · Hashpop`,
   listingFallbackTitle: "Listing · Hashpop",
-  listingFallbackDescription:
-    "Peer-to-peer listing on Hashpop. Meetup or escrow trust on Hedera, settled in HBAR.",
+  /** Used when a listing has no description. */
+  listingDescriptionFallback: (title: string, priceHbar: string) =>
+    `${title} for ${priceHbar} ℏ on Hashpop — escrow-backed P2P.`,
   categoriesTitle: "Browse Categories · Hashpop",
   categoriesDescription:
-    "Browse the Hashpop marketplace by category — electronics, vehicles, fashion, collectibles and more.",
+    "Shop Hashpop by category — electronics, vehicles, fashion, collectibles, and more. Escrow and wallet reputation built in.",
+  profileTitle: "Profile · Hashpop",
+  profileDescription: "Public wallet profile on Hashpop.",
   helpTitle: "Help Center · Hashpop",
   helpDescription:
     "Hashpop help center: how escrow works, what HBAR is, connecting HashPack, disputes, returns and more.",
@@ -34,8 +36,8 @@ export const SEO_COPY = {
   termsDescription: "Terms of Service for the Hashpop peer-to-peer marketplace on Hedera.",
 } as const;
 
-/** Meta descriptions stay within a typical search-snippet length. */
-export const META_DESCRIPTION_MAX = 160;
+/** First ~155 characters of a listing description. */
+export const META_DESCRIPTION_MAX = 155;
 
 /** schema.org Offer currency. Listings are priced in HBAR (ℏ), not fiat. */
 export const OFFER_PRICE_CURRENCY = "HBAR" as const;

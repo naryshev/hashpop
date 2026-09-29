@@ -1,5 +1,6 @@
-import { listingCanonicalPath } from "./metadata";
+import { CATEGORY_GROUPS } from "../categories";
 import { absoluteUrl } from "./host";
+import { listingCanonicalPath } from "./metadata";
 
 /**
  * Indexable routes that are not account-specific.
@@ -8,11 +9,25 @@ import { absoluteUrl } from "./host";
 export const PUBLIC_SITEMAP_PATHS = [
   "/marketplace",
   "/categories",
-  "/help",
-  "/support",
   "/privacy",
   "/terms",
+  "/help",
+  "/support",
 ] as const;
+
+/** Second guard on top of GET /api/listings (backend take: 100). */
+export const SITEMAP_LISTING_CAP = 500;
+
+/** Public category URLs are marketplace filters, matching the categories page. */
+export function categorySitemapPaths(): string[] {
+  const paths: string[] = [];
+  for (const group of CATEGORY_GROUPS) {
+    for (const category of group.categories) {
+      paths.push(`/marketplace?category=${encodeURIComponent(category)}`);
+    }
+  }
+  return paths;
+}
 
 export type SitemapListing = {
   id: string;
@@ -34,12 +49,24 @@ function lastModified(value?: string | null): string | undefined {
   return date.toISOString();
 }
 
-export function buildSitemap(listings: SitemapListing[]): SitemapEntry[] {
-  const staticEntries: SitemapEntry[] = PUBLIC_SITEMAP_PATHS.map((path) => ({
-    url: absoluteUrl(path),
-    changeFrequency: path === "/marketplace" ? "daily" : "weekly",
-    priority: path === "/marketplace" ? 1 : 0.6,
-  }));
+export function buildSitemap(
+  listings: SitemapListing[],
+  options?: { categoryPaths?: string[]; listingCap?: number },
+): SitemapEntry[] {
+  const categoryPaths = options?.categoryPaths ?? categorySitemapPaths();
+  const listingCap = options?.listingCap ?? SITEMAP_LISTING_CAP;
+  const staticEntries: SitemapEntry[] = [
+    ...PUBLIC_SITEMAP_PATHS.map((path) => ({
+      url: absoluteUrl(path),
+      changeFrequency: path === "/marketplace" ? ("daily" as const) : ("weekly" as const),
+      priority: path === "/marketplace" ? 1 : 0.6,
+    })),
+    ...categoryPaths.map((path) => ({
+      url: absoluteUrl(path),
+      changeFrequency: "weekly" as const,
+      priority: 0.5,
+    })),
+  ];
 
   const listingEntries: SitemapEntry[] = [];
   for (const listing of listings) {
@@ -53,6 +80,7 @@ export function buildSitemap(listings: SitemapListing[]): SitemapEntry[] {
       changeFrequency: "daily",
       priority: 0.8,
     });
+    if (listingEntries.length >= listingCap) break;
   }
 
   return [...staticEntries, ...listingEntries];

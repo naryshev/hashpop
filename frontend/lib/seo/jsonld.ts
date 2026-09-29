@@ -1,7 +1,7 @@
 import { formatPriceForDisplay } from "../formatPrice";
 import { getListingMediaUrls } from "../listingMedia";
-import { OFFER_PRICE_CURRENCY } from "./copy";
-import { absoluteUrl } from "./host";
+import { OFFER_PRICE_CURRENCY, SEO_COPY } from "./copy";
+import { absoluteUrl, CANONICAL_ORIGIN } from "./host";
 import { listingCanonicalPath, type SeoListing } from "./metadata";
 
 export type ListingOfferJsonLd = {
@@ -73,6 +73,27 @@ export function listingJsonLd(id: string, listing: SeoListing): ListingJsonLd {
   if (images.length > 0) data.image = images;
   if (listing.category?.trim()) data.category = listing.category.trim();
   return data;
+}
+
+/** Organization + WebSite graph for the marketplace shell. */
+export function siteJsonLd() {
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        name: SEO_COPY.siteName,
+        url: CANONICAL_ORIGIN,
+        description: SEO_COPY.rootDescription,
+      },
+      {
+        "@type": "WebSite",
+        name: SEO_COPY.siteName,
+        url: absoluteUrl("/marketplace"),
+        description: SEO_COPY.marketplaceDescription,
+      },
+    ],
+  };
 }
 
 /** JSON-LD safe to drop into a script tag (escapes `<` so descriptions cannot close it). */

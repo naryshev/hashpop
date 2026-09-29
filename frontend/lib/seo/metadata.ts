@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { formatPriceForDisplay } from "../formatPrice";
 import { getListingMediaUrls } from "../listingMedia";
 import { listingHref } from "../listingUrl";
 import { META_DESCRIPTION_MAX, SEO_COPY } from "./copy";
@@ -69,30 +70,18 @@ export function truncateMeta(text: string, max = META_DESCRIPTION_MAX): string {
   return `${clean.slice(0, max - 1).trimEnd()}…`;
 }
 
-/** Trust cue appended to listing snippets. Wording lives next to SEO_COPY. */
-export function listingTrustCue(listing: {
-  requireEscrow?: boolean | null;
-  condition?: string | null;
-  city?: string | null;
-}): string {
-  const parts: string[] = [];
-  if (listing.requireEscrow === true) parts.push("Escrow on Hedera");
-  else if (listing.requireEscrow === false) parts.push("Meetup");
-  if (listing.condition?.trim()) parts.push(listing.condition.trim());
-  if (listing.city?.trim()) parts.push(listing.city.trim());
-  return parts.join(" · ");
+export function listingPriceLabel(price: string | null | undefined): string {
+  return formatPriceForDisplay(price);
 }
 
+/** First ~155 characters of the listing description, or the research fallback sentence. */
 export function listingMetaDescription(listing: SeoListing | null): string {
-  if (!listing) return SEO_COPY.listingFallbackDescription;
-  const body = (listing.description || listing.subtitle || "").replace(/\s+/g, " ").trim();
-  const cue = listingTrustCue(listing);
-  if (!body && !cue) return SEO_COPY.listingFallbackDescription;
-  if (!cue) return truncateMeta(body);
-  const suffix = ` ${cue}`;
-  const budget = Math.max(40, META_DESCRIPTION_MAX - suffix.length);
-  const head = body ? truncateMeta(body, budget) : "";
-  return truncateMeta(`${head}${suffix}`.trim());
+  const title = listing?.title?.trim() || "Listing";
+  const price = listingPriceLabel(listing?.price);
+  const fallback = SEO_COPY.listingDescriptionFallback(title, price);
+  const body = (listing?.description || listing?.subtitle || "").replace(/\s+/g, " ").trim();
+  if (!body) return fallback;
+  return truncateMeta(body, META_DESCRIPTION_MAX);
 }
 
 export function marketplaceMetadata(): Metadata {
@@ -104,7 +93,7 @@ export function marketplaceMetadata(): Metadata {
     alternates: { canonical: url },
     openGraph: {
       title: SEO_COPY.marketplaceTitle,
-      description: SEO_COPY.marketplaceDescription,
+      description: SEO_COPY.marketplaceOgDescription,
       url,
       type: "website",
       siteName: SEO_COPY.siteName,
@@ -113,7 +102,7 @@ export function marketplaceMetadata(): Metadata {
     twitter: {
       card: "summary_large_image",
       title: SEO_COPY.marketplaceTitle,
-      description: SEO_COPY.marketplaceDescription,
+      description: SEO_COPY.marketplaceOgDescription,
       images: images.twitter,
     },
   };
@@ -122,7 +111,7 @@ export function marketplaceMetadata(): Metadata {
 export function listingMetadata(id: string, listing: SeoListing | null): Metadata {
   const url = absoluteUrl(listingCanonicalPath(id));
   const title = listing?.title?.trim()
-    ? SEO_COPY.listingTitle(listing.title.trim())
+    ? SEO_COPY.listingTitle(listing.title.trim(), listingPriceLabel(listing.price))
     : SEO_COPY.listingFallbackTitle;
   const description = listingMetaDescription(listing);
   const images = socialImages(listing ? primaryListingImage(listing) : undefined);

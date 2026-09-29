@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { SEO_COPY } from "../copy";
 import { apexRedirectUrl, isNoIndexPath } from "../host";
-import { listingJsonLd, serializeJsonLd } from "../jsonld";
+import { listingJsonLd, serializeJsonLd, siteJsonLd } from "../jsonld";
 import {
   FALLBACK_OG_IMAGE,
   FALLBACK_TWITTER_IMAGE,
@@ -9,17 +9,30 @@ import {
   marketplaceMetadata,
   staticPageMetadata,
 } from "../metadata";
-import { buildRobots, PRIVATE_PATH_PREFIXES } from "../robots";
+import { buildRobots, ROBOTS_ALLOW, ROBOTS_DISALLOW } from "../robots";
 import { buildSitemap, PUBLIC_SITEMAP_PATHS } from "../sitemap";
 
 describe("SEO copy", () => {
-  it("uses swappable marketplace and listing title patterns", () => {
+  it("keeps the research strings verbatim", () => {
+    expect(SEO_COPY.rootTitle).toBe("Hashpop — Reputation, chat & escrow on your wallet");
+    expect(SEO_COPY.rootDescription).toBe(
+      "Buy and sell real stuff on Hedera with wallet reputation, encrypted deal chat, and HBAR escrow. Meetups with a contract.",
+    );
     expect(SEO_COPY.marketplaceTitle).toBe("Marketplace · Hashpop");
-    expect(SEO_COPY.listingTitle("Vintage Camera")).toBe("Vintage Camera · Hashpop");
-    expect(SEO_COPY.marketplaceDescription.toLowerCase()).toContain("peer-to-peer");
-    expect(SEO_COPY.marketplaceDescription.toLowerCase()).toContain("meetup");
-    expect(SEO_COPY.marketplaceDescription.toLowerCase()).toContain("escrow");
-    expect(SEO_COPY.marketplaceDescription.toLowerCase()).toContain("hedera");
+    expect(SEO_COPY.marketplaceDescription).toBe(
+      "Browse listings settled in HBAR — escrow, wallet chat, and portable reputation. Meet locally with a contract or ship.",
+    );
+    expect(SEO_COPY.marketplaceOgDescription).toBe(
+      "P2P marketplace on Hedera: escrow, chat, and reputation on your wallet.",
+    );
+    expect(SEO_COPY.listingTitle("Vintage Camera", "84")).toBe("Vintage Camera · 84 ℏ · Hashpop");
+    expect(SEO_COPY.listingDescriptionFallback("Vintage Camera", "84")).toBe(
+      "Vintage Camera for 84 ℏ on Hashpop — escrow-backed P2P.",
+    );
+    expect(SEO_COPY.categoriesTitle).toBe("Browse Categories · Hashpop");
+    expect(SEO_COPY.categoriesDescription).toBe(
+      "Shop Hashpop by category — electronics, vehicles, fashion, collectibles, and more. Escrow and wallet reputation built in.",
+    );
   });
 });
 
@@ -58,6 +71,7 @@ describe("marketplace metadata", () => {
     expect(meta.description).toBe(SEO_COPY.marketplaceDescription);
     expect(meta.alternates?.canonical).toBe("https://hashpop.io/marketplace");
     expect(meta.openGraph?.title).toBe("Marketplace · Hashpop");
+    expect(meta.openGraph?.description).toBe(SEO_COPY.marketplaceOgDescription);
     expect(meta.openGraph?.url).toBe("https://hashpop.io/marketplace");
     expect(meta.openGraph?.images).toEqual([{ ...FALLBACK_OG_IMAGE }]);
     expect(meta.twitter && "card" in meta.twitter ? meta.twitter.card : undefined).toBe(
@@ -86,11 +100,13 @@ describe("listing metadata", () => {
 
   it("builds title, truncated description, image, and apex canonical", () => {
     const meta = listingMetadata("lst-1", listing);
-    expect(meta.title).toEqual({ absolute: "Vintage Camera · Hashpop" });
-    expect(String(meta.description).length).toBeLessThanOrEqual(160);
+    expect(meta.title).toEqual({ absolute: "Vintage Camera · 84 ℏ · Hashpop" });
+    expect(String(meta.description).length).toBeLessThanOrEqual(155);
     expect(meta.description).toContain("rangefinder");
-    expect(meta.description).toMatch(/escrow/i);
+    expect(meta.description).not.toMatch(/escrow-backed P2P/);
     expect(meta.alternates?.canonical).toBe("https://hashpop.io/listing/lst-1");
+    expect(meta.openGraph?.url).toBe("https://hashpop.io/listing/lst-1");
+    expect(meta.openGraph?.type).toBe("website");
     expect(meta.openGraph?.images).toEqual([{ url: "https://cdn.hashpop.io/camera.jpg" }]);
     expect(
       listingMetadata("lst-1", { ...listing, imageUrl: null, mediaUrls: [] }).openGraph?.images,
@@ -108,11 +124,20 @@ describe("listing metadata", () => {
     expect(meta.alternates?.canonical).toBe("https://hashpop.io/listing/lst-1");
   });
 
+  it("uses the escrow-backed sentence when the listing has no description", () => {
+    const meta = listingMetadata("lst-1", {
+      ...listing,
+      description: "   ",
+      subtitle: null,
+    });
+    expect(meta.description).toBe("Vintage Camera for 84 ℏ on Hashpop — escrow-backed P2P.");
+  });
+
   it("falls back when the listing is missing without a generic Hashpop title", () => {
     const meta = listingMetadata("missing", null);
     expect(meta.title).toEqual({ absolute: SEO_COPY.listingFallbackTitle });
     expect(meta.alternates?.canonical).toBe("https://hashpop.io/listing/missing");
-    expect(meta.description).toBeTruthy();
+    expect(meta.description).toBe("Listing for 0 ℏ on Hashpop — escrow-backed P2P.");
   });
 });
 
@@ -198,13 +223,24 @@ describe("robots.txt", () => {
     expect(robots.host).toBe("https://hashpop.io");
     const rule = Array.isArray(robots.rules) ? robots.rules[0] : robots.rules;
     expect(rule.userAgent).toBe("*");
-    expect(rule.allow).toBe("/");
-    for (const prefix of ["/admin", "/dashboard", "/messages", "/cart", "/api/", "/create"]) {
-      expect(rule.disallow).toContain(prefix);
+    expect(rule.allow).toEqual([...ROBOTS_ALLOW]);
+    expect(rule.disallow).toEqual([...ROBOTS_DISALLOW]);
+    for (const path of [
+      "/",
+      "/marketplace",
+      "/categories",
+      "/listing/",
+      "/privacy",
+      "/terms",
+      "/profile/",
+    ]) {
+      expect(rule.allow).toContain(path);
+    }
+    for (const path of ["/messages", "/cart", "/create", "/dashboard", "/admin", "/api/"]) {
+      expect(rule.disallow).toContain(path);
     }
     expect(rule.disallow).not.toContain("/marketplace");
-    expect(rule.disallow).not.toContain("/listing");
-    expect(PRIVATE_PATH_PREFIXES).toContain("/admin");
+    expect(rule.disallow).not.toContain("/profile/");
   });
 });
 
@@ -222,7 +258,12 @@ describe("sitemap.xml", () => {
     const urls = entries.map((entry) => entry.url);
     expect(urls).toContain("https://hashpop.io/marketplace");
     expect(urls).toContain("https://hashpop.io/categories");
-    expect(urls).toContain("https://hashpop.io/help");
+    expect(urls).toContain("https://hashpop.io/privacy");
+    expect(urls).toContain("https://hashpop.io/terms");
+    expect(urls).toContain("https://hashpop.io/marketplace?category=Watches");
+    expect(urls).toContain(
+      `https://hashpop.io/marketplace?category=${encodeURIComponent("Men's Clothing")}`,
+    );
     expect(urls).toContain("https://hashpop.io/listing/lst-9");
     expect(urls.some((url) => url.includes("/admin"))).toBe(false);
     expect(urls.some((url) => url.includes("lst-sold"))).toBe(false);
@@ -230,5 +271,33 @@ describe("sitemap.xml", () => {
     expect(PUBLIC_SITEMAP_PATHS).not.toContain("/admin");
     const listing = entries.find((entry) => entry.url.endsWith("/listing/lst-9"));
     expect(listing?.lastModified).toBe("2026-09-01T00:00:00.000Z");
+  });
+
+  it("caps listed URLs when the catalog is huge", () => {
+    const listings = Array.from({ length: 5 }, (_, i) => ({
+      id: `lst-${i}`,
+      status: "LISTED",
+    }));
+    const urls = buildSitemap(listings, { categoryPaths: [], listingCap: 2 }).map((e) => e.url);
+    expect(urls.filter((url) => url.includes("/listing/"))).toEqual([
+      "https://hashpop.io/listing/lst-0",
+      "https://hashpop.io/listing/lst-1",
+    ]);
+  });
+});
+
+describe("site JSON-LD", () => {
+  it("publishes Organization and WebSite", () => {
+    const data = siteJsonLd();
+    expect(data["@graph"].map((node) => node["@type"])).toEqual(["Organization", "WebSite"]);
+    expect(data["@graph"][0]).toMatchObject({
+      name: "Hashpop",
+      url: "https://hashpop.io",
+      description: SEO_COPY.rootDescription,
+    });
+    expect(data["@graph"][1]).toMatchObject({
+      url: "https://hashpop.io/marketplace",
+      description: SEO_COPY.marketplaceDescription,
+    });
   });
 });
