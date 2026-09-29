@@ -11,6 +11,32 @@ function primaryListingImage(listing: {
   return getListingMediaUrls(listing).find((url) => /^https?:\/\//i.test(url));
 }
 
+/** Vertical lock-crop card. Served by app/opengraph-image.png. */
+export const FALLBACK_OG_IMAGE = {
+  url: "/opengraph-image.png",
+  width: 1200,
+  height: 630,
+  alt: "Hashpop marketplace",
+} as const;
+
+/** Same art as the Open Graph card. Served by app/twitter-image.png. */
+export const FALLBACK_TWITTER_IMAGE = "/twitter-image.png";
+
+/**
+ * Listing media replaces the site card. Pages that set their own openGraph
+ * must pass images explicitly — a child openGraph object replaces the parent,
+ * and the file-based image is not filled in once openGraph is set.
+ */
+export function socialImages(primary?: string): {
+  openGraph: NonNullable<Metadata["openGraph"]>["images"];
+  twitter: string[];
+} {
+  if (primary) {
+    return { openGraph: [{ url: primary }], twitter: [primary] };
+  }
+  return { openGraph: [{ ...FALLBACK_OG_IMAGE }], twitter: [FALLBACK_TWITTER_IMAGE] };
+}
+
 export type SeoListing = {
   id: string;
   title?: string | null;
@@ -71,6 +97,7 @@ export function listingMetaDescription(listing: SeoListing | null): string {
 
 export function marketplaceMetadata(): Metadata {
   const url = absoluteUrl("/marketplace");
+  const images = socialImages();
   return {
     title: { absolute: SEO_COPY.marketplaceTitle },
     description: SEO_COPY.marketplaceDescription,
@@ -81,11 +108,13 @@ export function marketplaceMetadata(): Metadata {
       url,
       type: "website",
       siteName: SEO_COPY.siteName,
+      images: images.openGraph,
     },
     twitter: {
       card: "summary_large_image",
       title: SEO_COPY.marketplaceTitle,
       description: SEO_COPY.marketplaceDescription,
+      images: images.twitter,
     },
   };
 }
@@ -96,7 +125,7 @@ export function listingMetadata(id: string, listing: SeoListing | null): Metadat
     ? SEO_COPY.listingTitle(listing.title.trim())
     : SEO_COPY.listingFallbackTitle;
   const description = listingMetaDescription(listing);
-  const image = listing ? primaryListingImage(listing) : undefined;
+  const images = socialImages(listing ? primaryListingImage(listing) : undefined);
   return {
     title: { absolute: title },
     description,
@@ -107,13 +136,13 @@ export function listingMetadata(id: string, listing: SeoListing | null): Metadat
       url,
       type: "website",
       siteName: SEO_COPY.siteName,
-      ...(image ? { images: [{ url: image }] } : {}),
+      images: images.openGraph,
     },
     twitter: {
-      card: image ? "summary_large_image" : "summary",
+      card: "summary_large_image",
       title,
       description,
-      ...(image ? { images: [image] } : {}),
+      images: images.twitter,
     },
   };
 }
@@ -124,6 +153,7 @@ export function staticPageMetadata(input: {
   path: string;
 }): Metadata {
   const url = absoluteUrl(input.path);
+  const images = socialImages();
   return {
     title: { absolute: input.title },
     description: input.description,
@@ -134,11 +164,13 @@ export function staticPageMetadata(input: {
       url,
       type: "website",
       siteName: SEO_COPY.siteName,
+      images: images.openGraph,
     },
     twitter: {
       card: "summary_large_image",
       title: input.title,
       description: input.description,
+      images: images.twitter,
     },
   };
 }

@@ -5,6 +5,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
 import type { Metadata, Viewport } from "next";
 import { SEO_COPY } from "../lib/seo/copy";
+import { socialImages } from "../lib/seo/metadata";
 
 export const metadata: Metadata = {
   title: SEO_COPY.siteName,
@@ -22,6 +23,7 @@ export const metadata: Metadata = {
     title: SEO_COPY.siteName,
     description: SEO_COPY.defaultDescription,
     url: SEO_COPY.canonicalOrigin,
+    images: socialImages().openGraph,
   },
   twitter: {
     card: "summary_large_image",
@@ -29,6 +31,7 @@ export const metadata: Metadata = {
     creator: "@hashpop",
     title: SEO_COPY.siteName,
     description: SEO_COPY.defaultDescription,
+    images: socialImages().twitter,
   },
 };
 

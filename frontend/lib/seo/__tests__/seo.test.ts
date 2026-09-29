@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 import { SEO_COPY } from "../copy";
 import { apexRedirectUrl, isNoIndexPath } from "../host";
 import { listingJsonLd, serializeJsonLd } from "../jsonld";
-import { listingMetadata, marketplaceMetadata, staticPageMetadata } from "../metadata";
+import {
+  FALLBACK_OG_IMAGE,
+  FALLBACK_TWITTER_IMAGE,
+  listingMetadata,
+  marketplaceMetadata,
+  staticPageMetadata,
+} from "../metadata";
 import { buildRobots, PRIVATE_PATH_PREFIXES } from "../robots";
 import { buildSitemap, PUBLIC_SITEMAP_PATHS } from "../sitemap";
 
@@ -53,9 +59,13 @@ describe("marketplace metadata", () => {
     expect(meta.alternates?.canonical).toBe("https://hashpop.io/marketplace");
     expect(meta.openGraph?.title).toBe("Marketplace · Hashpop");
     expect(meta.openGraph?.url).toBe("https://hashpop.io/marketplace");
+    expect(meta.openGraph?.images).toEqual([{ ...FALLBACK_OG_IMAGE }]);
     expect(meta.twitter && "card" in meta.twitter ? meta.twitter.card : undefined).toBe(
       "summary_large_image",
     );
+    expect(meta.twitter && "images" in meta.twitter ? meta.twitter.images : undefined).toEqual([
+      FALLBACK_TWITTER_IMAGE,
+    ]);
   });
 });
 
@@ -82,6 +92,9 @@ describe("listing metadata", () => {
     expect(meta.description).toMatch(/escrow/i);
     expect(meta.alternates?.canonical).toBe("https://hashpop.io/listing/lst-1");
     expect(meta.openGraph?.images).toEqual([{ url: "https://cdn.hashpop.io/camera.jpg" }]);
+    expect(
+      listingMetadata("lst-1", { ...listing, imageUrl: null, mediaUrls: [] }).openGraph?.images,
+    ).toEqual([{ ...FALLBACK_OG_IMAGE }]);
     expect(meta.twitter && "card" in meta.twitter ? meta.twitter.card : undefined).toBe(
       "summary_large_image",
     );
