@@ -2,17 +2,14 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { getApiUrl } from "../../lib/apiUrl";
 import { CATEGORY_GROUPS, canonicalizeCategory } from "../../lib/categories";
+import { SEO_COPY } from "../../lib/seo/copy";
+import { staticPageMetadata } from "../../lib/seo/metadata";
 
-export const metadata: Metadata = {
-  title: "Browse Categories · Hashpop",
-  description:
-    "Browse the Hashpop marketplace by category — electronics, vehicles, fashion, collectibles and more.",
-  openGraph: {
-    title: "Browse Categories · Hashpop",
-    description: "Browse the Hashpop marketplace by category.",
-    type: "website",
-  },
-};
+export const metadata: Metadata = staticPageMetadata({
+  title: SEO_COPY.categoriesTitle,
+  description: SEO_COPY.categoriesDescription,
+  path: "/categories",
+});
 
 function normalizeListingStatus(status?: string): string {
   return String(status || "")
