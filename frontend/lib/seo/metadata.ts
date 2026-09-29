@@ -20,7 +20,7 @@ export const FALLBACK_OG_IMAGE = {
   url: "https://hashpop.io/opengraph-image",
   width: 1200,
   height: 630,
-  alt: "Hashpop - Community marketplace on Hedera",
+  alt: "Hashpop marketplace",
 } as const;
 
 export const FALLBACK_TWITTER_IMAGE = "https://hashpop.io/twitter-image";
