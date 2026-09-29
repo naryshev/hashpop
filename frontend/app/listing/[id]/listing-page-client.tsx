@@ -37,7 +37,6 @@ import { ConnectWalletButton } from "../../../components/ConnectWalletButton";
 import { activeHederaChain } from "../../../lib/hederaChains";
 import { readListingCompat } from "../../../lib/marketplaceRead";
 import { getTransactionExplorerUrl } from "../../../lib/explorer";
-import { LocationMap } from "../../../components/LocationMap";
 import { LocationPicker, type LocationValue } from "../../../components/LocationPicker";
 import { OffersPanel } from "../../../components/OffersPanel";
 
@@ -1007,16 +1006,14 @@ export default function ListingPage({
       </div>
     ) : null;
 
+  const locationLabel = listing?.city?.trim() || "";
   const locationJsx =
-    !editing &&
-    listing &&
-    typeof listing.locationLat === "number" &&
-    typeof listing.locationLng === "number" ? (
+    !editing && locationLabel ? (
       <div className="border-t border-white/10 pt-4">
         <h3 className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-3">
           Location
         </h3>
-        <LocationMap lat={listing.locationLat} lng={listing.locationLng} city={listing.city} />
+        <p className="text-sm text-white/80">{locationLabel}</p>
       </div>
     ) : null;
 
@@ -1629,11 +1626,10 @@ export default function ListingPage({
                 </div>
               </div>
             )}
-            {/* Desktop-only: want-to-sell + description + location live in
-                the left column under the photo on desktop. On mobile these
-                are rendered as a separate block below the grid so the buy
-                panel / shipping / seller surface immediately after the
-                photo. */}
+            {/* Desktop-only: want-to-sell + location live in the left column
+                under the photo. Description sits with the buy column, above
+                shipping. On mobile, location and want-to-sell render below
+                the grid so the buy panel surfaces right after the photo. */}
             <input
               ref={editFileInputRef}
               type="file"
@@ -1646,7 +1642,6 @@ export default function ListingPage({
               }}
             />
             <div className="hidden lg:block">{wantToSellJsx}</div>
-            <div className="hidden lg:block">{descriptionJsx}</div>
             <div className="hidden lg:block">{locationJsx}</div>
             {isSeller && isSellerActiveListing && editing && (
               <div className={cn(material.regular, "space-y-4 rounded-[18px] p-4")}>
@@ -1937,6 +1932,7 @@ export default function ListingPage({
                 </div>
               )}
 
+            {descriptionJsx}
             {listing && isListed && (
               <div className="border-t border-white/10 pt-4">
                 <h3 className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-3">
@@ -2038,12 +2034,10 @@ export default function ListingPage({
           </div>
         </div>
 
-        {/* Mobile-only: below the buy panel / shipping / seller, show the
-            location map first, then the description, then the want-to-sell
-            link. Desktop renders these inside the grid's left column. */}
+        {/* Mobile-only: location text and the want-to-sell link sit below
+            the buy column. Description is rendered above shipping. */}
         <div className="mt-4 space-y-4 lg:hidden">
           {locationJsx}
-          {descriptionJsx}
           {wantToSellJsx}
         </div>
 
