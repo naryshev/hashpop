@@ -22,6 +22,8 @@ type Props = {
   /** Shifts the camera focal point into the visible map, above the sheet. */
   padding?: { top: number; right: number; bottom: number; left: number };
   onViewChange?: (view: MapViewSnapshot) => void;
+  /** Fires for a click on the basemap, not on a marker. */
+  onMapClick?: () => void;
   children?: ReactNode;
 };
 
@@ -61,6 +63,7 @@ export default function DarkMap({
   navigation = true,
   padding,
   onViewChange,
+  onMapClick,
   children,
 }: Props) {
   const mapRef = useRef<MapRef>(null);
@@ -125,6 +128,7 @@ export default function DarkMap({
       onError={onError}
       onLoad={(event) => publishView(event.target)}
       onMoveEnd={(event) => publishView(event.target)}
+      onClick={() => onMapClick?.()}
       RTLTextPlugin={false}
     >
       {interactive && navigation ? (

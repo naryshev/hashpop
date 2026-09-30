@@ -16,6 +16,7 @@ type Props = {
   activeId: string | null;
   onSelect: (id: string) => void;
   onViewChange: (view: MapViewSnapshot) => void;
+  onMapClick?: () => void;
 };
 
 /**
@@ -32,6 +33,7 @@ export default function NearbyMapInner({
   activeId,
   onSelect,
   onViewChange,
+  onMapClick,
 }: Props) {
   return (
     <DarkMap
@@ -42,6 +44,7 @@ export default function NearbyMapInner({
       padding={padding}
       navigation={false}
       onViewChange={onViewChange}
+      onMapClick={onMapClick}
       interactive
     >
       {userPos ? (

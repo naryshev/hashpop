@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
-import { AlignJustify, ChevronDown, LocateFixed, Search } from "lucide-react";
+import { ChevronDown, LocateFixed, Menu } from "lucide-react";
 import { getApiUrl } from "../lib/apiUrl";
 import {
   GEOCODE_DEBOUNCE_MS,
@@ -23,6 +23,7 @@ import {
   type NearbyPriceBand,
   type NearbySheetItem,
 } from "../lib/nearbyListings";
+import { isUsaZip, preferUsaPostalHits } from "../lib/usaZip";
 import { LISTING_CONDITIONS } from "../lib/listingConditions";
 import type { ListingType } from "../lib/marketplaceFilters";
 import { material } from "../lib/materials";
@@ -36,6 +37,9 @@ const NearbyMapInner = dynamic(() => import("./NearbyMapInner"), {
 });
 
 const DEFAULT_CENTER = { lat: 39.5, lng: -98.35 };
+const USA_ZIP_ONLY = "US ZIP codes only";
+/** Digits of a ZIP or ZIP+4 while the user is still typing. */
+const ZIP_IN_PROGRESS = /^\d{1,5}(?:-\d{0,4})?$/;
 
 type Camera = {
   lat: number;
@@ -44,13 +48,30 @@ type Camera = {
   keepZoom: boolean;
 };
 
-type MenuId = "type" | "price" | "condition";
+type FilterId = "type" | "price" | "condition";
+type SheetDetent = "hidden" | "peek" | "open";
 
 const LISTING_TYPES: { id: ListingType; label: string }[] = [
   { id: "all", label: "All" },
   { id: "physical", label: "Physical" },
   { id: "digital", label: "Digital" },
 ];
+
+function locationLines(label: string | null, locating: boolean, hasUser: boolean) {
+  if (label) {
+    const parts = label
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean);
+    return {
+      primary: parts[0] || label,
+      subline: parts.slice(1).join(", ") || "United States",
+    };
+  }
+  if (locating) return { primary: "Current location", subline: "Finding you…" };
+  if (!hasUser) return { primary: "Current location", subline: "Location off" };
+  return { primary: "Current location", subline: "Near you" };
+}
 
 function Chip({
   testId,
@@ -84,7 +105,7 @@ function Chip({
   );
 }
 
-function Menu({ label, children }: { label: string; children: React.ReactNode }) {
+function FilterMenu({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div
       role="listbox"
@@ -138,18 +159,21 @@ export function NearbyMap({ open, onClose }: { open: boolean; onClose: () => voi
   const [listingType, setListingType] = useState<ListingType>("all");
   const [priceBand, setPriceBand] = useState<NearbyPriceBand>("any");
   const [condition, setCondition] = useState("");
-  const [menu, setMenu] = useState<MenuId | null>(null);
-  const [listOpen, setListOpen] = useState(false);
+  const [filter, setFilter] = useState<FilterId | null>(null);
+  const [detent, setDetent] = useState<SheetDetent>("peek");
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [placeOpen, setPlaceOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [placeLabel, setPlaceLabel] = useState<string | null>(null);
   const [placeQuery, setPlaceQuery] = useState("");
   const [placeHits, setPlaceHits] = useState<GeocodeHit[]>([]);
   const [placeError, setPlaceError] = useState<string | null>(null);
   const [searchAvailable, setSearchAvailable] = useState(true);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const filterRef = useRef<HTMLDivElement>(null);
+  const chromeRef = useRef<HTMLDivElement>(null);
   const sheetRef = useRef<HTMLElement>(null);
   const dragStart = useRef<number | null>(null);
-  const [mapPadding, setMapPadding] = useState({ top: 72, right: 0, bottom: 520, left: 0 });
+  const dragged = useRef(false);
+  const [mapPadding, setMapPadding] = useState({ top: 72, right: 0, bottom: 340, left: 0 });
 
   useEffect(() => setMounted(true), []);
 
@@ -190,7 +214,6 @@ export function NearbyMap({ open, onClose }: { open: boolean; onClose: () => voi
     setLocating(true);
     if (typeof navigator === "undefined" || !navigator.geolocation) {
       setLocating(false);
-      setPlaceOpen(true);
       return;
     }
     let cancelled = false;
@@ -206,12 +229,10 @@ export function NearbyMap({ open, onClose }: { open: boolean; onClose: () => voi
           keepZoom: false,
         });
         setLocating(false);
-        setPlaceOpen(false);
       },
       () => {
         if (cancelled) return;
         setLocating(false);
-        setPlaceOpen(true);
       },
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 },
     );
@@ -221,15 +242,28 @@ export function NearbyMap({ open, onClose }: { open: boolean; onClose: () => voi
   }, [open]);
 
   useEffect(() => {
-    if (!placeOpen || !searchAvailable) return;
+    if (!menuOpen || !searchAvailable) return;
     const q = placeQuery.trim();
-    if (q.length < 2) {
+    if (!q) {
       setPlaceHits([]);
+      setPlaceError(null);
+      return;
+    }
+    if (!ZIP_IN_PROGRESS.test(q)) {
+      setPlaceHits([]);
+      setPlaceError(USA_ZIP_ONLY);
+      return;
+    }
+    if (!isUsaZip(q)) {
+      setPlaceHits([]);
+      setPlaceError(null);
       return;
     }
     let cancelled = false;
     const timer = setTimeout(() => {
-      void searchGeocode(q, userPos ? { lat: userPos[0], lng: userPos[1] } : undefined)
+      void searchGeocode(q, userPos ? { lat: userPos[0], lng: userPos[1] } : undefined, {
+        country: "us",
+      })
         .then((result) => {
           if (cancelled) return;
           if (!result.available) {
@@ -238,7 +272,9 @@ export function NearbyMap({ open, onClose }: { open: boolean; onClose: () => voi
             setPlaceHits([]);
             return;
           }
-          setPlaceHits(result.suggestions.slice(0, 5));
+          const hits = preferUsaPostalHits(result.suggestions).slice(0, 5);
+          setPlaceHits(hits);
+          setPlaceError(hits.length === 0 ? USA_ZIP_ONLY : null);
         })
         .catch(() => {
           if (!cancelled) setPlaceError("Search failed. Try again.");
@@ -248,18 +284,29 @@ export function NearbyMap({ open, onClose }: { open: boolean; onClose: () => voi
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [placeOpen, placeQuery, searchAvailable, userPos]);
+  }, [menuOpen, placeQuery, searchAvailable, userPos]);
 
   useEffect(() => {
-    if (!menu) return;
+    if (!filter) return;
     const onPointer = (event: PointerEvent) => {
       const target = event.target;
-      if (target instanceof Node && menuRef.current?.contains(target)) return;
-      setMenu(null);
+      if (target instanceof Node && filterRef.current?.contains(target)) return;
+      setFilter(null);
     };
     window.addEventListener("pointerdown", onPointer);
     return () => window.removeEventListener("pointerdown", onPointer);
-  }, [menu]);
+  }, [filter]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onPointer = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Node && chromeRef.current?.contains(target)) return;
+      setMenuOpen(false);
+    };
+    window.addEventListener("pointerdown", onPointer);
+    return () => window.removeEventListener("pointerdown", onPointer);
+  }, [menuOpen]);
 
   const criteria = useMemo(
     () => ({ query, listingType, priceBand, condition }),
@@ -279,10 +326,10 @@ export function NearbyMap({ open, onClose }: { open: boolean; onClose: () => voi
 
   useEffect(() => {
     if (!open) return;
-    const sheet = sheetRef.current;
-    if (!sheet) return;
+    const sheetEl = sheetRef.current;
+    if (!sheetEl) return;
     const update = () => {
-      const rect = sheet.getBoundingClientRect();
+      const rect = sheetEl.getBoundingClientRect();
       const wide =
         typeof window.matchMedia === "function" && window.matchMedia("(min-width: 768px)").matches;
       const next = wide
@@ -312,25 +359,26 @@ export function NearbyMap({ open, onClose }: { open: boolean; onClose: () => voi
     };
     update();
     const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
-    observer?.observe(sheet);
+    observer?.observe(sheetEl);
     window.addEventListener("resize", update);
     return () => {
       observer?.disconnect();
       window.removeEventListener("resize", update);
     };
-  }, [listOpen, mounted, open]);
+  }, [detent, mounted, open]);
 
   useProfiles(listings.map((listing) => listing.seller));
 
   useEffect(() => {
-    if (!activeId) return;
+    if (!activeId || detent === "hidden") return;
     const escaped = window.CSS?.escape ? window.CSS.escape(activeId) : activeId;
     document.querySelector(`[data-nearby-card="${escaped}"]`)?.scrollIntoView({ block: "nearest" });
-  }, [activeId]);
+  }, [activeId, detent]);
 
   const selectListing = useCallback(
     (id: string) => {
       setActiveId(id);
+      setDetent((current) => (current === "hidden" ? "peek" : current));
       const item = listings.find((listing) => listing.id === id);
       if (!item) return;
       setCamera((cameraNow) => ({
@@ -344,8 +392,12 @@ export function NearbyMap({ open, onClose }: { open: boolean; onClose: () => voi
   );
 
   const goToUser = useCallback(() => {
+    setPlaceLabel(null);
+    setPlaceQuery("");
+    setPlaceHits([]);
+    setPlaceError(null);
     if (!userPos) {
-      setPlaceOpen(true);
+      setMenuOpen(true);
       return;
     }
     setCamera({
@@ -354,7 +406,7 @@ export function NearbyMap({ open, onClose }: { open: boolean; onClose: () => voi
       zoom: NEARBY_DEFAULT_ZOOM,
       keepZoom: false,
     });
-    setPlaceOpen(false);
+    setMenuOpen(false);
   }, [userPos]);
 
   const choosePlace = useCallback((hit: GeocodeHit) => {
@@ -364,23 +416,42 @@ export function NearbyMap({ open, onClose }: { open: boolean; onClose: () => voi
       zoom: NEARBY_DEFAULT_ZOOM,
       keepZoom: false,
     });
-    setPlaceOpen(false);
+    setPlaceLabel(hit.label);
+    setMenuOpen(false);
     setPlaceHits([]);
     setPlaceQuery("");
     setPlaceError(null);
   }, []);
 
-  const toggleMenu = (id: MenuId) => setMenu((current) => (current === id ? null : id));
+  const onMapClick = useCallback(() => {
+    setDetent((current) => (current === "hidden" ? "peek" : "hidden"));
+  }, []);
+
+  const toggleFilter = (id: FilterId) => setFilter((current) => (current === id ? null : id));
 
   const onGrabPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     dragStart.current = event.clientY;
+    dragged.current = false;
   };
   const onGrabPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
     if (dragStart.current == null) return;
     const delta = event.clientY - dragStart.current;
     dragStart.current = null;
-    if (delta < -36) setListOpen(true);
-    else if (delta > 36) setListOpen(false);
+    if (Math.abs(delta) < 36) return;
+    dragged.current = true;
+    setDetent((current) => {
+      if (delta < 0) return current === "hidden" ? "peek" : "open";
+      return current === "open" ? "peek" : "hidden";
+    });
+  };
+  const onHandleClick = () => {
+    if (dragged.current) {
+      dragged.current = false;
+      return;
+    }
+    setDetent((current) =>
+      current === "hidden" ? "peek" : current === "open" ? "peek" : "hidden",
+    );
   };
 
   if (!mounted || !open) return null;
@@ -389,6 +460,7 @@ export function NearbyMap({ open, onClose }: { open: boolean; onClose: () => voi
     listingType === "all" ? "Type" : listingType === "physical" ? "Physical" : "Digital";
   const priceChip = NEARBY_PRICE_BANDS.find((band) => band.id === priceBand)?.chip ?? "Price ℏ";
   const conditionChip = condition || "Condition";
+  const place = locationLines(placeLabel, locating, userPos != null);
 
   return createPortal(
     <div
@@ -409,100 +481,109 @@ export function NearbyMap({ open, onClose }: { open: boolean; onClose: () => voi
           activeId={activeId}
           onSelect={selectListing}
           onViewChange={setMapView}
+          onMapClick={onMapClick}
         />
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-30 px-3 pt-[max(12px,env(safe-area-inset-top))]">
+      <div
+        ref={chromeRef}
+        className="pointer-events-none absolute inset-x-0 top-0 z-30 px-3 pt-[max(12px,env(safe-area-inset-top))]"
+      >
         <div className="pointer-events-auto flex items-center gap-2">
-          <label
+          <button
+            type="button"
+            data-testid="nearby-current-location"
+            onClick={goToUser}
+            aria-busy={locating}
             className={cn(
               material.regular,
-              "flex h-11 min-w-0 flex-1 items-center gap-2 rounded-full px-3 text-white",
+              "flex h-12 min-w-0 flex-1 items-center gap-2 rounded-full px-3 text-left text-white",
             )}
           >
-            <Search size={16} aria-hidden className="shrink-0 text-silver" />
-            <input
-              data-testid="nearby-search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search nearby…"
-              aria-label="Search nearby"
-              className="w-full bg-transparent text-sm text-white outline-none placeholder:text-silver/70"
-            />
-          </label>
-          {placeOpen ? (
-            <form
-              className="relative shrink-0"
-              onSubmit={(event) => {
-                event.preventDefault();
-                const hit = placeHits[0];
-                if (hit) choosePlace(hit);
-              }}
-            >
+            <LocateFixed size={16} aria-hidden className="shrink-0 text-chrome" />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[13px] font-semibold leading-tight">
+                {place.primary}
+              </span>
+              <span className="block truncate text-[11px] leading-tight text-silver">
+                {place.subline}
+              </span>
+            </span>
+            <ChevronDown size={16} aria-hidden className="shrink-0 text-silver" />
+          </button>
+          <button
+            type="button"
+            data-testid="nearby-menu-toggle"
+            aria-expanded={menuOpen}
+            aria-label="Nearby menu"
+            onClick={() => setMenuOpen((openNow) => !openNow)}
+            className={cn(
+              material.regular,
+              "flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-white",
+              menuOpen && "text-chrome",
+            )}
+          >
+            <Menu size={18} aria-hidden />
+          </button>
+        </div>
+        {menuOpen && (
+          <div
+            data-testid="nearby-menu"
+            role="dialog"
+            aria-label="Set area"
+            className={cn(
+              material.thick,
+              "pointer-events-auto mt-2 space-y-3 rounded-[24px] border border-white/10 p-4 text-sm shadow-[0_16px_40px_rgba(0,0,0,0.45)]",
+            )}
+          >
+            <div>
+              <p className="text-[15px] font-semibold text-white">Set area</p>
+              <p className="text-[12px] text-silver">US ZIP codes only</p>
+            </div>
+            <label className="block">
+              <span className="sr-only">US ZIP code</span>
               <input
-                data-testid="nearby-place-search"
+                data-testid="nearby-zip"
                 value={placeQuery}
+                inputMode="numeric"
+                autoComplete="postal-code"
+                autoFocus
+                disabled={!searchAvailable}
                 onChange={(event) => {
                   setPlaceQuery(event.target.value);
                   setPlaceError(null);
                 }}
-                disabled={!searchAvailable}
-                placeholder={searchAvailable ? "City or ZIP" : SEARCH_UNAVAILABLE_COPY}
-                aria-label="Search city or ZIP"
-                className={cn(
-                  material.regular,
-                  "h-11 w-36 rounded-full px-3 text-sm text-white outline-none placeholder:text-silver/70 disabled:opacity-60",
-                )}
+                placeholder={searchAvailable ? "ZIP code" : SEARCH_UNAVAILABLE_COPY}
+                aria-label="US ZIP code"
+                className="h-11 w-full rounded-2xl border border-white/10 bg-white/[0.04] px-3 text-sm font-medium text-white outline-none placeholder:text-silver/70 disabled:opacity-60"
               />
-            </form>
-          ) : (
-            <button
-              type="button"
-              data-testid="nearby-current-location"
-              onClick={goToUser}
-              aria-busy={locating}
-              className={cn(
-                material.regular,
-                "flex h-11 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium text-white",
-              )}
-            >
-              <LocateFixed size={16} aria-hidden className="shrink-0 text-chrome" />
-              <span className="max-w-[7.5rem] truncate">Current location</span>
-            </button>
-          )}
-          <button
-            type="button"
-            data-testid="nearby-list-toggle"
-            aria-pressed={listOpen}
-            aria-label={listOpen ? "Show map" : "Show list"}
-            onClick={() => setListOpen((openNow) => !openNow)}
-            className={cn(
-              material.regular,
-              "flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white",
-              listOpen && "text-chrome",
-            )}
-          >
-            <AlignJustify size={18} aria-hidden />
-          </button>
-        </div>
-        {placeOpen && (placeError || placeHits.length > 0) && (
-          <div
-            className={cn(
-              material.thick,
-              "pointer-events-auto mt-2 overflow-hidden rounded-2xl border border-white/10 text-sm",
-            )}
-          >
-            {placeError ? <p className="px-3 py-2 text-rose-300">{placeError}</p> : null}
-            {placeHits.map((hit) => (
-              <button
-                key={`${hit.lat}:${hit.lng}:${hit.label}`}
-                type="button"
-                onClick={() => choosePlace(hit)}
-                className="block w-full truncate px-3 py-2 text-left text-white hover:bg-white/5"
-              >
-                {hit.label}
-              </button>
-            ))}
+            </label>
+            {placeError ? <p className="text-rose-300">{placeError}</p> : null}
+            {placeHits.length > 0 ? (
+              <div className="overflow-hidden rounded-2xl border border-white/10">
+                {placeHits.map((hit) => (
+                  <button
+                    key={`${hit.lat}:${hit.lng}:${hit.label}`}
+                    type="button"
+                    onClick={() => choosePlace(hit)}
+                    className="block w-full truncate px-3 py-2.5 text-left text-white hover:bg-white/5"
+                  >
+                    {hit.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            <label className="block text-[11px] font-semibold uppercase tracking-wide text-silver">
+              Search listings
+              <input
+                data-testid="nearby-search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search listings"
+                aria-label="Search listings"
+                className="mt-1 h-10 w-full rounded-2xl border border-white/10 bg-white/[0.04] px-3 text-sm font-medium normal-case tracking-normal text-white outline-none placeholder:text-silver/70"
+              />
+            </label>
           </div>
         )}
       </div>
@@ -510,140 +591,153 @@ export function NearbyMap({ open, onClose }: { open: boolean; onClose: () => voi
       <section
         ref={sheetRef}
         data-testid="nearby-sheet"
+        data-sheet-detent={detent}
         aria-label="Nearby listings"
         className={cn(
           material.thick,
           "absolute z-20 flex min-h-0 flex-col border border-white/10 shadow-[0_-12px_40px_rgba(0,0,0,0.35)]",
-          "inset-x-3 rounded-t-sheet bottom-[calc(env(safe-area-inset-bottom)+5rem)]",
-          "md:inset-x-auto md:bottom-4 md:right-4 md:w-[400px] md:rounded-sheet",
-          listOpen
-            ? "top-[calc(env(safe-area-inset-top)+4rem)]"
-            : "h-[min(56dvh,560px)] md:top-[calc(env(safe-area-inset-top)+4rem)] md:h-auto",
+          "bottom-[calc(env(safe-area-inset-bottom)+5rem)]",
+          detent === "hidden"
+            ? "inset-x-3 h-8 overflow-hidden rounded-full md:inset-x-auto md:bottom-4 md:right-4 md:h-10 md:w-14"
+            : cn(
+                "inset-x-3 rounded-t-sheet md:inset-x-auto md:bottom-4 md:right-4 md:top-[calc(env(safe-area-inset-top)+4rem)] md:w-[400px] md:rounded-sheet",
+                detent === "open"
+                  ? "top-[calc(env(safe-area-inset-top)+4rem)]"
+                  : "h-[min(38dvh,340px)] md:h-auto",
+              ),
         )}
       >
         <div
-          className="flex shrink-0 cursor-grab justify-center pt-2 pb-1 md:hidden"
+          data-testid="nearby-sheet-handle"
+          className="flex shrink-0 cursor-grab justify-center pt-2 pb-1"
           onPointerDown={onGrabPointerDown}
           onPointerUp={onGrabPointerUp}
+          onClick={onHandleClick}
         >
           <div className="h-[5px] w-9 rounded-full bg-white/25" />
         </div>
 
-        <div
-          ref={menuRef}
-          className="relative z-10 flex shrink-0 flex-wrap items-center gap-1.5 px-3 pb-2"
-        >
-          <div className="relative">
-            <Chip
-              testId="nearby-filter-type"
-              label={typeChip}
-              pressed={listingType !== "all"}
-              open={menu === "type"}
-              onClick={() => toggleMenu("type")}
-            />
-            {menu === "type" && (
-              <Menu label="Type">
-                {LISTING_TYPES.map((type) => (
-                  <MenuOption
-                    key={type.id}
-                    selected={listingType === type.id}
-                    onSelect={() => {
-                      setListingType(type.id);
-                      setMenu(null);
-                    }}
-                  >
-                    {type.label}
-                  </MenuOption>
-                ))}
-              </Menu>
-            )}
-          </div>
-          <div className="relative">
-            <Chip
-              testId="nearby-filter-price"
-              label={priceChip}
-              pressed={priceBand !== "any"}
-              open={menu === "price"}
-              onClick={() => toggleMenu("price")}
-            />
-            {menu === "price" && (
-              <Menu label="Price ℏ">
-                {NEARBY_PRICE_BANDS.map((band) => (
-                  <MenuOption
-                    key={band.id}
-                    selected={priceBand === band.id}
-                    onSelect={() => {
-                      setPriceBand(band.id);
-                      setMenu(null);
-                    }}
-                  >
-                    {band.label}
-                  </MenuOption>
-                ))}
-              </Menu>
-            )}
-          </div>
-          <div className="relative">
-            <Chip
-              testId="nearby-filter-condition"
-              label={conditionChip}
-              pressed={condition !== ""}
-              open={menu === "condition"}
-              onClick={() => toggleMenu("condition")}
-            />
-            {menu === "condition" && (
-              <Menu label="Condition">
-                <MenuOption
-                  selected={condition === ""}
-                  onSelect={() => {
-                    setCondition("");
-                    setMenu(null);
-                  }}
-                >
-                  Any condition
-                </MenuOption>
-                {LISTING_CONDITIONS.map((entry) => (
-                  <MenuOption
-                    key={entry.label}
-                    selected={condition === entry.label}
-                    onSelect={() => {
-                      setCondition(entry.label);
-                      setMenu(null);
-                    }}
-                  >
-                    {entry.label}
-                  </MenuOption>
-                ))}
-              </Menu>
-            )}
-          </div>
-          <p
-            data-testid="nearby-count"
-            className="ml-auto shrink-0 text-[12px] font-medium text-silver"
-          >
-            {nearbyCountLabel(sheet.totalInArea)}
-          </p>
-        </div>
+        {detent !== "hidden" && (
+          <>
+            <div
+              ref={filterRef}
+              className="relative z-10 flex shrink-0 flex-wrap items-center gap-1.5 px-3 pb-2"
+            >
+              <div className="relative">
+                <Chip
+                  testId="nearby-filter-type"
+                  label={typeChip}
+                  pressed={listingType !== "all"}
+                  open={filter === "type"}
+                  onClick={() => toggleFilter("type")}
+                />
+                {filter === "type" && (
+                  <FilterMenu label="Type">
+                    {LISTING_TYPES.map((type) => (
+                      <MenuOption
+                        key={type.id}
+                        selected={listingType === type.id}
+                        onSelect={() => {
+                          setListingType(type.id);
+                          setFilter(null);
+                        }}
+                      >
+                        {type.label}
+                      </MenuOption>
+                    ))}
+                  </FilterMenu>
+                )}
+              </div>
+              <div className="relative">
+                <Chip
+                  testId="nearby-filter-price"
+                  label={priceChip}
+                  pressed={priceBand !== "any"}
+                  open={filter === "price"}
+                  onClick={() => toggleFilter("price")}
+                />
+                {filter === "price" && (
+                  <FilterMenu label="Price ℏ">
+                    {NEARBY_PRICE_BANDS.map((band) => (
+                      <MenuOption
+                        key={band.id}
+                        selected={priceBand === band.id}
+                        onSelect={() => {
+                          setPriceBand(band.id);
+                          setFilter(null);
+                        }}
+                      >
+                        {band.label}
+                      </MenuOption>
+                    ))}
+                  </FilterMenu>
+                )}
+              </div>
+              <div className="relative">
+                <Chip
+                  testId="nearby-filter-condition"
+                  label={conditionChip}
+                  pressed={condition !== ""}
+                  open={filter === "condition"}
+                  onClick={() => toggleFilter("condition")}
+                />
+                {filter === "condition" && (
+                  <FilterMenu label="Condition">
+                    <MenuOption
+                      selected={condition === ""}
+                      onSelect={() => {
+                        setCondition("");
+                        setFilter(null);
+                      }}
+                    >
+                      Any condition
+                    </MenuOption>
+                    {LISTING_CONDITIONS.map((entry) => (
+                      <MenuOption
+                        key={entry.label}
+                        selected={condition === entry.label}
+                        onSelect={() => {
+                          setCondition(entry.label);
+                          setFilter(null);
+                        }}
+                      >
+                        {entry.label}
+                      </MenuOption>
+                    ))}
+                  </FilterMenu>
+                )}
+              </div>
+              <p
+                data-testid="nearby-count"
+                className="ml-auto shrink-0 text-[12px] font-medium text-silver"
+              >
+                {nearbyCountLabel(sheet.totalInArea)}
+              </p>
+            </div>
 
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 pb-4">
-          {loadError ? (
-            <p className="px-1 py-6 text-center text-sm text-silver">
-              Couldn&apos;t load listings.
-            </p>
-          ) : sheet.items.length === 0 ? (
-            <p className="px-1 py-6 text-center text-sm text-silver">No listings in this area.</p>
-          ) : (
-            sheet.items.map((item) => (
-              <NearbySheetCard
-                key={item.id}
-                item={item}
-                active={item.id === activeId}
-                onClose={onClose}
-                onSelect={selectListing}
-              />
-            ))
-          )}
-        </div>
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 pb-4">
+              {loadError ? (
+                <p className="px-1 py-6 text-center text-sm text-silver">
+                  Couldn&apos;t load listings.
+                </p>
+              ) : sheet.items.length === 0 ? (
+                <p className="px-1 py-6 text-center text-sm text-silver">
+                  No listings in this area.
+                </p>
+              ) : (
+                sheet.items.map((item) => (
+                  <NearbySheetCard
+                    key={item.id}
+                    item={item}
+                    active={item.id === activeId}
+                    onClose={onClose}
+                    onSelect={selectListing}
+                  />
+                ))
+              )}
+            </div>
+          </>
+        )}
       </section>
     </div>,
     document.body,
@@ -677,7 +771,7 @@ function NearbySheetCard({
     >
       <ListingCard
         variant="softTrust"
-        density="regular"
+        density="nearby"
         item={{
           id: item.id,
           title: item.title,

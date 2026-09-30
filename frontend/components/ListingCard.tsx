@@ -188,7 +188,8 @@ function TrustChipRow({ chips, compact }: { chips: GridTrustChip[]; compact: boo
 }
 
 /**
- * Concept C soft-trust tile. Inset 4:3 photo, title and one chip row under it.
+ * Concept C soft-trust tile. Grid densities keep the inset 4:3 photo.
+ * `nearby` is a short horizontal row for the Nearby sheet only (Lyft/Skyscanner density).
  * Compact = mobile 2-up (20px radius); regular = desktop grid (18px).
  */
 function SoftTrustCard({
@@ -196,8 +197,9 @@ function SoftTrustCard({
   density,
 }: {
   item: ListingCardItem;
-  density: "compact" | "regular";
+  density: "compact" | "regular" | "nearby";
 }) {
+  const nearby = density === "nearby";
   const compact = density === "compact";
   const profile = useProfile(item.seller);
   const capsule = gridStatusCapsule(item.status);
@@ -212,6 +214,67 @@ function SoftTrustCard({
   });
   const distance = item.distanceLabel?.trim() ?? "";
   const meta = listingCardMeta(item.category, item.condition);
+  const title = item.title || formatListingId(item.id) || "Untitled";
+
+  if (nearby) {
+    return (
+      <article
+        data-variant="softTrust"
+        data-density="nearby"
+        className={cn(
+          material.regular,
+          "flex h-[104px] flex-row items-stretch overflow-hidden rounded-[16px] border-white/12",
+        )}
+      >
+        <div
+          data-testid="soft-trust-media"
+          data-media="nearby"
+          className="relative h-full w-[88px] shrink-0 overflow-hidden bg-[#0b111b]"
+        >
+          <Link href={listingHref(item.id)} className="absolute inset-0 block">
+            <ListingMedia listing={item} bleed />
+          </Link>
+        </div>
+        <Link
+          href={listingHref(item.id)}
+          className="flex min-w-0 flex-1 flex-col justify-center px-2.5 py-1.5"
+        >
+          <div className="flex items-start gap-1">
+            <h2 className="min-w-0 flex-1 truncate text-[13px] font-semibold leading-tight text-white">
+              {title}
+            </h2>
+            <WishlistButton itemId={item.id} itemType="listing" compact surface="neutral" />
+          </div>
+          {meta ? (
+            <p data-testid="listing-card-meta" className="truncate text-[11px] text-silver/75">
+              {meta}
+            </p>
+          ) : null}
+          {capsule ? (
+            <div className="mt-1 flex h-5 items-center">
+              <span className={statusCapsule[capsule]}>{statusLabel[capsule]}</span>
+            </div>
+          ) : chips.length > 0 ? (
+            <TrustChipRow chips={chips} compact />
+          ) : null}
+          <div className="mt-0.5 flex items-baseline justify-between gap-2">
+            <p className="text-[14px] font-bold text-chrome">
+              {formatPriceForDisplay(item.price || "0")} <span className="italic">ℏ</span>
+            </p>
+            {distance ? (
+              <span
+                data-testid="listing-distance"
+                className="inline-flex shrink-0 items-center gap-0.5 text-[11px] text-white/70"
+              >
+                <MapPin size={12} aria-hidden className="shrink-0 text-chrome" />
+                {distance}
+              </span>
+            ) : null}
+          </div>
+        </Link>
+      </article>
+    );
+  }
 
   return (
     <article
@@ -225,6 +288,7 @@ function SoftTrustCard({
       <div className="px-1.5 pt-1.5">
         <div
           data-testid="soft-trust-media"
+          data-media="grid"
           className="relative aspect-[4/3] overflow-hidden rounded-[14px] bg-[#0b111b]"
         >
           <Link href={listingHref(item.id)} className="absolute inset-0 block">
@@ -243,7 +307,7 @@ function SoftTrustCard({
         )}
       >
         <h2 className="line-clamp-2 min-h-9 text-[13px] font-semibold leading-snug text-white">
-          {item.title || formatListingId(item.id) || "Untitled"}
+          {title}
         </h2>
         {meta ? (
           <p data-testid="listing-card-meta" className="mt-0.5 truncate text-[12px] text-silver/75">
@@ -288,7 +352,7 @@ export function ListingCard({
   variant = "glass",
 }: {
   item: ListingCardItem;
-  density?: "compact" | "regular";
+  density?: "compact" | "regular" | "nearby";
   variant?: ListingCardVariant;
 }) {
   if (variant === "softTrust" || variant === "mediaTrust") {

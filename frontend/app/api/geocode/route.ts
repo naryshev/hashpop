@@ -31,20 +31,32 @@ async function maptilerGeocode(req: NextRequest) {
   const lat = Number(req.nextUrl.searchParams.get("lat"));
   const lng = Number(req.nextUrl.searchParams.get("lng"));
   const proximity = Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : undefined;
+  const usaOnly = req.nextUrl.searchParams.get("country")?.trim().toLowerCase() === "us";
 
   try {
-    const res = await fetch(maptilerForwardUrl(q.slice(0, 200), key, proximity), {
-      headers: {
-        Accept: "application/json",
-        "User-Agent": "Hashpop/1.0 (https://hashpop.io)",
+    const res = await fetch(
+      maptilerForwardUrl(
+        q.slice(0, 200),
+        key,
+        proximity,
+        usaOnly ? { country: "us", types: "postal_code" } : undefined,
+      ),
+      {
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "Hashpop/1.0 (https://hashpop.io)",
+        },
+        cache: "no-store",
       },
-      cache: "no-store",
-    });
+    );
     if (!res.ok) {
       return json({ available: true, suggestions: [] }, 502);
     }
     const data: unknown = await res.json();
-    return json({ available: true, suggestions: parseMaptilerFeatures(data) });
+    return json({
+      available: true,
+      suggestions: parseMaptilerFeatures(data, usaOnly ? { country: "us" } : undefined),
+    });
   } catch {
     return json({ available: true, suggestions: [] }, 502);
   }

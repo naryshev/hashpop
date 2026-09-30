@@ -6,6 +6,8 @@ export type GeocodeHit = {
   label: string;
   lat: number;
   lng: number;
+  /** ISO 3166-1 alpha-2 when the geocoder provided one. */
+  countryCode?: string;
 };
 
 export type GeocodeResult = {
@@ -14,12 +16,17 @@ export type GeocodeResult = {
   error?: string;
 };
 
-export function geocodeRequestUrl(query: string, proximity?: { lat: number; lng: number }): string {
+export function geocodeRequestUrl(
+  query: string,
+  proximity?: { lat: number; lng: number },
+  options?: { country?: "us" },
+): string {
   const params = new URLSearchParams({ q: query.trim() });
   if (proximity && Number.isFinite(proximity.lat) && Number.isFinite(proximity.lng)) {
     params.set("lat", String(proximity.lat));
     params.set("lng", String(proximity.lng));
   }
+  if (options?.country) params.set("country", options.country);
   return `${GEOCODE_ENDPOINT}?${params.toString()}`;
 }
 
@@ -40,7 +47,15 @@ export function parseGeocodeResponse(body: unknown, status: number): GeocodeResu
       const lat = Number((item as { lat?: unknown }).lat);
       const lng = Number((item as { lng?: unknown }).lng);
       if (typeof label !== "string" || !Number.isFinite(lat) || !Number.isFinite(lng)) continue;
-      suggestions.push({ label, lat, lng });
+      const countryCode = (item as { countryCode?: unknown }).countryCode;
+      suggestions.push({
+        label,
+        lat,
+        lng,
+        ...(typeof countryCode === "string" && countryCode.trim()
+          ? { countryCode: countryCode.trim().toLowerCase() }
+          : {}),
+      });
     }
   }
   return { available, suggestions };
@@ -58,8 +73,9 @@ export async function probeGeocodeAvailable(): Promise<boolean> {
 export async function searchGeocode(
   query: string,
   proximity?: { lat: number; lng: number },
+  options?: { country?: "us" },
 ): Promise<GeocodeResult> {
-  const res = await fetch(geocodeRequestUrl(query, proximity), {
+  const res = await fetch(geocodeRequestUrl(query, proximity, options), {
     headers: { Accept: "application/json" },
   });
   let body: unknown = null;
