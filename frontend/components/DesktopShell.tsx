@@ -328,7 +328,9 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
           !immersive &&
           pathname !== "/marketplace" &&
           (marketplaceBrandHeader ? (
-            <div className="mb-3 px-3 pt-[calc(env(safe-area-inset-top)+12px)] md:hidden">
+            // Same top inset as Marketplace. No bottom margin: Marketplace's
+            // mb-3 sits under the search row, which these routes do not render.
+            <div className="px-3 pt-[calc(env(safe-area-inset-top)+12px)] md:hidden">
               <MarketplaceBrandHeader />
             </div>
           ) : (

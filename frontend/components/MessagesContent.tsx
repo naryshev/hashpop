@@ -747,7 +747,7 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
             ? "flex h-full min-h-0 flex-1 flex-col space-y-4 p-4"
             : selectedThread
               ? "sm:max-w-6xl sm:mx-auto sm:px-6 sm:py-6 sm:space-y-6"
-              : "max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6"
+              : "max-w-6xl mx-auto space-y-6 px-4 pb-6 pt-3 sm:px-6 md:py-6"
         }
       >
         <div

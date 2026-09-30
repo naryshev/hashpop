@@ -115,6 +115,7 @@ describe("DesktopShell marketplace chrome", () => {
       expect(brand.className).toContain("grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]");
       expect(brand.parentElement?.className).toContain("md:hidden");
       expect(brand.parentElement?.className).toContain("pt-[calc(env(safe-area-inset-top)+12px)]");
+      expect(brand.parentElement?.className).not.toContain("mb-");
       const wordmark = document.querySelector(
         '[data-testid="marketplace-wordmark"]',
       ) as HTMLElement;
