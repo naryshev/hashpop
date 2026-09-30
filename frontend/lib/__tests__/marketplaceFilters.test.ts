@@ -39,7 +39,7 @@ describe("marketplace filter params", () => {
   });
 
   it("writes sort, price, and posted-within, and reset keeps the query", () => {
-    const start = new URLSearchParams("q=sony&view=feed");
+    const start = new URLSearchParams("q=sony");
     const sorted = withSort(start, "price-asc");
     expect(sorted.get("sort")).toBe("price-asc");
     expect(withSort(sorted, "recent").get("sort")).toBeNull();
@@ -61,11 +61,10 @@ describe("marketplace filter params", () => {
 
     const reset = resetMarketplaceFilters(applied);
     expect(reset.get("q")).toBe("sony");
-    expect(reset.get("view")).toBe("feed");
     expect(reset.get("minPrice")).toBeNull();
     expect(reset.get("sort")).toBeNull();
     expect(reset.get("postedWithin")).toBeNull();
-    expect(marketplaceHref(reset)).toBe("/marketplace?q=sony&view=feed");
+    expect(marketplaceHref(reset)).toBe("/marketplace?q=sony");
   });
 
   it("counts active filters and clear leaves sort in place", () => {

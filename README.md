@@ -53,7 +53,7 @@ Hashpop connects buyers and sellers through a trustless, blockchain-backed tradi
 | Blockchain | Hedera (Hashgraph), Solidity smart contracts          |
 | Wallet     | HashPack via HashConnect / WalletConnect              |
 | Encryption | TweetNaCl.js (X25519 + XSalsa20-Poly1305)             |
-| Contracts  | Marketplace, Escrow, AuctionHouse, Treasury (Hardhat) |
+| Contracts  | Marketplace, Escrow, Treasury (Hardhat). AuctionHouse.sol stays for the already-deployed contract; new deploys do not include it. |
 | Indexer    | Hedera Mirror Node event sync                         |
 
 ## Project Structure

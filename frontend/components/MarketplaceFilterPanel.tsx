@@ -1,7 +1,6 @@
 "use client";
 
 import type { AdvancedFilterDraft, ListingType, SortMode } from "../lib/marketplaceFilters";
-import type { ViewMode } from "../lib/marketplaceView";
 import { material } from "../lib/materials";
 import { cn } from "../lib/utils";
 
@@ -212,17 +211,13 @@ export function MarketplaceFilterPanel({
   );
 }
 
-/** Sort order plus the Grid / Editorial view toggle. Opened from the search sliders. */
+/** Sort order. Opened from the search sliders. The marketplace is grid-only. */
 export function MarketplaceSortPanel({
   sortMode,
-  viewMode,
   onSort,
-  onView,
 }: {
   sortMode: SortMode;
-  viewMode: ViewMode;
   onSort: (sort: SortMode) => void;
-  onView: (view: ViewMode) => void;
 }) {
   return (
     <div data-testid="marketplace-sort-panel">
@@ -243,31 +238,6 @@ export function MarketplaceSortPanel({
               }`}
             >
               {sort.label}
-            </button>
-          );
-        })}
-      </div>
-      <p className="mt-4 text-xs font-semibold uppercase tracking-widest text-silver">View</p>
-      <div className="mt-2 grid grid-cols-2 gap-1 rounded-[14px] bg-white/5 p-1" role="group">
-        {(
-          [
-            { id: "grid", label: "Grid" },
-            { id: "editorial", label: "Editorial" },
-          ] as { id: ViewMode; label: string }[]
-        ).map((view) => {
-          const active = viewMode === view.id;
-          return (
-            <button
-              key={view.id}
-              type="button"
-              data-testid={`view-${view.id}`}
-              onClick={() => onView(view.id)}
-              className={cn(
-                "h-9 rounded-[10px] text-sm font-semibold",
-                active ? cn(material.chrome, "text-chrome") : "text-white/70",
-              )}
-            >
-              {view.label}
             </button>
           );
         })}

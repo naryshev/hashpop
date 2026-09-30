@@ -278,9 +278,7 @@ describe("MarketplaceMobileHeader", () => {
         onCloseSort: () => setSort(false),
         sortSheet: createElement(MarketplaceSortPanel, {
           sortMode: "recent",
-          viewMode: "grid",
           onSort: (mode) => pushes.push(marketplaceHref(withSort(params, mode))),
-          onView: (view) => pushes.push(view),
         }),
       });
     }
@@ -312,10 +310,9 @@ describe("MarketplaceMobileHeader", () => {
       (document.querySelector('[data-testid="sort-price-asc"]') as HTMLButtonElement).click();
     });
     expect(pushes.at(-1)).toContain("sort=price-asc");
-    await act(async () => {
-      (document.querySelector('[data-testid="view-editorial"]') as HTMLButtonElement).click();
-    });
-    expect(pushes.at(-1)).toBe("editorial");
+    expect(document.querySelector('[data-testid="view-editorial"]')).toBeNull();
+    expect(document.querySelector('[data-testid="view-grid"]')).toBeNull();
+    expect(document.querySelector('[data-testid="view-feed"]')).toBeNull();
 
     await act(async () => {
       filterButton.click();

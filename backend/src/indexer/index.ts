@@ -268,13 +268,12 @@ async function reconcileUnconfirmedListings(
  */
 async function backfillHistoricalEvents(
   marketplaceAddress: string,
-  auctionHouseAddress: string,
   prisma: PrismaClient,
   log: Logger,
 ): Promise<void> {
   try {
     log.info("Starting historical event backfill from mirror node (timestamp=0)");
-    const events = await fetchMirrorEvents(marketplaceAddress, auctionHouseAddress, 0);
+    const events = await fetchMirrorEvents(marketplaceAddress, 0);
     let processed = 0;
     for (const event of events) {
       try {
@@ -294,10 +293,9 @@ async function backfillHistoricalEvents(
 
 export async function startIndexer(prisma: PrismaClient, log: Logger) {
   const marketplaceAddress = normalizeAddress(process.env.MARKETPLACE_ADDRESS);
-  const auctionHouseAddress = normalizeAddress(process.env.AUCTION_HOUSE_ADDRESS);
 
-  if (!marketplaceAddress || !auctionHouseAddress) {
-    log.warn("Contract addresses not set; indexer disabled");
+  if (!marketplaceAddress) {
+    log.warn("MARKETPLACE_ADDRESS not set; indexer disabled");
     return;
   }
 
@@ -307,7 +305,6 @@ export async function startIndexer(prisma: PrismaClient, log: Logger) {
   log.info(
     {
       marketplaceAddress,
-      auctionHouseAddress,
       lastProcessedTimestamp,
       lastProcessedBlock: state.lastProcessedBlock,
     },
@@ -316,7 +313,7 @@ export async function startIndexer(prisma: PrismaClient, log: Logger) {
 
   const run = async () => {
     try {
-      const processed = await processEvents(marketplaceAddress, auctionHouseAddress, prisma, log);
+      const processed = await processEvents(marketplaceAddress, prisma, log);
       saveIndexerState(lastProcessedTimestamp, getLastProcessedBlock());
       if (processed > 0) {
         log.info({ processed }, "Indexer processed events");
@@ -327,7 +324,7 @@ export async function startIndexer(prisma: PrismaClient, log: Logger) {
   };
 
   // On startup: backfill all historical mirror events, then start the normal poll.
-  backfillHistoricalEvents(marketplaceAddress, auctionHouseAddress, prisma, log).finally(() => {
+  backfillHistoricalEvents(marketplaceAddress, prisma, log).finally(() => {
     run();
     setInterval(run, POLL_INTERVAL);
   });
@@ -344,14 +341,13 @@ export async function startIndexer(prisma: PrismaClient, log: Logger) {
 
 async function processEvents(
   marketplaceAddr: string,
-  auctionHouseAddr: string,
   prisma: PrismaClient,
   log: Logger,
 ): Promise<number> {
-  const events = await fetchMirrorEvents(marketplaceAddr, auctionHouseAddr, lastProcessedTimestamp);
+  const events = await fetchMirrorEvents(marketplaceAddr, lastProcessedTimestamp);
 
   if (events.length === 0 && lastProcessedTimestamp === 0) {
-    log.debug("Mirror returned 0 logs; check GET /api/debug/mirror-logs");
+    log.debug("Mirror returned 0 marketplace logs");
   }
 
   let processed = 0;
@@ -474,51 +470,5 @@ async function handleEvent(event: any, prisma: PrismaClient, log: Logger) {
         }
       }
       break;
-
-    case "AuctionCreated":
-      await prisma.auction.upsert({
-        where: { id: event.auctionId },
-        update: { status: "ACTIVE" },
-        create: {
-          id: event.auctionId,
-          seller: (event.seller || "").toLowerCase(),
-          reservePrice: chainAmountToHbar(event.reservePrice),
-          startTime: BigInt(event.startTime),
-          endTime: BigInt(event.endTime),
-          status: "ACTIVE",
-        },
-      });
-      break;
-
-    case "BidPlaced":
-      await prisma.bid.create({
-        data: {
-          id: `bid-${Date.now()}-${event.bidder}`,
-          auctionId: event.auctionId,
-          bidder: event.bidder,
-          amount: event.amount.toString(),
-          timestamp: BigInt(event.timestamp),
-        },
-      });
-      break;
-
-    case "AuctionSettled": {
-      const auction = await prisma.auction.findUnique({ where: { id: event.auctionId } });
-      const seller = auction?.seller ?? event.seller ?? "";
-      await prisma.sale.create({
-        data: {
-          id: `sale-auction-${Date.now()}-${event.auctionId}`,
-          auctionId: event.auctionId,
-          buyer: event.winner,
-          seller,
-          amount: event.amount.toString(),
-        },
-      });
-      await prisma.auction.update({
-        where: { id: event.auctionId },
-        data: { status: "SETTLED" },
-      });
-      break;
-    }
   }
 }

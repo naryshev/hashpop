@@ -1211,7 +1211,7 @@ export default function ListingPage({
                           if (!res.ok) throw new Error((await res.json()).error || "Failed");
                           setDeleteConfirmOpen(false);
                           setCanForceCancel(false);
-                          router.push("/selling");
+                          router.push("/dashboard");
                         } catch (err) {
                           setDeleteError(
                             err instanceof Error ? err.message : "Force cancel failed.",
@@ -1243,7 +1243,7 @@ export default function ListingPage({
                           );
                           if (!res.ok) throw new Error((await res.json()).error || "Failed");
                           setDeleteConfirmOpen(false);
-                          router.push("/selling");
+                          router.push("/dashboard");
                         } catch (err) {
                           setDeleteError(err instanceof Error ? err.message : "Delete failed.");
                         }

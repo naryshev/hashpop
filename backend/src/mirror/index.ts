@@ -4,19 +4,12 @@ const MIRROR_BASE = process.env.MIRROR_URL || "https://testnet.mirrornode.hedera
 
 export async function fetchMirrorEvents(
   marketplaceAddr: string,
-  auctionHouseAddr: string,
   sinceTimestamp: number,
 ): Promise<any[]> {
   try {
-    // Fetch contract logs from Mirror Node
-    const [marketplaceLogs, auctionLogs] = await Promise.all([
-      fetchContractLogs(marketplaceAddr, sinceTimestamp),
-      fetchContractLogs(auctionHouseAddr, sinceTimestamp),
-    ]);
-
-    const combined = [...marketplaceLogs, ...auctionLogs];
+    const logs = await fetchContractLogs(marketplaceAddr, sinceTimestamp);
     const toTs = (t: any) => (typeof t === "string" ? parseFloat(t) : Number(t)) || 0;
-    return combined.sort((a, b) => toTs(a.timestamp) - toTs(b.timestamp));
+    return logs.sort((a, b) => toTs(a.timestamp) - toTs(b.timestamp));
   } catch (err) {
     console.error("Mirror fetch error:", err);
     return [];

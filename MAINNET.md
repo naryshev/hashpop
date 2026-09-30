@@ -47,7 +47,7 @@ From the repo root:
 npm run deploy:mainnet
 ```
 
-Save the printed addresses (Escrow, Treasury, Reputation, Marketplace, AuctionHouse).
+Save the printed addresses (Escrow, Treasury, Reputation, Marketplace).
 
 **2d. Authorize escrow (if needed)**
 
@@ -73,7 +73,6 @@ MIRROR_URL=https://mainnet.mirrornode.hedera.com
 # Addresses from step 2 (mainnet deployment)
 MARKETPLACE_ADDRESS=0x...
 ESCROW_ADDRESS=0x...
-AUCTION_HOUSE_ADDRESS=0x...
 ```
 
 **3b. Frontend**
@@ -88,6 +87,8 @@ NEXT_PUBLIC_HEDERA_RPC=https://mainnet.hashio.io/api
 # Same mainnet contract addresses as backend
 NEXT_PUBLIC_MARKETPLACE_ADDRESS=0x...
 NEXT_PUBLIC_ESCROW_ADDRESS=0x...
+# Optional. Admin → Contracts still displays the already-deployed AuctionHouse.
+# New deploys do not print this address.
 NEXT_PUBLIC_AUCTION_HOUSE_ADDRESS=0x...
 
 # Rest unchanged (API URL, WalletConnect, etc.)

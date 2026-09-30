@@ -38,7 +38,6 @@ Save contract addresses from deploy output:
 
 - `MARKETPLACE_ADDRESS`
 - `ESCROW_ADDRESS`
-- `AUCTION_HOUSE_ADDRESS`
 
 ## 3) Backend Deployment (Railway/Render/Fly)
 
@@ -52,7 +51,6 @@ Set these in your backend hosting provider:
 DATABASE_URL=postgres://USER:PASSWORD@HOST:5432/DB?sslmode=require
 MARKETPLACE_ADDRESS=0x...
 ESCROW_ADDRESS=0x...
-AUCTION_HOUSE_ADDRESS=0x...
 HEDERA_RPC_URL=https://testnet.hashio.io/api
 MIRROR_URL=https://testnet.mirrornode.hedera.com
 PORT=4000
@@ -99,6 +97,7 @@ NEXT_PUBLIC_API_URL=https://your-backend-domain.com
 NEXT_PUBLIC_HEDERA_RPC=https://testnet.hashio.io/api
 NEXT_PUBLIC_MARKETPLACE_ADDRESS=0x...
 NEXT_PUBLIC_ESCROW_ADDRESS=0x...
+# Optional. Admin → Contracts still displays an already-deployed AuctionHouse.
 NEXT_PUBLIC_AUCTION_HOUSE_ADDRESS=0x...
 NEXT_PUBLIC_WC_PROJECT_ID=your_project_id
 NEXT_PUBLIC_HASHPACK_EXTENSION_ONLY=false

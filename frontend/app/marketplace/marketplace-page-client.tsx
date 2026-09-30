@@ -1,22 +1,13 @@
 "use client";
-import { formatListingId, listingHref } from "../../lib/listingUrl";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Fuse from "fuse.js";
-import { ListingMedia } from "../../components/ListingMedia";
-import { ListingCard, formatSellerDisplay } from "../../components/ListingCard";
-import { TrustStrip } from "../../components/TrustStrip";
+import { ListingCard } from "../../components/ListingCard";
 import { formatPriceForDisplay } from "../../lib/formatPrice";
-import { formatHbarWithUsd } from "../../lib/hbarUsd";
-import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { canonicalizeCategory, CATEGORY_GROUPS } from "../../lib/categories";
 import { getApiUrl } from "../../lib/apiUrl";
 import { useProfiles } from "../../lib/profiles";
-import { listingCta, material } from "../../lib/materials";
-import { cn } from "../../lib/utils";
-import { parseViewMode, viewModeQueryValue, type ViewMode } from "../../lib/marketplaceView";
 import {
   activeFilterCount,
   clearListingFilters,
@@ -41,13 +32,6 @@ import {
   MarketplaceFilterDrawer,
   RAIL_PRICE_CEILING,
 } from "../../components/MarketplaceBrowseRail";
-import { ChevronDown } from "lucide-react";
-
-function normalizeListingStatus(status?: string): string {
-  return String(status || "")
-    .trim()
-    .toUpperCase();
-}
 
 function parsePostedWithinDays(value: string): number | null {
   if (!value) return null;
@@ -77,23 +61,6 @@ function parseListingType(value: string | null): ListingType {
 function parseSortMode(value: string | null): SortMode {
   if (value === "price-asc" || value === "price-desc" || value === "trending") return value;
   return "recent";
-}
-
-function relativeTimeShort(iso?: string): string {
-  if (!iso) return "";
-  const ms = Date.now() - new Date(iso).getTime();
-  if (Number.isNaN(ms) || ms < 0) return "";
-  const sec = Math.floor(ms / 1000);
-  if (sec < 60) return `${sec}s`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h`;
-  const d = Math.floor(hr / 24);
-  if (d < 30) return `${d}d`;
-  const mo = Math.floor(d / 30);
-  if (mo < 12) return `${mo}mo`;
-  return `${Math.floor(mo / 12)}y`;
 }
 
 export type ListingItem = {
@@ -129,7 +96,6 @@ export default function MarketplacePageClient({
   const [filterOpen, setFilterOpen] = useState(false);
   const [desktopFilterOpen, setDesktopFilterOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
-  const [viewMenuOpen, setViewMenuOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   // "F" focuses the top-bar search (unless the user is already typing).
@@ -157,7 +123,6 @@ export default function MarketplacePageClient({
   const postedWithinQuery = searchParams.get("postedWithin")?.trim() ?? "";
   const conditionQuery = searchParams.get("condition")?.trim() ?? "";
   const locationQuery = searchParams.get("location")?.trim() ?? "";
-  const viewMode: ViewMode = parseViewMode(searchParams.get("view"));
   const sortMode: SortMode = parseSortMode(searchParams.get("sort"));
   const typeQuery: ListingType = parseListingType(searchParams.get("type"));
   // Category pills for the selected listing type (layer 2 of the mobile
@@ -194,7 +159,6 @@ export default function MarketplacePageClient({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const usdRate = useHbarUsd();
   // Warm the profile cache for every seller in one batched request so cards
   // can render display names, avatars and ratings without per-card fetches.
   useProfiles(items.map((i) => i.seller));
@@ -206,14 +170,6 @@ export default function MarketplacePageClient({
     (window as unknown as { __hashpopReady?: boolean }).__hashpopReady = true;
     window.dispatchEvent(new Event("hashpop:ready"));
   }, []);
-
-  const setParam = (key: string, value: string | null) => {
-    const p = new URLSearchParams(searchParams.toString());
-    if (value && value !== "") p.set(key, value);
-    else p.delete(key);
-    const qs = p.toString();
-    router.push(qs ? `/marketplace?${qs}` : "/marketplace");
-  };
 
   const filteredItems = useMemo(() => {
     // Listing type (all / physical / digital) narrows before category/query.
@@ -473,51 +429,6 @@ export default function MarketplacePageClient({
     />
   );
 
-  // View-mode dropdown (Editorial / Feed / Grid) — triggered by a carat next
-  // to the section title, replacing the old pill row.
-  const viewDropdown = (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setViewMenuOpen((o) => !o)}
-        aria-label="Change view"
-        aria-expanded={viewMenuOpen}
-        className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-silver transition-colors duration-300 hover:bg-white/5 hover:text-white"
-      >
-        {viewMode === "editorial" ? "Editorial" : viewMode === "feed" ? "Feed" : "Grid"}
-        <ChevronDown
-          size={13}
-          className={`transition-transform duration-300 ${viewMenuOpen ? "rotate-180" : ""}`}
-        />
-      </button>
-      {viewMenuOpen && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-36 rounded-xl border border-white/10 bg-[#0a0a0a] p-1.5 shadow-2xl">
-          {(
-            [
-              { id: "editorial", label: "Editorial" },
-              { id: "feed", label: "Feed" },
-              { id: "grid", label: "Grid" },
-            ] as { id: ViewMode; label: string }[]
-          ).map((v) => (
-            <button
-              key={v.id}
-              type="button"
-              onClick={() => {
-                setViewMenuOpen(false);
-                setParam("view", viewModeQueryValue(v.id));
-              }}
-              className={`block w-full rounded-lg px-3 py-1.5 text-left text-xs transition-colors duration-300 ${
-                viewMode === v.id ? "bg-[#00ffa3]/10 text-[#00ffa3]" : "text-white hover:bg-white/5"
-              }`}
-            >
-              {v.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-
   return (
     <main className="min-h-screen">
       <MarketplaceDesktopHeader
@@ -555,9 +466,7 @@ export default function MarketplacePageClient({
           sortSheet={
             <MarketplaceSortPanel
               sortMode={sortMode}
-              viewMode={viewMode}
               onSort={(sort) => router.push(marketplaceHref(withSort(searchParams, sort)))}
-              onView={(view) => setParam("view", viewModeQueryValue(view))}
             />
           }
         />
@@ -570,10 +479,8 @@ export default function MarketplacePageClient({
             <MarketplaceDesktopToolbar
               resultCount={filteredItems.length}
               sortMode={sortMode}
-              viewMode={viewMode}
               filterCount={filterCount}
               onSort={(sort) => router.push(marketplaceHref(withSort(searchParams, sort)))}
-              onView={(view) => setParam("view", viewModeQueryValue(view))}
               onOpenFilters={() => setDesktopFilterOpen(true)}
             />
             {listingsError ? (
@@ -595,13 +502,8 @@ export default function MarketplacePageClient({
               </p>
             ) : (
               <>
-                {/* Mobile 2-up: 12px page margins, 8px gutter. */}
-                <div
-                  className={cn(
-                    "grid-cols-2 gap-2 md:hidden",
-                    viewMode === "editorial" ? "hidden" : "grid",
-                  )}
-                >
+                {/* Mobile 2-up: 12px page margins, 8px gutter. Desktop is the same soft-trust grid. */}
+                <div className="grid grid-cols-2 gap-2 md:hidden">
                   {filteredItems.map((item) => (
                     <ListingCard
                       key={`${item.itemType}-${item.id}`}
@@ -611,170 +513,16 @@ export default function MarketplacePageClient({
                     />
                   ))}
                 </div>
-                {viewMode === "grid" && (
-                  <div className="hidden gap-4 md:grid md:grid-cols-2 xl:grid-cols-3">
-                    {filteredItems.map((item) => (
-                      <ListingCard
-                        key={`${item.itemType}-${item.id}`}
-                        item={item}
-                        density="regular"
-                        variant="softTrust"
-                      />
-                    ))}
-                  </div>
-                )}
-
-                {viewMode === "feed" && (
-                  <div
-                    className={cn(
-                      material.regular,
-                      "hidden divide-y divide-hairline rounded-[16px] md:block",
-                    )}
-                  >
-                    {filteredItems.map((item) => {
-                      return (
-                        <Link
-                          key={`${item.itemType}-${item.id}`}
-                          href={listingHref(item.id)}
-                          className="grid grid-cols-[88px_minmax(0,1fr)_140px_120px] gap-4 items-center px-4 py-3 hover:bg-white/[0.03] transition-colors"
-                        >
-                          <div className="relative h-[88px] w-[88px] overflow-hidden rounded-lg bg-white/5">
-                            <ListingMedia
-                              listing={{
-                                imageUrl: item.imageUrl,
-                                mediaUrls: item.mediaUrls?.slice(0, 1) ?? null,
-                              }}
-                              className="w-full"
-                              aspectRatio="square"
-                              cardSize
-                              compactHeight="88px"
-                            />
-                          </div>
-                          <div className="min-w-0">
-                            <h3 className="text-sm font-semibold text-white truncate">
-                              {item.title || formatListingId(item.id) || "Untitled"}
-                            </h3>
-                            <div className="mt-1 flex items-center gap-3 text-[11px] text-silver/70 flex-wrap">
-                              {item.category && (
-                                <span className="rounded-full bg-white/5 px-2 py-0.5 text-silver/80">
-                                  {item.category}
-                                </span>
-                              )}
-                              {item.condition && (
-                                <span className="text-silver/60">{item.condition}</span>
-                              )}
-                              {item.seller && (
-                                <TrustStrip
-                                  density="inline"
-                                  address={item.seller}
-                                  linkToProfile={false}
-                                />
-                              )}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-base font-bold text-chrome">
-                              {formatHbarWithUsd(formatPriceForDisplay(item.price || "0"), usdRate)}
-                            </div>
-                          </div>
-                          <div className="text-right text-[11px] text-silver/70 leading-relaxed">
-                            {item.createdAt && (
-                              <div>Listed {relativeTimeShort(item.createdAt)} ago</div>
-                            )}
-                            {(item.watchlistCount ?? 0) > 0 && (
-                              <div className="text-silver/50">♡ {item.watchlistCount} watching</div>
-                            )}
-                          </div>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {viewMode === "editorial" && (
-                  <div className="space-y-6">
-                    {(() => {
-                      const hero =
-                        filteredItems.find((i) => normalizeListingStatus(i.status) === "LISTED") ||
-                        filteredItems[0];
-                      const rest = filteredItems.filter((i) => i.id !== hero?.id);
-                      return (
-                        <>
-                          {hero && (
-                            <Link
-                              href={listingHref(hero.id)}
-                              className="group relative block overflow-hidden rounded-[20px] border border-hairline"
-                            >
-                              <div className="relative h-[280px] sm:h-[320px] bg-gradient-to-br from-[#1b2940] to-[#0b111b]">
-                                <ListingMedia
-                                  listing={hero}
-                                  className="absolute inset-0 w-full h-full"
-                                  aspectRatio="video"
-                                  slideshow="auto"
-                                  cardSize
-                                  compactHeight="320px"
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-                              </div>
-                              <div className="absolute left-6 top-6">
-                                <span className="rounded-full bg-chrome px-3 py-1 text-[10px] font-bold text-on-chrome">
-                                  Editor&apos;s pick
-                                </span>
-                              </div>
-                              <div className="absolute left-6 right-6 bottom-6 max-w-2xl">
-                                <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
-                                  {hero.title || formatListingId(hero.id) || "Featured listing"}
-                                </h2>
-                                {hero.subtitle && (
-                                  <p className="mt-2 text-sm text-white/75 line-clamp-2">
-                                    {hero.subtitle}
-                                  </p>
-                                )}
-                                <div className="mt-4 flex items-center gap-3 flex-wrap">
-                                  <span className={cn(listingCta.filled, "w-auto px-5")}>
-                                    Buy for{" "}
-                                    {formatHbarWithUsd(
-                                      formatPriceForDisplay(hero.price || "0"),
-                                      usdRate,
-                                    )}
-                                  </span>
-                                  {hero.seller && (
-                                    <span className="text-xs font-mono text-white/60">
-                                      Seller {formatSellerDisplay(hero.seller)}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </Link>
-                          )}
-                          <div>
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center gap-2">
-                                <h3 className="text-lg font-bold tracking-tight">
-                                  Recently listed
-                                </h3>
-                                <div className="md:hidden">{viewDropdown}</div>
-                              </div>
-                              <span className="text-xs text-silver/60">
-                                {rest.length.toLocaleString()} more
-                              </span>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 xl:grid-cols-3">
-                              {rest.map((item) => (
-                                <ListingCard
-                                  key={`${item.itemType}-${item.id}`}
-                                  item={item}
-                                  density="regular"
-                                  variant="softTrust"
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        </>
-                      );
-                    })()}
-                  </div>
-                )}
+                <div className="hidden gap-4 md:grid md:grid-cols-2 xl:grid-cols-3">
+                  {filteredItems.map((item) => (
+                    <ListingCard
+                      key={`${item.itemType}-${item.id}`}
+                      item={item}
+                      density="regular"
+                      variant="softTrust"
+                    />
+                  ))}
+                </div>
               </>
             )}
           </div>
