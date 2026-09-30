@@ -99,7 +99,7 @@ describe("Nearby map chrome", () => {
     host = undefined;
   });
 
-  it("leads with current location, a hideable sheet, and shorter soft-trust cards", async () => {
+  it("puts ZIP search in the sheet, a locate FAB on the map, and shorter cards", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({
@@ -132,21 +132,27 @@ describe("Nearby map chrome", () => {
 
     await renderNearby();
 
-    const face = document.querySelector('[data-testid="nearby-current-location"]');
-    expect(face?.textContent).toContain("Current location");
-    expect(face?.textContent).toContain("Near you");
+    const sheet = document.querySelector('[data-testid="nearby-sheet"]') as HTMLElement;
+    const zip = document.querySelector('[data-testid="nearby-zip"]') as HTMLInputElement;
+    expect(sheet.contains(zip)).toBe(true);
+    expect(zip.getAttribute("placeholder")).toBe("Current location");
+    expect(document.querySelector('[data-testid="nearby-locate-fab"]')).toBeTruthy();
     expect(document.querySelector('[data-testid="nearby-menu-toggle"]')).toBeTruthy();
     expect(document.body.textContent).not.toContain("Search nearby");
-    expect(document.querySelector('[data-testid="nearby-zip"]')).toBeNull();
 
-    const sheet = document.querySelector('[data-testid="nearby-sheet"]') as HTMLElement;
     expect(sheet.dataset.sheetDetent).toBe("peek");
+    await act(async () => {
+      document.querySelector<HTMLElement>('[data-testid="nearby-menu-toggle"]')?.click();
+    });
     expect(document.querySelector('[data-testid="nearby-filter-type"]')?.textContent).toContain(
       "Type",
     );
     expect(document.querySelector('[data-testid="nearby-filter-price"]')?.textContent).toContain(
       "ℏ",
     );
+    await act(async () => {
+      document.querySelector<HTMLElement>('[data-testid="nearby-menu-toggle"]')?.click();
+    });
     expect(document.querySelector('[data-testid="nearby-count"]')?.textContent).toBe(
       "1 listing nearby",
     );
@@ -160,6 +166,8 @@ describe("Nearby map chrome", () => {
     });
     expect(sheet.dataset.sheetDetent).toBe("hidden");
     expect(document.querySelector('[data-testid="nearby-card"]')).toBeNull();
+    expect(document.querySelector('[data-testid="nearby-zip"]')).toBeNull();
+    expect(document.querySelector('[data-testid="nearby-locate-fab"]')).toBeTruthy();
 
     await act(async () => {
       document.querySelector<HTMLElement>('[data-testid="nearby-map-canvas"]')?.click();
@@ -168,7 +176,7 @@ describe("Nearby map chrome", () => {
     expect(document.querySelector('[data-testid="nearby-card"]')).toBeTruthy();
   });
 
-  it("keeps ZIP search inside the area menu and only queries US ZIPs", async () => {
+  it("accepts only US ZIPs in the in-sheet search", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({
@@ -198,19 +206,16 @@ describe("Nearby map chrome", () => {
 
     await renderNearby();
 
-    expect(document.querySelector('[data-testid="nearby-zip"]')).toBeNull();
-    expect(
-      document.querySelector('[data-testid="nearby-current-location"]')?.textContent,
-    ).toContain("Location off");
+    const zip = document.querySelector('[data-testid="nearby-zip"]') as HTMLInputElement;
+    expect(zip.getAttribute("placeholder")).toBe("Location off");
+    expect(document.querySelector('[data-testid="nearby-locate-fab"]')).toBeTruthy();
 
     await act(async () => {
       document.querySelector<HTMLElement>('[data-testid="nearby-menu-toggle"]')?.click();
     });
-    const menu = document.querySelector('[data-testid="nearby-menu"]');
-    expect(menu?.textContent).toContain("Set area");
-    expect(menu?.textContent).toContain("US ZIP codes only");
-
-    const zip = document.querySelector('[data-testid="nearby-zip"]') as HTMLInputElement;
+    expect(document.querySelector('[data-testid="nearby-menu"]')?.textContent).toContain(
+      "US ZIP codes only",
+    );
     await act(async () => {
       setInput(zip, "SW1A");
     });
@@ -231,9 +236,9 @@ describe("Nearby map chrome", () => {
       );
       hit?.click();
     });
-    expect(
-      document.querySelector('[data-testid="nearby-current-location"]')?.textContent,
-    ).toContain("Beverly Hills");
+    expect(document.querySelector('[data-testid="nearby-zip"]')?.getAttribute("placeholder")).toBe(
+      "Beverly Hills",
+    );
     expect(document.querySelector('[data-testid="nearby-menu"]')).toBeNull();
   });
 });
