@@ -37,22 +37,34 @@ export const MAP_ATTRIBUTION =
 
 export const MAP_CANVAS_BG = color.bg;
 
-/** Product lock: ~5 km privacy blob on listing picker + detail, and Nearby center. */
+/** Product lock: ~5 km privacy blob on the listing picker. No exact pin. */
 export const LISTING_AREA_RADIUS_M = 5000;
 
 /**
  * Country-scale zoom so a 5 km mint disc reads as a small soft blob.
- * Listing detail + create picker share this; Nearby is one step tighter
- * so listing dots stay usable. Radius stays LISTING_AREA_RADIUS_M.
+ * LocationPicker stays here. Nearby discovery does not use this zoom.
  */
 export const COUNTRY_AREA_ZOOM = 7;
 export const LISTING_AREA_ZOOM = COUNTRY_AREA_ZOOM;
 export const PICKER_AREA_ZOOM = COUNTRY_AREA_ZOOM;
-export const NEARBY_DEFAULT_ZOOM = 8;
+/**
+ * Nearby discovery opens at neighborhood scale so exact ℏ price pins
+ * are readable. Do not reuse this for LocationPicker privacy maps.
+ */
+export const NEARBY_DEFAULT_ZOOM = 13;
 export const PICKER_EMPTY_ZOOM = 3;
 
-/** Nearby user/search center uses the same 5 km mint disc (not per listing). */
-export const NEARBY_CENTER_RADIUS_M = LISTING_AREA_RADIUS_M;
+export type MapBounds = {
+  west: number;
+  south: number;
+  east: number;
+  north: number;
+};
+
+export type MapViewSnapshot = {
+  bounds: MapBounds;
+  center: { lat: number; lng: number };
+};
 
 export const areaPaint = {
   color: color.chrome,

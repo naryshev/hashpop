@@ -393,6 +393,31 @@ describe("ListingCard softTrust", () => {
     expect(document.querySelector(".aspect-square")).toBeNull();
   });
 
+  it("shows category and condition under the title when the sheet passes them", async () => {
+    loadedProfile(0, 0);
+    await renderCard({
+      variant: "softTrust",
+      item: {
+        id: "lst-meta",
+        title: "Sony WH-1000XM5",
+        price: "5",
+        seller,
+        status: "LISTED",
+        requireEscrow: false,
+        category: "Headphones & Audio",
+        condition: "Excellent",
+        distanceLabel: "0.8 mi",
+      },
+    });
+    expect(document.querySelector('[data-testid="listing-card-meta"]')?.textContent).toBe(
+      "Headphones & Audio • Excellent",
+    );
+    expect(document.querySelector('[data-testid="listing-distance"]')?.textContent).toContain(
+      "0.8 mi",
+    );
+    expect(document.body.textContent).toContain("ℏ");
+  });
+
   it("keeps the glass body and TrustStrip on the default variant", async () => {
     loadedProfile(49, 50);
     await renderCard({

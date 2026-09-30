@@ -28,8 +28,14 @@ export type ListingCardItem = {
   meetup?: boolean | null;
   /** Preformatted distance. Omitted when unknown — never invent km. */
   distanceLabel?: string | null;
+  category?: string | null;
+  condition?: string | null;
   itemType?: "listing";
 };
+
+export function listingCardMeta(category?: string | null, condition?: string | null): string {
+  return [category?.trim(), condition?.trim()].filter(Boolean).join(" • ");
+}
 
 export type ListingCardVariant = "glass" | "softTrust" | "mediaTrust";
 
@@ -205,6 +211,7 @@ function SoftTrustCard({
     kycVerified: profile?.kycVerified,
   });
   const distance = item.distanceLabel?.trim() ?? "";
+  const meta = listingCardMeta(item.category, item.condition);
 
   return (
     <article
@@ -238,6 +245,11 @@ function SoftTrustCard({
         <h2 className="line-clamp-2 min-h-9 text-[13px] font-semibold leading-snug text-white">
           {item.title || formatListingId(item.id) || "Untitled"}
         </h2>
+        {meta ? (
+          <p data-testid="listing-card-meta" className="mt-0.5 truncate text-[12px] text-silver/75">
+            {meta}
+          </p>
+        ) : null}
         {capsule ? (
           <div className="mt-1.5 flex h-6 items-center">
             <span className={statusCapsule[capsule]}>{statusLabel[capsule]}</span>

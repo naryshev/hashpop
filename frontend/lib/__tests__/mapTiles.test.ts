@@ -9,7 +9,6 @@ import {
   LISTING_AREA_ZOOM,
   MAP_ATTRIBUTION,
   MAP_CANVAS_BG,
-  NEARBY_CENTER_RADIUS_M,
   NEARBY_DEFAULT_ZOOM,
   OPENFREEMAP_DARK_STYLE_URL,
   PICKER_AREA_ZOOM,
@@ -69,7 +68,6 @@ describe("shared dark map config", () => {
     expect(PICKER_AREA_ZOOM).toBe(7);
     expect(LISTING_AREA_ZOOM).toBe(COUNTRY_AREA_ZOOM);
     expect(PICKER_AREA_ZOOM).toBe(COUNTRY_AREA_ZOOM);
-    expect(NEARBY_DEFAULT_ZOOM).toBe(8);
     expect(PICKER_EMPTY_ZOOM).toBe(3);
     expect(areaPaint.fillOpacity).toBeGreaterThanOrEqual(0.2);
     expect(areaPaint.fillOpacity).toBeLessThanOrEqual(0.3);
@@ -91,8 +89,9 @@ describe("shared dark map config", () => {
     ).toBe(OPENFREEMAP_DARK_STYLE_URL);
   });
 
-  it("shares the 5km mint disc between listing privacy and Nearby user/search center", () => {
-    expect(NEARBY_CENTER_RADIUS_M).toBe(5000);
-    expect(NEARBY_CENTER_RADIUS_M).toBe(LISTING_AREA_RADIUS_M);
+  it("opens Nearby discovery at neighborhood zoom, separate from the privacy disc", () => {
+    expect(LISTING_AREA_RADIUS_M).toBe(5000);
+    expect(NEARBY_DEFAULT_ZOOM).toBe(13);
+    expect(NEARBY_DEFAULT_ZOOM).toBeGreaterThan(LISTING_AREA_ZOOM);
   });
 });
