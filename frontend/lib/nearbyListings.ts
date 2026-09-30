@@ -21,6 +21,16 @@ export const NEARBY_PRICE_BANDS = [
 
 export type NearbyPriceBand = (typeof NEARBY_PRICE_BANDS)[number]["id"];
 
+/** Max distance from the map focus. `miles: null` means no cap. */
+export const NEARBY_DISTANCE_BANDS = [
+  { id: "any", label: "Any distance", chip: "Distance", miles: null },
+  { id: "1", label: "Within 1 mi", chip: "1 mi", miles: 1 },
+  { id: "5", label: "Within 5 mi", chip: "5 mi", miles: 5 },
+  { id: "25", label: "Within 25 mi", chip: "25 mi", miles: 25 },
+] as const;
+
+export type NearbyDistanceBand = (typeof NEARBY_DISTANCE_BANDS)[number]["id"];
+
 export type NearbyListing = {
   id: string;
   title: string | null;
@@ -49,6 +59,9 @@ export type NearbyCriteria = {
   listingType: ListingType;
   priceBand: NearbyPriceBand;
   condition: string;
+  distanceBand?: NearbyDistanceBand;
+  /** Point the distance cap is measured from. Required for a non-any band to apply. */
+  focus?: { lat: number; lng: number } | null;
 };
 
 function finiteNumber(value: unknown): number | null {
@@ -170,6 +183,16 @@ function matchesCondition(listing: NearbyListing, condition: string): boolean {
   return (listing.condition ?? "").trim().toLowerCase() === expected;
 }
 
+function matchesDistance(
+  listing: NearbyListing,
+  band: NearbyDistanceBand | undefined,
+  focus: { lat: number; lng: number } | null | undefined,
+): boolean {
+  const miles = NEARBY_DISTANCE_BANDS.find((entry) => entry.id === (band ?? "any"))?.miles;
+  if (miles == null || !focus) return true;
+  return haversineMeters(focus.lat, focus.lng, listing.lat, listing.lng) <= miles * METERS_PER_MILE;
+}
+
 export function filterNearbyListings(
   listings: NearbyListing[],
   criteria: NearbyCriteria,
@@ -179,7 +202,8 @@ export function filterNearbyListings(
       matchesQuery(listing, criteria.query) &&
       matchesType(listing, criteria.listingType) &&
       matchesPrice(listing, criteria.priceBand) &&
-      matchesCondition(listing, criteria.condition),
+      matchesCondition(listing, criteria.condition) &&
+      matchesDistance(listing, criteria.distanceBand, criteria.focus),
   );
 }
 

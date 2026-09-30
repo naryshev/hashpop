@@ -140,6 +140,13 @@ describe("nearby sheet", () => {
     expect(
       filterNearbyListings(listings, { ...baseCriteria, condition: "Used" }).map((item) => item.id),
     ).toEqual(["bike"]);
+    expect(
+      filterNearbyListings(listings, {
+        ...baseCriteria,
+        distanceBand: "1",
+        focus: { lat: 1, lng: 1 },
+      }).map((item) => item.id),
+    ).toEqual(["phones"]);
   });
 
   it("parses listing coordinates and ignores rows without a point", () => {

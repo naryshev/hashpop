@@ -14,12 +14,14 @@ import {
 } from "../lib/geocode";
 import { MAP_LOADER_CLASS, NEARBY_DEFAULT_ZOOM, type MapViewSnapshot } from "../lib/mapTiles";
 import {
+  NEARBY_DISTANCE_BANDS,
   NEARBY_PRICE_BANDS,
   nearbyCountLabel,
   parseNearbyListing,
   selectNearbySheet,
   filterNearbyListings,
   type NearbyListing,
+  type NearbyDistanceBand,
   type NearbyPriceBand,
   type NearbySheetItem,
 } from "../lib/nearbyListings";
@@ -48,7 +50,7 @@ type Camera = {
   keepZoom: boolean;
 };
 
-type FilterId = "type" | "price" | "condition";
+type FilterId = "type" | "price" | "condition" | "distance";
 type SheetDetent = "hidden" | "peek" | "open";
 
 const LISTING_TYPES: { id: ListingType; label: string }[] = [
@@ -159,6 +161,7 @@ export function NearbyMap({ open, onClose }: { open: boolean; onClose: () => voi
   const [listingType, setListingType] = useState<ListingType>("all");
   const [priceBand, setPriceBand] = useState<NearbyPriceBand>("any");
   const [condition, setCondition] = useState("");
+  const [distanceBand, setDistanceBand] = useState<NearbyDistanceBand>("any");
   const [filter, setFilter] = useState<FilterId | null>(null);
   const [detent, setDetent] = useState<SheetDetent>("peek");
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -308,20 +311,30 @@ export function NearbyMap({ open, onClose }: { open: boolean; onClose: () => voi
     return () => window.removeEventListener("pointerdown", onPointer);
   }, [menuOpen]);
 
+  const focusLat = mapView?.center.lat ?? camera.lat;
+  const focusLng = mapView?.center.lng ?? camera.lng;
+  const bounds = mapView?.bounds ?? null;
   const criteria = useMemo(
-    () => ({ query, listingType, priceBand, condition }),
-    [condition, listingType, priceBand, query],
+    () => ({
+      query,
+      listingType,
+      priceBand,
+      condition,
+      distanceBand,
+      focus: { lat: focusLat, lng: focusLng },
+    }),
+    [condition, distanceBand, focusLat, focusLng, listingType, priceBand, query],
   );
   const pins = useMemo(() => filterNearbyListings(listings, criteria), [criteria, listings]);
   const sheet = useMemo(
     () =>
       selectNearbySheet(listings, {
         ...criteria,
-        bounds: mapView?.bounds ?? null,
-        focus: mapView?.center ?? { lat: camera.lat, lng: camera.lng },
+        bounds,
+        focus: criteria.focus ?? null,
         pinId: activeId,
       }),
-    [activeId, camera.lat, camera.lng, criteria, listings, mapView],
+    [activeId, bounds, criteria, listings],
   );
 
   useEffect(() => {
@@ -481,6 +494,8 @@ export function NearbyMap({ open, onClose }: { open: boolean; onClose: () => voi
     listingType === "all" ? "Type" : listingType === "physical" ? "Physical" : "Digital";
   const priceChip = NEARBY_PRICE_BANDS.find((band) => band.id === priceBand)?.chip ?? "Price ℏ";
   const conditionChip = condition || "Condition";
+  const distanceChip =
+    NEARBY_DISTANCE_BANDS.find((band) => band.id === distanceBand)?.chip ?? "Distance";
   const place = locationLines(placeLabel, locating, userPos != null);
   const zipPlaceholder = placeLabel
     ? place.primary
@@ -723,6 +738,31 @@ export function NearbyMap({ open, onClose }: { open: boolean; onClose: () => voi
                               }}
                             >
                               {entry.label}
+                            </MenuOption>
+                          ))}
+                        </FilterMenu>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <Chip
+                        testId="nearby-filter-distance"
+                        label={distanceChip}
+                        pressed={distanceBand !== "any"}
+                        open={filter === "distance"}
+                        onClick={() => toggleFilter("distance")}
+                      />
+                      {filter === "distance" && (
+                        <FilterMenu label="Distance">
+                          {NEARBY_DISTANCE_BANDS.map((band) => (
+                            <MenuOption
+                              key={band.id}
+                              selected={distanceBand === band.id}
+                              onSelect={() => {
+                                setDistanceBand(band.id);
+                                setFilter(null);
+                              }}
+                            >
+                              {band.label}
                             </MenuOption>
                           ))}
                         </FilterMenu>

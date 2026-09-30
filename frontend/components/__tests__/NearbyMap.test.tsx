@@ -153,6 +153,7 @@ describe("Nearby map chrome", () => {
     expect(menu?.textContent).toContain("Type");
     expect(menu?.textContent).toContain("Price");
     expect(menu?.textContent).toContain("Condition");
+    expect(menu?.textContent).toContain("Distance");
     expect(menu?.querySelector('[data-testid="nearby-zip"]')).toBeTruthy();
     expect(document.querySelector('[data-testid="nearby-filter-price"]')?.textContent).toContain(
       "ℏ",
