@@ -25,7 +25,6 @@ describe("MarketplaceDesktopToolbar", () => {
 
   it("counts results and collapses the rail to a Filter button below lg", async () => {
     const onSort = vi.fn();
-    const onView = vi.fn();
     const onOpenFilters = vi.fn();
     host = document.createElement("div");
     document.body.appendChild(host);
@@ -35,10 +34,8 @@ describe("MarketplaceDesktopToolbar", () => {
         createElement(MarketplaceDesktopToolbar, {
           resultCount: 6,
           sortMode: "recent",
-          viewMode: "grid",
           filterCount: 0,
           onSort,
-          onView,
           onOpenFilters,
         }),
       );
@@ -72,20 +69,8 @@ describe("MarketplaceDesktopToolbar", () => {
       ).click();
     });
     expect(onSort).toHaveBeenCalledWith("price-asc");
-
-    await act(async () => {
-      (
-        document.querySelector('[data-testid="marketplace-view-trigger"]') as HTMLButtonElement
-      ).click();
-    });
-    await act(async () => {
-      (
-        document.querySelector('[data-testid="desktop-view-editorial"]') as HTMLButtonElement
-      ).click();
-    });
-    expect(onView).toHaveBeenCalledWith("editorial");
-    expect(
-      document.querySelector('[data-testid="marketplace-view-trigger"]')?.textContent,
-    ).toContain("Grid");
+    expect(document.querySelector('[data-testid="marketplace-view-trigger"]')).toBeNull();
+    expect(document.querySelector('[data-testid="desktop-view-editorial"]')).toBeNull();
+    expect(document.querySelector('[data-testid="desktop-view-feed"]')).toBeNull();
   });
 });

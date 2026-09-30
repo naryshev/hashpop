@@ -1,7 +1,7 @@
 /**
- * Deploys the EscrowV2 stack: EscrowV2 + a paired Marketplace/AuctionHouse
+ * Deploys the EscrowV2 stack: EscrowV2 + Marketplace
  * (the Marketplace pins its escrow at construction, so upgrading escrow means
- * redeploying both). Reuses existing Treasury/Reputation when their addresses
+ * redeploying Marketplace too). Reuses existing Treasury/Reputation when their addresses
  * are provided via env, otherwise deploys fresh ones.
  *
  * All transactions carry explicit gas overrides: Hashio's mainnet relay
@@ -73,21 +73,10 @@ async function main() {
   await marketplace.waitForDeployment();
   console.log("Marketplace deployed to:", await marketplace.getAddress());
 
-  const AuctionHouse = await ethers.getContractFactory("AuctionHouse");
-  const auctionHouse = await AuctionHouse.deploy(
-    await escrow.getAddress(),
-    treasuryAddr,
-    platformFeeBps,
-    DEPLOY_OV,
-  );
-  await auctionHouse.waitForDeployment();
-  console.log("AuctionHouse deployed to:", await auctionHouse.getAddress());
-
   console.log("\nAuthorizing contracts...");
-  // First setMarketplace call also records the completion callback.
+  // setMarketplace also records the completion callback.
   await (await escrow.setMarketplace(await marketplace.getAddress(), CALL_OV)).wait();
-  await (await escrow.setMarketplace(await auctionHouse.getAddress(), CALL_OV)).wait();
-  console.log("Marketplace + AuctionHouse authorized on EscrowV2");
+  console.log("Marketplace authorized on EscrowV2");
 
   const arbiterAddr = process.env.ARBITER_ADDRESS;
   if (arbiterAddr) {
@@ -102,11 +91,9 @@ async function main() {
   console.log("Treasury:", treasuryAddr);
   console.log("Reputation:", reputationAddr);
   console.log("Marketplace:", await marketplace.getAddress());
-  console.log("AuctionHouse:", await auctionHouse.getAddress());
   console.log("\nBackend env:");
   console.log("  ESCROW_ADDRESS=" + (await escrow.getAddress()));
   console.log("  MARKETPLACE_ADDRESS=" + (await marketplace.getAddress()));
-  console.log("  AUCTION_HOUSE_ADDRESS=" + (await auctionHouse.getAddress()));
   console.log("  ESCROW_V2=true");
   console.log("  ESCROW_ARBITER_KEY=<arbiter private key>");
   console.log("Frontend env: NEXT_PUBLIC_ESCROW_V2=true");

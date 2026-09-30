@@ -1,12 +1,10 @@
 import path from "path";
-import fs from "fs";
 import { Router } from "express";
 import multer from "multer";
 import { PrismaClient } from "../generated/prisma/client";
 import type { Logger } from "pino";
 import { ethers } from "ethers";
-import { fetchMirrorEvents } from "../mirror";
-import { decodeEvents, EXPECTED_TOPIC0_ITEM_LISTED } from "../indexer/decoder";
+import { decodeEvents } from "../indexer/decoder";
 import { saveUpload } from "../storage";
 import { decryptJson, encryptJson, secretBoxConfigured } from "../lib/secretBox";
 import { listingVariantsForDb } from "../listingVariants";
@@ -424,16 +422,6 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         orderBy: { createdAt: "desc" },
         take: 100,
       });
-      let auctions: Awaited<ReturnType<typeof prisma.auction.findMany>> = [];
-      try {
-        auctions = await prisma.auction.findMany({
-          where: { status: "ACTIVE" },
-          orderBy: { createdAt: "desc" },
-          take: 50,
-        });
-      } catch (auctionErr) {
-        log.warn({ err: auctionErr }, "Could not fetch auctions (table may not exist yet)");
-      }
       let listingPriceOverrides = new Map<string, string>();
       let listingStatusOverrides = new Map<string, string>();
       const marketplaceAddr = process.env.MARKETPLACE_ADDRESS;
@@ -490,12 +478,6 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           mediaUrls: rewriteMediaUrlsForClient((l as any).mediaUrls) ?? (l as any).mediaUrls,
           status: listingStatusOverrides.get(l.id) ?? l.status,
           price: listingPriceOverrides.get(l.id) ?? toHbarForClient(l.price),
-        })),
-        auctions: auctions.map((a) => ({
-          ...a,
-          imageUrl: rewriteMediaUrlForClient(a.imageUrl),
-          mediaUrls: rewriteMediaUrlsForClient((a as any).mediaUrls) ?? (a as any).mediaUrls,
-          reservePrice: toHbarForClient(a.reservePrice),
         })),
       };
       listingsResponseCache = { at: Date.now(), payload };
@@ -1412,96 +1394,6 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     }
   });
 
-  /**
-   * Sync an auction from createAuction transaction so it shows immediately.
-   */
-  router.post("/sync-auction", async (req, res) => {
-    const {
-      txHash,
-      title,
-      subtitle,
-      description,
-      condition,
-      yearOfProduction,
-      imageUrl,
-      mediaUrls,
-    } = (req.body || {}) as {
-      txHash?: string;
-      title?: string;
-      subtitle?: string;
-      description?: string;
-      condition?: string;
-      yearOfProduction?: string;
-      imageUrl?: string;
-      mediaUrls?: string[];
-    };
-    if (!txHash || typeof txHash !== "string") {
-      return res.status(400).json({ error: "txHash required" });
-    }
-    const rpcUrl = process.env.HEDERA_RPC_URL;
-    if (!rpcUrl) {
-      return res.status(503).json({ error: "HEDERA_RPC_URL not set" });
-    }
-    try {
-      const provider = getRpcProvider(rpcUrl);
-      const receipt = await provider.getTransactionReceipt(txHash);
-      if (!receipt?.logs?.length) {
-        return res.status(404).json({ error: "Transaction or logs not found" });
-      }
-      const subtitleStr = typeof subtitle === "string" && subtitle.trim() ? subtitle.trim() : null;
-      const conditionStr =
-        typeof condition === "string" && condition.trim() ? condition.trim() : null;
-      const yearStr =
-        typeof yearOfProduction === "string" && yearOfProduction.trim()
-          ? yearOfProduction.trim()
-          : null;
-      for (const logEntry of receipt.logs) {
-        const decoded = decodeEvents(logEntry);
-        if (decoded?.type !== "AuctionCreated") continue;
-        const auctionId = normalizeListingId(decoded.auctionId);
-        const seller = (decoded.seller || "").toLowerCase();
-        const titleStr = typeof title === "string" && title.trim() ? title.trim() : null;
-        const descriptionStr =
-          typeof description === "string" && description.trim() ? description.trim() : null;
-        const imageUrlStr = typeof imageUrl === "string" && imageUrl ? imageUrl : null;
-        const mediaList =
-          Array.isArray(mediaUrls) && mediaUrls.length > 0
-            ? mediaUrls.filter((u): u is string => typeof u === "string" && u.length > 0)
-            : imageUrlStr
-              ? [imageUrlStr]
-              : [];
-        const extra = {
-          ...(titleStr != null && { title: titleStr }),
-          ...(subtitleStr != null && { subtitle: subtitleStr }),
-          ...(descriptionStr != null && { description: descriptionStr }),
-          ...(conditionStr != null && { condition: conditionStr }),
-          ...(yearStr != null && { yearOfProduction: yearStr }),
-          ...(imageUrlStr != null && { imageUrl: imageUrlStr }),
-          ...(mediaList.length > 0 && { mediaUrls: mediaList }),
-        };
-        await prisma.auction.upsert({
-          where: { id: auctionId },
-          update: { status: "ACTIVE", ...extra },
-          create: {
-            id: auctionId,
-            seller,
-            reservePrice: weiToHbar(decoded.reservePrice),
-            startTime: decoded.startTime,
-            endTime: decoded.endTime,
-            status: "ACTIVE",
-            ...extra,
-          },
-        });
-        log.info({ auctionId, seller, txHash }, "Synced auction from tx");
-        return res.json({ ok: true, auctionId });
-      }
-      return res.status(404).json({ error: "No AuctionCreated event in transaction" });
-    } catch (err: any) {
-      log.error({ err, txHash }, "Sync auction failed");
-      return res.status(500).json({ error: err.message || "Sync failed" });
-    }
-  });
-
   router.get("/listing/:id", async (req, res) => {
     try {
       const rawId = req.params.id ?? "";
@@ -2046,129 +1938,23 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     }
   });
 
-  router.get("/auction/:id", async (req, res) => {
-    try {
-      const id = normalizeListingId(req.params.id ?? "");
-      const auction = await prisma.auction.findUnique({
-        where: { id },
-        include: { bids: { orderBy: { createdAt: "desc" }, take: 20 } },
-      });
-      if (!auction) return res.status(404).json({ error: "Auction not found" });
-      res.json({
-        auction: {
-          ...auction,
-          imageUrl: rewriteMediaUrlForClient((auction as any).imageUrl),
-          mediaUrls:
-            rewriteMediaUrlsForClient((auction as any).mediaUrls) ?? (auction as any).mediaUrls,
-          reservePrice: toHbarForClient(auction.reservePrice),
-        },
-      });
-    } catch (err) {
-      log.error({ err }, "Failed to fetch auction");
-      res.status(500).json({ error: "Internal server error" });
-    }
-  });
-
-  router.patch("/auction/:id", async (req, res) => {
-    try {
-      const id = normalizeListingId(req.params.id ?? "");
-      const {
-        title,
-        subtitle,
-        description,
-        condition,
-        yearOfProduction,
-        imageUrl,
-        mediaUrls,
-        sellerAddress,
-      } = (req.body || {}) as {
-        title?: string;
-        subtitle?: string;
-        description?: string;
-        condition?: string;
-        yearOfProduction?: string;
-        imageUrl?: string;
-        mediaUrls?: string[];
-        sellerAddress?: string;
-      };
-      const auction = await prisma.auction.findUnique({ where: { id } });
-      if (!auction) return res.status(404).json({ error: "Auction not found" });
-      const sellerLower =
-        sellerAddress && typeof sellerAddress === "string" ? sellerAddress.toLowerCase() : "";
-      if (sellerLower !== auction.seller.toLowerCase()) {
-        return res.status(403).json({ error: "Only the seller can edit this auction" });
-      }
-      const update: {
-        title?: string | null;
-        subtitle?: string | null;
-        description?: string | null;
-        condition?: string | null;
-        yearOfProduction?: string | null;
-        imageUrl?: string | null;
-        mediaUrls?: string[];
-      } = {};
-      if (title !== undefined) update.title = title === "" ? null : title;
-      if (subtitle !== undefined) update.subtitle = subtitle === "" ? null : subtitle;
-      if (description !== undefined) update.description = description === "" ? null : description;
-      if (condition !== undefined) update.condition = condition === "" ? null : condition;
-      if (yearOfProduction !== undefined)
-        update.yearOfProduction = yearOfProduction === "" ? null : yearOfProduction;
-      if (mediaUrls !== undefined && Array.isArray(mediaUrls)) {
-        update.mediaUrls = mediaUrls.filter(
-          (u): u is string => typeof u === "string" && u.length > 0,
-        );
-      } else if (imageUrl !== undefined && imageUrl !== "") {
-        const a = auction as { mediaUrls?: string[]; imageUrl?: string | null };
-        const existing = a.mediaUrls?.length ? a.mediaUrls : a.imageUrl ? [a.imageUrl] : [];
-        update.mediaUrls = [...existing, imageUrl];
-      }
-      const updated = await prisma.auction.update({
-        where: { id },
-        data: update,
-      });
-      res.json({
-        auction: {
-          ...updated,
-          imageUrl: rewriteMediaUrlForClient((updated as any).imageUrl),
-          mediaUrls:
-            rewriteMediaUrlsForClient((updated as any).mediaUrls) ?? (updated as any).mediaUrls,
-        },
-      });
-    } catch (err) {
-      log.error({ err }, "Failed to update auction");
-      res.status(500).json({ error: err instanceof Error ? err.message : "Internal server error" });
-    }
-  });
-
   router.get("/user/:address/listings", async (req, res) => {
     try {
       const { address } = req.params;
       const addrLower = address?.toLowerCase() ?? "";
-      const [activeListings, archivedListings, activeAuctions, archivedAuctions] =
-        await Promise.all([
-          prisma.listing.findMany({
-            where: visibleListingWhere({ seller: addrLower, status: "LISTED" }) as never,
-            orderBy: { createdAt: "desc" },
-          }),
-          prisma.listing.findMany({
-            where: {
-              seller: addrLower,
-              status: { in: ["CANCELLED", "LOCKED", "COMPLETED", "SOLD"] },
-            },
-            orderBy: { updatedAt: "desc" },
-          }),
-          prisma.auction.findMany({
-            where: { seller: addrLower, status: "ACTIVE" },
-            orderBy: { createdAt: "desc" },
-          }),
-          prisma.auction.findMany({
-            where: {
-              seller: addrLower,
-              status: { not: "ACTIVE" },
-            },
-            orderBy: { updatedAt: "desc" },
-          }),
-        ]);
+      const [activeListings, archivedListings] = await Promise.all([
+        prisma.listing.findMany({
+          where: visibleListingWhere({ seller: addrLower, status: "LISTED" }) as never,
+          orderBy: { createdAt: "desc" },
+        }),
+        prisma.listing.findMany({
+          where: {
+            seller: addrLower,
+            status: { in: ["CANCELLED", "LOCKED", "COMPLETED", "SOLD"] },
+          },
+          orderBy: { updatedAt: "desc" },
+        }),
+      ]);
       res.json({
         active: activeListings.map((l) => ({
           ...omitModerationFields(l),
@@ -2183,18 +1969,6 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           mediaUrls: rewriteMediaUrlsForClient((l as any).mediaUrls) ?? (l as any).mediaUrls,
           price: toHbarForClient(l.price),
           itemType: "listing" as const,
-        })),
-        activeAuctions: activeAuctions.map((a) => ({
-          ...a,
-          imageUrl: rewriteMediaUrlForClient((a as any).imageUrl),
-          mediaUrls: rewriteMediaUrlsForClient((a as any).mediaUrls) ?? (a as any).mediaUrls,
-          reservePrice: toHbarForClient(a.reservePrice),
-        })),
-        archivedAuctions: archivedAuctions.map((a) => ({
-          ...a,
-          imageUrl: rewriteMediaUrlForClient((a as any).imageUrl),
-          mediaUrls: rewriteMediaUrlsForClient((a as any).mediaUrls) ?? (a as any).mediaUrls,
-          reservePrice: toHbarForClient(a.reservePrice),
         })),
       });
     } catch (err) {
@@ -2291,14 +2065,13 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
 
   router.post("/wishlist", async (req, res) => {
     try {
-      const { address, itemId, itemType } = (req.body || {}) as {
+      const { address, itemId } = (req.body || {}) as {
         address?: string;
         itemId?: string;
-        itemType?: string;
       };
       const userAddress = address?.trim()?.toLowerCase();
       const id = itemId?.trim();
-      const type = itemType === "auction" ? "auction" : "listing";
+      const type = "listing";
       if (!userAddress || !id)
         return res.status(400).json({ error: "address and itemId required" });
       await prisma.wishlistItem.upsert({
@@ -3199,106 +2972,6 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     } catch (err) {
       log.error({ err }, "Admin: failed to delete listing");
       return res.status(500).json({ error: "Internal server error" });
-    }
-  });
-
-  router.get("/debug/mirror-logs", async (req, res) => {
-    const marketplaceAddress = process.env.MARKETPLACE_ADDRESS;
-    const auctionHouseAddress = process.env.AUCTION_HOUSE_ADDRESS;
-    if (!marketplaceAddress || !auctionHouseAddress) {
-      return res.json({ error: "MARKETPLACE_ADDRESS or AUCTION_HOUSE_ADDRESS not set" });
-    }
-    try {
-      const events = await fetchMirrorEvents(marketplaceAddress, auctionHouseAddress, 0);
-      const eventsWithDecoded = events.map((ev: any) => {
-        const topic0 = ev.topics?.[0] ?? ev.topic0 ?? null;
-        const decoded = decodeEvents(ev);
-        return {
-          topic0: topic0 ? String(topic0).toLowerCase() : null,
-          decodedType: decoded?.type ?? null,
-          timestamp: ev.timestamp,
-        };
-      });
-      const itemListedCount = eventsWithDecoded.filter(
-        (e: any) => e.decodedType === "ItemListed",
-      ).length;
-      return res.json({
-        totalLogs: events.length,
-        expectedTopic0ItemListed: EXPECTED_TOPIC0_ITEM_LISTED,
-        itemListedDecodedCount: itemListedCount,
-        events: eventsWithDecoded,
-      });
-    } catch (err: any) {
-      log.error({ err }, "Debug mirror-logs failed");
-      return res.status(500).json({ error: err.message });
-    }
-  });
-
-  router.get("/debug/listings", async (req, res) => {
-    try {
-      const count = await prisma.listing.count();
-      const listed = await prisma.listing.findMany({
-        where: { status: "LISTED" },
-        take: 20,
-        orderBy: { createdAt: "desc" },
-      });
-      return res.json({ count, listedCount: listed.length, listings: listed });
-    } catch (err: any) {
-      log.error({ err }, "Debug listings failed");
-      return res.status(500).json({ error: err.message });
-    }
-  });
-
-  router.delete("/debug/clear-listings", async (req, res) => {
-    try {
-      await prisma.sale.deleteMany({});
-      const result = await prisma.listing.deleteMany({});
-      log.info({ deleted: result.count }, "Cleared all listings (and sales)");
-      return res.json({ ok: true, deleted: result.count });
-    } catch (err: any) {
-      log.error({ err }, "Clear listings failed");
-      return res.status(500).json({ error: err.message });
-    }
-  });
-
-  router.delete("/debug/clear-history", async (req, res) => {
-    try {
-      const sales = await prisma.sale.deleteMany({});
-      const bids = await prisma.bid.deleteMany({});
-      const ratings = await prisma.rating.deleteMany({});
-      const messages = await prisma.message.deleteMany({});
-      const wishlist = await prisma.wishlistItem.deleteMany({});
-      const users = await prisma.user.deleteMany({});
-
-      // Reset indexer state so it doesn't re-index old purchase events
-      const stateFile = path.join(process.cwd(), ".indexer-state.json");
-      const nowSec = Math.floor(Date.now() / 1000);
-      try {
-        fs.writeFileSync(
-          stateFile,
-          JSON.stringify({ lastProcessedTimestamp: nowSec, lastProcessedBlock: 999999999 }),
-          "utf8",
-        );
-      } catch {}
-
-      log.info(
-        { sales: sales.count, bids: bids.count, ratings: ratings.count, messages: messages.count },
-        "Cleared history (kept listings)",
-      );
-      return res.json({
-        ok: true,
-        cleared: {
-          sales: sales.count,
-          bids: bids.count,
-          ratings: ratings.count,
-          messages: messages.count,
-          wishlist: wishlist.count,
-          users: users.count,
-        },
-      });
-    } catch (err: any) {
-      log.error({ err }, "Clear history failed");
-      return res.status(500).json({ error: err.message });
     }
   });
 

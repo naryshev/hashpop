@@ -220,7 +220,7 @@ export default function OffersPage() {
                   {tab === "received" ? (
                     <>
                       Active offers from buyers will appear here.{" "}
-                      <Link href="/selling" className="text-chrome hover:text-white underline">
+                      <Link href="/dashboard" className="text-chrome hover:text-white underline">
                         See your listings
                       </Link>
                       .

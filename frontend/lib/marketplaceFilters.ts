@@ -62,7 +62,7 @@ export function withAdvancedFilters(
   return next;
 }
 
-/** Filter-sheet Clear. Leaves search, sort, and view alone. */
+/** Filter-sheet Clear. Leaves search and sort alone. */
 export function clearListingFilters(params: ParamSource): URLSearchParams {
   const next = copyParams(params);
   for (const key of [
@@ -99,7 +99,7 @@ export function activeFilterCount(input: {
   return count;
 }
 
-/** Clears the sheet controls. Leaves the search query (`q`) and view mode alone. */
+/** Clears the sheet controls. Leaves the search query (`q`) alone. */
 export function resetMarketplaceFilters(params: ParamSource): URLSearchParams {
   const next = copyParams(params);
   for (const key of [

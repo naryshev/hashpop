@@ -6,7 +6,6 @@ async function main() {
     treasury: process.env.TREASURY_ADDRESS || "",
     reputation: process.env.REPUTATION_ADDRESS || "",
     marketplace: process.env.MARKETPLACE_ADDRESS || "",
-    auctionHouse: process.env.AUCTION_HOUSE_ADDRESS || "",
   };
 
   console.log("Verifying contracts...");

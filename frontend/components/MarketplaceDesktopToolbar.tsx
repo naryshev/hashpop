@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Funnel } from "lucide-react";
 import type { SortMode } from "../lib/marketplaceFilters";
-import type { ViewMode } from "../lib/marketplaceView";
 import { cn } from "../lib/utils";
 
 const SORTS: { id: SortMode; label: string }[] = [
@@ -11,12 +10,6 @@ const SORTS: { id: SortMode; label: string }[] = [
   { id: "trending", label: "Trending" },
   { id: "price-asc", label: "Price ↑" },
   { id: "price-desc", label: "Price ↓" },
-];
-
-const VIEWS: { id: ViewMode; label: string }[] = [
-  { id: "grid", label: "Grid" },
-  { id: "editorial", label: "Editorial" },
-  { id: "feed", label: "Feed" },
 ];
 
 function useDismiss(open: boolean, onClose: () => void) {
@@ -41,30 +34,23 @@ function useDismiss(open: boolean, onClose: () => void) {
 
 /**
  * Desktop results row. Filter button is the collapsed rail at 768–1023.
- * Sort and a quiet view toggle sit on the right. Grid stays the default face.
+ * Sort sits on the right. The marketplace is grid-only.
  */
 export function MarketplaceDesktopToolbar({
   resultCount,
   sortMode,
-  viewMode,
   filterCount,
   onSort,
-  onView,
   onOpenFilters,
 }: {
   resultCount: number;
   sortMode: SortMode;
-  viewMode: ViewMode;
   filterCount: number;
   onSort: (sort: SortMode) => void;
-  onView: (view: ViewMode) => void;
   onOpenFilters: () => void;
 }) {
   const [sortOpen, setSortOpen] = useState(false);
-  const [viewOpen, setViewOpen] = useState(false);
   const sortRef = useDismiss(sortOpen, () => setSortOpen(false));
-  const viewRef = useDismiss(viewOpen, () => setViewOpen(false));
-  const viewLabel = VIEWS.find((view) => view.id === viewMode)?.label ?? "Grid";
 
   return (
     <div
@@ -94,7 +80,6 @@ export function MarketplaceDesktopToolbar({
             aria-expanded={sortOpen}
             aria-haspopup="listbox"
             onClick={() => {
-              setViewOpen(false);
               setSortOpen((open) => !open);
             }}
             className="inline-flex h-9 items-center gap-1 rounded-full px-2.5 text-sm font-medium text-white/80 hover:bg-white/5 hover:text-white"
@@ -121,45 +106,6 @@ export function MarketplaceDesktopToolbar({
                   )}
                 >
                   {sort.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        <div className="relative" ref={viewRef}>
-          <button
-            type="button"
-            data-testid="marketplace-view-trigger"
-            aria-label="Change view"
-            aria-expanded={viewOpen}
-            onClick={() => {
-              setSortOpen(false);
-              setViewOpen((open) => !open);
-            }}
-            className="inline-flex h-9 items-center gap-1 rounded-full px-2.5 text-xs font-medium text-white/45 hover:bg-white/5 hover:text-white/80"
-          >
-            {viewLabel}
-            <ChevronDown size={13} className={viewOpen ? "rotate-180" : ""} />
-          </button>
-          {viewOpen && (
-            <div className="absolute right-0 top-full z-40 mt-1 w-36 rounded-xl border border-white/10 bg-[#0a0a0a] p-1.5 shadow-2xl">
-              {VIEWS.map((view) => (
-                <button
-                  key={view.id}
-                  type="button"
-                  data-testid={`desktop-view-${view.id}`}
-                  onClick={() => {
-                    setViewOpen(false);
-                    onView(view.id);
-                  }}
-                  className={cn(
-                    "block w-full rounded-lg px-3 py-1.5 text-left text-xs",
-                    viewMode === view.id
-                      ? "bg-[#00ffa3]/10 text-[#00ffa3]"
-                      : "text-white/70 hover:bg-white/5 hover:text-white",
-                  )}
-                >
-                  {view.label}
                 </button>
               ))}
             </div>

@@ -5,12 +5,6 @@ const ITEM_LISTED = ethers.id("ItemListed(bytes32,address,uint256)").toLowerCase
 const ITEM_PURCHASED = ethers.id("ItemPurchased(bytes32,address,address,uint256)").toLowerCase();
 const LISTING_CANCELLED = ethers.id("ListingCancelled(bytes32,address)").toLowerCase();
 const PRICE_UPDATED = ethers.id("PriceUpdated(bytes32,uint256)").toLowerCase();
-const AUCTION_CREATED = ethers
-  .id("AuctionCreated(bytes32,address,uint256,uint256,uint256)")
-  .toLowerCase();
-const BID_PLACED = ethers.id("BidPlaced(bytes32,address,uint256)").toLowerCase();
-const AUCTION_EXTENDED = ethers.id("AuctionExtended(bytes32,uint256)").toLowerCase();
-const AUCTION_SETTLED = ethers.id("AuctionSettled(bytes32,address,uint256)").toLowerCase();
 const OFFER_MADE = ethers.id("OfferMade(bytes32,address,uint256)").toLowerCase();
 const OFFER_ACCEPTED = ethers.id("OfferAccepted(bytes32,address,uint256)").toLowerCase();
 const OFFER_REJECTED = ethers.id("OfferRejected(bytes32,address,uint256)").toLowerCase();
@@ -102,49 +96,6 @@ export function decodeEvents(event: any): any | null {
       type: "PriceUpdated",
       listingId: topicAt(event, 1),
       newPrice: uint256FromData(data),
-    };
-  }
-
-  if (t0 === AUCTION_CREATED.toLowerCase()) {
-    // data = reservePrice (32) + startTime (32) + endTime (32)
-    const reservePrice = data.length >= 66 ? ethers.toBigInt("0x" + data.slice(2, 66)) : 0n;
-    const startTime = data.length >= 130 ? ethers.toBigInt("0x" + data.slice(66, 130)) : 0n;
-    const endTime = data.length >= 194 ? ethers.toBigInt("0x" + data.slice(130, 194)) : 0n;
-    return {
-      type: "AuctionCreated",
-      auctionId: topicAt(event, 1),
-      seller: addressFromTopic(topicAt(event, 2)),
-      reservePrice,
-      startTime,
-      endTime,
-    };
-  }
-
-  if (t0 === BID_PLACED) {
-    return {
-      type: "BidPlaced",
-      auctionId: topicAt(event, 1),
-      bidder: addressFromTopic(topicAt(event, 2)),
-      amount: uint256FromData(data),
-      timestamp: BigInt(Math.floor(Date.now() / 1000)),
-    };
-  }
-
-  if (t0 === AUCTION_EXTENDED) {
-    return {
-      type: "AuctionExtended",
-      auctionId: topicAt(event, 1),
-      newEndTime: uint256FromData(data),
-    };
-  }
-
-  if (t0 === AUCTION_SETTLED) {
-    return {
-      type: "AuctionSettled",
-      auctionId: topicAt(event, 1),
-      winner: addressFromTopic(topicAt(event, 2)),
-      amount: uint256FromData(data),
-      seller: "", // not in event; could be looked up from auction if needed
     };
   }
 

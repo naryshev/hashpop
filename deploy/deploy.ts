@@ -37,19 +37,9 @@ async function main() {
   );
   console.log("Marketplace deployed to:", await marketplace.getAddress());
 
-  // Deploy AuctionHouse
-  const AuctionHouse = await ethers.getContractFactory("AuctionHouse");
-  const auctionHouse = await AuctionHouse.deploy(
-    await escrow.getAddress(),
-    await treasury.getAddress(),
-    platformFeeBps,
-  );
-  console.log("AuctionHouse deployed to:", await auctionHouse.getAddress());
-
-  // Grant Escrow MARKETPLACE_ROLE to both Marketplace and AuctionHouse (deployer has admin on Escrow)
+  // Grant Escrow MARKETPLACE_ROLE to Marketplace (deployer has admin on Escrow).
   console.log("\nAuthorizing contracts...");
   await escrow.setMarketplace(await marketplace.getAddress());
-  await escrow.setMarketplace(await auctionHouse.getAddress());
   console.log("Authorization complete");
 
   console.log("\n=== Deployment Summary ===");
@@ -57,7 +47,6 @@ async function main() {
   console.log("Treasury:", await treasury.getAddress());
   console.log("Reputation:", await reputation.getAddress());
   console.log("Marketplace:", await marketplace.getAddress());
-  console.log("AuctionHouse:", await auctionHouse.getAddress());
   console.log("\nAdd to backend .env: ESCROW_ADDRESS=" + (await escrow.getAddress()));
 }
 

@@ -54,7 +54,6 @@ function pathnameTitle(pathname: string): string {
   if (pathname.startsWith("/create")) return "Create Listing";
   if (pathname.startsWith("/offers")) return "Offers";
   if (pathname.startsWith("/purchases")) return "Purchases";
-  if (pathname.startsWith("/selling")) return "Selling";
   if (pathname.startsWith("/watchlist")) return "Watchlist";
   if (pathname.startsWith("/messages")) return "Messages";
   if (pathname.startsWith("/support")) return "Support";

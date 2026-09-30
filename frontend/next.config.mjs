@@ -14,7 +14,10 @@ const nextConfig = {
   // Terser handles these edge cases correctly.
   swcMinify: false,
   async redirects() {
-    return [{ source: "/area51", destination: "/admin", permanent: false }];
+    return [
+      { source: "/area51", destination: "/admin", permanent: false },
+      { source: "/selling", destination: "/dashboard", permanent: false },
+    ];
   },
   transpilePackages: [
     "@hashgraph/sdk",

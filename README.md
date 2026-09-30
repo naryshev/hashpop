@@ -46,15 +46,17 @@ Hashpop connects buyers and sellers through a trustless, blockchain-backed tradi
 
 ## Architecture
 
-| Layer      | Technology                                            |
-| ---------- | ----------------------------------------------------- |
-| Frontend   | Next.js 14, React 18, TailwindCSS                     |
-| Backend    | Express, Prisma ORM, PostgreSQL                       |
-| Blockchain | Hedera (Hashgraph), Solidity smart contracts          |
-| Wallet     | HashPack via HashConnect / WalletConnect              |
-| Encryption | TweetNaCl.js (X25519 + XSalsa20-Poly1305)             |
-| Contracts  | Marketplace, Escrow, AuctionHouse, Treasury (Hardhat) |
-| Indexer    | Hedera Mirror Node event sync                         |
+| Layer      | Technology                                   |
+| ---------- | -------------------------------------------- |
+| Frontend   | Next.js 14, React 18, TailwindCSS            |
+| Backend    | Express, Prisma ORM, PostgreSQL              |
+| Blockchain | Hedera (Hashgraph), Solidity smart contracts |
+| Wallet     | HashPack via HashConnect / WalletConnect     |
+| Encryption | TweetNaCl.js (X25519 + XSalsa20-Poly1305)    |
+| Contracts  | Marketplace, Escrow, Treasury (Hardhat)      |
+| Indexer    | Hedera Mirror Node event sync                |
+
+`AuctionHouse.sol` stays in the repo for the already-deployed contract. New deploys do not include it.
 
 ## Project Structure
 
