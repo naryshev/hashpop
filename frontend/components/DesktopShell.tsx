@@ -24,6 +24,7 @@ import { useSignInModal } from "../lib/signInModal";
 import { useTopBarSlotFilled, useTopBarSlotRef } from "../lib/topBar";
 import { cn } from "../lib/utils";
 import { Footer } from "./Footer";
+import { MarketplaceBrandHeader } from "./MarketplaceBrandHeader";
 import { MobileTopBar } from "./MobileTopBar";
 import { ProfileCardSheet } from "./ProfileCardSheet";
 import { MessagesModal } from "./MessagesModal";
@@ -172,11 +173,11 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
   // so the icon row, Connect chip, and Sign in pill do not stack on top.
   const marketplaceHome = pathname === "/marketplace";
 
-  // Mobile page header (logo, bell, wallet pill) lives here in the shell —
-  // OUTSIDE the route-keyed fade wrapper below — so it stays put on page
-  // switches while the content still eases in. Marketplace renders its own
-  // mobile header. Focused screens (listing, order, activity…) keep their
-  // own back-button chrome.
+  // Mobile page header lives here in the shell — OUTSIDE the route-keyed fade
+  // wrapper below — so it stays put on page switches while the content still
+  // eases in. Marketplace renders its own mobile header (brand row + search).
+  // Cart and Messages share that same brand row. Focused screens (listing,
+  // order, activity…) keep their own back-button chrome.
   const MOBILE_HEADER_ROUTES = [
     "/marketplace",
     "/cart",
@@ -186,6 +187,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
     "/create",
   ];
   const showMobileHeader = MOBILE_HEADER_ROUTES.includes(pathname);
+  const marketplaceBrandHeader = pathname === "/cart" || pathname === "/messages";
   const isAdminRoute = pathname.startsWith("/admin") || pathname.startsWith("/area51");
   // Full-screen surfaces (open message thread) hide all chrome.
   const [immersive, setImmersive] = useState(false);
@@ -322,11 +324,18 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
           bordered center card. Mobile gets bottom padding so content clears
           the floating BottomNav; the document itself scrolls. */}
       <main className="flex min-h-[100dvh] flex-1 flex-col pb-24 md:min-h-0 md:pb-0">
-        {showMobileHeader && !immersive && pathname !== "/marketplace" && (
-          <div className="px-3 pt-4">
-            <MobileTopBar />
-          </div>
-        )}
+        {showMobileHeader &&
+          !immersive &&
+          pathname !== "/marketplace" &&
+          (marketplaceBrandHeader ? (
+            <div className="mb-3 px-3 pt-[calc(env(safe-area-inset-top)+12px)] md:hidden">
+              <MarketplaceBrandHeader />
+            </div>
+          ) : (
+            <div className="px-3 pt-4">
+              <MobileTopBar />
+            </div>
+          ))}
         {/* Content takes the available height so the footer (marketplace
             only) stays pinned to the bottom. Keyed on pathname so each route
             change eases in gently instead of snapping. */}

@@ -10,8 +10,8 @@ import { ProfileCardSheet } from "./ProfileCardSheet";
 /**
  * Mobile page header (demo-video style): Hashpop logo + wordmark on the left,
  * notification bell and the green wallet pill (opens the profile sheet) on
- * the right. Used across mobile pages (marketplace, purchases, offers, cart,
- * create, map) so navigation chrome is consistent everywhere.
+ * the right. Used on mobile pages that are not the marketplace brand header
+ * (purchases, offers, create, map). Cart and Messages use MarketplaceBrandHeader.
  */
 export function MobileTopBar({ className = "" }: { className?: string }) {
   const { accountId, address } = useHashpackWallet();
