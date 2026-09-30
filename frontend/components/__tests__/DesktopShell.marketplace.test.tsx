@@ -99,5 +99,36 @@ describe("DesktopShell marketplace chrome", () => {
     await renderShell();
     expect(document.querySelector('nav[aria-label="Primary navigation"]')).toBeTruthy();
     expect(document.body.textContent).toContain("Sign in");
+    expect(document.querySelector('[data-testid="mobile-top-bar"]')).toBeTruthy();
+    expect(document.querySelector('[data-testid="marketplace-brand-header"]')).toBeNull();
   });
+
+  it.each(["/cart", "/messages"])(
+    "uses the marketplace brand header on %s without search or the old mobile bar",
+    async (pathname) => {
+      nav.pathname = pathname;
+      await renderShell();
+      const brand = document.querySelector(
+        '[data-testid="marketplace-brand-header"]',
+      ) as HTMLElement;
+      expect(brand).toBeTruthy();
+      expect(brand.className).toContain("grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]");
+      expect(brand.parentElement?.className).toContain("md:hidden");
+      expect(brand.parentElement?.className).toContain("pt-[calc(env(safe-area-inset-top)+12px)]");
+      expect(brand.parentElement?.className).not.toContain("mb-");
+      const wordmark = document.querySelector(
+        '[data-testid="marketplace-wordmark"]',
+      ) as HTMLElement;
+      expect(wordmark.textContent).toBe("marketplace");
+      expect(wordmark.className).toContain("text-white/60");
+      expect(document.querySelector('[data-testid="marketplace-logo"]')).toBeTruthy();
+      expect(document.querySelector('[data-testid="hashpop-ring-o"]')).toBeTruthy();
+      expect(document.querySelector('[data-testid="marketplace-profile"]')).toBeTruthy();
+      expect(document.querySelector('[data-testid="mobile-top-bar"]')).toBeNull();
+      expect(document.querySelector('[data-testid="marketplace-search-field"]')).toBeNull();
+      expect(document.querySelector('[data-testid="marketplace-filter-button"]')).toBeNull();
+      expect(wordmark.textContent).not.toBe("cart");
+      expect(wordmark.textContent).not.toBe("messages");
+    },
+  );
 });

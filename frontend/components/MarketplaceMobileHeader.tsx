@@ -1,16 +1,9 @@
 "use client";
 
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import Link from "next/link";
-import { Funnel, Search as SearchIcon, SlidersHorizontal, User } from "lucide-react";
-import { useHashpackWallet } from "../lib/hashpackWallet";
-import { useSignInModal } from "../lib/signInModal";
-import { profileAvatarUrl, useProfile } from "../lib/profiles";
-import { material } from "../lib/materials";
+import { Funnel, Search as SearchIcon, SlidersHorizontal } from "lucide-react";
 import { cn } from "../lib/utils";
-import { HashpopWordmark } from "./HashpopWordmark";
-import { NotificationBell } from "./NotificationBell";
-import { ProfileCardSheet } from "./ProfileCardSheet";
+import { MarketplaceBrandHeader } from "./MarketplaceBrandHeader";
 import { Sheet } from "./ui/Sheet";
 
 const FILTER_DETENTS = ["medium", "large"] as const;
@@ -32,44 +25,10 @@ function useMobileSheet() {
   return isMobile;
 }
 
-function ProfileAvatarButton() {
-  const { accountId, address, isConnected } = useHashpackWallet();
-  const { openSignIn } = useSignInModal();
-  const [profileOpen, setProfileOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
-  const signedIn = mounted && isConnected;
-  const profile = useProfile(signedIn ? (address ?? accountId) : null);
-  const avatar = signedIn ? profileAvatarUrl(profile) : null;
-
-  return (
-    <>
-      <button
-        type="button"
-        data-testid="marketplace-profile"
-        aria-label={signedIn ? "Open profile" : "Sign in"}
-        onClick={() => (signedIn ? setProfileOpen(true) : openSignIn())}
-        className={cn(
-          material.chrome,
-          "flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full text-white/90",
-        )}
-      >
-        {avatar ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={avatar} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <User size={20} aria-hidden />
-        )}
-      </button>
-      <ProfileCardSheet open={profileOpen} onClose={() => setProfileOpen(false)} />
-    </>
-  );
-}
-
 /**
- * Marketplace chrome below 768px. Brand row is a 3-column grid so the
- * wordmark is centered on the screen. Sliders open Sort; Filter opens the sheet.
+ * Marketplace chrome below 768px. Brand row is the shared marketplace header.
+ * Sliders open Sort; Filter opens the sheet. Cart and Messages reuse the brand
+ * row only — search and Filter stay on this route.
  */
 export function MarketplaceMobileHeader({
   searchValue,
@@ -111,22 +70,7 @@ export function MarketplaceMobileHeader({
       data-testid="marketplace-mobile-header"
       className="mb-3 pt-[calc(env(safe-area-inset-top)+12px)] md:hidden"
     >
-      <div className="grid h-14 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center">
-        <div aria-hidden />
-        <Link href="/marketplace" aria-label="Hashpop home" className="flex flex-col items-center">
-          <HashpopWordmark />
-          <span
-            data-testid="marketplace-wordmark"
-            className="mt-0.5 text-[12px] font-medium lowercase leading-none tracking-[0.12em] text-white/60"
-          >
-            marketplace
-          </span>
-        </Link>
-        <div className="flex items-center justify-end gap-2">
-          <NotificationBell variant="marketplace" />
-          <ProfileAvatarButton />
-        </div>
-      </div>
+      <MarketplaceBrandHeader />
 
       <div className="mt-3 flex h-11 items-center gap-2">
         <form onSubmit={onSearchSubmit} className="min-w-0 flex-1">
