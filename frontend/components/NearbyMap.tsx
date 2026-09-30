@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
-import { ChevronDown, LocateFixed, Menu, Search } from "lucide-react";
+import { ChevronDown, LocateFixed, Search, SlidersHorizontal } from "lucide-react";
 import { getApiUrl } from "../lib/apiUrl";
 import {
   GEOCODE_DEBOUNCE_MS,
@@ -561,73 +561,88 @@ export function NearbyMap({ open, onClose }: { open: boolean; onClose: () => voi
         {detent !== "hidden" && (
           <>
             <div ref={chromeRef} className="relative z-10 shrink-0 px-3 pb-2">
-              <div className="flex items-center gap-2">
-                <label
-                  className={cn(
-                    material.regular,
-                    "flex h-11 min-w-0 flex-1 items-center gap-2 rounded-full px-3 text-white",
-                  )}
-                >
-                  <Search size={16} aria-hidden className="shrink-0 text-silver" />
-                  <input
-                    data-testid="nearby-zip"
-                    value={placeQuery}
-                    inputMode="numeric"
-                    autoComplete="postal-code"
-                    disabled={!searchAvailable}
-                    onChange={(event) => {
-                      setPlaceQuery(event.target.value);
-                      setPlaceError(null);
-                    }}
-                    placeholder={zipPlaceholder}
-                    aria-label="US ZIP code"
-                    className="w-full bg-transparent text-sm font-medium text-white outline-none placeholder:text-white/80 disabled:opacity-60"
-                  />
-                </label>
+              <div
+                data-testid="nearby-search-bar"
+                className={cn(
+                  material.regular,
+                  "flex h-11 items-center gap-1 rounded-full pl-3 pr-1 text-white",
+                )}
+              >
+                <Search size={16} aria-hidden className="shrink-0 text-silver" />
+                <input
+                  data-testid="nearby-search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder={zipPlaceholder}
+                  aria-label="Search listings"
+                  className="min-w-0 flex-1 bg-transparent text-sm font-medium text-white outline-none placeholder:text-white/80"
+                />
                 <button
                   type="button"
                   data-testid="nearby-menu-toggle"
                   aria-expanded={menuOpen}
-                  aria-label="Nearby menu"
+                  aria-label="Filters"
                   onClick={() => setMenuOpen((openNow) => !openNow)}
                   className={cn(
-                    material.regular,
-                    "flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white",
-                    menuOpen && "text-chrome",
+                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white",
+                    menuOpen ? "bg-[#00ffa3]/15 text-chrome" : "bg-white/10",
                   )}
                 >
-                  <Menu size={18} aria-hidden />
+                  <SlidersHorizontal size={16} aria-hidden />
                 </button>
               </div>
-              {!searchAvailable ? (
-                <p className="px-3 pt-2 text-[12px] text-silver">{SEARCH_UNAVAILABLE_COPY}</p>
-              ) : null}
-              {placeError ? (
-                <p className="px-3 pt-2 text-[12px] text-rose-300">{placeError}</p>
-              ) : null}
-              {placeHits.length > 0 ? (
-                <div className="mt-2 overflow-hidden rounded-2xl border border-white/10">
-                  {placeHits.map((hit) => (
-                    <button
-                      key={`${hit.lat}:${hit.lng}:${hit.label}`}
-                      type="button"
-                      onClick={() => choosePlace(hit)}
-                      className="block w-full truncate px-3 py-2.5 text-left text-sm text-white hover:bg-white/5"
-                    >
-                      {hit.label}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
               {menuOpen && (
                 <div
                   ref={filterRef}
                   data-testid="nearby-menu"
                   role="dialog"
-                  aria-label="Nearby filters"
-                  className="mt-2 space-y-2 rounded-2xl border border-white/10 bg-[#121a29] p-3"
+                  aria-label="Filters"
+                  className="mt-2 space-y-3 rounded-2xl border border-white/10 bg-[#121a29] p-3"
                 >
-                  <p className="text-[12px] text-silver">US ZIP codes only</p>
+                  <div>
+                    <p
+                      data-testid="nearby-filter-location"
+                      className="text-[12px] font-semibold text-white"
+                    >
+                      Location
+                    </p>
+                    <p className="text-[12px] text-silver">{place.primary}</p>
+                    <p className="text-[12px] text-silver">US ZIP codes only</p>
+                    {!searchAvailable ? (
+                      <p className="pt-1 text-[12px] text-silver">{SEARCH_UNAVAILABLE_COPY}</p>
+                    ) : null}
+                    <input
+                      data-testid="nearby-zip"
+                      value={placeQuery}
+                      inputMode="numeric"
+                      autoComplete="postal-code"
+                      disabled={!searchAvailable}
+                      onChange={(event) => {
+                        setPlaceQuery(event.target.value);
+                        setPlaceError(null);
+                      }}
+                      placeholder="ZIP code"
+                      aria-label="US ZIP code"
+                      className="mt-2 h-10 w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 text-sm text-white outline-none placeholder:text-silver/70 disabled:opacity-60"
+                    />
+                    {placeError ? (
+                      <p className="pt-2 text-[12px] text-rose-300">{placeError}</p>
+                    ) : null}
+                    {placeHits.length > 0 ? (
+                      <div className="mt-2 overflow-hidden rounded-xl border border-white/10">
+                        {placeHits.map((hit) => (
+                          <button
+                            key={`${hit.lat}:${hit.lng}:${hit.label}`}
+                            type="button"
+                            onClick={() => choosePlace(hit)}
+                            className="block w-full truncate px-3 py-2.5 text-left text-sm text-white hover:bg-white/5"
+                          >
+                            {hit.label}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
                   <div className="flex flex-wrap items-center gap-1.5">
                     <div className="relative">
                       <Chip
@@ -714,17 +729,6 @@ export function NearbyMap({ open, onClose }: { open: boolean; onClose: () => voi
                       )}
                     </div>
                   </div>
-                  <label className="block text-[11px] font-semibold uppercase tracking-wide text-silver">
-                    Search listings
-                    <input
-                      data-testid="nearby-search"
-                      value={query}
-                      onChange={(event) => setQuery(event.target.value)}
-                      placeholder="Search listings"
-                      aria-label="Search listings"
-                      className="mt-1 h-10 w-full rounded-2xl border border-white/10 bg-white/[0.04] px-3 text-sm font-medium normal-case tracking-normal text-white outline-none placeholder:text-silver/70"
-                    />
-                  </label>
                 </div>
               )}
               <p

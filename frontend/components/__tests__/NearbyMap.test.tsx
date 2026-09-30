@@ -133,20 +133,27 @@ describe("Nearby map chrome", () => {
     await renderNearby();
 
     const sheet = document.querySelector('[data-testid="nearby-sheet"]') as HTMLElement;
-    const zip = document.querySelector('[data-testid="nearby-zip"]') as HTMLInputElement;
-    expect(sheet.contains(zip)).toBe(true);
-    expect(zip.getAttribute("placeholder")).toBe("Current location");
+    const bar = document.querySelector('[data-testid="nearby-search-bar"]') as HTMLElement;
+    const search = document.querySelector('[data-testid="nearby-search"]') as HTMLInputElement;
+    const filters = document.querySelector('[data-testid="nearby-menu-toggle"]') as HTMLElement;
+    expect(sheet.contains(bar)).toBe(true);
+    expect(bar.contains(search)).toBe(true);
+    expect(bar.contains(filters)).toBe(true);
+    expect(search.getAttribute("placeholder")).toBe("Current location");
+    expect(document.querySelector('[data-testid="nearby-zip"]')).toBeNull();
     expect(document.querySelector('[data-testid="nearby-locate-fab"]')).toBeTruthy();
-    expect(document.querySelector('[data-testid="nearby-menu-toggle"]')).toBeTruthy();
     expect(document.body.textContent).not.toContain("Search nearby");
 
     expect(sheet.dataset.sheetDetent).toBe("peek");
     await act(async () => {
-      document.querySelector<HTMLElement>('[data-testid="nearby-menu-toggle"]')?.click();
+      filters.click();
     });
-    expect(document.querySelector('[data-testid="nearby-filter-type"]')?.textContent).toContain(
-      "Type",
-    );
+    const menu = document.querySelector('[data-testid="nearby-menu"]');
+    expect(menu?.textContent).toContain("Location");
+    expect(menu?.textContent).toContain("Type");
+    expect(menu?.textContent).toContain("Price");
+    expect(menu?.textContent).toContain("Condition");
+    expect(menu?.querySelector('[data-testid="nearby-zip"]')).toBeTruthy();
     expect(document.querySelector('[data-testid="nearby-filter-price"]')?.textContent).toContain(
       "ℏ",
     );
@@ -206,16 +213,20 @@ describe("Nearby map chrome", () => {
 
     await renderNearby();
 
-    const zip = document.querySelector('[data-testid="nearby-zip"]') as HTMLInputElement;
-    expect(zip.getAttribute("placeholder")).toBe("Location off");
-    expect(document.querySelector('[data-testid="nearby-locate-fab"]')).toBeTruthy();
+    const search = document.querySelector('[data-testid="nearby-search"]') as HTMLInputElement;
+    expect(search.getAttribute("placeholder")).toBe("Location off");
+    expect(document.querySelector('[data-testid="nearby-zip"]')).toBeNull();
+    const bar = document.querySelector('[data-testid="nearby-search-bar"]') as HTMLElement;
+    const filters = bar.querySelector('[data-testid="nearby-menu-toggle"]') as HTMLElement;
+    expect(filters).toBeTruthy();
 
     await act(async () => {
-      document.querySelector<HTMLElement>('[data-testid="nearby-menu-toggle"]')?.click();
+      filters.click();
     });
     expect(document.querySelector('[data-testid="nearby-menu"]')?.textContent).toContain(
       "US ZIP codes only",
     );
+    const zip = document.querySelector('[data-testid="nearby-zip"]') as HTMLInputElement;
     await act(async () => {
       setInput(zip, "SW1A");
     });
@@ -236,9 +247,9 @@ describe("Nearby map chrome", () => {
       );
       hit?.click();
     });
-    expect(document.querySelector('[data-testid="nearby-zip"]')?.getAttribute("placeholder")).toBe(
-      "Beverly Hills",
-    );
+    expect(
+      document.querySelector('[data-testid="nearby-search"]')?.getAttribute("placeholder"),
+    ).toBe("Beverly Hills");
     expect(document.querySelector('[data-testid="nearby-menu"]')).toBeNull();
   });
 });
