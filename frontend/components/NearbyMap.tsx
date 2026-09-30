@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { ChevronDown, LocateFixed, Search, SlidersHorizontal } from "lucide-react";
@@ -107,12 +107,40 @@ function Chip({
   );
 }
 
-function FilterMenu({ label, children }: { label: string; children: React.ReactNode }) {
+function FilterMenu({
+  label,
+  testId,
+  children,
+}: {
+  label: string;
+  testId?: string;
+  children: React.ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [opensUp, setOpensUp] = useState(false);
+
+  useLayoutEffect(() => {
+    const menu = ref.current;
+    const anchor = menu?.parentElement;
+    if (!menu || !anchor) return;
+    const anchorRect = anchor.getBoundingClientRect();
+    const dock = document.querySelector('[aria-label="Primary navigation"]');
+    const dockTop = dock?.getBoundingClientRect().top ?? 0;
+    const limit = dockTop > 0 ? dockTop - 8 : window.innerHeight - 96;
+    setOpensUp(limit - anchorRect.bottom < menu.offsetHeight + 8);
+  }, []);
+
   return (
     <div
+      ref={ref}
       role="listbox"
       aria-label={label}
-      className="absolute left-0 top-[calc(100%+6px)] z-30 min-w-[10.5rem] rounded-2xl border border-white/10 bg-[#121a29] p-1 shadow-xl"
+      data-testid={testId}
+      data-placement={opensUp ? "up" : "down"}
+      className={cn(
+        "absolute left-0 z-30 min-w-[10.5rem] rounded-2xl border border-white/10 bg-[#121a29] p-1 shadow-xl",
+        opensUp ? "bottom-[calc(100%+6px)]" : "top-[calc(100%+6px)]",
+      )}
     >
       {children}
     </div>
@@ -752,7 +780,7 @@ export function NearbyMap({ open, onClose }: { open: boolean; onClose: () => voi
                         onClick={() => toggleFilter("distance")}
                       />
                       {filter === "distance" && (
-                        <FilterMenu label="Distance">
+                        <FilterMenu label="Distance" testId="nearby-distance-menu">
                           {NEARBY_DISTANCE_BANDS.map((band) => (
                             <MenuOption
                               key={band.id}

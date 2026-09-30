@@ -154,6 +154,14 @@ describe("Nearby map chrome", () => {
     expect(menu?.textContent).toContain("Price");
     expect(menu?.textContent).toContain("Condition");
     expect(menu?.textContent).toContain("Distance");
+    await act(async () => {
+      document.querySelector<HTMLElement>('[data-testid="nearby-filter-distance"]')?.click();
+    });
+    expect(
+      [...document.querySelectorAll('[data-testid="nearby-distance-menu"] [role="option"]')].map(
+        (option) => option.textContent,
+      ),
+    ).toEqual(["Any distance", "Within 1 mi", "Within 5 mi", "Within 25 mi"]);
     expect(menu?.querySelector('[data-testid="nearby-zip"]')).toBeTruthy();
     expect(document.querySelector('[data-testid="nearby-filter-price"]')?.textContent).toContain(
       "ℏ",
