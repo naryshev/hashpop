@@ -311,6 +311,43 @@ describe("ListingCard softTrust", () => {
     expect(distance.querySelector("svg")?.getAttribute("class")).toContain("text-chrome");
     const heart = document.querySelector('[data-testid="wishlist"]') as HTMLElement;
     expect(heart.dataset.surface).toBe("neutral");
+    const gridMedia = document.querySelector('[data-testid="soft-trust-media"]') as HTMLElement;
+    expect(gridMedia.dataset.media).toBe("grid");
+    expect(gridMedia.className).toContain("aspect-[4/3]");
+  });
+
+  it("uses a short media frame on the Nearby sheet density only", async () => {
+    loadedProfile(49, 50);
+    await renderCard({
+      variant: "softTrust",
+      density: "nearby",
+      item: {
+        id: "lst-near",
+        title: "Sony WH-1000XM5",
+        price: "5",
+        seller,
+        status: "LISTED",
+        requireEscrow: false,
+        category: "Headphones & Audio",
+        condition: "Like new",
+        distanceLabel: "0.5 mi",
+      },
+    });
+    const card = document.querySelector('[data-variant="softTrust"]') as HTMLElement;
+    expect(card.dataset.density).toBe("nearby");
+    expect(card.className).toContain("flex-row");
+    expect(card.className).toContain("h-[104px]");
+    const media = document.querySelector('[data-testid="soft-trust-media"]') as HTMLElement;
+    expect(media.dataset.media).toBe("nearby");
+    expect(media.className).toContain("w-[88px]");
+    expect(media.className).not.toContain("aspect-[4/3]");
+    const title = document.querySelector("h2") as HTMLElement;
+    expect(title.className).toContain("truncate");
+    expect(title.className).not.toContain("min-h-9");
+    expect(document.body.textContent).toContain("Headphones & Audio • Like new");
+    expect(document.querySelector('[data-testid="listing-distance"]')?.textContent).toContain(
+      "0.5 mi",
+    );
   });
 
   it("keeps a low completion percent on silver glass and still shows Escrow", async () => {
@@ -391,6 +428,31 @@ describe("ListingCard softTrust", () => {
     expect(document.querySelector('[data-variant="softTrust"]')).toBeTruthy();
     expect(document.querySelector(".aspect-\\[4\\/3\\]")).toBeTruthy();
     expect(document.querySelector(".aspect-square")).toBeNull();
+  });
+
+  it("shows category and condition under the title when the sheet passes them", async () => {
+    loadedProfile(0, 0);
+    await renderCard({
+      variant: "softTrust",
+      item: {
+        id: "lst-meta",
+        title: "Sony WH-1000XM5",
+        price: "5",
+        seller,
+        status: "LISTED",
+        requireEscrow: false,
+        category: "Headphones & Audio",
+        condition: "Excellent",
+        distanceLabel: "0.8 mi",
+      },
+    });
+    expect(document.querySelector('[data-testid="listing-card-meta"]')?.textContent).toBe(
+      "Headphones & Audio • Excellent",
+    );
+    expect(document.querySelector('[data-testid="listing-distance"]')?.textContent).toContain(
+      "0.8 mi",
+    );
+    expect(document.body.textContent).toContain("ℏ");
   });
 
   it("keeps the glass body and TrustStrip on the default variant", async () => {

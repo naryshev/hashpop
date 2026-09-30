@@ -17,6 +17,9 @@ describe("geocode client helpers", () => {
     expect(geocodeRequestUrl("90210", { lat: 34.05, lng: -118.24 })).toBe(
       "/api/geocode?q=90210&lat=34.05&lng=-118.24",
     );
+    expect(geocodeRequestUrl("90210", { lat: 34.05, lng: -118.24 }, { country: "us" })).toBe(
+      "/api/geocode?q=90210&lat=34.05&lng=-118.24&country=us",
+    );
   });
 
   it("treats 503 payloads as search unavailable", () => {
@@ -72,5 +75,38 @@ describe("MapTiler proxy helpers", () => {
 
   it("shortens place names to city, region", () => {
     expect(shortPlaceLabel("Austin, Texas, United States")).toBe("Austin, Texas");
+  });
+
+  it("limits a US postal lookup to the United States", () => {
+    const url = maptilerForwardUrl("90210", "test-key", undefined, {
+      country: "us",
+      types: "postal_code",
+    });
+    expect(url).toContain("country=us");
+    expect(url).toContain("types=postal_code");
+    const hits = parseMaptilerFeatures(
+      {
+        features: [
+          {
+            place_name: "Beverly Hills, California, United States",
+            center: [-118.41, 34.09],
+            properties: { country_code: "us" },
+          },
+          {
+            place_name: "Toronto, Ontario, Canada",
+            center: [-79.38, 43.65],
+            properties: { country_code: "ca" },
+          },
+          {
+            place_name: "Somewhere",
+            center: [-79.38, 43.65],
+          },
+        ],
+      },
+      { country: "us" },
+    );
+    expect(hits).toEqual([
+      { label: "Beverly Hills, California", lat: 34.09, lng: -118.41, countryCode: "us" },
+    ]);
   });
 });
