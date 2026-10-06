@@ -28,6 +28,7 @@ import {
   type DealListing,
   type MeetupCard,
 } from "../lib/dealRoom";
+import { bucketInboxConversations, inboxListPhase } from "../lib/inboxBuckets";
 
 type InboxConversation = {
   otherAddress: string;
@@ -279,6 +280,9 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
   const [replyBody, setReplyBody] = useState("");
   const [sending, setSending] = useState(false);
   const [listingPreviews, setListingPreviews] = useState<Record<string, ListingPreview>>({});
+  // Listing fetches that finished without a seller. Those threads are no longer
+  // "role pending" — leaving them pending would spin the Buying tab forever.
+  const [failedListings, setFailedListings] = useState<Readonly<Record<string, true>>>({});
   const [msgTab, setMsgTab] = useState<MsgTab>("buying");
   const [lockEscrowOpen, setLockEscrowOpen] = useState(false);
   const dismissedLockRef = useRef<string | null>(null);
@@ -302,17 +306,27 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
     }
   }, []);
 
+  const markListingFailed = useCallback((listingId: string) => {
+    setFailedListings((prev) => (prev[listingId] ? prev : { ...prev, [listingId]: true }));
+  }, []);
+
   const fetchListingPreview = useCallback(
     async (listingId: string) => {
       if (!listingId) return;
-      if (listingPreviews[listingId]) return;
+      if (listingPreviews[listingId] || failedListings[listingId]) return;
       if (listingFetchInFlight.current.has(listingId)) return;
       listingFetchInFlight.current.add(listingId);
       try {
         const res = await fetch(`${getApiUrl()}/api/listing/${encodeListingIdForUrl(listingId)}`);
-        if (!res.ok) return;
+        if (!res.ok) {
+          markListingFailed(listingId);
+          return;
+        }
         const data = await res.json();
-        if (!data?.listing) return;
+        if (!data?.listing) {
+          markListingFailed(listingId);
+          return;
+        }
         const l = data.listing;
         setListingPreviews((prev) => ({
           ...prev,
@@ -338,12 +352,12 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
           },
         }));
       } catch {
-        // best-effort
+        markListingFailed(listingId);
       } finally {
         listingFetchInFlight.current.delete(listingId);
       }
     },
-    [listingPreviews],
+    [failedListings, listingPreviews, markListingFailed],
   );
 
   useEffect(() => {
@@ -582,34 +596,21 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
   // Bucket conversations into Buying / Selling / Direct / Offers, each sorted
   // by most-recent activity. Offer threads are detected from the preview text
   // the offer flow writes; buying vs selling comes from whether the connected
-  // wallet is the listing's seller.
-  const byRecency = (a: InboxConversation, b: InboxConversation) =>
-    new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime();
-  const buckets = useMemo(() => {
-    const myAddr = (address ?? "").toLowerCase();
-    const b: Record<MsgTab, InboxConversation[]> = {
-      buying: [],
-      selling: [],
-      direct: [],
-      offers: [],
-    };
-    for (const c of conversations) {
-      if (/\boffer\b/i.test(c.preview ?? "")) {
-        b.offers.push(c);
-        continue;
-      }
-      if (!c.listingId) {
-        b.direct.push(c);
-        continue;
-      }
-      const l = listingPreviews[c.listingId];
-      if (l && myAddr && l.seller?.toLowerCase() === myAddr) b.selling.push(c);
-      else b.buying.push(c);
-    }
-    (Object.keys(b) as MsgTab[]).forEach((k) => b[k].sort(byRecency));
-    return b;
-  }, [conversations, listingPreviews, address]);
+  // wallet is the listing's seller. Unresolved listing roles stay out of both
+  // tabs so Selling rows cannot paint on Buying while previews load.
+  const failedListingIds = useMemo(() => new Set(Object.keys(failedListings)), [failedListings]);
+  const { buckets, rolePending } = useMemo(
+    () => bucketInboxConversations(conversations, listingPreviews, failedListingIds, address),
+    [conversations, listingPreviews, failedListingIds, address],
+  );
   const hasConversations = conversations.length > 0;
+  const listPhase = inboxListPhase({
+    inboxLoading,
+    hasConversations,
+    tab: msgTab,
+    visibleCount: buckets[msgTab].length,
+    rolePending,
+  });
 
   // Custom scroll indicator for the conversation list — the native scrollbar
   // is hidden and replaced with a gradient pill that slides with scroll.
@@ -746,7 +747,7 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
             ? "flex h-full min-h-0 flex-1 flex-col space-y-4 p-4"
             : selectedThread
               ? "sm:max-w-6xl sm:mx-auto sm:px-6 sm:py-6 sm:space-y-6"
-              : "max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6"
+              : "max-w-6xl mx-auto space-y-6 px-4 pb-6 pt-3 sm:px-6 md:py-6"
         }
       >
         <div
@@ -808,6 +809,7 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
                         <button
                           key={t.key}
                           type="button"
+                          data-testid={`inbox-tab-${t.key}`}
                           onClick={() => setMsgTab(t.key)}
                           className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors duration-300 ${
                             isActive
@@ -828,15 +830,29 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
                     })}
                   </div>
 
-                  {inboxLoading ? (
-                    <p className="px-4 py-3 text-silver text-sm">Loading…</p>
-                  ) : !hasConversations ? (
-                    <p className="px-4 py-3 text-silver text-sm">
+                  {listPhase === "loading" ? (
+                    <p
+                      data-testid="inbox-list"
+                      data-phase="loading"
+                      className="px-4 py-3 text-silver text-sm"
+                    >
+                      Loading…
+                    </p>
+                  ) : listPhase === "empty-inbox" ? (
+                    <p
+                      data-testid="inbox-list"
+                      data-phase="empty-inbox"
+                      className="px-4 py-3 text-silver text-sm"
+                    >
                       No conversations yet. Message a seller from a listing or their profile to
                       start a chat.
                     </p>
-                  ) : buckets[msgTab].length === 0 ? (
-                    <p className="px-4 py-3 text-silver text-sm">
+                  ) : listPhase === "empty-tab" ? (
+                    <p
+                      data-testid="inbox-list"
+                      data-phase="empty-tab"
+                      className="px-4 py-3 text-silver text-sm"
+                    >
                       {msgTab === "buying"
                         ? "No buying conversations yet."
                         : msgTab === "selling"
@@ -846,7 +862,11 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
                             : "No offer messages yet."}
                     </p>
                   ) : (
-                    <ul className="space-y-1.5 px-2 pt-2">
+                    <ul
+                      data-testid="inbox-list"
+                      data-phase="rows"
+                      className="space-y-1.5 px-2 pt-2"
+                    >
                       {buckets[msgTab].map((c) => renderConversationRow(c))}
                     </ul>
                   )}

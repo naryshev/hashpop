@@ -200,7 +200,7 @@ export default function CartPage() {
 
   return (
     <main className="min-h-screen">
-      <div className="mx-auto max-w-3xl space-y-4 px-4 py-6 sm:px-6">
+      <div className="mx-auto max-w-3xl space-y-4 px-4 pb-6 pt-3 sm:px-6 md:py-6">
         <div className="flex items-center gap-2">
           <ShoppingCart size={18} className="text-chrome" />
           <h1 className="text-lg font-bold text-white">Cart</h1>
