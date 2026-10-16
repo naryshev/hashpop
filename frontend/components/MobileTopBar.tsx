@@ -11,7 +11,7 @@ import { profileHref } from "./MarketplaceBrandHeader";
  * Mobile page header (demo-video style): Hashpop logo + wordmark on the left,
  * notification bell and the green wallet pill on the right. The pill goes
  * straight to the signed-in profile. Used on mobile pages that are not the
- * marketplace brand header (purchases, offers, map). Cart, Messages, and
+ * marketplace brand header (purchases, map). Cart, Messages, Offers, and
  * Create use MarketplaceBrandHeader.
  */
 export function MobileTopBar({ className = "" }: { className?: string }) {
