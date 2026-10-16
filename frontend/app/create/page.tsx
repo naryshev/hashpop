@@ -933,7 +933,7 @@ function ListingPreviewCard({
           by {account ? `${account.slice(0, 6)}…${account.slice(-4)}` : "you"} · ★ 5.0
         </p>
         <div className="flex items-baseline justify-between mt-2.5">
-          <span className="text-lg font-extrabold text-chrome">{displayPrice}</span>
+          <span className="font-mono text-lg font-extrabold text-chrome">{displayPrice}</span>
           <span className="text-[11px] font-mono text-silver truncate ml-2">{location || "—"}</span>
         </div>
         <div className="flex flex-wrap gap-1.5 mt-2.5">

@@ -43,7 +43,7 @@ export function ItemRow({
         <div className="mt-0.5 truncate font-mono text-[11px] text-muted">by {seller}</div>
       </div>
       <div className="shrink-0 text-right">
-        <div className={cn("font-bold text-chrome", compact ? "text-sm" : "text-base")}>
+        <div className={cn("font-mono font-bold text-chrome", compact ? "text-sm" : "text-base")}>
           {priceHbar} ℏ
         </div>
         {priceUsd && <div className="text-[10px] text-muted">{priceUsd}</div>}

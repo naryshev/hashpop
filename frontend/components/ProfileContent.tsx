@@ -248,7 +248,7 @@ export function ProfileContent({
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <h2 className="flex items-center gap-1.5 text-2xl font-bold text-white sm:text-3xl">
+            <h2 className="flex items-center gap-1.5 font-display text-2xl font-bold text-white sm:text-3xl">
               <span className="truncate">{title}</span>
               {isVerified && (
                 <BadgeCheck size={22} className="shrink-0 text-chrome" aria-label="KYC verified" />

@@ -84,7 +84,7 @@ export default function NearbyMapInner({
             >
               <span
                 className={cn(
-                  "whitespace-nowrap rounded-full border px-2 py-1 text-[11px] font-bold leading-none shadow-[0_6px_16px_rgba(0,0,0,0.35)]",
+                  "whitespace-nowrap rounded-full border px-2 py-1 font-mono text-[11px] font-bold leading-none shadow-[0_6px_16px_rgba(0,0,0,0.35)]",
                   active
                     ? "border-chrome bg-chrome text-[#04150f]"
                     : "border-white/15 bg-[#121a29]/95 text-chrome",

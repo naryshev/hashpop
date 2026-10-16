@@ -183,7 +183,7 @@ export const AdminDeals = forwardRef<
                   <AdminWallet address={d.seller} isAdmin={d.sellerIsAdmin} />
                 </div>
                 <div className="mt-1 flex items-center justify-between text-xs text-silver">
-                  <span className="tabular-nums text-white">{d.amountHbar} ℏ</span>
+                  <span className="font-mono text-white">{d.amountHbar} ℏ</span>
                   <Link
                     href={listingHref(d.listingId)}
                     target="_blank"

@@ -156,7 +156,7 @@ function PriceRange({
           style={{ zIndex: 4 }}
         />
       </div>
-      <p data-testid="rail-price-label" className="mt-1 text-[13px] text-[#d7fff0]">
+      <p data-testid="rail-price-label" className="mt-1 font-mono text-[13px] text-[#d7fff0]">
         {minValue} ℏ — {maxValue} ℏ
       </p>
     </div>

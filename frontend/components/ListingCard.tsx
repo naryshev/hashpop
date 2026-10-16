@@ -258,7 +258,7 @@ function SoftTrustCard({
             <TrustChipRow chips={chips} compact />
           ) : null}
           <div className="mt-0.5 flex items-baseline justify-between gap-2">
-            <p className="text-[14px] font-bold text-chrome">
+            <p className="font-mono text-[14px] font-bold text-chrome">
               {formatPriceForDisplay(item.price || "0")} <span className="italic">ℏ</span>
             </p>
             {distance ? (
@@ -322,7 +322,12 @@ function SoftTrustCard({
           <TrustChipRow chips={chips} compact={compact} />
         ) : null}
         <div className="mt-auto flex items-baseline justify-between gap-2 pt-1.5">
-          <p className={cn("font-bold text-chrome", compact ? "text-[14px]" : "text-[15px]")}>
+          <p
+            className={cn(
+              "font-mono font-bold text-chrome",
+              compact ? "text-[14px]" : "text-[15px]",
+            )}
+          >
             {formatPriceForDisplay(item.price || "0")} <span className="italic">ℏ</span>
           </p>
           {distance ? (
@@ -392,7 +397,7 @@ export function ListingCard({
             {item.title || formatListingId(item.id) || "Untitled"}
           </h2>
           <div className="mt-2 flex items-center justify-between">
-            <p className="text-[17px] font-bold text-chrome">
+            <p className="font-mono text-[17px] font-bold text-chrome">
               {formatPriceForDisplay(item.price || "0")} <span className="italic">ℏ</span>
             </p>
             {(item.watchlistCount ?? 0) > 0 && (

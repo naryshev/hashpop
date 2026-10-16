@@ -234,7 +234,7 @@ export function BuyButton({
   return (
     <div className="mx-auto w-full max-w-[360px]">
       <p className="flex items-baseline gap-2 text-left">
-        <span className="text-[34px] font-bold leading-none tracking-tight text-chrome">
+        <span className="font-mono text-[34px] font-bold leading-none tracking-tight text-chrome">
           {priceHbarDisplay} <span className="italic">ℏ</span>
         </span>
         {priceUsd && <span className="text-[15px] text-silver/70">(${priceUsd})</span>}

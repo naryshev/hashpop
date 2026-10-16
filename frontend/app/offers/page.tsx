@@ -291,14 +291,14 @@ export default function OffersPage() {
                               <span className="text-silver/70">
                                 {tab === "received" ? "Offer:" : "Your offer:"}{" "}
                               </span>
-                              <span className="font-semibold">
+                              <span className="font-mono font-semibold">
                                 {formatHbarWithUsd(myAmount, usdRate)}
                               </span>
                             </span>
                             {askingHbar && (
                               <span className="text-silver/70">
                                 Asking:{" "}
-                                <span className="text-silver">
+                                <span className="font-mono text-silver">
                                   {formatHbarWithUsd(askingHbar, usdRate)}
                                 </span>
                               </span>

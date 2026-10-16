@@ -1903,7 +1903,7 @@ export default function ListingPage({
                   <p className="text-xs text-silver uppercase tracking-wider mb-1">
                     Your listing price
                   </p>
-                  <p className="text-xl font-bold text-white">
+                  <p className="font-mono text-xl font-bold text-white">
                     {formatHbarWithUsd(
                       apiPriceHbar ?? formatPriceForDisplay(listing.price || "0"),
                       usdRate,
@@ -2138,7 +2138,7 @@ export default function ListingPage({
                       <p className="text-white text-sm font-medium line-clamp-2 leading-tight">
                         {item.title || "Untitled"}
                       </p>
-                      <p className="text-chrome text-sm font-semibold mt-1">
+                      <p className="mt-1 font-mono text-sm font-semibold text-chrome">
                         {item.price ? `${formatPriceForDisplay(item.price)} ℏ` : "—"}
                       </p>
                     </div>

@@ -116,7 +116,7 @@ export function ConfirmPurchaseSheet({
             </p>
           )}
         </div>
-        <p className="shrink-0 text-sm font-extrabold text-chrome">
+        <p className="shrink-0 font-mono text-sm font-extrabold text-chrome">
           {hbar} <span className="italic">{HBAR}</span>
         </p>
       </div>

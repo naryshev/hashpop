@@ -389,7 +389,7 @@ export default function ActivityPage() {
                                   )}
                                 </span>
                                 {e.amountHbar ? (
-                                  <span className="text-chrome">{e.amountHbar} ℏ</span>
+                                  <span className="font-mono text-chrome">{e.amountHbar} ℏ</span>
                                 ) : null}
                                 {e.status ? (
                                   <span className="uppercase tracking-wide text-[10px]">

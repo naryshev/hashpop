@@ -402,7 +402,7 @@ export function AdminMoney() {
                     <span aria-hidden>·</span>
                     <AdminWallet address={deal.seller} isAdmin={deal.sellerIsAdmin} />
                   </span>
-                  <span className="shrink-0 tabular-nums text-white">{deal.amountHbar} ℏ</span>
+                  <span className="shrink-0 font-mono text-white">{deal.amountHbar} ℏ</span>
                 </div>
                 <div className="mt-1 flex items-center justify-between text-xs text-silver">
                   <span>

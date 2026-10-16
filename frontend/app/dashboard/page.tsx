@@ -130,7 +130,7 @@ function SoldItemCard({
             <p className="text-white font-semibold truncate">{listingTitle}</p>
           )}
           <p className="text-silver/70 text-xs mt-0.5 font-mono">Buyer: {shortAddr(sale.buyer)}</p>
-          <p className="text-chrome font-semibold text-sm mt-1">
+          <p className="mt-1 font-mono text-sm font-semibold text-chrome">
             {formatHbarWithUsd(sale.amount, usdRate)}
           </p>
           <p className="text-silver/50 text-xs mt-0.5">{formatListingDate(sale.createdAt)}</p>
@@ -882,7 +882,7 @@ export default function DashboardPage() {
                             >
                               {row.title || formatListingId(row.id) || row.id.slice(0, 10) + "…"}
                             </Link>
-                            <p className="text-chrome font-semibold text-sm mt-auto pt-2">
+                            <p className="mt-auto pt-2 font-mono text-sm font-semibold text-chrome">
                               {formatHbarWithUsd(
                                 formatPriceForDisplay(row.price || row.reservePrice || "0"),
                                 usdRate,

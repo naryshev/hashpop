@@ -1,4 +1,5 @@
 import "./globals.css";
+import { clashDisplay, generalSans, hbarGlyph, plexMono } from "./fonts";
 import { ClientProviders } from "../components/ClientProviders";
 import { BootSplash } from "../components/BootSplash";
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -72,7 +73,11 @@ const BOOT_ERROR_CATCHER = `
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${clashDisplay.variable} ${generalSans.variable} ${plexMono.variable} ${hbarGlyph.variable}`}
+      suppressHydrationWarning
+    >
       <body suppressHydrationWarning>
         <script
           type="application/ld+json"

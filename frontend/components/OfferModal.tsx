@@ -140,7 +140,7 @@ export function OfferModal({ open, onClose, listingId, askingPriceHbar, onOfferS
 
         <div className="mb-2 rounded-lg border-2 border-emerald-500 px-6 py-5 focus-within:ring-2 focus-within:ring-emerald-200">
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-bold text-black">ℏ</span>
+            <span className="font-mono text-3xl font-bold text-black">ℏ</span>
             <input
               ref={inputRef}
               type="number"
@@ -154,7 +154,7 @@ export function OfferModal({ open, onClose, listingId, askingPriceHbar, onOfferS
                   void handleSubmit();
                 }
               }}
-              className="w-full bg-transparent text-3xl font-bold text-black outline-none placeholder:text-black/30"
+              className="w-full bg-transparent font-mono text-3xl font-bold text-black outline-none placeholder:text-black/30"
               placeholder="0"
               aria-label="Offer amount in HBAR"
             />

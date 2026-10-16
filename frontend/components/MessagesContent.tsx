@@ -703,7 +703,9 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
               </div>
               <div className="mt-1 flex items-center gap-1.5">
                 {listing?.price && (
-                  <span className="text-[11px] font-semibold text-chrome">{listing.price} ℏ</span>
+                  <span className="font-mono text-[11px] font-semibold text-chrome">
+                    {listing.price} ℏ
+                  </span>
                 )}
                 {c.listingId && <StatePill stateKey={stateKey} />}
               </div>
@@ -937,7 +939,7 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
                         {selectedListing.title ?? "Listing"}
                       </p>
                       {selectedListing.price && (
-                        <p className="text-[13px] font-bold text-chrome">
+                        <p className="font-mono text-[13px] font-bold text-chrome">
                           {selectedListing.price} ℏ
                         </p>
                       )}

@@ -351,7 +351,7 @@ export default function PurchasesPage() {
                             <span className="mx-1.5 text-white/30">·</span>
                             {formatListingDate(row.createdAt)}
                           </p>
-                          <p className="mt-1 text-sm font-semibold text-white">
+                          <p className="mt-1 font-mono text-sm font-semibold text-white">
                             {formatHbarWithUsd(formatPriceForDisplay(row.amount || "0"), usdRate)}
                           </p>
                         </div>
