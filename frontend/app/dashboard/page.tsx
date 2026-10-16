@@ -3,7 +3,9 @@ import { listingHref } from "../../lib/listingUrl";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { MessageSquare, ChevronDown, ChevronUp, User } from "lucide-react";
+import { ProfileOwnerHeader } from "../../components/ProfileOwnerHeader";
 import { formatPriceForDisplay, groupHbarAmount, withHbarGlyph } from "../../lib/formatPrice";
 import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
@@ -261,6 +263,7 @@ function timeAgo(d: Date | null): string {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const { address, accountId, disconnect, balanceTinybar } = useHashpackWallet();
   const [mounted, setMounted] = useState(false);
   const [stats, setStats] = useState<any>(null);
@@ -555,6 +558,7 @@ export default function DashboardPage() {
 
   return (
     <main className="min-h-screen">
+      <ProfileOwnerHeader title="My Hashpop" onBack={() => router.back()} />
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="glass-card p-6 w-full max-w-sm space-y-4">

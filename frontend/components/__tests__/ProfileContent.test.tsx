@@ -9,6 +9,7 @@ const { wallet } = vi.hoisted(() => ({
   wallet: {
     address: "0xabc0000000000000000000000000000000000001" as string | null,
     accountId: null as string | null,
+    disconnect: vi.fn(async () => {}),
   },
 }));
 
@@ -70,6 +71,7 @@ beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   wallet.address = SELF;
   wallet.accountId = null;
+  wallet.disconnect.mockClear();
   active = [
     {
       id: "coat-1",
@@ -278,5 +280,29 @@ describe("ProfileContent", () => {
     expect(host!.querySelector('[data-testid="profile-tab-reviews"]')).toBeTruthy();
     expect(host!.querySelector('[data-testid="profile-tab-purchased"]')).toBeNull();
     expect(host!.querySelector('a[aria-label="New listing"]')).toBeNull();
+    expect(host!.querySelector('[data-testid="profile-gear"]')).toBeNull();
+  });
+
+  it("keeps sheet destinations in the gear that the profile tabs do not cover", async () => {
+    await renderProfile(SELF);
+    expect(host!.textContent).not.toContain("Your profile");
+    const gear = host!.querySelector('[data-testid="profile-gear"]') as HTMLButtonElement;
+    await act(async () => {
+      gear.click();
+    });
+    const menu = host!.querySelector('[data-testid="profile-gear-menu"]') as HTMLElement;
+    expect(menu.textContent).toContain("Edit profile");
+    expect(menu.querySelector('a[href="/dashboard"]')?.textContent).toContain("My Hashpop");
+    expect(menu.querySelector('a[href="/offers"]')?.textContent).toContain("Offers");
+    expect(menu.querySelector('a[href="/help"]')?.textContent).toContain("Help & support");
+    expect(menu.textContent).not.toContain("Purchases");
+    expect(menu.textContent).not.toContain("Sold");
+    const signOut = Array.from(menu.querySelectorAll("button")).find(
+      (button) => button.textContent === "Sign out",
+    ) as HTMLButtonElement;
+    await act(async () => {
+      signOut.click();
+    });
+    expect(wallet.disconnect).toHaveBeenCalledOnce();
   });
 });

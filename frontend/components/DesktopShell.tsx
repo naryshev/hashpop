@@ -24,9 +24,8 @@ import { useSignInModal } from "../lib/signInModal";
 import { useTopBarSlotFilled, useTopBarSlotRef } from "../lib/topBar";
 import { cn } from "../lib/utils";
 import { Footer } from "./Footer";
-import { MarketplaceBrandHeader } from "./MarketplaceBrandHeader";
+import { MarketplaceBrandHeader, profileHref } from "./MarketplaceBrandHeader";
 import { MobileTopBar } from "./MobileTopBar";
-import { ProfileCardSheet } from "./ProfileCardSheet";
 import { MessagesModal } from "./MessagesModal";
 import { NotificationBell } from "./NotificationBell";
 import { DockBadge } from "./ui/DockBadge";
@@ -108,7 +107,6 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
   const { openSignIn } = useSignInModal();
   const { count: cartCount } = useCart();
   const unreadThreads = useUnreadCount();
-  const [profileOpen, setProfileOpen] = useState(false);
   const [messagesOpen, setMessagesOpen] = useState(false);
 
   // Defer wallet-dependent UI until after hydration. Without this the top bar
@@ -176,7 +174,8 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
   // Mobile page header lives here in the shell — OUTSIDE the route-keyed fade
   // wrapper below — so it stays put on page switches while the content still
   // eases in. Marketplace renders its own mobile header (brand row + search).
-  // Cart, Messages, Create, My Hashpop, and profile share that same brand row.
+  // Cart, Messages, Create, My Hashpop, and profile share that same brand row
+  // (no search or filter). The top inset is hp-brand-safe-top.
   // Focused screens (listing, order, activity…) keep their own back-button chrome.
   const MOBILE_HEADER_ROUTES = [
     "/marketplace",
@@ -195,6 +194,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
     pathname === "/create" ||
     pathname === "/dashboard" ||
     profileRoute;
+  const accountHref = effectiveConnected ? profileHref(address, accountId) : null;
   const isAdminRoute = pathname.startsWith("/admin") || pathname.startsWith("/area51");
   // Full-screen surfaces (open message thread) hide all chrome.
   const [immersive, setImmersive] = useState(false);
@@ -303,10 +303,9 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
               </span>
             </Link>
             <NotificationBell variant="desktop" />
-            {effectiveConnected ? (
-              <button
-                type="button"
-                onClick={() => setProfileOpen(true)}
+            {accountHref ? (
+              <Link
+                href={accountHref}
                 className="flex items-center gap-2 rounded-glass border border-white/10 bg-white/5 px-3 py-1.5 text-xs hover:bg-white/10"
                 aria-label="Open profile"
               >
@@ -314,7 +313,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
                 <span className="font-mono text-white/80">
                   {shortAccount(accountId ?? address ?? "")}
                 </span>
-              </button>
+              </Link>
             ) : (
               <button
                 type="button"
@@ -356,9 +355,6 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
         {showFooter && <Footer />}
       </main>
 
-      {/* Desktop overlays: account menu sheet + messages. Menu rows
-          close the sheet and navigate; messages stay on-page. */}
-      <ProfileCardSheet open={profileOpen} onClose={() => setProfileOpen(false)} />
       <MessagesModal open={messagesOpen} onClose={() => setMessagesOpen(false)} />
     </div>
   );

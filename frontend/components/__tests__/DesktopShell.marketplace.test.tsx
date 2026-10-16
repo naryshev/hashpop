@@ -3,7 +3,14 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DesktopShell } from "../DesktopShell";
 
-const nav = vi.hoisted(() => ({ pathname: "/marketplace" }));
+const { nav, wallet } = vi.hoisted(() => ({
+  nav: { pathname: "/marketplace" },
+  wallet: {
+    isConnected: false,
+    accountId: null as string | null,
+    address: null as string | null,
+  },
+}));
 
 vi.mock("next/link", () => ({
   default: ({
@@ -23,7 +30,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("../../lib/hashpackWallet", () => ({
-  useHashpackWallet: () => ({ isConnected: false, accountId: null, address: null }),
+  useHashpackWallet: () => wallet,
 }));
 
 vi.mock("../../lib/signInModal", () => ({
@@ -40,10 +47,6 @@ vi.mock("../NotificationBell", () => ({
 
 vi.mock("../MessagesModal", () => ({
   MessagesModal: () => null,
-}));
-
-vi.mock("../ProfileCardSheet", () => ({
-  ProfileCardSheet: () => null,
 }));
 
 vi.mock("../Footer", () => ({
@@ -70,6 +73,9 @@ describe("DesktopShell marketplace chrome", () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     nav.pathname = "/marketplace";
+    wallet.isConnected = false;
+    wallet.accountId = null;
+    wallet.address = null;
     window.localStorage.clear();
   });
 
@@ -137,4 +143,30 @@ describe("DesktopShell marketplace chrome", () => {
       expect(wordmark.textContent).not.toBe("messages");
     },
   );
+
+  it("keeps the zero-height desktop bar on create and the brand row on mobile only", async () => {
+    nav.pathname = "/create";
+    await renderShell();
+    const shellHeader = document.querySelector("header.hp-desktop-bar") as HTMLElement;
+    expect(shellHeader.className).toContain("h-0");
+    expect(shellHeader.className).toContain("md:h-14");
+    const brand = document.querySelector('[data-testid="marketplace-brand-header"]') as HTMLElement;
+    expect(brand.parentElement?.className).toBe("hp-brand-safe-top");
+    expect(brand.parentElement?.parentElement?.className).toContain("md:hidden");
+    expect(document.querySelector('[data-testid="mobile-top-bar"]')).toBeNull();
+    expect(document.querySelector('[data-testid="marketplace-search-field"]')).toBeNull();
+    expect(document.querySelector('[data-testid="marketplace-filter-button"]')).toBeNull();
+    expect(document.querySelector('nav[aria-label="Primary navigation"]')).toBeTruthy();
+  });
+
+  it("links the desktop account chip to the profile", async () => {
+    wallet.isConnected = true;
+    wallet.address = "0xabc";
+    nav.pathname = "/purchases";
+    await renderShell();
+    const chip = document.querySelector('[aria-label="Open profile"]') as HTMLAnchorElement;
+    expect(chip.tagName).toBe("A");
+    expect(chip.getAttribute("href")).toBe("/profile/0xabc");
+    expect(document.body.textContent).not.toContain("Your profile");
+  });
 });

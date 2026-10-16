@@ -9,13 +9,12 @@ import {
   ChevronLeft,
   ChevronRight,
   MoreHorizontal,
-  Plus,
-  Settings,
   Share2,
   SlidersHorizontal,
   User,
   Mail,
 } from "lucide-react";
+import { ProfileOwnerHeader } from "./ProfileOwnerHeader";
 import { AddressDisplay } from "./AddressDisplay";
 import { TrustStrip } from "./TrustStrip";
 import { getApiUrl } from "../lib/apiUrl";
@@ -237,7 +236,6 @@ export function ProfileContent({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
-  const [gearOpen, setGearOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [bioOpen, setBioOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -547,7 +545,6 @@ export function ProfileContent({
 
   const enterSelect = (id?: string) => {
     setSelecting(true);
-    setGearOpen(false);
     setFilterOpen(false);
     setSelected(id ? new Set([id]) : new Set());
     setDelistError(null);
@@ -611,132 +608,93 @@ export function ProfileContent({
     <main
       className={cn("mx-auto min-h-screen w-full max-w-[720px]", selecting ? "pb-44" : "pb-28")}
     >
-      <header className="sticky top-0 z-30 bg-bg md:top-14">
-        <div className="grid h-14 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center px-1">
-          <div className="flex justify-start">
-            <button
-              type="button"
-              onClick={goBack}
-              aria-label={selecting ? "Cancel selection" : "Back"}
-              className={iconBtn}
+      {isSelf && !selecting ? (
+        <ProfileOwnerHeader
+          title={title}
+          verified={isVerified}
+          onBack={goBack}
+          onEdit={() => setEditing(true)}
+          notice={notice}
+        />
+      ) : (
+        <header className="sticky top-0 z-30 bg-bg md:top-14">
+          <div className="grid h-14 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center px-1">
+            <div className="flex justify-start">
+              <button
+                type="button"
+                onClick={goBack}
+                aria-label={selecting ? "Cancel selection" : "Back"}
+                className={iconBtn}
+              >
+                <ChevronLeft size={22} />
+              </button>
+            </div>
+            <h1
+              data-testid="profile-handle"
+              className="flex max-w-[60vw] items-center gap-1 text-[17px] font-semibold tracking-tight text-white"
             >
-              <ChevronLeft size={22} />
-            </button>
-          </div>
-          <h1
-            data-testid="profile-handle"
-            className="flex max-w-[60vw] items-center gap-1 text-[17px] font-semibold tracking-tight text-white"
-          >
-            <span className="truncate">{selecting ? `${selected.size} selected` : title}</span>
-            {!selecting && isVerified && (
-              <BadgeCheck size={16} className="shrink-0 text-chrome" aria-label="KYC verified" />
-            )}
-          </h1>
-          <div className="flex items-center justify-end">
-            {selecting ? (
-              <span className="w-11" />
-            ) : isSelf ? (
-              <>
-                <Link href="/create" aria-label="New listing" className={iconBtn}>
-                  <Plus size={22} />
-                </Link>
-                <div className="relative">
+              <span className="truncate">{selecting ? `${selected.size} selected` : title}</span>
+              {!selecting && isVerified && (
+                <BadgeCheck size={16} className="shrink-0 text-chrome" aria-label="KYC verified" />
+              )}
+            </h1>
+            <div className="flex items-center justify-end">
+              {selecting ? (
+                <span className="w-11" />
+              ) : (
+                <>
+                  <Link
+                    href={`/messages?openThread=${encodeURIComponent(address)}`}
+                    aria-label="Message"
+                    className={iconBtn}
+                  >
+                    <Mail size={20} />
+                  </Link>
                   <button
                     type="button"
-                    aria-label="Settings"
-                    aria-expanded={gearOpen}
+                    aria-label="Share profile"
                     className={iconBtn}
-                    onClick={() => {
-                      setGearOpen((open) => !open);
-                      setMoreOpen(false);
-                    }}
+                    onClick={() => void onShare()}
                   >
-                    <Settings size={20} />
+                    <Share2 size={18} />
                   </button>
-                  {gearOpen && (
-                    <div
-                      className={cn(
-                        material.regular,
-                        "absolute right-0 top-11 z-40 w-44 rounded-[14px] p-1",
-                      )}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      aria-label="More"
+                      aria-expanded={moreOpen}
+                      className={iconBtn}
+                      onClick={() => setMoreOpen((open) => !open)}
                     >
-                      <button
-                        type="button"
-                        className="block w-full rounded-[10px] px-3 py-2 text-left text-sm text-white hover:bg-white/10"
-                        onClick={() => {
-                          setGearOpen(false);
-                          setEditing(true);
-                        }}
+                      <MoreHorizontal size={20} />
+                    </button>
+                    {moreOpen && (
+                      <div
+                        className={cn(
+                          material.regular,
+                          "absolute right-0 top-11 z-40 w-40 rounded-[14px] p-1",
+                        )}
                       >
-                        Edit profile
-                      </button>
-                      <Link
-                        href="/dashboard"
-                        className="block rounded-[10px] px-3 py-2 text-sm text-white hover:bg-white/10"
-                        onClick={() => setGearOpen(false)}
-                      >
-                        My Hashpop
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              </>
-            ) : (
-              <>
-                <Link
-                  href={`/messages?openThread=${encodeURIComponent(address)}`}
-                  aria-label="Message"
-                  className={iconBtn}
-                >
-                  <Mail size={20} />
-                </Link>
-                <button
-                  type="button"
-                  aria-label="Share profile"
-                  className={iconBtn}
-                  onClick={() => void onShare()}
-                >
-                  <Share2 size={18} />
-                </button>
-                <div className="relative">
-                  <button
-                    type="button"
-                    aria-label="More"
-                    aria-expanded={moreOpen}
-                    className={iconBtn}
-                    onClick={() => {
-                      setMoreOpen((open) => !open);
-                      setGearOpen(false);
-                    }}
-                  >
-                    <MoreHorizontal size={20} />
-                  </button>
-                  {moreOpen && (
-                    <div
-                      className={cn(
-                        material.regular,
-                        "absolute right-0 top-11 z-40 w-40 rounded-[14px] p-1",
-                      )}
-                    >
-                      <button
-                        type="button"
-                        className="block w-full rounded-[10px] px-3 py-2 text-left text-sm text-white hover:bg-white/10"
-                        onClick={() => {
-                          setMoreOpen(false);
-                          void onShare();
-                        }}
-                      >
-                        Copy link
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
+                        <button
+                          type="button"
+                          className="block w-full rounded-[10px] px-3 py-2 text-left text-sm text-white hover:bg-white/10"
+                          onClick={() => {
+                            setMoreOpen(false);
+                            void onShare();
+                          }}
+                        >
+                          Copy link
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
-        </div>
-        {notice && <p className="px-4 pb-1 text-center text-[12px] text-white/60">{notice}</p>}
-      </header>
+          {notice && <p className="px-4 pb-1 text-center text-[12px] text-white/60">{notice}</p>}
+        </header>
+      )}
 
       <section className="px-4 pt-2">
         <div className="flex items-center gap-4">

@@ -64,11 +64,6 @@ vi.mock("../NotificationBell", () => ({
     ),
 }));
 
-vi.mock("../ProfileCardSheet", () => ({
-  ProfileCardSheet: ({ open }: { open: boolean }) =>
-    open ? createElement("div", { "data-testid": "profile-sheet" }, "profile") : null,
-}));
-
 let root: Root | undefined;
 let host: HTMLElement | undefined;
 
@@ -217,22 +212,19 @@ describe("MarketplaceMobileHeader", () => {
     ).toContain("Filter");
   });
 
-  it("opens the profile sheet from the avatar when signed in", async () => {
+  it("links the avatar straight to the profile when signed in", async () => {
     wallet.isConnected = true;
     wallet.address = "0xabc";
     profile.current = { avatarUrl: "https://cdn.example/a.png", hashpackAvatarUrl: null };
     await renderHeader();
-    const profileButton = document.querySelector(
+    const profileLink = document.querySelector(
       '[data-testid="marketplace-profile"]',
-    ) as HTMLButtonElement;
-    expect(profileButton.getAttribute("aria-label")).toBe("Open profile");
-    expect(profileButton.querySelector("img")?.getAttribute("src")).toBe(
-      "https://cdn.example/a.png",
-    );
-    await act(async () => {
-      profileButton.click();
-    });
-    expect(document.querySelector('[data-testid="profile-sheet"]')).toBeTruthy();
+    ) as HTMLAnchorElement;
+    expect(profileLink.tagName).toBe("A");
+    expect(profileLink.getAttribute("href")).toBe("/profile/0xabc");
+    expect(profileLink.getAttribute("aria-label")).toBe("Open profile");
+    expect(profileLink.querySelector("img")?.getAttribute("src")).toBe("https://cdn.example/a.png");
+    expect(document.body.textContent).not.toContain("Your profile");
     expect(openSignIn).not.toHaveBeenCalled();
   });
 
