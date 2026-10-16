@@ -6,6 +6,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { Capsule } from "@/components/ui/Capsule";
 import { listingCta, material } from "@/lib/materials";
 import { cn } from "@/lib/utils";
+import { withHbarGlyph } from "@/lib/formatPrice";
 import {
   consensusToDate,
   fetchMirrorContractResult,
@@ -160,9 +161,14 @@ export function TxDetailSheet({ open, txId, hashscanHref, onClose }: SheetProps)
           <Section title="Fees">
             <KV
               label="Charged"
-              value={tx?.charged_tx_fee != null ? `${tinybarToHbar(tx.charged_tx_fee)} ℏ` : "—"}
+              value={
+                tx?.charged_tx_fee != null ? withHbarGlyph(tinybarToHbar(tx.charged_tx_fee)) : "—"
+              }
             />
-            <KV label="Max fee" value={tx?.max_fee ? `${tinybarToHbar(tx.max_fee)} ℏ` : "—"} />
+            <KV
+              label="Max fee"
+              value={tx?.max_fee ? withHbarGlyph(tinybarToHbar(tx.max_fee)) : "—"}
+            />
             <KV
               label="Valid duration"
               value={tx?.valid_duration_seconds ? `${tx.valid_duration_seconds}s` : "—"}
@@ -185,7 +191,7 @@ export function TxDetailSheet({ open, txId, hashscanHref, onClose }: SheetProps)
                       )}
                     >
                       {t.amount > 0 ? "+" : ""}
-                      {tinybarToHbar(t.amount)} ℏ
+                      {withHbarGlyph(tinybarToHbar(t.amount))}
                     </span>
                   </div>
                 ))}

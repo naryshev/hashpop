@@ -1,5 +1,5 @@
 import { CATEGORY_GROUPS, canonicalizeCategory } from "./categories";
-import { formatPriceForDisplay } from "./formatPrice";
+import { formatPriceForDisplay, HBAR_GAP, parseHbarAmount, withHbarGlyph } from "./formatPrice";
 import type { ListingType } from "./marketplaceFilters";
 import type { MapBounds } from "./mapTiles";
 
@@ -14,9 +14,9 @@ const DIGITAL_CATEGORIES = new Set(
 
 export const NEARBY_PRICE_BANDS = [
   { id: "any", label: "Any price", chip: "Price ℏ" },
-  { id: "under-25", label: "Under 25 ℏ", chip: "Under 25 ℏ" },
-  { id: "25-100", label: "25–100 ℏ", chip: "25–100 ℏ" },
-  { id: "over-100", label: "100+ ℏ", chip: "100+ ℏ" },
+  { id: "under-25", label: `Under 25${HBAR_GAP}ℏ`, chip: `Under 25${HBAR_GAP}ℏ` },
+  { id: "25-100", label: `25–100${HBAR_GAP}ℏ`, chip: `25–100${HBAR_GAP}ℏ` },
+  { id: "over-100", label: `100+${HBAR_GAP}ℏ`, chip: `100+${HBAR_GAP}ℏ` },
 ] as const;
 
 export type NearbyPriceBand = (typeof NEARBY_PRICE_BANDS)[number]["id"];
@@ -82,13 +82,13 @@ export function isDigitalListingCategory(category: string | null | undefined): b
 }
 
 export function nearbyHbar(price: string | null | undefined): number | null {
-  const amount = Number(formatPriceForDisplay(price));
+  const amount = parseHbarAmount(price);
   return Number.isFinite(amount) ? amount : null;
 }
 
 /** Pin text is the listing price in ℏ. Star ratings are never used. */
 export function nearbyPinLabel(price: string | null | undefined): string {
-  return `${formatPriceForDisplay(price)} ℏ`;
+  return withHbarGlyph(formatPriceForDisplay(price));
 }
 
 export function nearbyCountLabel(count: number): string {

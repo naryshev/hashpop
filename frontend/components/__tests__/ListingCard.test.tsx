@@ -134,7 +134,7 @@ describe("ListingCard softTrust", () => {
     expect(document.querySelector(".aspect-\\[3\\/4\\]")).toBeNull();
     expect(document.querySelector(".bg-gradient-to-t")).toBeNull();
     expect(document.body.textContent).toContain("Sony A7 III body + kit");
-    expect(document.body.textContent).toContain("1240");
+    expect(document.body.textContent).toContain("1,240");
     expect(document.body.textContent).toContain("ℏ");
     const title = document.querySelector("h2") as HTMLElement;
     expect(title.className).toContain("line-clamp-2");

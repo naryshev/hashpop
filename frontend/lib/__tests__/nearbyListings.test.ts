@@ -37,8 +37,9 @@ const baseCriteria = {
 
 describe("nearby price pins", () => {
   it("labels the pin with the ℏ price and never a star rating", () => {
-    expect(nearbyPinLabel("5")).toBe("5 ℏ");
-    expect(nearbyPinLabel("12.5")).toBe("12.5 ℏ");
+    expect(nearbyPinLabel("5")).toBe("5\u2009ℏ");
+    expect(nearbyPinLabel("12.5")).toBe("12.5\u2009ℏ");
+    expect(nearbyPinLabel("1250")).toBe("1,250\u2009ℏ");
     expect(nearbyPinLabel("5")).not.toMatch(/★|⭐|star/i);
   });
 });

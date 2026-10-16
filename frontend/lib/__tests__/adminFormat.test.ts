@@ -61,7 +61,7 @@ describe("activitySentence", () => {
       "Watch created",
     );
     expect(activitySentence({ type: "sale", listingTitle: "Watch", amountHbar: "10" })).toBe(
-      "Watch sold · 10 ℏ",
+      "Watch sold · 10\u2009ℏ",
     );
     expect(
       activitySentence({ type: "listing_updated", listingTitle: "Watch", status: "LOCKED" }),

@@ -9,7 +9,7 @@ import { CategorySearch } from "../../components/CategorySearch";
 import { LocationPicker, type LocationValue } from "../../components/LocationPicker";
 import { ListingVariantsEditor } from "../../components/ListingVariantsEditor";
 import { compressImage } from "../../lib/compressImage";
-import { formatPriceForDisplay } from "../../lib/formatPrice";
+import { groupHbarAmount, hbarAmountPlain, withHbarGlyph } from "../../lib/formatPrice";
 import { LISTING_CONDITIONS } from "../../lib/listingConditions";
 import {
   parseListingVariants,
@@ -225,7 +225,7 @@ function CreatePageContent() {
             lng: typeof item.locationLng === "number" ? item.locationLng : null,
           });
         }
-        setPrice(formatPriceForDisplay(item.price ?? "0"));
+        setPrice(hbarAmountPlain(item.price ?? "0"));
         const urls = item.mediaUrls?.length ? item.mediaUrls : item.imageUrl ? [item.imageUrl] : [];
         duplicateMediaUrlsRef.current = urls;
         setDuplicateMediaCount(urls.length);
@@ -455,7 +455,9 @@ function CreatePageContent() {
           </div>
         )}
         <div className="flex items-center justify-between mb-2">
-          <h1 className="text-xl sm:text-2xl font-bold text-white">Create Listing</h1>
+          <h1 className="text-xl font-semibold tracking-normal text-white sm:text-2xl">
+            Create Listing
+          </h1>
         </div>
 
         {!walletConnected && (
@@ -797,8 +799,8 @@ function CreatePageContent() {
 
               <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-silver">
                 Posting a listing costs HBAR for the Hedera network (gas) fee — no platform fee.
-                Estimated <span className="text-chrome font-medium">~0.01 – 0.05 ℏ</span>; your
-                wallet will show the exact amount.
+                Estimated <span className="text-chrome font-medium">~0.01 – 0.05{"\u2009"}ℏ</span>;
+                your wallet will show the exact amount.
               </div>
 
               {listingSuccess && !(createdListingIdRef.current ?? createdListingId) && (
@@ -894,7 +896,8 @@ function ListingPreviewCard({
   requireEscrow: boolean;
 }) {
   const displayTitle = title.trim() || "Your listing title";
-  const displayPrice = price && Number(price) > 0 ? `${price} ℏ` : "— ℏ";
+  const displayPrice =
+    price && Number(price) > 0 ? withHbarGlyph(groupHbarAmount(price)) : "—\u2009ℏ";
   return (
     <div className="rounded-2xl overflow-hidden bg-white/[0.03] border border-white/10">
       <div className="relative h-48 bg-gradient-to-br from-[#3b3b56] to-[#1a1a2e] flex items-center justify-center text-5xl">

@@ -1,3 +1,5 @@
+import { groupHbarAmount } from "./formatPrice";
+
 /**
  * HBAR/USD rate for display. Fetches from CoinGecko (no key) or uses NEXT_PUBLIC_HBAR_USD.
  */
@@ -37,9 +39,10 @@ export async function fetchHbarUsd(): Promise<number | null> {
 
 /** Format "X HBAR" with optional " ($Y.YY)" when rate is available. */
 export function formatHbarWithUsd(hbarDisplay: string, usdPerHbar: number | null): string {
-  const base = `${hbarDisplay} HBAR`;
+  const numeric = String(hbarDisplay).replace(/,/g, "").trim();
+  const base = `${groupHbarAmount(numeric)} HBAR`;
   if (usdPerHbar == null || usdPerHbar <= 0) return base;
-  const hbarNum = Number(hbarDisplay);
+  const hbarNum = Number(numeric);
   if (Number.isNaN(hbarNum)) return base;
   const usd = hbarNum * usdPerHbar;
   if (usd >= 0.01) return `${base} ($${usd.toFixed(2)})`;

@@ -1,3 +1,5 @@
+import { formatPriceForDisplay, withHbarGlyph } from "./formatPrice";
+
 export function truncateAdminAddr(addr?: string | null): string {
   if (!addr) return "—";
   if (addr.startsWith("0x") && addr.length === 42) {
@@ -53,6 +55,10 @@ export function dealStageFromRow(row: {
   return "Offered";
 }
 
+function amountGlyph(amount: string): string {
+  return withHbarGlyph(formatPriceForDisplay(amount));
+}
+
 export function activitySentence(event: {
   type: string;
   listingTitle?: string | null;
@@ -63,7 +69,9 @@ export function activitySentence(event: {
   const title = event.listingTitle?.trim() || "Listing";
   switch (event.type) {
     case "sale":
-      return event.amountHbar ? `${title} sold · ${event.amountHbar} ℏ` : `${title} sold`;
+      return event.amountHbar
+        ? `${title} sold · ${amountGlyph(event.amountHbar)}`
+        : `${title} sold`;
     case "listing_created":
       return `${title} created`;
     case "listing_updated":
@@ -73,7 +81,9 @@ export function activitySentence(event: {
     case "dispute_opened":
       return `Dispute opened on ${title}`;
     case "offer":
-      return event.amountHbar ? `Offer on ${title} · ${event.amountHbar} ℏ` : `Offer on ${title}`;
+      return event.amountHbar
+        ? `Offer on ${title} · ${amountGlyph(event.amountHbar)}`
+        : `Offer on ${title}`;
     case "admin_delete":
       return `Admin deleted ${title}`;
     default:

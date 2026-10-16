@@ -77,7 +77,7 @@ describe("MarketplaceBrowseRail", () => {
     expect(rail.textContent).not.toMatch(/categor/i);
     expect(rail.textContent).not.toContain("$");
     expect(document.querySelector('[data-testid="rail-price-label"]')?.textContent).toBe(
-      "0 ℏ — 500 ℏ",
+      "0\u2009ℏ — 500\u2009ℏ",
     );
     const all = document.querySelector('[data-testid="rail-type-all"]') as HTMLButtonElement;
     expect(all.getAttribute("aria-pressed")).toBe("true");

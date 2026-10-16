@@ -2,6 +2,7 @@
 // Powers the in-app tx detail sheet on the order/escrow screen so users
 // don't have to bounce out to HashScan for basic on-chain metadata.
 
+import { groupHbarAmount } from "./formatPrice";
 import { activeHederaChain } from "./hederaChains";
 
 const MAINNET = "https://mainnet.mirrornode.hedera.com";
@@ -118,7 +119,7 @@ export function consensusToDate(ts: string | undefined | null): Date | null {
   return new Date(ms);
 }
 
-/** Tinybar → "X.YYYYYYYY" HBAR (no padding zeros). */
+/** Tinybar → grouped HBAR (no padding zeros). */
 export function tinybarToHbar(tinybar: number | string | null | undefined): string {
   if (tinybar == null) return "0";
   const n =
@@ -128,7 +129,7 @@ export function tinybarToHbar(tinybar: number | string | null | undefined): stri
   const whole = n / div;
   const frac = n % div;
   const fracStr = frac.toString().padStart(8, "0").replace(/0+$/, "");
-  return fracStr ? `${sign}${whole}.${fracStr}` : `${sign}${whole}`;
+  return groupHbarAmount(fracStr ? `${sign}${whole}.${fracStr}` : `${sign}${whole}`);
 }
 
 // ─── Account-scoped tx history (for /activity + dashboard sparkline) ────────

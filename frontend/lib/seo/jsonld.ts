@@ -1,4 +1,4 @@
-import { formatPriceForDisplay } from "../formatPrice";
+import { hbarAmountPlain } from "../formatPrice";
 import { getListingMediaUrls } from "../listingMedia";
 import { OFFER_PRICE_CURRENCY, SEO_COPY } from "./copy";
 import { absoluteUrl, CANONICAL_ORIGIN } from "./host";
@@ -56,7 +56,7 @@ export function listingJsonLd(id: string, listing: SeoListing): ListingJsonLd {
   const description = (listing.description || listing.subtitle || name).replace(/\s+/g, " ").trim();
   const offer: ListingOfferJsonLd = {
     "@type": "Offer",
-    price: formatPriceForDisplay(listing.price),
+    price: hbarAmountPlain(listing.price),
     priceCurrency: OFFER_PRICE_CURRENCY,
     url,
   };

@@ -23,7 +23,13 @@ import {
 import { profileAvatarUrl, useProfile } from "../../../lib/profiles";
 import { ChevronLeft, Heart, Share2, Sparkles } from "lucide-react";
 import { cn } from "../../../lib/utils";
-import { formatContractAmountToHbar, formatPriceForDisplay } from "../../../lib/formatPrice";
+import {
+  formatContractAmountToHbar,
+  formatPriceForDisplay,
+  hbarAmountPlain,
+  parseHbarAmount,
+  withHbarGlyph,
+} from "../../../lib/formatPrice";
 import { formatHbarWithUsd } from "../../../lib/hbarUsd";
 import { useHbarUsd } from "../../../hooks/useHbarUsd";
 import { formatListingDate } from "../../../lib/formatDate";
@@ -244,7 +250,7 @@ export default function ListingPage({
   const priceMismatch =
     apiPriceHbar != null &&
     onChainPriceHbar != null &&
-    Math.abs(Number(apiPriceHbar) - Number(onChainPriceHbar)) > 0.0001;
+    Math.abs(parseHbarAmount(apiPriceHbar) - parseHbarAmount(onChainPriceHbar)) > 0.0001;
 
   const fetchListing = useCallback(
     (attempt = 0, clearFirst = true) => {
@@ -296,7 +302,7 @@ export default function ListingPage({
     if (!listing) return;
     setEditTitle(listing.title ?? "");
     setEditDescription(listing.description ?? "");
-    setEditPrice(formatPriceForDisplay(listing.price));
+    setEditPrice(hbarAmountPlain(listing.price));
     setEditCondition(listing.condition ?? "");
     setEditYearOfProduction(listing.yearOfProduction ?? "");
     setEditLocation({
@@ -684,12 +690,13 @@ export default function ListingPage({
     let priceUpdateTxHash: string | null = null;
     let priceSyncFailed = false;
     const currentPriceDisplay = formatPriceForDisplay(listing.price);
+    const currentPricePlain = hbarAmountPlain(listing.price);
     const newPriceDisplay = editPrice.trim();
     const priceChanged =
       newPriceDisplay &&
       !Number.isNaN(Number(newPriceDisplay)) &&
       Number(newPriceDisplay) >= 0 &&
-      newPriceDisplay !== currentPriceDisplay;
+      newPriceDisplay !== currentPricePlain;
     try {
       if (priceChanged) {
         try {
@@ -868,7 +875,7 @@ export default function ListingPage({
   const titleBlockJsx = (
     <div>
       <div className="flex flex-wrap items-start gap-2">
-        <h1 className="min-w-0 flex-1 text-2xl font-extrabold tracking-tight text-white">
+        <h1 className="min-w-0 flex-1 text-2xl font-semibold tracking-normal text-white">
           {editing ? editTitle || displayTitle : displayTitle}
         </h1>
         {!isListed && !isUnconfirmed && (
@@ -921,7 +928,7 @@ export default function ListingPage({
   const mobileTitleBlockJsx = (
     <div>
       <div className="flex flex-wrap items-start gap-2">
-        <h1 className="min-w-0 flex-1 text-2xl font-extrabold tracking-tight text-white">
+        <h1 className="min-w-0 flex-1 text-2xl font-semibold tracking-normal text-white">
           {editing ? editTitle || displayTitle : displayTitle}
         </h1>
         {!isListed && !isUnconfirmed && (
@@ -1331,7 +1338,7 @@ export default function ListingPage({
           priceMismatch &&
           apiPriceHbar &&
           onChainPriceHbar &&
-          Number(apiPriceHbar) < Number(onChainPriceHbar) && (
+          parseHbarAmount(apiPriceHbar) < parseHbarAmount(onChainPriceHbar) && (
             <div className="mb-4 rounded-glass border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
               <strong>Complete the price update:</strong> Your listing is set to {apiPriceHbar} HBAR
               but buyers still see {onChainPriceHbar} HBAR. Click &quot;Configure&quot;, set the
@@ -2139,7 +2146,7 @@ export default function ListingPage({
                         {item.title || "Untitled"}
                       </p>
                       <p className="mt-1 font-mono text-sm font-semibold text-chrome">
-                        {item.price ? `${formatPriceForDisplay(item.price)} ℏ` : "—"}
+                        {item.price ? withHbarGlyph(formatPriceForDisplay(item.price)) : "—"}
                       </p>
                     </div>
                   </Link>

@@ -4,7 +4,7 @@ import { listingHref } from "../../lib/listingUrl";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { MessageSquare, ChevronDown, ChevronUp, User } from "lucide-react";
-import { formatPriceForDisplay } from "../../lib/formatPrice";
+import { formatPriceForDisplay, groupHbarAmount, withHbarGlyph } from "../../lib/formatPrice";
 import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { formatListingDate } from "../../lib/formatDate";
@@ -239,7 +239,12 @@ function KPICard({
         style={{ color: accent }}
       >
         {value}
-        {unit ? <span className="ml-1 text-lg">{unit}</span> : null}
+        {unit ? (
+          <span className={unit === "ℏ" ? "text-lg" : "ml-1 text-lg"}>
+            {unit === "ℏ" ? "\u2009" : null}
+            {unit}
+          </span>
+        ) : null}
       </div>
       {sub ? <div className="mt-1.5 text-[11px] text-silver">{sub}</div> : null}
     </div>
@@ -312,7 +317,7 @@ export default function DashboardPage() {
     const events: Evt[] = [];
     for (const s of allSales) {
       const title = s.listing?.title || (s.listingId ? formatListingId(s.listingId) : "listing");
-      const amount = `${formatPriceForDisplay(s.amount || "0")} ℏ`;
+      const amount = withHbarGlyph(formatPriceForDisplay(s.amount || "0"));
       const targetId = s.listingId ?? s.listing?.id ?? "";
       events.push({
         key: `sale-${s.id}`,
@@ -324,7 +329,7 @@ export default function DashboardPage() {
     }
     for (const o of offerRows) {
       const title = o.listing?.title || "listing";
-      const amount = `${formatPriceForDisplay(o.amount || "0")} ℏ`;
+      const amount = withHbarGlyph(formatPriceForDisplay(o.amount || "0"));
       const verb =
         o.direction === "received"
           ? o.status === "ACCEPTED"
@@ -697,7 +702,7 @@ export default function DashboardPage() {
                     <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-silver">
                       Welcome back
                     </div>
-                    <h1 className="mt-0.5 truncate text-[24px] font-extrabold tracking-[-0.01em] text-white sm:text-[28px]">
+                    <h1 className="mt-0.5 truncate text-[24px] font-semibold tracking-normal text-white sm:text-[28px]">
                       {displayName ?? (accountId ? `@${accountId}` : "My Hashpop")}
                     </h1>
                   </div>
@@ -748,18 +753,18 @@ export default function DashboardPage() {
               <div className="grid gap-3.5 md:grid-cols-4">
                 <KPICard
                   label="Wallet balance"
-                  value={Math.round(tinybarToHbarNum(balanceTinybar)).toLocaleString()}
+                  value={groupHbarAmount(String(Math.round(tinybarToHbarNum(balanceTinybar))))}
                   unit="ℏ"
                   sub={
                     balanceTinybar != null && usdRate
-                      ? `≈ $${Math.round(tinybarToHbarNum(balanceTinybar) * usdRate).toLocaleString()} USD`
+                      ? `≈ $${groupHbarAmount(String(Math.round(tinybarToHbarNum(balanceTinybar) * usdRate)))} USD`
                       : "Connect wallet to view"
                   }
                   accent="#00ffa3"
                 />
                 <KPICard
                   label="In escrow"
-                  value={Math.round(escrowTinybar / 1e8).toLocaleString()}
+                  value={groupHbarAmount(String(Math.round(escrowTinybar / 1e8)))}
                   unit="ℏ"
                   sub={`${purchaseCount + soldItems.length} active orders`}
                   accent="#fbbf24"

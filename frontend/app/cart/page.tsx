@@ -7,12 +7,12 @@ import { ShoppingCart, Trash2 } from "lucide-react";
 import { useCart } from "../../lib/cart";
 import { listingHref } from "../../lib/listingUrl";
 import { getApiUrl } from "../../lib/apiUrl";
-import { formatPriceForDisplay } from "../../lib/formatPrice";
+import { formatPriceForDisplay, HBAR_GAP, parseHbarAmount } from "../../lib/formatPrice";
 import { formatHbarWithUsd } from "../../lib/hbarUsd";
 
 /** Cart amounts use the ℏ glyph so the mono face and the U+210F subset both show. */
 function cartAmount(hbar: string, usdPerHbar: number | null): string {
-  return formatHbarWithUsd(hbar, usdPerHbar).replace(" HBAR", " ℏ");
+  return formatHbarWithUsd(hbar, usdPerHbar).replace(" HBAR", `${HBAR_GAP}\u210F`);
 }
 import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
@@ -104,7 +104,7 @@ export default function CartPage() {
   const totalHbar = useMemo(
     () =>
       buyable.reduce((sum, r) => {
-        const n = Number(formatPriceForDisplay(r.listing!.price || "0"));
+        const n = parseHbarAmount(r.listing!.price || "0");
         return Number.isNaN(n) ? sum : sum + n;
       }, 0),
     [buyable],

@@ -9,7 +9,7 @@ import { getApiUrl } from "../lib/apiUrl";
 import { getTransactionErrorMessage } from "../lib/transactionError";
 import { activeHederaChain } from "../lib/hederaChains";
 import { useHashpackWallet } from "../lib/hashpackWallet";
-import { formatPriceForDisplay } from "../lib/formatPrice";
+import { hbarAmountPlain } from "../lib/formatPrice";
 import { formatHbarWithUsd } from "../lib/hbarUsd";
 import { useHbarUsd } from "../hooks/useHbarUsd";
 
@@ -32,10 +32,7 @@ export function OfferModal({ open, onClose, listingId, askingPriceHbar, onOfferS
   const { send, isPending } = useRobustContractWrite();
   const chainId = activeHederaChain.id;
   const usdRate = useHbarUsd();
-  const initialAmount = useMemo(
-    () => formatPriceForDisplay(askingPriceHbar || "0"),
-    [askingPriceHbar],
-  );
+  const initialAmount = useMemo(() => hbarAmountPlain(askingPriceHbar || "0"), [askingPriceHbar]);
   const [amount, setAmount] = useState(initialAmount);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);

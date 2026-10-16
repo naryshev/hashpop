@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getApiUrl } from "../../lib/apiUrl";
 import { formatRelativeAge, STATUS_PILL_CLASS } from "../../lib/adminFormat";
+import { formatPriceForDisplay, withHbarGlyph } from "../../lib/formatPrice";
 import { AdminWallet } from "./AdminBadge";
 import { listingHref } from "../../lib/listingUrl";
 import {
@@ -361,7 +362,7 @@ export function AdminMoney() {
                       <AdminWallet address={deal.seller} isAdmin={deal.sellerIsAdmin} />
                     </td>
                     <td className="px-3 font-mono text-xs tabular-nums text-white">
-                      {deal.amountHbar}
+                      {formatPriceForDisplay(deal.amountHbar)}
                     </td>
                     <td className="px-3">
                       <StagePill deal={deal} />
@@ -402,7 +403,9 @@ export function AdminMoney() {
                     <span aria-hidden>·</span>
                     <AdminWallet address={deal.seller} isAdmin={deal.sellerIsAdmin} />
                   </span>
-                  <span className="shrink-0 font-mono text-white">{deal.amountHbar} ℏ</span>
+                  <span className="shrink-0 font-mono text-white">
+                    {withHbarGlyph(formatPriceForDisplay(deal.amountHbar))}
+                  </span>
                 </div>
                 <div className="mt-1 flex items-center justify-between text-xs text-silver">
                   <span>

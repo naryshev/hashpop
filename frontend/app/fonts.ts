@@ -43,6 +43,7 @@ export const plexMono = localFont({
 
 /**
  * Single-glyph face. unicode-range keeps it from painting any other character.
+ * size-adjust pulls the subset down to about 0.9em so ℏ sits with the digits.
  * The italic src is the same file so an existing italic ℏ does not get a faux slant.
  */
 export const hbarGlyph = localFont({
@@ -54,5 +55,8 @@ export const hbarGlyph = localFont({
   variable: "--font-hbar",
   adjustFontFallback: false,
   preload: true,
-  declarations: [{ prop: "unicode-range", value: "U+210F" }],
+  declarations: [
+    { prop: "unicode-range", value: "U+210F" },
+    { prop: "size-adjust", value: "90%" },
+  ],
 });

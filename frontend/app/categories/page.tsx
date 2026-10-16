@@ -44,7 +44,7 @@ export default async function CategoriesPage() {
     <main className="min-h-screen">
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         <header className="mb-8">
-          <h1 className="text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
+          <h1 className="text-2xl font-semibold tracking-normal text-white sm:text-3xl">
             Browse by category
           </h1>
           <p className="mt-2 text-sm text-silver">

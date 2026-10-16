@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { material } from "@/lib/materials";
+import { formatPriceForDisplay, withHbarGlyph } from "@/lib/formatPrice";
 import { cn } from "@/lib/utils";
 
 export function ReleaseConfirmModal({
@@ -26,11 +27,13 @@ export function ReleaseConfirmModal({
       onClose={onCancel}
       detent="medium"
       dismissible={!submitting}
-      title={`Release ${amount} ℏ?`}
+      title={`Release ${withHbarGlyph(formatPriceForDisplay(amount))}?`}
       footer={
         <div className="flex flex-col gap-2">
           <Button onClick={onConfirm} disabled={submitting}>
-            {submitting ? "Submitting…" : `Yes, release ${amount} ℏ`}
+            {submitting
+              ? "Submitting…"
+              : `Yes, release ${withHbarGlyph(formatPriceForDisplay(amount))}`}
           </Button>
           <Button variant="gray" onClick={onCancel} disabled={submitting}>
             Cancel

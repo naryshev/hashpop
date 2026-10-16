@@ -94,7 +94,7 @@ describe("NearbyMapInner price pins", () => {
     });
 
     const pin = document.querySelector('[data-testid="nearby-price-pin"]');
-    expect(pin?.getAttribute("aria-label")).toBe("Sony WH-1000XM5, 5 ℏ");
+    expect(pin?.getAttribute("aria-label")).toBe("Sony WH-1000XM5, 5\u2009ℏ");
     expect(pin?.textContent).toContain("ℏ");
     expect(pin?.textContent).not.toMatch(/★|⭐/);
     const marker = pin?.closest("[data-lng]");

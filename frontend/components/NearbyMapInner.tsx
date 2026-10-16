@@ -75,7 +75,7 @@ export default function NearbyMapInner({
               type="button"
               data-testid="nearby-price-pin"
               data-active={active ? "true" : "false"}
-              aria-label={`${name}, ${amount} ℏ`}
+              aria-label={`${name}, ${amount}\u2009ℏ`}
               onClick={(event) => {
                 event.stopPropagation();
                 onSelect(item.id);
@@ -90,7 +90,8 @@ export default function NearbyMapInner({
                     : "border-white/15 bg-[#121a29]/95 text-chrome",
                 )}
               >
-                {amount} <span className="italic">ℏ</span>
+                {amount}
+                <span className="italic">{"\u2009ℏ"}</span>
               </span>
               <span
                 aria-hidden

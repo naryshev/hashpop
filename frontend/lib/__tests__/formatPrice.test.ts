@@ -70,6 +70,14 @@ describe("formatPriceForDisplay", () => {
     expect(formatPriceForDisplay("84")).toBe("84");
   });
 
+  it("groups thousands with Intl.NumberFormat", () => {
+    expect(formatPriceForDisplay("1250")).toBe("1,250");
+    expect(formatPriceForDisplay("1250.5")).toBe("1,250.5");
+    expect(formatPriceForDisplay("1,250")).toBe("1,250");
+    expect(formatPriceWeiToHbar("1250000000000000000000")).toBe("1,250");
+    expect(formatTinybarToHbar("125000000000")).toBe("1,250");
+  });
+
   it("converts long numeric strings as wei", () => {
     expect(formatPriceForDisplay("1000000000000000000")).toBe("1");
   });

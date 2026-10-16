@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getApiUrl } from "../../lib/apiUrl";
+import { formatPriceForDisplay } from "../../lib/formatPrice";
 import { material } from "../../lib/materials";
 import { useAdminSession } from "./AdminShell";
 import { AdminActivity, type ActivityEvent } from "./AdminActivity";
@@ -210,7 +211,7 @@ export function AdminOverview() {
         />
         <KpiCard
           label="Volume ℏ"
-          value={stats ? stats.sales.volumeHbar : "—"}
+          value={stats ? formatPriceForDisplay(stats.sales.volumeHbar) : "—"}
           accent="#ffffff"
           loading={loading && !stats}
         />

@@ -4,6 +4,7 @@ import { forwardRef } from "react";
 import Link from "next/link";
 import { listingHref } from "../../lib/listingUrl";
 import { formatRelativeAge, listingStatusPill, STATUS_PILL_CLASS } from "../../lib/adminFormat";
+import { formatPriceForDisplay, withHbarGlyph } from "../../lib/formatPrice";
 import { material } from "../../lib/materials";
 import { AdminWallet } from "./AdminBadge";
 
@@ -213,7 +214,9 @@ export const AdminListings = forwardRef<
                   >
                     {pill.label}
                   </span>
-                  <span className="font-mono text-xs tabular-nums text-white">{l.price} ℏ</span>
+                  <span className="font-mono text-xs tabular-nums text-white">
+                    {withHbarGlyph(formatPriceForDisplay(l.price))}
+                  </span>
                 </summary>
                 <div className="mt-2 flex items-center justify-between text-xs text-silver">
                   <AdminWallet address={l.seller} isAdmin={l.sellerIsAdmin} />

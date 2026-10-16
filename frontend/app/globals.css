@@ -209,6 +209,37 @@ a,
   h1 {
     font-family: var(--font-display), var(--font-hbar), ui-sans-serif, system-ui, sans-serif;
   }
+
+  /*
+   * Clash Display over 22px (text-2xl is 24px) crams when it is heavier than
+   * 600 or tracked tighter than 0. Page titles and .font-display share this.
+   */
+  h1.text-2xl,
+  h1.text-3xl,
+  h1.text-4xl,
+  h1.sm\:text-2xl,
+  h1.sm\:text-3xl,
+  h1.sm\:text-4xl,
+  h1[class~="text-[24px]"],
+  h1[class~="text-[28px]"],
+  h1[class~="text-[32px]"],
+  h1[class~="sm:text-[24px]"],
+  h1[class~="sm:text-[28px]"],
+  h1[class~="sm:text-[32px]"],
+  .font-display.text-2xl,
+  .font-display.text-3xl,
+  .font-display.text-4xl,
+  .font-display.sm\:text-2xl,
+  .font-display.sm\:text-3xl,
+  .font-display[class~="text-[24px]"],
+  .font-display[class~="text-[28px]"],
+  .font-display[class~="text-[32px]"],
+  .font-display[class~="sm:text-[24px]"],
+  .font-display[class~="sm:text-[28px]"],
+  .font-display[class~="sm:text-[32px]"] {
+    font-weight: 600;
+    letter-spacing: 0;
+  }
 }
 
 @layer components {

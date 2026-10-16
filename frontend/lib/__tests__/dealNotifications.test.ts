@@ -77,7 +77,7 @@ describe("buildDealNotifications", () => {
     expect(items.some((i) => i.kind === "ship" && i.title === "Item shipped")).toBe(true);
     expect(items.some((i) => i.kind === "rating" && i.title === "New rating")).toBe(true);
     expect(items.every((i) => i.kind !== ("message" as DealKind))).toBe(true);
-    expect(items.find((i) => i.title === "New offer")?.body).toBe("12 ℏ on Polaroid");
+    expect(items.find((i) => i.title === "New offer")?.body).toBe("12\u2009ℏ on Polaroid");
   });
 
   it("uses sentence-case titles and a one-line body", () => {

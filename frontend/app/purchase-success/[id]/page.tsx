@@ -7,7 +7,7 @@ import Link from "next/link";
 import { getApiUrl } from "../../../lib/apiUrl";
 import { getTransactionExplorerUrl } from "../../../lib/explorer";
 import { activeHederaChain } from "../../../lib/hederaChains";
-import { formatPriceForDisplay } from "../../../lib/formatPrice";
+import { formatPriceForDisplay, withHbarGlyph } from "../../../lib/formatPrice";
 import { formatHbarWithUsd } from "../../../lib/hbarUsd";
 import { useHbarUsd } from "../../../hooks/useHbarUsd";
 
@@ -71,13 +71,13 @@ export default function PurchaseSuccessPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-white">
+          <h1 className="text-2xl font-semibold tracking-normal text-white">
             {listing?.requireEscrow === false ? "Purchase complete" : "Funds locked in escrow"}
           </h1>
           <p className="text-silver text-sm mt-2 max-w-sm">
             The seller has been notified.
             {listing?.requireEscrow !== false && priceDisplay
-              ? ` ${formatPriceForDisplay(listing?.price ?? "0")} ℏ releases when you confirm delivery.`
+              ? ` ${withHbarGlyph(formatPriceForDisplay(listing?.price ?? "0"))} releases when you confirm delivery.`
               : ""}
           </p>
           {txHash && (

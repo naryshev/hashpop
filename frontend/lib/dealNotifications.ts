@@ -1,4 +1,4 @@
-import { formatPriceForDisplay } from "./formatPrice";
+import { formatPriceForDisplay, withHbarGlyph } from "./formatPrice";
 import { listingHref } from "./listingUrl";
 
 export const DEAL_UPDATES_EMPTY_TITLE = "No updates yet.";
@@ -65,7 +65,7 @@ function listingTitle(title?: string | null): string {
 
 function amountLabel(amount?: string): string {
   if (!amount) return "";
-  return `${formatPriceForDisplay(amount)} ℏ`;
+  return withHbarGlyph(formatPriceForDisplay(amount));
 }
 
 export function formatRelativeTime(when: Date, now = new Date()): string {
