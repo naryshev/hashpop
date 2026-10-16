@@ -704,9 +704,7 @@ export default function DashboardPage() {
                     </div>
                   )}
                   <div className="min-w-0">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-silver">
-                      Welcome back
-                    </div>
+                    <div className="text-[13px] font-medium text-silver">Welcome back</div>
                     <h1 className="mt-0.5 truncate text-[24px] font-semibold tracking-normal text-white sm:text-[28px]">
                       {displayName ?? (accountId ? `@${accountId}` : "My Hashpop")}
                     </h1>
