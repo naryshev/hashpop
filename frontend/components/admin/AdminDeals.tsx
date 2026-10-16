@@ -9,6 +9,7 @@ import {
   STATUS_PILL_CLASS,
   type ListingStatusTone,
 } from "../../lib/adminFormat";
+import { formatPriceForDisplay, withHbarGlyph } from "../../lib/formatPrice";
 import { material } from "../../lib/materials";
 import { AdminWallet } from "./AdminBadge";
 
@@ -121,7 +122,7 @@ export const AdminDeals = forwardRef<
                       <AdminWallet address={d.seller} isAdmin={d.sellerIsAdmin} />
                     </td>
                     <td className="px-3 font-mono text-xs tabular-nums text-white">
-                      {d.amountHbar}
+                      {formatPriceForDisplay(d.amountHbar)}
                     </td>
                     <td className="px-3">
                       <span
@@ -183,7 +184,9 @@ export const AdminDeals = forwardRef<
                   <AdminWallet address={d.seller} isAdmin={d.sellerIsAdmin} />
                 </div>
                 <div className="mt-1 flex items-center justify-between text-xs text-silver">
-                  <span className="tabular-nums text-white">{d.amountHbar} ℏ</span>
+                  <span className="font-mono text-white">
+                    {withHbarGlyph(formatPriceForDisplay(d.amountHbar))}
+                  </span>
                   <Link
                     href={listingHref(d.listingId)}
                     target="_blank"

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Fuse from "fuse.js";
 import { ListingCard } from "../../components/ListingCard";
-import { formatPriceForDisplay } from "../../lib/formatPrice";
+import { parseHbarAmount } from "../../lib/formatPrice";
 import { canonicalizeCategory, CATEGORY_GROUPS } from "../../lib/categories";
 import { getApiUrl } from "../../lib/apiUrl";
 import { useProfiles } from "../../lib/profiles";
@@ -237,7 +237,7 @@ export default function MarketplacePageClient({
     const maxAgeMs = postedDays ? postedDays * 24 * 60 * 60 * 1000 : null;
 
     const filtered = queryMatched.filter((item) => {
-      const hbar = Number(formatPriceForDisplay(item.price || "0"));
+      const hbar = parseHbarAmount(item.price || "0");
       if (min != null && (Number.isNaN(hbar) || hbar < min)) return false;
       if (max != null && (Number.isNaN(hbar) || hbar > max)) return false;
       if (maxAgeMs != null) {
@@ -254,7 +254,7 @@ export default function MarketplacePageClient({
 
     const sorted = [...filtered];
     const priceOf = (i: ListingItem) => {
-      const n = Number(formatPriceForDisplay(i.price || "0"));
+      const n = parseHbarAmount(i.price || "0");
       return Number.isNaN(n) ? 0 : n;
     };
     if (sortMode === "price-asc") sorted.sort((a, b) => priceOf(a) - priceOf(b));
@@ -374,7 +374,7 @@ export default function MarketplacePageClient({
   const priceCeiling = useMemo(() => {
     let highest = 0;
     for (const item of items) {
-      const n = Number(formatPriceForDisplay(item.price || "0"));
+      const n = parseHbarAmount(item.price || "0");
       if (!Number.isNaN(n)) highest = Math.max(highest, n);
     }
     if (highest <= RAIL_PRICE_CEILING) return RAIL_PRICE_CEILING;

@@ -13,7 +13,11 @@ import { escrowAbi, escrowAddress } from "@/lib/contracts";
 import { activeHederaChain } from "@/lib/hederaChains";
 import { getTransactionErrorMessage } from "@/lib/transactionError";
 import { getTransactionExplorerUrl } from "@/lib/explorer";
-import { formatContractAmountToHbar, formatPriceForDisplay } from "@/lib/formatPrice";
+import {
+  formatContractAmountToHbar,
+  formatPriceForDisplay,
+  withHbarGlyph,
+} from "@/lib/formatPrice";
 import { getListingMediaUrls } from "@/lib/listingMedia";
 import { ConnectWalletButton } from "@/components/ConnectWalletButton";
 import { AddressDisplay } from "@/components/AddressDisplay";
@@ -603,7 +607,9 @@ function StatusBlock({
   if (phase === "refunded") {
     return (
       <div className="rounded-control border border-danger/30 bg-danger/10 p-4.5 text-center">
-        <div className="text-sm font-semibold text-fg">{hbar} ℏ returned to the buyer</div>
+        <div className="text-sm font-semibold text-fg">
+          {withHbarGlyph(hbar)} returned to the buyer
+        </div>
         <div className="mt-1 text-[11px] text-muted">
           The escrow timed out before shipment, so the payment was refunded automatically.
         </div>
@@ -616,7 +622,7 @@ function StatusBlock({
       <div className="rounded-control border border-chrome/30 bg-chrome/10 p-4.5 text-center">
         <div className="mb-1.5 text-4xl">✓</div>
         <div className="text-sm font-semibold text-fg">
-          {hbar} ℏ released to {sellerLabel}
+          {withHbarGlyph(hbar)} released to {sellerLabel}
         </div>
         {releasedTxHash ? (
           releaseHref ? (

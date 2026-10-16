@@ -116,12 +116,8 @@ body {
     radial-gradient(900px 500px at 90% -20%, rgba(0, 255, 163, 0.15), transparent 58%),
     radial-gradient(900px 600px at 50% 130%, rgba(109, 223, 133, 0.16), transparent 62%), var(--bg);
   color: var(--text);
-  font-family:
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    "Inter",
-    sans-serif;
+  /* General Sans, then the U+210F subset. Matches Tailwind font-sans. */
+  font-family: var(--font-sans), var(--font-hbar), ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   /* Prevent horizontal overflow on narrow screens */
   overflow-x: hidden;
@@ -206,6 +202,44 @@ button,
 a,
 [role="button"] {
   touch-action: manipulation;
+}
+
+@layer base {
+  /* Clash Display for page titles. Card titles and UI stay on General Sans. */
+  h1 {
+    font-family: var(--font-display), var(--font-hbar), ui-sans-serif, system-ui, sans-serif;
+  }
+
+  /*
+   * Clash Display over 22px (text-2xl is 24px) crams when it is heavier than
+   * 600 or tracked tighter than 0. Page titles and .font-display share this.
+   */
+  h1.text-2xl,
+  h1.text-3xl,
+  h1.text-4xl,
+  h1.sm\:text-2xl,
+  h1.sm\:text-3xl,
+  h1.sm\:text-4xl,
+  h1[class~="text-[24px]"],
+  h1[class~="text-[28px]"],
+  h1[class~="text-[32px]"],
+  h1[class~="sm:text-[24px]"],
+  h1[class~="sm:text-[28px]"],
+  h1[class~="sm:text-[32px]"],
+  .font-display.text-2xl,
+  .font-display.text-3xl,
+  .font-display.text-4xl,
+  .font-display.sm\:text-2xl,
+  .font-display.sm\:text-3xl,
+  .font-display[class~="text-[24px]"],
+  .font-display[class~="text-[28px]"],
+  .font-display[class~="text-[32px]"],
+  .font-display[class~="sm:text-[24px]"],
+  .font-display[class~="sm:text-[28px]"],
+  .font-display[class~="sm:text-[32px]"] {
+    font-weight: 600;
+    letter-spacing: 0;
+  }
 }
 
 @layer components {
@@ -325,6 +359,11 @@ a,
 }
 
 @layer utilities {
+  /* Plex is already tabular. Don't faux-bold weights outside 500/600. */
+  .font-mono {
+    font-synthesis: none;
+    font-variant-numeric: tabular-nums;
+  }
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;

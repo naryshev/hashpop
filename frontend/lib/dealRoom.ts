@@ -1,3 +1,5 @@
+import { formatPriceForDisplay, withHbarGlyph } from "./formatPrice";
+
 export const DEAL_ROOM_EMPTY_HEADLINE = "This is the deal room";
 export const DEAL_ROOM_EMPTY_BODY =
   "Chat here. Lock escrow before you meet. Reputation updates when you both confirm.";
@@ -120,7 +122,7 @@ export function escrowBarFromListing(
   const shipped = !!(listing.shippedAt || listing.trackingNumber);
 
   if (status === "SOLD" || status === "COMPLETED" || listing.exchangeConfirmedAt) {
-    const amount = sale?.amount ? `${sale.amount} ℏ` : null;
+    const amount = sale?.amount ? withHbarGlyph(formatPriceForDisplay(sale.amount)) : null;
     return {
       label: "Complete",
       detail:
@@ -189,7 +191,7 @@ export function escrowSystemCards(
   const locked = listingEscrowLocked(listing) || status === "LOCKED";
 
   if (locked) {
-    const amount = sale?.amount ? ` · ${sale.amount} ℏ` : "";
+    const amount = sale?.amount ? ` · ${withHbarGlyph(formatPriceForDisplay(sale.amount))}` : "";
     cards.push({
       key: "escrow-locked",
       title: "Escrow locked",
@@ -230,7 +232,9 @@ export function escrowSystemCards(
     cards.push({
       key: "complete",
       title: "Trade complete",
-      body: sale?.amount ? `Closed at ${sale.amount} ℏ.` : "This listing is complete.",
+      body: sale?.amount
+        ? `Closed at ${withHbarGlyph(formatPriceForDisplay(sale.amount))}.`
+        : "This listing is complete.",
     });
   }
 

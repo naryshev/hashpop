@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ConnectWalletButton } from "@/components/ConnectWalletButton";
 import { useHashpackWallet } from "@/lib/hashpackWallet";
 import { getApiUrl } from "@/lib/apiUrl";
-import { formatPriceForDisplay } from "@/lib/formatPrice";
+import { formatPriceForDisplay, withHbarGlyph } from "@/lib/formatPrice";
 import { listingHref } from "@/lib/listingUrl";
 import { AddressDisplay } from "@/components/AddressDisplay";
 import { markActivitySeen } from "@/hooks/useUnseenActivity";
@@ -324,7 +324,7 @@ export default function ActivityPage() {
     <main className="min-h-screen">
       <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
         <div className="mb-6">
-          <h1 className="text-2xl font-extrabold tracking-[-0.01em] text-white">Activity</h1>
+          <h1 className="text-2xl font-semibold tracking-normal text-white">Activity</h1>
           <p className="mt-1 text-xs text-silver">
             {userKey
               ? "Sales, purchases, offers, messages, and reviews."
@@ -389,7 +389,9 @@ export default function ActivityPage() {
                                   )}
                                 </span>
                                 {e.amountHbar ? (
-                                  <span className="text-chrome">{e.amountHbar} ℏ</span>
+                                  <span className="font-mono text-chrome">
+                                    {withHbarGlyph(e.amountHbar)}
+                                  </span>
                                 ) : null}
                                 {e.status ? (
                                   <span className="uppercase tracking-wide text-[10px]">

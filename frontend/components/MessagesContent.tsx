@@ -15,6 +15,7 @@ import { TrustStrip } from "./TrustStrip";
 import { DealRoomOfferCards } from "./DealRoomOfferCards";
 import { LockEscrowSheet } from "./LockEscrowSheet";
 import { listingCta, material } from "../lib/materials";
+import { withHbarGlyph, formatPriceForDisplay } from "../lib/formatPrice";
 import { cn } from "../lib/utils";
 import {
   DEAL_ROOM_EMPTY_BODY,
@@ -703,7 +704,9 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
               </div>
               <div className="mt-1 flex items-center gap-1.5">
                 {listing?.price && (
-                  <span className="text-[11px] font-semibold text-chrome">{listing.price} ℏ</span>
+                  <span className="font-mono text-[11px] font-semibold text-chrome">
+                    {withHbarGlyph(formatPriceForDisplay(listing.price))}
+                  </span>
                 )}
                 {c.listingId && <StatePill stateKey={stateKey} />}
               </div>
@@ -755,7 +758,9 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
             selectedThread && !embedded ? "hidden lg:flex" : "flex"
           }`}
         >
-          <h1 className="text-xl sm:text-2xl font-bold text-white">Conversations</h1>
+          <h1 className="text-xl font-semibold tracking-normal text-white sm:text-2xl">
+            Conversations
+          </h1>
           <span className="inline-flex items-center gap-1.5 rounded-full bg-chrome/10 border border-chrome/30 px-2.5 py-1 text-[11px] font-semibold text-chrome">
             <LockIcon className="h-3 w-3" />
             Private wallet-to-wallet
@@ -937,8 +942,8 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
                         {selectedListing.title ?? "Listing"}
                       </p>
                       {selectedListing.price && (
-                        <p className="text-[13px] font-bold text-chrome">
-                          {selectedListing.price} ℏ
+                        <p className="font-mono text-[13px] font-bold text-chrome">
+                          {withHbarGlyph(formatPriceForDisplay(selectedListing.price))}
                         </p>
                       )}
                     </div>

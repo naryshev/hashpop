@@ -7,8 +7,13 @@ import { ShoppingCart, Trash2 } from "lucide-react";
 import { useCart } from "../../lib/cart";
 import { listingHref } from "../../lib/listingUrl";
 import { getApiUrl } from "../../lib/apiUrl";
-import { formatPriceForDisplay } from "../../lib/formatPrice";
+import { formatPriceForDisplay, HBAR_GAP, parseHbarAmount } from "../../lib/formatPrice";
 import { formatHbarWithUsd } from "../../lib/hbarUsd";
+
+/** Cart amounts use the ℏ glyph so the mono face and the U+210F subset both show. */
+function cartAmount(hbar: string, usdPerHbar: number | null): string {
+  return formatHbarWithUsd(hbar, usdPerHbar).replace(" HBAR", `${HBAR_GAP}\u210F`);
+}
 import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
 import { useSignInModal } from "../../lib/signInModal";
@@ -99,7 +104,7 @@ export default function CartPage() {
   const totalHbar = useMemo(
     () =>
       buyable.reduce((sum, r) => {
-        const n = Number(formatPriceForDisplay(r.listing!.price || "0"));
+        const n = parseHbarAmount(r.listing!.price || "0");
         return Number.isNaN(n) ? sum : sum + n;
       }, 0),
     [buyable],
@@ -258,8 +263,8 @@ export default function CartPage() {
                         {listing?.title || "Listing"}
                       </Link>
                       {listing && (
-                        <p className="mt-0.5 text-sm font-semibold text-chrome">
-                          {formatHbarWithUsd(formatPriceForDisplay(listing.price || "0"), usdRate)}
+                        <p className="mt-0.5 font-mono text-sm font-semibold text-chrome">
+                          {cartAmount(formatPriceForDisplay(listing.price || "0"), usdRate)}
                         </p>
                       )}
                       {gone && (
@@ -294,8 +299,8 @@ export default function CartPage() {
                 <span className="text-sm text-silver">
                   Total ({buyable.length} item{buyable.length === 1 ? "" : "s"})
                 </span>
-                <span className="text-base font-bold text-white">
-                  {formatHbarWithUsd(String(totalHbar), usdRate)}
+                <span className="font-mono text-base font-bold text-white">
+                  {cartAmount(String(totalHbar), usdRate)}
                 </span>
               </div>
               <p className="mt-1 text-[11px] text-silver/60">

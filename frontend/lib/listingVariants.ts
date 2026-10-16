@@ -1,4 +1,4 @@
-import { formatPriceForDisplay } from "./formatPrice";
+import { parseHbarAmount } from "./formatPrice";
 
 export const MAX_LISTING_VARIANTS = 20;
 
@@ -114,8 +114,8 @@ export function variantPriceMismatchesListing(
 ): boolean {
   if (variantPrice == null || variantPrice === "") return false;
   if (listingPrice == null || listingPrice === "") return false;
-  const a = Number(formatPriceForDisplay(variantPrice));
-  const b = Number(formatPriceForDisplay(listingPrice));
+  const a = parseHbarAmount(variantPrice);
+  const b = parseHbarAmount(listingPrice);
   if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
   return Math.abs(a - b) > 0.0001;
 }

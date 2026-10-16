@@ -98,7 +98,7 @@ export default function HelpPage() {
     <main className="min-h-screen">
       <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
         <header className="mb-6">
-          <h1 className="flex items-center gap-2 text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
+          <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-normal text-white sm:text-3xl">
             <LifeBuoy className="text-chrome" size={26} />
             Help Center
           </h1>

@@ -9,7 +9,7 @@ import { getApiUrl } from "../lib/apiUrl";
 import { getTransactionErrorMessage } from "../lib/transactionError";
 import { activeHederaChain } from "../lib/hederaChains";
 import { useHashpackWallet } from "../lib/hashpackWallet";
-import { formatPriceForDisplay } from "../lib/formatPrice";
+import { hbarAmountPlain } from "../lib/formatPrice";
 import { formatHbarWithUsd } from "../lib/hbarUsd";
 import { useHbarUsd } from "../hooks/useHbarUsd";
 
@@ -32,10 +32,7 @@ export function OfferModal({ open, onClose, listingId, askingPriceHbar, onOfferS
   const { send, isPending } = useRobustContractWrite();
   const chainId = activeHederaChain.id;
   const usdRate = useHbarUsd();
-  const initialAmount = useMemo(
-    () => formatPriceForDisplay(askingPriceHbar || "0"),
-    [askingPriceHbar],
-  );
+  const initialAmount = useMemo(() => hbarAmountPlain(askingPriceHbar || "0"), [askingPriceHbar]);
   const [amount, setAmount] = useState(initialAmount);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -140,7 +137,7 @@ export function OfferModal({ open, onClose, listingId, askingPriceHbar, onOfferS
 
         <div className="mb-2 rounded-lg border-2 border-emerald-500 px-6 py-5 focus-within:ring-2 focus-within:ring-emerald-200">
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-bold text-black">ℏ</span>
+            <span className="font-mono text-3xl font-bold text-black">ℏ</span>
             <input
               ref={inputRef}
               type="number"
@@ -154,7 +151,7 @@ export function OfferModal({ open, onClose, listingId, askingPriceHbar, onOfferS
                   void handleSubmit();
                 }
               }}
-              className="w-full bg-transparent text-3xl font-bold text-black outline-none placeholder:text-black/30"
+              className="w-full bg-transparent font-mono text-3xl font-bold text-black outline-none placeholder:text-black/30"
               placeholder="0"
               aria-label="Offer amount in HBAR"
             />

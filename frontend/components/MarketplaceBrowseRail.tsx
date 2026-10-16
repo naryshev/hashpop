@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, MapPin } from "lucide-react";
 import type { ListingType } from "../lib/marketplaceFilters";
+import { groupHbarAmount, withHbarGlyph } from "../lib/formatPrice";
 import { cn } from "../lib/utils";
 
 /** Scale shown in the Browse Rail lock. Expands only when a listing costs more. */
@@ -156,8 +157,9 @@ function PriceRange({
           style={{ zIndex: 4 }}
         />
       </div>
-      <p data-testid="rail-price-label" className="mt-1 text-[13px] text-[#d7fff0]">
-        {minValue} ℏ — {maxValue} ℏ
+      <p data-testid="rail-price-label" className="mt-1 font-mono text-[13px] text-[#d7fff0]">
+        {withHbarGlyph(groupHbarAmount(String(minValue)))} —{" "}
+        {withHbarGlyph(groupHbarAmount(String(maxValue)))}
       </p>
     </div>
   );

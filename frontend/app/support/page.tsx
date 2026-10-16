@@ -56,7 +56,7 @@ export default function SupportPage() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6">
         <section className="rounded-2xl border border-white/15 bg-gradient-to-br from-[#5865F2]/30 via-[#0d1222] to-[#0f4f76]/40 p-6 sm:p-8">
           <p className="text-xs uppercase tracking-[0.2em] text-indigo-200/90">Hashpop Support</p>
-          <h1 className="mt-2 text-2xl sm:text-3xl font-bold text-white">
+          <h1 className="mt-2 text-2xl font-semibold tracking-normal text-white sm:text-3xl">
             Help & Contact on Discord
           </h1>
           <p className="mt-3 text-silver max-w-2xl">

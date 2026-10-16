@@ -358,7 +358,7 @@ export function EscrowPanel({
             </div>
             <div className="text-right">
               <p className="text-[10px] uppercase tracking-wider text-white/40 mb-0.5">In escrow</p>
-              <p className="text-chrome font-semibold text-xs">
+              <p className="font-mono text-xs font-semibold text-chrome">
                 {formatHbarWithUsd(formatContractAmountToHbar(escrow.amount), usdRate)}
               </p>
             </div>

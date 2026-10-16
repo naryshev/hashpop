@@ -140,7 +140,7 @@ export default function WatchlistPage() {
                         </p>
                       )}
                       <div className="flex items-center justify-between mt-1.5">
-                        <p className="text-chrome font-semibold">
+                        <p className="font-mono font-semibold text-chrome">
                           {formatHbarWithUsd(
                             formatPriceForDisplay(item.price || item.reservePrice || "0"),
                             usdRate,
@@ -202,7 +202,7 @@ export default function WatchlistPage() {
                         </p>
                       )}
                       <div className="flex items-center justify-between mt-2">
-                        <p className="text-chrome font-semibold text-lg">
+                        <p className="font-mono text-lg font-semibold text-chrome">
                           {formatHbarWithUsd(
                             formatPriceForDisplay(item.price || item.reservePrice || "0"),
                             usdRate,

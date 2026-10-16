@@ -2,7 +2,7 @@
 
 import { cn } from "../lib/utils";
 import { material } from "../lib/materials";
-import { formatPriceForDisplay } from "../lib/formatPrice";
+import { formatPriceForDisplay, withHbarGlyph } from "../lib/formatPrice";
 import type { ListingVariant } from "../lib/listingVariants";
 
 export function ListingVariantPicker({
@@ -34,7 +34,9 @@ export function ListingVariantPicker({
               )}
             >
               <span className="min-w-0 truncate text-sm font-semibold">{v.label}</span>
-              <span className="shrink-0 font-mono text-sm">{formatPriceForDisplay(v.price)} ℏ</span>
+              <span className="shrink-0 font-mono text-sm">
+                {withHbarGlyph(formatPriceForDisplay(v.price))}
+              </span>
             </button>
           );
         })}

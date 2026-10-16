@@ -2,7 +2,12 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { marketplaceAbi, marketplaceAddress } from "../lib/contracts";
-import { formatContractAmountToHbar, formatPriceForDisplay } from "../lib/formatPrice";
+import {
+  formatContractAmountToHbar,
+  formatPriceForDisplay,
+  parseHbarAmount,
+  withHbarGlyph,
+} from "../lib/formatPrice";
 import { getTransactionErrorMessage } from "../lib/transactionError";
 import { useHbarUsd } from "../hooks/useHbarUsd";
 import { listingIdToBytes32 } from "../lib/bytes32";
@@ -182,8 +187,8 @@ export function BuyButton({
       );
       setConfirmDetail(
         contractIdForDetail
-          ? `escrow ${contractIdForDetail} · locking ${payHbarForDetail} ℏ`
-          : `locking ${payHbarForDetail} ℏ`,
+          ? `escrow ${contractIdForDetail} · locking ${withHbarGlyph(payHbarForDetail)}`
+          : `locking ${withHbarGlyph(payHbarForDetail)}`,
       );
       const txHash = await send({
         address: marketplaceAddress,
@@ -225,8 +230,8 @@ export function BuyButton({
 
   const priceHbarDisplay = formatPriceForDisplay(variantPrice || _price || "0");
   const priceUsd =
-    usdRate && usdRate > 0 && !Number.isNaN(Number(priceHbarDisplay))
-      ? (Number(priceHbarDisplay) * usdRate).toFixed(2)
+    usdRate && usdRate > 0 && !Number.isNaN(parseHbarAmount(priceHbarDisplay))
+      ? (parseHbarAmount(priceHbarDisplay) * usdRate).toFixed(2)
       : null;
   const hasCallout = notOnChain || isLegacyWeiListing || variantBlocked;
   const purchaseOffset = descriptionSlot || hasCallout ? "mt-3" : "mt-4";
@@ -234,8 +239,9 @@ export function BuyButton({
   return (
     <div className="mx-auto w-full max-w-[360px]">
       <p className="flex items-baseline gap-2 text-left">
-        <span className="text-[34px] font-bold leading-none tracking-tight text-chrome">
-          {priceHbarDisplay} <span className="italic">ℏ</span>
+        <span className="font-mono text-[34px] font-bold leading-none tracking-tight text-chrome">
+          {priceHbarDisplay}
+          <span className="italic">{"\u2009ℏ"}</span>
         </span>
         {priceUsd && <span className="text-[15px] text-silver/70">(${priceUsd})</span>}
       </p>
@@ -271,9 +277,9 @@ export function BuyButton({
             descriptionSlot || notOnChain || isLegacyWeiListing ? "mt-2" : "mt-4",
           )}
         >
-          This option is {formatPriceForDisplay(variantPrice || "0")} ℏ, but the on-chain listing is{" "}
-          {listingHbar} ℏ. Purchase is disabled until they match — the contract can only collect the
-          on-chain price.
+          This option is {withHbarGlyph(formatPriceForDisplay(variantPrice || "0"))}, but the
+          on-chain listing is {withHbarGlyph(listingHbar)}. Purchase is disabled until they match —
+          the contract can only collect the on-chain price.
         </p>
       )}
 

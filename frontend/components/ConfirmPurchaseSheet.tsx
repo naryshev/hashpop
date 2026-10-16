@@ -5,7 +5,7 @@ import { Lock } from "lucide-react";
 import { AddressDisplay } from "./AddressDisplay";
 import { Sheet } from "./ui/Sheet";
 import { getApiUrl } from "../lib/apiUrl";
-import { formatPriceForDisplay } from "../lib/formatPrice";
+import { formatPriceForDisplay, HBAR_GAP } from "../lib/formatPrice";
 import { useHbarUsd } from "../hooks/useHbarUsd";
 import { resolveContractIdDisplay } from "../lib/contractId";
 import { listingCta, material } from "../lib/materials";
@@ -96,7 +96,7 @@ export function ConfirmPurchaseSheet({
           disabled={confirming}
           className={listingCta.filled}
         >
-          {confirming ? "Confirm in wallet\u2026" : `Confirm \u00b7 ${hbar} ${HBAR}`}
+          {confirming ? "Confirm in wallet\u2026" : `Confirm \u00b7 ${hbar}${HBAR_GAP}${HBAR}`}
         </button>
       }
     >
@@ -116,8 +116,9 @@ export function ConfirmPurchaseSheet({
             </p>
           )}
         </div>
-        <p className="shrink-0 text-sm font-extrabold text-chrome">
-          {hbar} <span className="italic">{HBAR}</span>
+        <p className="shrink-0 font-mono text-sm font-extrabold text-chrome">
+          {hbar}
+          <span className="italic">{`${HBAR_GAP}${HBAR}`}</span>
         </p>
       </div>
 
@@ -125,13 +126,18 @@ export function ConfirmPurchaseSheet({
         <div className="flex items-center justify-between py-3">
           <dt className="text-silver">Price</dt>
           <dd className="text-white">
-            {hbar} {HBAR}
+            {hbar}
+            {HBAR_GAP}
+            {HBAR}
             {usd ? <span className="text-silver/70"> (${usd})</span> : null}
           </dd>
         </div>
         <div className="flex items-center justify-between py-3">
           <dt className="text-silver">Network fee</dt>
-          <dd className="text-white">~0.1 {HBAR}</dd>
+          <dd className="text-white">
+            ~0.1{HBAR_GAP}
+            {HBAR}
+          </dd>
         </div>
         {contractId && (
           <div className="flex items-center justify-between py-3">
@@ -145,7 +151,7 @@ export function ConfirmPurchaseSheet({
         <Lock size={14} className="mt-0.5 shrink-0 text-chrome" />
         <p className="text-[13px] leading-snug text-white/90">
           {escrowed
-            ? `${hbar} ${HBAR} is held in on-chain escrow until you confirm delivery.`
+            ? `${hbar}${HBAR_GAP}${HBAR} is held in on-chain escrow until you confirm delivery.`
             : "Payment is sent directly to the seller on-chain."}
         </p>
       </div>

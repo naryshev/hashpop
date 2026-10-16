@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import { fontFamily } from "./lib/designTokens";
 
 const config: Config = {
   // lib/ and hooks/ contain client components too (sign-in modal, HashPack
@@ -12,6 +13,11 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        display: [...fontFamily.display],
+        sans: [...fontFamily.sans],
+        mono: [...fontFamily.mono],
+      },
       colors: {
         surface: {
           DEFAULT: "rgba(255,255,255,0.04)",

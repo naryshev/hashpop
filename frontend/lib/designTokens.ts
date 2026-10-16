@@ -24,3 +24,21 @@ export const radius = {
   control: "14px",
   sheet: "28px",
 } as const;
+
+/**
+ * Direction C stacks. The CSS variables are defined by next/font/local on
+ * <html> (--font-display, --font-sans, --font-mono, --font-hbar). Noto's
+ * U+210F subset sits immediately after each face so ℏ matches everywhere.
+ */
+export const fontFamily = {
+  display: ["var(--font-display)", "var(--font-hbar)", "sans-serif"],
+  sans: ["var(--font-sans)", "var(--font-hbar)", "ui-sans-serif", "system-ui", "sans-serif"],
+  mono: [
+    "var(--font-mono)",
+    "var(--font-hbar)",
+    "ui-monospace",
+    "SFMono-Regular",
+    "Menlo",
+    "monospace",
+  ],
+} as const;
