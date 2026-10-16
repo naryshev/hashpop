@@ -27,6 +27,11 @@ export type TrustStripProps = {
   className?: string;
   /** When false, the strip is not a profile link (used under an existing identity header). */
   linkToProfile?: boolean;
+  /**
+   * Profile dossier: the same chips, without the score card, so they sit under
+   * the stats row. Empty when this wallet has no chip to show.
+   */
+  chipsOnly?: boolean;
 };
 
 function Chip({
@@ -78,6 +83,7 @@ export function TrustStrip({
   onPressProfile,
   className,
   linkToProfile = true,
+  chipsOnly = false,
 }: TrustStripProps) {
   const profile = useProfile(address);
   const resolvedName = identityTitle({
@@ -182,6 +188,33 @@ export function TrustStrip({
       {density !== "full" && chips}
     </span>
   );
+
+  const chipRow = (
+    <span className={cn("flex min-w-0 flex-wrap items-center gap-1.5", className)}>
+      {view.showSkeleton && (
+        <span className="h-4 w-24 animate-pulse rounded-full bg-white/10" aria-hidden />
+      )}
+      {view.unknownLabel && <span className="text-[12px] text-white/60">{view.unknownLabel}</span>}
+      {chips}
+    </span>
+  );
+
+  const chipsHaveContent =
+    view.showSkeleton ||
+    !!view.unknownLabel ||
+    view.showRatings ||
+    view.showKyc ||
+    !!view.refundsLabel ||
+    !!view.timeoutsLabel;
+
+  if (chipsOnly) {
+    if (!chipsHaveContent) return null;
+    return (
+      <div data-testid="trust-strip" className="flex min-w-0">
+        {chipRow}
+      </div>
+    );
+  }
 
   const inner =
     density === "full" ? (
