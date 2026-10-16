@@ -10,40 +10,51 @@ import { material } from "../lib/materials";
 import { cn } from "../lib/utils";
 import { HashpopWordmark } from "./HashpopWordmark";
 import { NotificationBell } from "./NotificationBell";
-import { ProfileCardSheet } from "./ProfileCardSheet";
 
-function ProfileAvatarButton() {
+export function profileHref(address: string | null, accountId: string | null): string | null {
+  const key = address ?? accountId;
+  return key ? `/profile/${encodeURIComponent(key)}` : null;
+}
+
+export function ProfileAvatarButton({ testId = "marketplace-profile" }: { testId?: string }) {
   const { accountId, address, isConnected } = useHashpackWallet();
   const { openSignIn } = useSignInModal();
-  const [profileOpen, setProfileOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
   const signedIn = mounted && isConnected;
+  const href = signedIn ? profileHref(address, accountId) : null;
   const profile = useProfile(signedIn ? (address ?? accountId) : null);
   const avatar = signedIn ? profileAvatarUrl(profile) : null;
+  const className = cn(
+    material.chrome,
+    "flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full text-white/90",
+  );
+  const face = avatar ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={avatar} alt="" className="h-full w-full object-cover" />
+  ) : (
+    <User size={20} aria-hidden />
+  );
+
+  if (href) {
+    return (
+      <Link href={href} data-testid={testId} aria-label="Open profile" className={className}>
+        {face}
+      </Link>
+    );
+  }
 
   return (
-    <>
-      <button
-        type="button"
-        data-testid="marketplace-profile"
-        aria-label={signedIn ? "Open profile" : "Sign in"}
-        onClick={() => (signedIn ? setProfileOpen(true) : openSignIn())}
-        className={cn(
-          material.chrome,
-          "flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full text-white/90",
-        )}
-      >
-        {avatar ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={avatar} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <User size={20} aria-hidden />
-        )}
-      </button>
-      <ProfileCardSheet open={profileOpen} onClose={() => setProfileOpen(false)} />
-    </>
+    <button
+      type="button"
+      data-testid={testId}
+      aria-label="Sign in"
+      onClick={() => openSignIn()}
+      className={className}
+    >
+      {face}
+    </button>
   );
 }
 
@@ -52,7 +63,8 @@ function ProfileAvatarButton() {
  * My Hashpop, and profile.
  * 3-column grid: equal side columns keep the wordmark optically centered,
  * with the bell and glass profile in the right cluster. The subline is the
- * brand label ("marketplace"), not the page name.
+ * brand label ("marketplace"), not the page name. No search or filter.
+ * The top inset is hp-brand-safe-top.
  */
 export function MarketplaceBrandHeader() {
   return (

@@ -2,53 +2,13 @@
 
 import { useEffect, useState, type FormEvent, type Ref } from "react";
 import Link from "next/link";
-import { Search as SearchIcon, ShoppingCart, User } from "lucide-react";
+import { Search as SearchIcon, ShoppingCart } from "lucide-react";
 import { useCart } from "../lib/cart";
-import { useHashpackWallet } from "../lib/hashpackWallet";
-import { useSignInModal } from "../lib/signInModal";
-import { profileAvatarUrl, useProfile } from "../lib/profiles";
-import { material } from "../lib/materials";
-import { cn } from "../lib/utils";
 import { formatDockBadgeCount } from "../lib/dockBadge";
 import { HashpopWordmark } from "./HashpopWordmark";
 import { NotificationBell } from "./NotificationBell";
-import { ProfileCardSheet } from "./ProfileCardSheet";
+import { ProfileAvatarButton } from "./MarketplaceBrandHeader";
 import { DockBadge } from "./ui/DockBadge";
-
-function ProfileButton() {
-  const { accountId, address, isConnected } = useHashpackWallet();
-  const { openSignIn } = useSignInModal();
-  const [profileOpen, setProfileOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
-  const signedIn = mounted && isConnected;
-  const profile = useProfile(signedIn ? (address ?? accountId) : null);
-  const avatar = signedIn ? profileAvatarUrl(profile) : null;
-
-  return (
-    <>
-      <button
-        type="button"
-        data-testid="marketplace-desktop-profile"
-        aria-label={signedIn ? "Open profile" : "Sign in"}
-        onClick={() => (signedIn ? setProfileOpen(true) : openSignIn())}
-        className={cn(
-          material.chrome,
-          "flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full text-white/90",
-        )}
-      >
-        {avatar ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={avatar} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <User size={20} aria-hidden />
-        )}
-      </button>
-      <ProfileCardSheet open={profileOpen} onClose={() => setProfileOpen(false)} />
-    </>
-  );
-}
 
 /**
  * Marketplace slim bar at ≥768px. Cart mark sits left of the mint ring-o
@@ -132,7 +92,7 @@ export function MarketplaceDesktopHeader({
           </span>
         </Link>
         <NotificationBell variant="marketplace" />
-        <ProfileButton />
+        <ProfileAvatarButton testId="marketplace-desktop-profile" />
       </div>
     </header>
   );

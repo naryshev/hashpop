@@ -3,7 +3,9 @@ import { listingHref } from "../../lib/listingUrl";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { MessageSquare, ChevronDown, ChevronUp, User } from "lucide-react";
+import { ProfileOwnerHeader } from "../../components/ProfileOwnerHeader";
 import { formatPriceForDisplay, groupHbarAmount, withHbarGlyph } from "../../lib/formatPrice";
 import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
@@ -13,6 +15,7 @@ import { profileAvatarUrl, profileDisplayName, useProfile } from "../../lib/prof
 import { getApiUrl } from "../../lib/apiUrl";
 import { OnboardingChecklist } from "../../components/OnboardingChecklist";
 import { useCancelListing } from "../../hooks/useCancelListing";
+import { cn } from "../../lib/utils";
 
 function formatListingId(id: string): string {
   if (!id || !id.startsWith("0x") || id.length !== 66) return id;
@@ -221,22 +224,22 @@ function KPICard({
   value,
   unit,
   sub,
-  accent,
+  primary = false,
 }: {
   label: string;
   value: string;
   unit?: string;
   sub?: string;
-  accent: string;
+  primary?: boolean;
 }) {
   return (
     <div className="rounded-glass-lg border border-white/10 bg-[#0e1422] p-[18px]">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-silver">
-        {label}
-      </div>
+      <div className="text-[13px] font-medium text-silver">{label}</div>
       <div
-        className="mt-2.5 text-[32px] font-extrabold tracking-[-0.02em] leading-none"
-        style={{ color: accent }}
+        className={cn(
+          "mt-2.5 text-[32px] font-extrabold leading-none tracking-[-0.02em]",
+          primary ? "text-[#00ffa3]" : "text-white",
+        )}
       >
         {value}
         {unit ? (
@@ -261,7 +264,8 @@ function timeAgo(d: Date | null): string {
 }
 
 export default function DashboardPage() {
-  const { address, accountId, disconnect, balanceTinybar } = useHashpackWallet();
+  const router = useRouter();
+  const { address, accountId, balanceTinybar } = useHashpackWallet();
   const [mounted, setMounted] = useState(false);
   const [stats, setStats] = useState<any>(null);
   const [activeListings, setActiveListings] = useState<any[]>([]);
@@ -555,6 +559,7 @@ export default function DashboardPage() {
 
   return (
     <main className="min-h-screen">
+      <ProfileOwnerHeader title="My Hashpop" onBack={() => router.back()} />
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="glass-card p-6 w-full max-w-sm space-y-4">
@@ -699,9 +704,7 @@ export default function DashboardPage() {
                     </div>
                   )}
                   <div className="min-w-0">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-silver">
-                      Welcome back
-                    </div>
+                    <div className="text-[13px] font-medium text-silver">Welcome back</div>
                     <h1 className="mt-0.5 truncate text-[24px] font-semibold tracking-normal text-white sm:text-[28px]">
                       {displayName ?? (accountId ? `@${accountId}` : "My Hashpop")}
                     </h1>
@@ -732,13 +735,6 @@ export default function DashboardPage() {
                   >
                     Purchases
                   </Link>
-                  <button
-                    type="button"
-                    onClick={() => void disconnect()}
-                    className="rounded-full border border-rose-500/60 bg-rose-500/10 px-3.5 py-2 text-xs font-semibold text-rose-300 hover:bg-rose-500/20"
-                  >
-                    Sign out
-                  </button>
                 </div>
               </div>
 
@@ -760,27 +756,24 @@ export default function DashboardPage() {
                       ? `≈ $${groupHbarAmount(String(Math.round(tinybarToHbarNum(balanceTinybar) * usdRate)))} USD`
                       : "Connect wallet to view"
                   }
-                  accent="#00ffa3"
+                  primary
                 />
                 <KPICard
                   label="In escrow"
                   value={groupHbarAmount(String(Math.round(escrowTinybar / 1e8)))}
                   unit="ℏ"
                   sub={`${purchaseCount + soldItems.length} active orders`}
-                  accent="#fbbf24"
                 />
                 <KPICard
                   label="Trades"
                   value={String((stats?.totalSales ?? 0) + purchaseCount)}
                   sub={`${stats?.totalSales ?? 0} sold · ${purchaseCount} bought`}
-                  accent="#00e5ff"
                 />
                 <KPICard
                   label="Avg rating"
                   value={Number(stats?.ratingAverage ?? 0).toFixed(1)}
                   unit="★"
                   sub={`${stats?.ratingCount ?? 0} ratings`}
-                  accent="#a78bfa"
                 />
               </div>
 

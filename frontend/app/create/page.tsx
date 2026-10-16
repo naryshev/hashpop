@@ -456,7 +456,7 @@ function CreatePageContent() {
         )}
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-xl font-semibold tracking-normal text-white sm:text-2xl">
-            Create Listing
+            Create listing
           </h1>
         </div>
 

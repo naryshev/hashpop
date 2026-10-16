@@ -46,10 +46,6 @@ vi.mock("../NotificationBell", () => ({
     ),
 }));
 
-vi.mock("../ProfileCardSheet", () => ({
-  ProfileCardSheet: () => null,
-}));
-
 let root: Root | undefined;
 let host: HTMLElement | undefined;
 
@@ -169,6 +165,19 @@ describe("MarketplaceDesktopHeader", () => {
       profile.click();
     });
     expect(openSignIn).toHaveBeenCalledOnce();
+  });
+
+  it("links the profile control straight to the profile when signed in", async () => {
+    wallet.isConnected = true;
+    wallet.address = "0xabc";
+    await renderHeader();
+    const profile = document.querySelector(
+      '[data-testid="marketplace-desktop-profile"]',
+    ) as HTMLAnchorElement;
+    expect(profile.tagName).toBe("A");
+    expect(profile.getAttribute("href")).toBe("/profile/0xabc");
+    expect(profile.getAttribute("aria-label")).toBe("Open profile");
+    expect(document.body.textContent).not.toContain("Your profile");
   });
 
   it("shows a cart badge only when the cart is non-empty", async () => {
