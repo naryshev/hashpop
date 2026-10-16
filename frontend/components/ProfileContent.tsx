@@ -919,7 +919,7 @@ export function ProfileContent({
       </nav>
 
       {tab === "shop" && (
-        <div className="relative flex items-center justify-between px-3 py-2.5">
+        <div className="relative flex items-center justify-between px-4 py-2.5">
           <p data-testid="profile-active-count" className="text-[15px] font-semibold text-white">
             {activeListingsLabel(active.length)}
           </p>
@@ -951,7 +951,7 @@ export function ProfileContent({
             <div
               className={cn(
                 material.regular,
-                "absolute right-3 top-12 z-40 w-56 rounded-[16px] p-3 text-left",
+                "absolute right-4 top-12 z-40 w-56 rounded-[16px] p-3 text-left",
               )}
             >
               <p className="text-[11px] uppercase tracking-wide text-white/50">Sort</p>
@@ -1061,7 +1061,7 @@ export function ProfileContent({
           }
         />
       ) : (
-        <div data-testid="profile-grid" className="grid grid-cols-3 gap-0.5">
+        <div data-testid="profile-grid" className="grid min-w-0 grid-cols-3 gap-0.5 px-4">
           {tiles.map((tile) => (
             <ProfileTile
               key={tile.key}
@@ -1247,7 +1247,7 @@ function ProfileTile({
   );
 
   const className = cn(
-    "relative block aspect-square overflow-hidden bg-white/[0.03]",
+    "relative block aspect-square min-w-0 overflow-hidden bg-white/[0.03]",
     selected && "ring-2 ring-inset ring-chrome",
   );
   const dimmed = dimSold ? "true" : "false";

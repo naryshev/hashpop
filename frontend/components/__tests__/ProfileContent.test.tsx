@@ -209,6 +209,12 @@ describe("ProfileContent", () => {
     const shopTiles = host!.querySelectorAll('[data-testid="profile-tile"]');
     expect(shopTiles.length).toBeGreaterThan(0);
     expect([...shopTiles].every((tile) => tile.getAttribute("data-dimmed") === "false")).toBe(true);
+    const grid = host!.querySelector('[data-testid="profile-grid"]') as HTMLElement;
+    expect(grid.className).toContain("px-4");
+    expect(grid.className).not.toContain("-mx");
+    expect(
+      host!.querySelector('[data-testid="profile-active-count"]')?.parentElement?.className,
+    ).toContain("px-4");
 
     const sold = host!.querySelector('[data-testid="profile-tab-sold"]') as HTMLButtonElement;
     await act(async () => {
