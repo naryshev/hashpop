@@ -163,7 +163,10 @@ describe("MarketplaceMobileHeader", () => {
     expect(logo.className.baseVal).toContain("w-[124px]");
     expect(logo.className.baseVal).toContain("h-auto");
     expect(logo.className.baseVal).toContain("text-white");
-    expect(header.className).toContain("pt-[calc(env(safe-area-inset-top)+12px)]");
+    expect(header.className).not.toContain("pt-[calc(env(safe-area-inset-top)+12px)]");
+    expect(header.className).not.toContain("hp-brand-safe-top");
+    const brand = document.querySelector('[data-testid="marketplace-brand-header"]') as HTMLElement;
+    expect(brand.parentElement?.className).toBe("hp-brand-safe-top");
     const searchField = document.querySelector(
       '[data-testid="marketplace-search-field"]',
     ) as HTMLElement;

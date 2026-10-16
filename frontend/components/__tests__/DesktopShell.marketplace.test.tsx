@@ -101,9 +101,14 @@ describe("DesktopShell marketplace chrome", () => {
     expect(document.body.textContent).toContain("Sign in");
     expect(document.querySelector('[data-testid="mobile-top-bar"]')).toBeTruthy();
     expect(document.querySelector('[data-testid="marketplace-brand-header"]')).toBeNull();
+    const shellHeader = document.querySelector("header");
+    expect(shellHeader?.className).toContain("hp-desktop-bar");
+    expect(shellHeader?.className).toContain("h-0");
+    expect(shellHeader?.className).toContain("md:h-14");
+    expect(shellHeader?.className).not.toContain(" h-14 ");
   });
 
-  it.each(["/cart", "/messages"])(
+  it.each(["/cart", "/messages", "/create", "/dashboard", "/profile/0.0.1234"])(
     "uses the marketplace brand header on %s without search or the old mobile bar",
     async (pathname) => {
       nav.pathname = pathname;
@@ -113,8 +118,9 @@ describe("DesktopShell marketplace chrome", () => {
       ) as HTMLElement;
       expect(brand).toBeTruthy();
       expect(brand.className).toContain("grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]");
-      expect(brand.parentElement?.className).toContain("md:hidden");
-      expect(brand.parentElement?.className).toContain("pt-[calc(env(safe-area-inset-top)+12px)]");
+      expect(brand.parentElement?.className).toBe("hp-brand-safe-top");
+      expect(brand.parentElement?.parentElement?.className).toContain("md:hidden");
+      expect(brand.parentElement?.parentElement?.className).not.toContain("pt-[");
       expect(brand.parentElement?.className).not.toContain("mb-");
       const wordmark = document.querySelector(
         '[data-testid="marketplace-wordmark"]',

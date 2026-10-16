@@ -95,7 +95,10 @@ describe("MarketplaceDesktopHeader", () => {
     const header = document.querySelector(
       '[data-testid="marketplace-desktop-header"]',
     ) as HTMLElement;
+    expect(header.className).toContain("hp-desktop-bar");
     expect(header.className).toContain("hidden");
+    expect(header.className).toContain("h-0");
+    expect(header.className).toContain("md:h-[72px]");
     expect(header.className).toContain("md:grid");
     const brand = document.querySelector(
       '[data-testid="marketplace-desktop-brand"]',

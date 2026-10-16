@@ -66,10 +66,7 @@ export function MarketplaceMobileHeader({
   const mobileSheet = useMobileSheet();
   const filtersActive = filterCount > 0;
   return (
-    <div
-      data-testid="marketplace-mobile-header"
-      className="mb-3 pt-[calc(env(safe-area-inset-top)+12px)] md:hidden"
-    >
+    <div data-testid="marketplace-mobile-header" className="mb-3 md:hidden">
       <MarketplaceBrandHeader />
 
       <div className="mt-3 flex h-11 items-center gap-2">

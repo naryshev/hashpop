@@ -48,30 +48,33 @@ function ProfileAvatarButton() {
 }
 
 /**
- * Marketplace brand row shared by Marketplace, Cart, and Messages.
+ * Marketplace brand row shared by Marketplace, Cart, Messages, Create,
+ * My Hashpop, and profile.
  * 3-column grid: equal side columns keep the wordmark optically centered,
  * with the bell and glass profile in the right cluster. The subline is the
  * brand label ("marketplace"), not the page name.
  */
 export function MarketplaceBrandHeader() {
   return (
-    <div
-      data-testid="marketplace-brand-header"
-      className="grid h-14 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center"
-    >
-      <div aria-hidden />
-      <Link href="/marketplace" aria-label="Hashpop home" className="flex flex-col items-center">
-        <HashpopWordmark />
-        <span
-          data-testid="marketplace-wordmark"
-          className="mt-0.5 text-[12px] font-medium lowercase leading-none tracking-[0.12em] text-white/60"
-        >
-          marketplace
-        </span>
-      </Link>
-      <div className="flex items-center justify-end gap-2">
-        <NotificationBell variant="marketplace" />
-        <ProfileAvatarButton />
+    <div className="hp-brand-safe-top">
+      <div
+        data-testid="marketplace-brand-header"
+        className="grid h-14 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center"
+      >
+        <div aria-hidden />
+        <Link href="/marketplace" aria-label="Hashpop home" className="flex flex-col items-center">
+          <HashpopWordmark />
+          <span
+            data-testid="marketplace-wordmark"
+            className="mt-0.5 text-[12px] font-medium lowercase leading-none tracking-[0.12em] text-white/60"
+          >
+            marketplace
+          </span>
+        </Link>
+        <div className="flex items-center justify-end gap-2">
+          <NotificationBell variant="marketplace" />
+          <ProfileAvatarButton />
+        </div>
       </div>
     </div>
   );
