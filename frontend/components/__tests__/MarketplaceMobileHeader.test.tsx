@@ -152,12 +152,16 @@ describe("MarketplaceMobileHeader", () => {
       '[data-testid="marketplace-mobile-header"]',
     ) as HTMLElement;
     expect(header.className).toContain("md:hidden");
-    const logo = document.querySelector('[data-testid="marketplace-logo"]') as SVGElement;
-    expect(logo.tagName.toLowerCase()).toBe("svg");
+    const logo = document.querySelector('[data-testid="marketplace-logo"]') as HTMLElement;
+    expect(logo.tagName.toLowerCase()).toBe("span");
     expect(logo.getAttribute("aria-label")).toBe("Hashpop");
-    expect(logo.className.baseVal).toContain("w-[124px]");
-    expect(logo.className.baseVal).toContain("h-auto");
-    expect(logo.className.baseVal).toContain("text-white");
+    expect(logo.className).toContain("w-[124px]");
+    expect(logo.className).toContain("h-auto");
+    expect(logo.className).toContain("text-white");
+    expect(logo.className).toContain("font-display");
+    expect(logo.className).toContain("font-semibold");
+    expect(logo.className).toContain("tracking-[-0.02em]");
+    expect(logo.className).not.toContain("font-bold");
     expect(header.className).not.toContain("pt-[calc(env(safe-area-inset-top)+12px)]");
     expect(header.className).not.toContain("hp-brand-safe-top");
     const brand = document.querySelector('[data-testid="marketplace-brand-header"]') as HTMLElement;
@@ -178,7 +182,6 @@ describe("MarketplaceMobileHeader", () => {
     expect(filterButton.className).toContain("border-[#00ffa3]/40");
     expect(filterButton.className).toContain("text-[#00ffa3]");
     expect(filterButton.className).not.toContain("bg-material-chrome");
-    expect(logo.querySelector("path")?.getAttribute("fill")).toBe("currentColor");
     const ring = document.querySelector('[data-testid="hashpop-ring-o"]') as SVGGElement;
     expect(ring.tagName.toLowerCase()).toBe("g");
     expect(ring.id).toBe("ring-o");
@@ -186,7 +189,10 @@ describe("MarketplaceMobileHeader", () => {
     expect(ring.textContent).not.toBe("o");
     const wordmark = document.querySelector('[data-testid="marketplace-wordmark"]') as HTMLElement;
     expect(wordmark.textContent).toBe("marketplace");
-    expect(wordmark.className).toContain("tracking-[0.12em]");
+    expect(wordmark.className).toContain("font-sans");
+    expect(wordmark.className).toContain("font-medium");
+    expect(wordmark.className).toContain("lowercase");
+    expect(wordmark.className).toContain("tracking-[0.08em]");
     expect(wordmark.className).toContain("text-white/60");
     expect(wordmark.className).toContain("text-[12px]");
     const home = document.querySelector('a[aria-label="Hashpop home"]') as HTMLElement;

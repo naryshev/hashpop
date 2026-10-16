@@ -101,7 +101,7 @@ describe("MarketplaceDesktopHeader", () => {
     ) as HTMLElement;
     expect(brand.className).toContain("gap-2.5");
     const cart = brand.querySelector('[data-testid="marketplace-cart-mark"]') as HTMLImageElement;
-    const logo = brand.querySelector('[data-testid="marketplace-logo"]') as SVGElement;
+    const logo = brand.querySelector('[data-testid="marketplace-logo"]') as HTMLElement;
     expect(cart.tagName.toLowerCase()).toBe("img");
     expect(cart.getAttribute("src")).toBe("/hashpop-cart-3d.PNG");
     expect(brand.querySelectorAll("svg")).toHaveLength(1);
@@ -109,9 +109,12 @@ describe("MarketplaceDesktopHeader", () => {
       false,
     );
     expect(cart.compareDocumentPosition(logo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(logo.className.baseVal).toContain("h-8");
-    expect(logo.className.baseVal).toContain("text-white");
-    expect(logo.querySelector("path")?.getAttribute("fill")).toBe("currentColor");
+    expect(logo.className).toContain("h-8");
+    expect(logo.className).toContain("text-white");
+    expect(logo.className).toContain("font-display");
+    expect(logo.className).toContain("font-semibold");
+    expect(logo.className).toContain("tracking-[-0.02em]");
+    expect(logo.className).not.toContain("font-bold");
     const ring = logo.querySelector('[data-testid="hashpop-ring-o"]') as SVGGElement;
     expect(ring.getAttribute("fill")).toBe("var(--color-chrome)");
     expect(header.querySelector('[data-testid="marketplace-wordmark"]')).toBeNull();
