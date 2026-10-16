@@ -59,7 +59,7 @@ export function ProfileAvatarButton({ testId = "marketplace-profile" }: { testId
 }
 
 /**
- * Marketplace brand row shared by Marketplace, Cart, Messages, Create,
+ * Marketplace brand row shared by Marketplace, Cart, Messages, Offers, Create,
  * My Hashpop, and profile.
  * 3-column grid: equal side columns keep the wordmark optically centered,
  * with the bell and glass profile in the right cluster. The subline is the
