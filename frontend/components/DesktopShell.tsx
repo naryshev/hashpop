@@ -51,7 +51,7 @@ function shortAccount(value: string | null | undefined): string | null {
 function pathnameTitle(pathname: string): string {
   if (pathname === "/" || pathname.startsWith("/marketplace")) return "Marketplace";
   if (pathname.startsWith("/dashboard")) return "My Hashpop";
-  if (pathname.startsWith("/create")) return "Create Listing";
+  if (pathname.startsWith("/create")) return "Create listing";
   if (pathname.startsWith("/offers")) return "Offers";
   if (pathname.startsWith("/purchases")) return "Purchases";
   if (pathname.startsWith("/watchlist")) return "Watchlist";

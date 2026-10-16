@@ -640,7 +640,14 @@ export function ProfileContent({
             </h1>
             <div className="flex items-center justify-end">
               {selecting ? (
-                <span className="w-11" />
+                <button
+                  type="button"
+                  data-testid="profile-select-cancel"
+                  onClick={goBack}
+                  className="px-3 text-[15px] font-semibold text-white"
+                >
+                  Cancel
+                </button>
               ) : (
                 <>
                   <Link

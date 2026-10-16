@@ -236,6 +236,16 @@ describe("ProfileContent", () => {
     expect(bar.textContent).toContain("Delist");
     expect(host!.textContent).not.toContain("Mark sold");
     expect(host!.textContent).toContain("0 selected");
+    const cancel = host!.querySelector(
+      '[data-testid="profile-select-cancel"]',
+    ) as HTMLButtonElement;
+    expect(cancel.textContent).toBe("Cancel");
+    await act(async () => {
+      cancel.click();
+    });
+    expect(host!.querySelector('[data-testid="profile-select-bar"]')).toBeNull();
+    expect(host!.querySelector('[data-testid="profile-select-cancel"]')).toBeNull();
+    expect(host!.textContent).not.toContain("0 selected");
   });
 
   it("shows the own empty rack with Active (0) and Start selling", async () => {
