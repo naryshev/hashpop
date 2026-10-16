@@ -21,6 +21,19 @@ export function generateMetadata({ params }: ProfileLayoutProps): Metadata {
   });
 }
 
+/**
+ * The Vercel preview toolbar is a draggable circle (a menu icon) injected on
+ * preview deployments. It is not part of Hashpop. On /profile it was parked on
+ * the right edge, clipped, and covering the grid. This rule is mounted only
+ * with the profile layout, so the toolbar stays available on every other route.
+ */
+const HIDE_PREVIEW_TOOLBAR = "vercel-live-feedback{display:none !important}";
+
 export default function ProfileLayout({ children }: ProfileLayoutProps) {
-  return children;
+  return (
+    <>
+      <style>{HIDE_PREVIEW_TOOLBAR}</style>
+      {children}
+    </>
+  );
 }
