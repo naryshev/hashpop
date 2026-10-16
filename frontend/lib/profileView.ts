@@ -1,7 +1,7 @@
 /**
  * Profile page view model. Every column, tab, and badge here is derived from
- * fields the existing APIs already return. Missing inputs are omitted — this
- * module does not invent followers, member-since, or a mark-sold action.
+ * fields the existing APIs already return. Missing inputs stay as an em dash.
+ * This module does not invent followers, member-since, or a mark-sold action.
  */
 import { completionPercent } from "./mediaTrust";
 import { formatContractAmountToHbar, formatPriceForDisplay } from "./formatPrice";
@@ -33,7 +33,7 @@ export function profileTabList(isSelf: boolean, likesAvailable: boolean): Profil
   return tabs;
 }
 
-export type ProfileStatId = "followers" | "following" | "completed" | "completion" | "rating";
+export type ProfileStatId = "deals" | "listings" | "completion" | "rating";
 
 export type ProfileStat = {
   id: ProfileStatId;
@@ -41,10 +41,22 @@ export type ProfileStat = {
   label: string;
 };
 
+/** Shown in a stat column when that number was not returned. */
+export const PROFILE_STAT_MISSING = "—";
+
 export type ProfileStatInput = {
-  /** Present only when a real follower count was returned. Absent hides the column. */
-  followers?: number | null;
-  following?: number | null;
+  /**
+   * Tile count on the Sold tab. That tab is seller-role purchases plus archived
+   * listings that are no longer listed, so this is the deals column. It is not
+   * `successfulCompletions`, which can stay 0 while those rows exist.
+   * Null when the purchases or listings read has not landed.
+   */
+  soldCount?: number | null;
+  /**
+   * Active shop listings from the user payload. Fills the first column only
+   * when `soldCount` is unknown.
+   */
+  activeListings?: number | null;
   successfulCompletions?: number | null;
   totalSales?: number | null;
   ratingAverage?: number | null;
@@ -60,32 +72,25 @@ function formatCount(value: number): string {
 }
 
 /**
- * Followers and following replace the trust stats when either count exists.
- * Otherwise show Completed deals, Completion %, and ★ rating — each only when
- * the underlying number is actually present.
+ * Always three columns: deals, completion %, and ★ rating.
+ * A missing number is "—". Active listings stand in for deals only when the
+ * Sold-tab count has not loaded, so the row never collapses to a single "0".
  */
 export function profileStatColumns(input: ProfileStatInput): ProfileStat[] {
-  const social: ProfileStat[] = [];
-  if (isCount(input.followers)) {
-    social.push({ id: "followers", value: formatCount(input.followers), label: "followers" });
-  }
-  if (isCount(input.following)) {
-    social.push({ id: "following", value: formatCount(input.following), label: "following" });
-  }
-  if (social.length > 0) return social;
+  const deals: ProfileStat = isCount(input.soldCount)
+    ? { id: "deals", value: formatCount(input.soldCount), label: "deals" }
+    : isCount(input.activeListings)
+      ? { id: "listings", value: formatCount(input.activeListings), label: "listings" }
+      : { id: "deals", value: PROFILE_STAT_MISSING, label: "deals" };
 
-  const stats: ProfileStat[] = [];
-  if (isCount(input.successfulCompletions)) {
-    stats.push({
-      id: "completed",
-      value: formatCount(input.successfulCompletions),
-      label: "completed deals",
-    });
-  }
   const pct = completionPercent(input.successfulCompletions, input.totalSales);
-  if (pct != null) {
-    stats.push({ id: "completion", value: `${pct}%`, label: "completion" });
-  }
+  const completion: ProfileStat = {
+    id: "completion",
+    value: pct == null ? PROFILE_STAT_MISSING : `${pct}%`,
+    label: "completion",
+  };
+
+  let rating: ProfileStat = { id: "rating", value: PROFILE_STAT_MISSING, label: "rating" };
   if (
     input.ratingAverage != null &&
     Number.isFinite(input.ratingAverage) &&
@@ -94,13 +99,36 @@ export function profileStatColumns(input: ProfileStatInput): ProfileStat[] {
   ) {
     const rounded = Math.round(input.ratingAverage * 10) / 10;
     const value = Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1);
-    stats.push({
+    rating = {
       id: "rating",
       value: `★ ${value}`,
       label: `rating (${formatCount(input.ratingCount)})`,
-    });
+    };
   }
-  return stats;
+
+  return [deals, completion, rating];
+}
+
+type SoldSale = { role?: string | null; listingId?: string | null };
+type SoldListing = { id: string; status?: string | null };
+
+/**
+ * The Sold tab: seller-role purchases, plus archived listings that are not
+ * still listed and are not already represented by one of those sales.
+ */
+export function selectSoldEntries<S extends SoldSale, L extends SoldListing>(
+  sales: S[],
+  archived: L[],
+): { sales: S[]; archived: L[] } {
+  const sellerSales = sales.filter((sale) => sale.role === "seller");
+  const covered = new Set(
+    sellerSales.map((sale) => sale.listingId).filter((id): id is string => !!id),
+  );
+  const extras = archived.filter(
+    (listing) =>
+      !covered.has(listing.id) && String(listing.status ?? "").toUpperCase() !== "LISTED",
+  );
+  return { sales: sellerSales, archived: extras };
 }
 
 export const PROFILE_EARNINGS_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;

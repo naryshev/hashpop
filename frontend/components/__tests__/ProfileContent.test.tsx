@@ -175,9 +175,17 @@ describe("ProfileContent", () => {
     );
     expect(host!.querySelector('[data-testid="profile-tab-likes"]')?.textContent).toBe("Likes");
     expect(host!.querySelector('[data-testid="profile-tab-reviews"]')).toBeNull();
-    expect(text).toContain("completed deals");
-    expect(text).toContain("80%");
-    expect(text).toContain("rating (2)");
+    expect(host!.querySelector('[data-testid="profile-stat-deals"]')?.textContent).toContain("1");
+    expect(host!.querySelector('[data-testid="profile-stat-deals"]')?.textContent).toContain(
+      "deals",
+    );
+    expect(host!.querySelector('[data-testid="profile-stat-completion"]')?.textContent).toContain(
+      "80%",
+    );
+    expect(host!.querySelector('[data-testid="profile-stat-rating"]')?.textContent).toContain(
+      "rating (2)",
+    );
+    expect(text).not.toContain("completed deals");
     expect(text).not.toContain("followers");
     expect(text).not.toContain("Follow");
     expect(host!.querySelector('[data-testid="profile-earnings-earned"]')?.textContent).toContain(
@@ -195,13 +203,25 @@ describe("ProfileContent", () => {
     );
     expect(host!.querySelector('[data-testid="trust-kyc-chip"]')).toBeTruthy();
     expect(host!.querySelector('a[href="/create"]')).toBeTruthy();
+    const shopTiles = host!.querySelectorAll('[data-testid="profile-tile"]');
+    expect(shopTiles.length).toBeGreaterThan(0);
+    expect([...shopTiles].every((tile) => tile.getAttribute("data-dimmed") === "false")).toBe(
+      true,
+    );
 
     const sold = host!.querySelector('[data-testid="profile-tab-sold"]') as HTMLButtonElement;
     await act(async () => {
       sold.click();
     });
-    expect(host!.textContent).toContain("Sold");
-    expect(host!.querySelectorAll('[data-testid="profile-tile"]').length).toBe(1);
+    const soldTiles = host!.querySelectorAll('[data-testid="profile-tile"]');
+    expect(soldTiles.length).toBe(1);
+    expect(
+      [...soldTiles].every((tile) => tile.getAttribute("data-dimmed") === "true"),
+    ).toBe(true);
+    const soldLabels = host!.querySelectorAll('[data-testid="profile-sold-label"]');
+    expect(soldLabels.length).toBe(soldTiles.length);
+    expect([...soldLabels].every((label) => label.textContent === "Sold")).toBe(true);
+    expect(host!.querySelector('[data-testid="profile-stat-deals"]')?.textContent).toContain("1");
 
     const shop = host!.querySelector('[data-testid="profile-tab-shop"]') as HTMLButtonElement;
     await act(async () => {
@@ -238,6 +258,14 @@ describe("ProfileContent", () => {
     expect(
       host!.querySelector('[data-testid="profile-earnings-potential"]')?.textContent,
     ).toContain("From 0 active listings");
+    expect(host!.querySelector('[data-testid="profile-stat-deals"]')?.textContent).toContain("1");
+    expect(host!.querySelector('[data-testid="profile-stat-completion"]')?.textContent).toContain(
+      "80%",
+    );
+    expect(host!.querySelector('[data-testid="profile-stat-rating"]')?.textContent).toContain(
+      "rating (2)",
+    );
+    expect(host!.textContent).not.toContain("completed deals");
   });
 
   it("hides own-only actions on a public profile and keeps Likes when wishlist data exists", async () => {

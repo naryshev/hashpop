@@ -9,6 +9,7 @@ import {
   profileStatColumns,
   profileTabList,
   profileTileBadge,
+  selectSoldEntries,
   summarizeOpenEscrow,
 } from "../profileView";
 
@@ -37,47 +38,90 @@ describe("profileTabList", () => {
 });
 
 describe("profileStatColumns", () => {
-  it("uses followers and following only when those counts exist, and drops the trust stats", () => {
+  it("counts Sold-tab rows as deals, even when successfulCompletions is zero", () => {
     expect(
       profileStatColumns({
-        followers: 12,
-        following: 3,
-        successfulCompletions: 4,
-        totalSales: 5,
-        ratingAverage: 5,
+        soldCount: 3,
+        successfulCompletions: 0,
+        totalSales: 0,
+        ratingAverage: 4.5,
         ratingCount: 2,
-      }).map((stat) => stat.id),
-    ).toEqual(["followers", "following"]);
+      }),
+    ).toEqual([
+      { id: "deals", value: "3", label: "deals" },
+      { id: "completion", value: "—", label: "completion" },
+      { id: "rating", value: "★ 4.5", label: "rating (2)" },
+    ]);
   });
 
-  it("shows completed deals, completion, and rating from real numbers", () => {
+  it("keeps completion and rating beside the deals count", () => {
     expect(
       profileStatColumns({
+        soldCount: 3,
         successfulCompletions: 4,
         totalSales: 5,
         ratingAverage: 4.5,
         ratingCount: 2,
       }),
     ).toEqual([
-      { id: "completed", value: "4", label: "completed deals" },
+      { id: "deals", value: "3", label: "deals" },
       { id: "completion", value: "80%", label: "completion" },
       { id: "rating", value: "★ 4.5", label: "rating (2)" },
     ]);
   });
 
-  it("hides completion and rating when there are no sales or reviews, and still shows zero deals", () => {
+  it("always returns three columns and uses an em dash where a number is missing", () => {
     expect(
       profileStatColumns({
+        soldCount: 0,
         successfulCompletions: 0,
         totalSales: 0,
         ratingAverage: null,
         ratingCount: 0,
       }),
-    ).toEqual([{ id: "completed", value: "0", label: "completed deals" }]);
+    ).toEqual([
+      { id: "deals", value: "0", label: "deals" },
+      { id: "completion", value: "—", label: "completion" },
+      { id: "rating", value: "—", label: "rating" },
+    ]);
   });
 
-  it("hides every stat when the user payload never arrived", () => {
-    expect(profileStatColumns({})).toEqual([]);
+  it("lets the listings count stand in when the Sold tab has not loaded", () => {
+    expect(
+      profileStatColumns({
+        soldCount: null,
+        activeListings: 4,
+        successfulCompletions: null,
+        totalSales: null,
+      }).map((stat) => ({ id: stat.id, value: stat.value, label: stat.label })),
+    ).toEqual([
+      { id: "listings", value: "4", label: "listings" },
+      { id: "completion", value: "—", label: "completion" },
+      { id: "rating", value: "—", label: "rating" },
+    ]);
+  });
+
+  it("uses an em dash for deals when neither sold rows nor listings have loaded", () => {
+    expect(profileStatColumns({}).map((stat) => stat.value)).toEqual(["—", "—", "—"]);
+  });
+});
+
+describe("selectSoldEntries", () => {
+  it("matches the Sold tab: seller sales plus archived listings that are not still listed", () => {
+    const selected = selectSoldEntries(
+      [
+        { id: "sale-1", role: "seller", listingId: "scarf" },
+        { id: "sale-2", role: "buyer", listingId: "lamp" },
+        { id: "sale-3", role: "seller", listingId: "old" },
+      ],
+      [
+        { id: "jacket", status: "LOCKED" },
+        { id: "scarf", status: "COMPLETED" },
+        { id: "still", status: "LISTED" },
+      ],
+    );
+    expect(selected.sales.map((sale) => sale.id)).toEqual(["sale-1", "sale-3"]);
+    expect(selected.archived.map((listing) => listing.id)).toEqual(["jacket"]);
   });
 });
 

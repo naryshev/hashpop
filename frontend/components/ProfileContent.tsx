@@ -35,6 +35,7 @@ import {
   filterShopListings,
   profileEarnings,
   profileStatColumns,
+  selectSoldEntries,
   profileTabList,
   profileTileBadge,
   shopCategories,
@@ -61,6 +62,7 @@ type ProfileStats = {
   refunds?: number;
   timeouts?: number;
   completedBuys?: number;
+  activeListings?: number;
 };
 
 type Kyc = {
@@ -221,6 +223,7 @@ export function ProfileContent({
   const [offerIds, setOfferIds] = useState<Set<string>>(new Set());
   const [openEscrow, setOpenEscrow] = useState<OpenEscrowSummary | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [catalogReady, setCatalogReady] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [tab, setTab] = useState<ProfileTabId>("shop");
   const [filter, setFilter] = useState<ShopFilter>(DEFAULT_SHOP_FILTER);
@@ -259,6 +262,7 @@ export function ProfileContent({
     const api = getApiUrl();
     setLoaded(false);
     setStatsLoaded(false);
+    setCatalogReady(false);
 
     const load = async () => {
       const [statsRes, profileRes, listingsRes, ratingsRes, purchasesRes, wishlistRes, offersRes] =
@@ -287,13 +291,16 @@ export function ProfileContent({
       const offersBody = await readJson<{ received?: OfferRow[] }>(offersRes);
       if (cancelled) return;
 
+      const listingsOk = listingsRes.ok && listingsBody != null;
+      const purchasesOk = purchasesRes.ok && purchasesBody != null;
       setStats(statsBody);
       setStatsLoaded(true);
       setProfile(profileBody);
-      setActive(listingsBody?.active ?? []);
-      setArchived(listingsBody?.archived ?? []);
+      setActive(listingsOk ? (listingsBody.active ?? []) : []);
+      setArchived(listingsOk ? (listingsBody.archived ?? []) : []);
       setReviews(ratingsBody?.ratings ?? []);
-      setSales(purchasesBody?.purchases ?? []);
+      setSales(purchasesOk ? (purchasesBody.purchases ?? []) : []);
+      setCatalogReady(listingsOk && purchasesOk);
       setOfferIds(
         new Set(
           (offersBody?.received ?? [])
@@ -404,16 +411,24 @@ export function ProfileContent({
   const bioText = (editing ? draft?.bio : profile?.bio)?.trim() || "";
   const completions = stats?.successfulCompletions ?? stats?.successful;
 
-  const statColumns = profileStatColumns(
-    statsLoaded && stats
-      ? {
-          successfulCompletions: completions ?? 0,
-          totalSales: stats.totalSales ?? 0,
-          ratingAverage: stats.ratingAverage,
-          ratingCount: stats.ratingCount ?? 0,
-        }
-      : {},
-  );
+  const soldTiles = useMemo(() => {
+    const selected = selectSoldEntries(sales, archived);
+    return [
+      ...selected.sales.map(saleToTile),
+      ...selected.archived.map((listing) => listingToTile(listing, "sold")),
+    ];
+  }, [sales, archived]);
+
+  const statColumns = loaded
+    ? profileStatColumns({
+        soldCount: catalogReady ? soldTiles.length : null,
+        activeListings: catalogReady ? null : (stats?.activeListings ?? null),
+        successfulCompletions: stats ? (completions ?? null) : null,
+        totalSales: stats?.totalSales ?? null,
+        ratingAverage: stats?.ratingAverage ?? null,
+        ratingCount: stats?.ratingCount ?? null,
+      })
+    : [];
 
   const earnings = profileEarnings({
     sales,
@@ -426,21 +441,6 @@ export function ProfileContent({
     const filtered = filterShopListings(active, filter);
     return filtered.map((listing) => listingToTile(listing, "shop"));
   }, [active, filter]);
-
-  const soldTiles = useMemo(() => {
-    const sellerSales = sales.filter((sale) => sale.role === "seller");
-    const covered = new Set(
-      sellerSales.map((sale) => sale.listingId).filter((id): id is string => !!id),
-    );
-    const extras = archived.filter(
-      (listing) =>
-        !covered.has(listing.id) && String(listing.status ?? "").toUpperCase() !== "LISTED",
-    );
-    return [
-      ...sellerSales.map(saleToTile),
-      ...extras.map((listing) => listingToTile(listing, "sold")),
-    ];
-  }, [sales, archived]);
 
   const purchasedTiles = useMemo(
     () => sales.filter((sale) => sale.role === "buyer").map(saleToTile),
@@ -760,7 +760,7 @@ export function ProfileContent({
               <User size={28} />
             </div>
           )}
-          {!statsLoaded ? (
+          {!loaded ? (
             <div className="grid flex-1 grid-cols-3 gap-2" aria-hidden>
               {[0, 1, 2].map((slot) => (
                 <span
@@ -769,11 +769,8 @@ export function ProfileContent({
                 />
               ))}
             </div>
-          ) : statColumns.length > 0 ? (
-            <div
-              className="grid min-w-0 flex-1 gap-1"
-              style={{ gridTemplateColumns: `repeat(${statColumns.length}, minmax(0, 1fr))` }}
-            >
+          ) : (
+            <div className="grid min-w-0 flex-1 grid-cols-3 gap-1">
               {statColumns.map((stat) => (
                 <div
                   key={stat.id}
@@ -789,8 +786,6 @@ export function ProfileContent({
                 </div>
               ))}
             </div>
-          ) : (
-            <div className="flex-1" />
           )}
         </div>
         <div className="mt-3">
@@ -1106,10 +1101,15 @@ export function ProfileContent({
             <ProfileTile
               key={tile.key}
               tile={tile}
-              badge={profileTileBadge({
-                status: tile.status,
-                hasActiveOffer: !!tile.listingId && offerIds.has(tile.listingId),
-              })}
+              badge={
+                tab === "sold"
+                  ? { label: "Sold", tone: "sold" }
+                  : profileTileBadge({
+                      status: tile.status,
+                      hasActiveOffer: !!tile.listingId && offerIds.has(tile.listingId),
+                    })
+              }
+              dimSold={tab === "sold"}
               selecting={selecting && tab === "shop"}
               selected={!!tile.selectableId && selected.has(tile.selectableId)}
               onToggle={
@@ -1215,6 +1215,7 @@ function PriceField({
 function ProfileTile({
   tile,
   badge,
+  dimSold = false,
   selecting,
   selected,
   onToggle,
@@ -1222,6 +1223,7 @@ function ProfileTile({
 }: {
   tile: GridTile;
   badge: { label: string; tone: "sold" | "escrow" | "offer" } | null;
+  dimSold?: boolean;
   selecting: boolean;
   selected: boolean;
   onToggle?: () => void;
@@ -1232,11 +1234,18 @@ function ProfileTile({
     <>
       {tile.imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={tile.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        <img
+          src={tile.imageUrl}
+          alt=""
+          className={cn(
+            "absolute inset-0 h-full w-full object-cover",
+            dimSold && "opacity-50",
+          )}
+        />
       ) : (
-        <span className="absolute inset-0 bg-white/[0.04]" />
+        <span className={cn("absolute inset-0", dimSold ? "bg-black/50" : "bg-white/[0.04]")} />
       )}
-      {badge?.tone === "sold" && <span className="absolute inset-0 bg-black/50" />}
+      {badge?.tone === "sold" && !dimSold && <span className="absolute inset-0 bg-black/50" />}
       {badge && badge.tone !== "sold" && (
         <span
           className={cn(
@@ -1248,7 +1257,10 @@ function ProfileTile({
         </span>
       )}
       {badge?.tone === "sold" && (
-        <span className="absolute left-1.5 top-1.5 text-[11px] font-semibold text-white">
+        <span
+          data-testid="profile-sold-label"
+          className="absolute left-1.5 top-1.5 text-[11px] font-semibold text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.85)]"
+        >
           {badge.label}
         </span>
       )}
@@ -1276,12 +1288,14 @@ function ProfileTile({
     "relative block aspect-square overflow-hidden bg-white/[0.03]",
     selected && "ring-2 ring-inset ring-chrome",
   );
+  const dimmed = dimSold ? "true" : "false";
 
   if (selecting && onToggle) {
     return (
       <button
         type="button"
         data-testid="profile-tile"
+        data-dimmed={dimmed}
         aria-pressed={selected}
         className={className}
         onClick={onToggle}
@@ -1302,14 +1316,14 @@ function ProfileTile({
 
   if (!tile.href) {
     return (
-      <div data-testid="profile-tile" className={className} {...hold}>
+      <div data-testid="profile-tile" data-dimmed={dimmed} className={className} {...hold}>
         {body}
       </div>
     );
   }
 
   return (
-    <Link href={tile.href} data-testid="profile-tile" className={className} {...hold}>
+    <Link href={tile.href} data-testid="profile-tile" data-dimmed={dimmed} className={className} {...hold}>
       {body}
     </Link>
   );
