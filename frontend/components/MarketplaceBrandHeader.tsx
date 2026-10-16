@@ -78,7 +78,7 @@ export function MarketplaceBrandHeader() {
           <HashpopWordmark />
           <span
             data-testid="marketplace-wordmark"
-            className="mt-0.5 text-[12px] font-medium lowercase leading-none tracking-[0.12em] text-white/60"
+            className="mt-0.5 font-sans text-[12px] font-medium lowercase leading-none tracking-[0.08em] text-white/60"
           >
             marketplace
           </span>
