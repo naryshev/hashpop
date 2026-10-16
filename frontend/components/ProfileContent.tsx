@@ -1237,10 +1237,7 @@ function ProfileTile({
         <img
           src={tile.imageUrl}
           alt=""
-          className={cn(
-            "absolute inset-0 h-full w-full object-cover",
-            dimSold && "opacity-50",
-          )}
+          className={cn("absolute inset-0 h-full w-full object-cover", dimSold && "opacity-50")}
         />
       ) : (
         <span className={cn("absolute inset-0", dimSold ? "bg-black/50" : "bg-white/[0.04]")} />
@@ -1323,7 +1320,13 @@ function ProfileTile({
   }
 
   return (
-    <Link href={tile.href} data-testid="profile-tile" data-dimmed={dimmed} className={className} {...hold}>
+    <Link
+      href={tile.href}
+      data-testid="profile-tile"
+      data-dimmed={dimmed}
+      className={className}
+      {...hold}
+    >
       {body}
     </Link>
   );

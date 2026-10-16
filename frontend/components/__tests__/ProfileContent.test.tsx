@@ -205,9 +205,7 @@ describe("ProfileContent", () => {
     expect(host!.querySelector('a[href="/create"]')).toBeTruthy();
     const shopTiles = host!.querySelectorAll('[data-testid="profile-tile"]');
     expect(shopTiles.length).toBeGreaterThan(0);
-    expect([...shopTiles].every((tile) => tile.getAttribute("data-dimmed") === "false")).toBe(
-      true,
-    );
+    expect([...shopTiles].every((tile) => tile.getAttribute("data-dimmed") === "false")).toBe(true);
 
     const sold = host!.querySelector('[data-testid="profile-tab-sold"]') as HTMLButtonElement;
     await act(async () => {
@@ -215,9 +213,7 @@ describe("ProfileContent", () => {
     });
     const soldTiles = host!.querySelectorAll('[data-testid="profile-tile"]');
     expect(soldTiles.length).toBe(1);
-    expect(
-      [...soldTiles].every((tile) => tile.getAttribute("data-dimmed") === "true"),
-    ).toBe(true);
+    expect([...soldTiles].every((tile) => tile.getAttribute("data-dimmed") === "true")).toBe(true);
     const soldLabels = host!.querySelectorAll('[data-testid="profile-sold-label"]');
     expect(soldLabels.length).toBe(soldTiles.length);
     expect([...soldLabels].every((label) => label.textContent === "Sold")).toBe(true);
