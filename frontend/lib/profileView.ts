@@ -4,7 +4,7 @@
  * This module does not invent followers, member-since, or a mark-sold action.
  */
 import { completionPercent } from "./mediaTrust";
-import { formatContractAmountToHbar, formatPriceForDisplay } from "./formatPrice";
+import { formatContractAmountToHbar, parseHbarAmount, withHbarGlyph } from "./formatPrice";
 
 export type ProfileTabId = "shop" | "sold" | "purchased" | "likes" | "reviews";
 
@@ -134,24 +134,24 @@ export function selectSoldEntries<S extends SoldSale, L extends SoldListing>(
 export const PROFILE_EARNINGS_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 export function hbarNumber(price: string | null | undefined): number {
-  const n = Number(formatPriceForDisplay(price));
+  const n = parseHbarAmount(price);
   return Number.isFinite(n) ? n : 0;
 }
 
 export function chainAmountToHbar(amount: string | null | undefined): number {
-  const n = Number(formatContractAmountToHbar(amount ?? "0"));
+  const n = Number(formatContractAmountToHbar(amount ?? "0").replace(/,/g, ""));
   return Number.isFinite(n) ? n : 0;
 }
 
-/** ℏ first, grouped. Fiat stays a separate gray line. */
+/** ℏ first, grouped, with the thin space Direction C uses before the glyph. */
 export function formatProfileHbar(amount: number): string {
-  if (!Number.isFinite(amount)) return "0 ℏ";
+  if (!Number.isFinite(amount)) return withHbarGlyph("0");
   const rounded = Math.round(amount * 100) / 100;
   const text = rounded.toLocaleString("en-US", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   });
-  return `${text} ℏ`;
+  return withHbarGlyph(text);
 }
 
 export function formatProfileFiat(hbar: number, usdPerHbar: number | null): string | null {

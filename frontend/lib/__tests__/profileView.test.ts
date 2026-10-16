@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { withHbarGlyph } from "../formatPrice";
 import {
   OWN_SHOP_EMPTY,
   PUBLIC_SHOP_EMPTY,
@@ -144,13 +145,13 @@ describe("profileEarnings", () => {
     });
     expect(columns.map((column) => column.id)).toEqual(["earned", "potential"]);
     expect(columns[0]).toMatchObject({
-      amountLabel: "10 ℏ",
+      amountLabel: withHbarGlyph("10"),
       caption: "earned",
       detail: "Last 30 days",
       fiatLabel: "≈ $1.00",
     });
     expect(columns[1]).toMatchObject({
-      amountLabel: "4.5 ℏ",
+      amountLabel: withHbarGlyph("4.5"),
       caption: "potential",
       detail: "From 2 active listings",
       fiatLabel: "≈ $0.45",
@@ -178,7 +179,7 @@ describe("profileEarnings", () => {
     });
     expect(withEscrow[2]).toMatchObject({
       id: "escrow",
-      amountLabel: "320 ℏ",
+      amountLabel: withHbarGlyph("320"),
       caption: "in escrow",
       detail: "From 3 open deals",
       fiatLabel: "≈ $16.00",

@@ -1,4 +1,5 @@
 import { createElement, act } from "react";
+import { withHbarGlyph } from "../../lib/formatPrice";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -191,14 +192,14 @@ describe("ProfileContent", () => {
     expect(text).not.toContain("followers");
     expect(text).not.toContain("Follow");
     expect(host!.querySelector('[data-testid="profile-earnings-earned"]')?.textContent).toContain(
-      "10 ℏ",
+      withHbarGlyph("10"),
     );
     expect(host!.querySelector('[data-testid="profile-earnings-earned"]')?.textContent).toContain(
       "≈ $1.00",
     );
     expect(
       host!.querySelector('[data-testid="profile-earnings-potential"]')?.textContent,
-    ).toContain("7.5 ℏ");
+    ).toContain(withHbarGlyph("7.5"));
     expect(host!.querySelector('[data-testid="profile-earnings-escrow"]')).toBeNull();
     expect(host!.querySelector('[data-testid="profile-active-count"]')?.textContent).toBe(
       "Active (1 listing)",
