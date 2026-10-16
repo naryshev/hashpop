@@ -214,7 +214,7 @@ describe("ProfileContent", () => {
     const bar = host!.querySelector('[data-testid="profile-select-bar"]') as HTMLElement;
     expect(bar).toBeTruthy();
     expect(bar.getAttribute("data-clears-dock")).toBe("true");
-    expect(bar.className).toContain("bottom-[calc(env(safe-area-inset-bottom)+80px)]");
+    expect(bar.className).toContain("bottom-[calc(env(safe-area-inset-bottom)+96px)]");
     expect(bar.textContent).toContain("Delist");
     expect(host!.textContent).not.toContain("Mark sold");
     expect(host!.textContent).toContain("0 selected");

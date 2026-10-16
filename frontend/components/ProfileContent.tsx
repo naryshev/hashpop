@@ -1134,7 +1134,7 @@ export function ProfileContent({
         <div
           data-testid="profile-select-bar"
           data-clears-dock="true"
-          className="fixed inset-x-0 z-[70] px-3 bottom-[calc(env(safe-area-inset-bottom)+80px)] md:bottom-6"
+          className="fixed inset-x-0 z-[70] px-3 bottom-[calc(env(safe-area-inset-bottom)+96px)] md:bottom-6"
         >
           <div className="mx-auto max-w-[720px]">
             <button
