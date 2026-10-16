@@ -73,7 +73,7 @@ export function MarketplaceDesktopHeader({
   return (
     <header
       data-testid="marketplace-desktop-header"
-      className="sticky top-0 z-30 hidden h-[72px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 border-b border-white/[0.06] bg-[#0b111b]/90 px-4 backdrop-blur-xl md:grid md:px-5"
+      className="hp-desktop-bar sticky top-0 z-30 hidden h-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 overflow-hidden border-0 border-white/[0.06] bg-[#0b111b]/90 px-0 backdrop-blur-xl md:grid md:h-[72px] md:overflow-visible md:border-b md:px-5"
     >
       <Link
         href="/marketplace"

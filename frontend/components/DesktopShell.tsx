@@ -176,8 +176,8 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
   // Mobile page header lives here in the shell — OUTSIDE the route-keyed fade
   // wrapper below — so it stays put on page switches while the content still
   // eases in. Marketplace renders its own mobile header (brand row + search).
-  // Cart and Messages share that same brand row. Focused screens (listing,
-  // order, activity…) keep their own back-button chrome.
+  // Cart, Messages, Create, My Hashpop, and profile share that same brand row.
+  // Focused screens (listing, order, activity…) keep their own back-button chrome.
   const MOBILE_HEADER_ROUTES = [
     "/marketplace",
     "/cart",
@@ -185,9 +185,16 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
     "/purchases",
     "/offers",
     "/create",
+    "/dashboard",
   ];
-  const showMobileHeader = MOBILE_HEADER_ROUTES.includes(pathname);
-  const marketplaceBrandHeader = pathname === "/cart" || pathname === "/messages";
+  const profileRoute = pathname.startsWith("/profile/");
+  const showMobileHeader = MOBILE_HEADER_ROUTES.includes(pathname) || profileRoute;
+  const marketplaceBrandHeader =
+    pathname === "/cart" ||
+    pathname === "/messages" ||
+    pathname === "/create" ||
+    pathname === "/dashboard" ||
+    profileRoute;
   const isAdminRoute = pathname.startsWith("/admin") || pathname.startsWith("/area51");
   // Full-screen surfaces (open message thread) hide all chrome.
   const [immersive, setImmersive] = useState(false);
@@ -207,9 +214,10 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen flex-col">
       {/* Top bar — desktop only, and not on marketplace home (that route
           paints MarketplaceDesktopHeader). Sticky so page content scrolls
-          beneath it. */}
+          beneath it. Height is 0 below md so a wallet webview that ignores
+          `hidden` cannot reserve a 56px band above the brand header. */}
       {!marketplaceHome && (
-        <header className="sticky top-0 z-20 hidden h-14 shrink-0 items-center gap-3 border-b border-white/5 bg-[#0b111b]/90 px-3 backdrop-blur-xl md:flex">
+        <header className="hp-desktop-bar sticky top-0 z-20 hidden h-0 shrink-0 items-center gap-3 overflow-hidden border-0 border-white/5 bg-[#0b111b]/90 px-0 backdrop-blur-xl md:flex md:h-14 md:overflow-visible md:border-b md:px-3">
           {/* Logo, then the page's search (center slot), then the nav strip. */}
           <Link
             href="/marketplace"
@@ -328,13 +336,14 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
           !immersive &&
           pathname !== "/marketplace" &&
           (marketplaceBrandHeader ? (
-            // Same top inset as Marketplace. No bottom margin: Marketplace's
-            // mb-3 sits under the search row, which these routes do not render.
-            <div className="px-3 pt-[calc(env(safe-area-inset-top)+12px)] md:hidden">
+            // Top inset lives on MarketplaceBrandHeader (hp-brand-safe-top).
+            // No bottom margin: Marketplace's mb-3 sits under the search row,
+            // which these routes do not render.
+            <div className="px-3 md:hidden">
               <MarketplaceBrandHeader />
             </div>
           ) : (
-            <div className="px-3 pt-4">
+            <div className="hp-brand-safe-top px-3">
               <MobileTopBar />
             </div>
           ))}

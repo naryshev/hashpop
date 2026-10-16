@@ -108,6 +108,11 @@ html {
   --material-chrome: rgba(0, 255, 163, 0.14);
   --scrim: rgba(0, 0, 0, 0.5);
   --hairline: rgba(255, 255, 255, 0.12);
+  /* Single top inset for the brand header and the other page bars that sit
+     at the viewport edge. 10px of breathing room plus the device safe area.
+     When the inset is 0 (wallet in-app browsers), this is only the pad. */
+  --hp-brand-pad: 10px;
+  --hp-safe-top: env(safe-area-inset-top, 0px);
 }
 
 body {
@@ -374,5 +379,25 @@ a,
   /* Tab bar + sheet footer: iOS safe area with a 12px floor. */
   .pb-safe {
     padding-bottom: max(env(safe-area-inset-bottom), 12px);
+  }
+  /* Brand header and sibling page bars. One class, not a per-page calc. */
+  .hp-brand-safe-top {
+    padding-top: calc(var(--hp-safe-top) + var(--hp-brand-pad));
+  }
+}
+
+/* Desktop sticky bars are in the document above the brand header. Below md
+   they must not reserve their 56px / 72px height: a wallet webview that
+   forces `header { display: block }` would otherwise paint an empty dark
+   band (that height, plus the safe-area pad) above the logo. */
+@media (max-width: 767px) {
+  .hp-desktop-bar {
+    display: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-width: 0 !important;
+    overflow: hidden !important;
   }
 }
