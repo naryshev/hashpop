@@ -5,6 +5,7 @@ import Link from "next/link";
 import { BadgeCheck, ChevronLeft, Plus, Settings } from "lucide-react";
 import { useHashpackWallet } from "../lib/hashpackWallet";
 import { material } from "../lib/materials";
+import type { ProfileTitleKind } from "../lib/profileTitle";
 import { cn } from "../lib/utils";
 
 const iconBtn =
@@ -20,12 +21,15 @@ const menuItem =
  */
 export function ProfileOwnerHeader({
   title,
+  titleKind = "name",
   verified = false,
   onBack,
   onEdit,
   notice,
 }: {
   title: string;
+  /** .h names use Clash. Account ids and truncated addresses use the mono face. */
+  titleKind?: ProfileTitleKind;
   verified?: boolean;
   onBack: () => void;
   onEdit?: () => void;
@@ -56,7 +60,10 @@ export function ProfileOwnerHeader({
         </div>
         <h1
           data-testid="profile-handle"
-          className="flex max-w-[60vw] items-center gap-1 text-[17px] font-semibold tracking-tight text-white"
+          className={cn(
+            "flex max-w-[60vw] items-center gap-1 text-[17px] font-semibold text-white",
+            titleKind === "address" ? "font-mono tracking-normal" : "font-display tracking-tight",
+          )}
         >
           <span className="truncate">{title}</span>
           {verified && (

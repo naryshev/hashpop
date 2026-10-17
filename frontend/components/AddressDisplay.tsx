@@ -1,16 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { BadgeCheck } from "lucide-react";
 
-import { getApiUrl } from "../lib/apiUrl";
+import { useHederaAccountId } from "../lib/useHederaAccountId";
 import { profileDisplayName, useProfile } from "../lib/profiles";
-import { activeHederaChain } from "../lib/hederaChains";
-
-const MIRROR_BASE =
-  activeHederaChain.id === 295
-    ? "https://mainnet.mirrornode.hedera.com"
-    : "https://testnet.mirrornode.hedera.com";
 
 /**
  * Renders a wallet identity: the HashPack wallet username when set, otherwise
@@ -30,33 +23,8 @@ export function AddressDisplay({
   /** false = always render the account id / address, never the display name. */
   preferName?: boolean;
 }) {
-  const [accountId, setAccountId] = useState<string | null>(null);
+  const accountId = useHederaAccountId(address);
   const profile = useProfile(address);
-
-  useEffect(() => {
-    if (!address || !address.startsWith("0x") || address.length !== 42) {
-      setAccountId(null);
-      return;
-    }
-    setAccountId(null);
-    let cancelled = false;
-    const evm = address.toLowerCase();
-    const fromMirror = () =>
-      fetch(`${MIRROR_BASE}/api/v1/accounts/${evm}`)
-        .then((r) => (r.ok ? r.json() : Promise.reject(r)))
-        .then((data: { account?: string }) => data.account ?? null);
-    fetch(`${getApiUrl()}/api/relay/account-id?evmAddress=${encodeURIComponent(evm)}`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(r)))
-      .then((data: { accountId?: string }) => data.accountId ?? fromMirror())
-      .catch(fromMirror)
-      .then((id) => {
-        if (!cancelled && typeof id === "string" && id) setAccountId(id);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [address]);
 
   const displayName = preferName ? profileDisplayName(profile) : null;
   const isEvm = !!address && address.startsWith("0x") && address.length === 42;
