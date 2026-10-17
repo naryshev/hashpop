@@ -1,8 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { BadgeCheck, ChevronLeft, Plus, Settings } from "lucide-react";
+import { placeGearMenu, type GearMenuPlacement } from "../lib/gearMenu";
 import { useHashpackWallet } from "../lib/hashpackWallet";
 import { material } from "../lib/materials";
 import type { ProfileTitleKind } from "../lib/profileTitle";
@@ -18,6 +29,10 @@ const menuItem =
  * Own-profile bar: back, centered title, new-listing, and the account gear.
  * The gear keeps every destination the old profile sheet offered that the
  * profile tabs do not already cover, plus sign out.
+ *
+ * The menu is portaled to document.body. A short profile (account id, no bio)
+ * used to clip it: the menu lived in the sticky header, and the earnings card's
+ * backdrop-filter painted through the bottom edge.
  */
 export function ProfileOwnerHeader({
   title,
@@ -35,16 +50,39 @@ export function ProfileOwnerHeader({
   onEdit?: () => void;
   notice?: string | null;
 }) {
+  const pathname = usePathname();
   const { address, accountId, disconnect } = useHashpackWallet();
   const [gearOpen, setGearOpen] = useState(false);
   const gearRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const pathnameRef = useRef(pathname);
+  const wasOpenRef = useRef(false);
   const profileKey = address ?? accountId;
   const editHref = profileKey ? `/profile/${encodeURIComponent(profileKey)}?edit=1` : null;
+
+  const closeGear = useCallback(() => setGearOpen(false), []);
+
+  useEffect(() => {
+    if (pathnameRef.current !== pathname) {
+      pathnameRef.current = pathname;
+      setGearOpen(false);
+    }
+  }, [pathname]);
+
+  useEffect(() => {
+    if (wasOpenRef.current && !gearOpen) buttonRef.current?.focus();
+    wasOpenRef.current = gearOpen;
+  }, [gearOpen]);
 
   useEffect(() => {
     if (!gearOpen) return;
     const onPointer = (event: PointerEvent) => {
-      if (!gearRef.current?.contains(event.target as Node)) setGearOpen(false);
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (gearRef.current?.contains(target)) return;
+      if (menuRef.current?.contains(target)) return;
+      setGearOpen(false);
     };
     document.addEventListener("pointerdown", onPointer);
     return () => document.removeEventListener("pointerdown", onPointer);
@@ -76,25 +114,20 @@ export function ProfileOwnerHeader({
           </Link>
           <div className="relative" ref={gearRef}>
             <button
+              ref={buttonRef}
               type="button"
               data-testid="profile-gear"
               aria-label="Settings"
               aria-expanded={gearOpen}
               aria-haspopup="menu"
+              aria-controls="profile-gear-menu"
               className={iconBtn}
               onClick={() => setGearOpen((open) => !open)}
             >
               <Settings size={20} />
             </button>
             {gearOpen && (
-              <div
-                role="menu"
-                data-testid="profile-gear-menu"
-                className={cn(
-                  material.regular,
-                  "absolute right-0 top-11 z-40 w-52 rounded-[14px] p-1",
-                )}
-              >
+              <GearMenu anchorRef={buttonRef} menuRef={menuRef} onClose={closeGear}>
                 {onEdit ? (
                   <button
                     type="button"
@@ -155,12 +188,117 @@ export function ProfileOwnerHeader({
                 >
                   Sign out
                 </button>
-              </div>
+              </GearMenu>
             )}
           </div>
         </div>
       </div>
       {notice && <p className="px-4 pb-1 text-center text-[12px] text-white/60">{notice}</p>}
     </header>
+  );
+}
+
+function GearMenu({
+  anchorRef,
+  menuRef,
+  onClose,
+  children,
+}: {
+  anchorRef: RefObject<HTMLElement | null>;
+  menuRef: RefObject<HTMLDivElement | null>;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const [mounted, setMounted] = useState(false);
+  const [placement, setPlacement] = useState<GearMenuPlacement | null>(null);
+
+  useEffect(() => setMounted(true), []);
+
+  useLayoutEffect(() => {
+    if (!mounted) return;
+    const menu = menuRef.current;
+    const anchor = anchorRef.current;
+    if (!menu || !anchor) return;
+
+    const measure = () => {
+      const rect = anchor.getBoundingClientRect();
+      const next = placeGearMenu(
+        { top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left },
+        { width: menu.offsetWidth || 208, height: menu.scrollHeight },
+        { width: window.innerWidth, height: window.innerHeight },
+      );
+      setPlacement((current) =>
+        current &&
+        current.top === next.top &&
+        current.left === next.left &&
+        current.maxHeight === next.maxHeight
+          ? current
+          : next,
+      );
+    };
+
+    measure();
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, true);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+    };
+  }, [anchorRef, menuRef, mounted]);
+
+  useEffect(() => {
+    const menu = menuRef.current;
+    if (!mounted || !menu) return;
+    const items = () => Array.from(menu.querySelectorAll<HTMLElement>('[role="menuitem"]'));
+    items()[0]?.focus();
+
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab" && event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+      const list = items();
+      if (list.length === 0) return;
+      event.preventDefault();
+      const index = list.indexOf(document.activeElement as HTMLElement);
+      const backward = event.key === "ArrowUp" || (event.key === "Tab" && event.shiftKey);
+      const next = backward
+        ? index <= 0
+          ? list[list.length - 1]
+          : list[index - 1]
+        : index === -1 || index === list.length - 1
+          ? list[0]
+          : list[index + 1];
+      next?.focus();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [menuRef, mounted, onClose]);
+
+  if (!mounted) return null;
+
+  return createPortal(
+    <div
+      ref={menuRef}
+      id="profile-gear-menu"
+      role="menu"
+      data-testid="profile-gear-menu"
+      style={{
+        top: placement?.top ?? 0,
+        left: placement?.left ?? 0,
+        maxHeight: placement?.maxHeight ?? undefined,
+        visibility: placement ? "visible" : "hidden",
+      }}
+      className={cn(
+        material.regular,
+        "fixed z-[80] w-52 overflow-y-auto rounded-[14px] p-1",
+        placement?.maxHeight != null && "overscroll-contain",
+      )}
+    >
+      {children}
+    </div>,
+    document.body,
   );
 }
