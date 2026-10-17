@@ -25,7 +25,9 @@ import { useCancelListing } from "../hooks/useCancelListing";
 import { getListingMediaUrls } from "../lib/listingMedia";
 import { listingHref } from "../lib/listingUrl";
 import { material } from "../lib/materials";
+import { profileCustomName, profileHeaderTitle } from "../lib/profileTitle";
 import { profileAvatarUrl, profileDisplayName, useProfile } from "../lib/profiles";
+import { useHederaAccountId } from "../lib/useHederaAccountId";
 import {
   DEFAULT_SHOP_FILTER,
   OWN_SHOP_EMPTY,
@@ -47,7 +49,7 @@ import {
   type ShopFilter,
   type ShopSort,
 } from "../lib/profileView";
-import { identityTitle, profileAddressKey, profileEmptyCopy } from "../lib/trustStrip";
+import { profileAddressKey, profileEmptyCopy } from "../lib/trustStrip";
 import { cn } from "../lib/utils";
 
 type ProfileStats = {
@@ -396,10 +398,18 @@ export function ProfileContent({
 
   const routeHandle = /^\d+\.\d+\.\d+$/.test(addressParam.trim()) ? addressParam.trim() : null;
   const publicProfile = useProfile(address);
-  const title = identityTitle({
-    displayName: profile?.displayName,
-    hashpackName: profileDisplayName(publicProfile) ?? publicProfile?.hashpackName,
+  const hnsName = profileDisplayName(publicProfile);
+  const resolvedAccountId = useHederaAccountId(routeHandle ?? address);
+  const headerAccountId = routeHandle ?? (isSelf ? accountId : null) ?? resolvedAccountId;
+  const headerTitle = profileHeaderTitle({
+    hashpackName: hnsName,
+    accountId: headerAccountId,
     address: routeHandle ?? address,
+  });
+  const title = headerTitle.text;
+  const customName = profileCustomName({
+    displayName: (editing ? draft?.displayName : profile?.displayName) ?? null,
+    hashpackName: hnsName,
   });
   const avatarUrl =
     (editing ? draft?.avatarUrl?.trim() : profile?.avatarUrl?.trim()) ||
@@ -611,6 +621,7 @@ export function ProfileContent({
       {isSelf && !selecting ? (
         <ProfileOwnerHeader
           title={title}
+          titleKind={headerTitle.kind}
           verified={isVerified}
           onBack={goBack}
           onEdit={() => setEditing(true)}
@@ -631,7 +642,12 @@ export function ProfileContent({
             </div>
             <h1
               data-testid="profile-handle"
-              className="flex max-w-[60vw] items-center gap-1 text-[17px] font-semibold tracking-tight text-white"
+              className={cn(
+                "flex max-w-[60vw] items-center gap-1 text-[17px] font-semibold text-white",
+                !selecting && headerTitle.kind === "address"
+                  ? "font-mono tracking-normal"
+                  : "font-display tracking-tight",
+              )}
             >
               <span className="truncate">{selecting ? `${selected.size} selected` : title}</span>
               {!selecting && isVerified && (
@@ -774,8 +790,16 @@ export function ProfileContent({
             linkToProfile={false}
           />
         </div>
+        {customName ? (
+          <p
+            data-testid="profile-display-name"
+            className="mt-3 font-sans text-[17px] font-semibold leading-tight text-white"
+          >
+            {customName}
+          </p>
+        ) : null}
         {bioText ? (
-          <div className="mt-3">
+          <div className={customName ? "mt-1" : "mt-3"}>
             <p className={cn("text-[13px] leading-5 text-white/60", !bioOpen && "line-clamp-2")}>
               {bioText}
             </p>

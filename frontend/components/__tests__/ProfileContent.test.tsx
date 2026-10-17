@@ -6,11 +6,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const SELF = "0xabc0000000000000000000000000000000000001";
 const PUBLIC = "0xdef0000000000000000000000000000000000002";
 
-const { wallet } = vi.hoisted(() => ({
+const { wallet, profileSlot } = vi.hoisted(() => ({
   wallet: {
     address: "0xabc0000000000000000000000000000000000001" as string | null,
     accountId: null as string | null,
     disconnect: vi.fn(async () => {}),
+  },
+  profileSlot: {
+    hashpackName: null as string | null,
+    displayName: "Ada",
   },
 }));
 
@@ -49,8 +53,14 @@ vi.mock("../../hooks/useCancelListing", () => ({
 }));
 
 vi.mock("../../lib/profiles", () => ({
-  useProfile: () => undefined,
-  profileDisplayName: () => null,
+  useProfile: () =>
+    profileSlot.hashpackName
+      ? { hashpackName: profileSlot.hashpackName, address: "", displayName: null }
+      : undefined,
+  profileDisplayName: (profile?: { hashpackName?: string | null }) => {
+    const name = profile?.hashpackName?.trim();
+    return name ? name : null;
+  },
   profileAvatarUrl: () => null,
 }));
 
@@ -73,6 +83,8 @@ beforeEach(() => {
   wallet.address = SELF;
   wallet.accountId = null;
   wallet.disconnect.mockClear();
+  profileSlot.hashpackName = null;
+  profileSlot.displayName = "Ada";
   active = [
     {
       id: "coat-1",
@@ -90,7 +102,7 @@ beforeEach(() => {
       if (url.includes("/profile")) {
         return json({
           address: SELF,
-          displayName: "Ada",
+          displayName: profileSlot.displayName,
           bio: "Short bio",
           avatarUrl: null,
           kyc: { status: "VERIFIED" },
@@ -170,7 +182,10 @@ describe("ProfileContent", () => {
   it("renders the own-profile dossier from real stats, earnings, and shop tabs", async () => {
     await renderProfile(SELF);
     const text = host!.textContent ?? "";
-    expect(host!.querySelector('[data-testid="profile-handle"]')?.textContent).toContain("Ada");
+    const handle = host!.querySelector('[data-testid="profile-handle"]') as HTMLElement;
+    expect(handle.textContent).toContain("0xabc0…0001");
+    expect(handle.className).toContain("font-mono");
+    expect(host!.querySelector('[data-testid="profile-display-name"]')?.textContent).toBe("Ada");
     expect(host!.querySelector('[data-testid="profile-tab-shop"]')?.textContent).toBe("Shop");
     expect(host!.querySelector('[data-testid="profile-tab-sold"]')?.textContent).toBe("Sold");
     expect(host!.querySelector('[data-testid="profile-tab-purchased"]')?.textContent).toBe(
@@ -321,5 +336,38 @@ describe("ProfileContent", () => {
       signOut.click();
     });
     expect(wallet.disconnect).toHaveBeenCalledOnce();
+  });
+
+  it("puts a .h name in the title and the custom name above the bio", async () => {
+    profileSlot.hashpackName = "wunno.h";
+    profileSlot.displayName = "Admin";
+    await renderProfile(SELF);
+    const handle = host!.querySelector('[data-testid="profile-handle"]') as HTMLElement;
+    expect(handle.textContent).toContain("wunno.h");
+    expect(handle.className).toContain("font-display");
+    expect(handle.className).not.toContain("font-mono");
+    const name = host!.querySelector('[data-testid="profile-display-name"]') as HTMLElement;
+    expect(name.textContent).toBe("Admin");
+    expect(name.className).toContain("font-sans");
+    expect(name.className).toContain("font-semibold");
+    expect(host!.textContent).toContain("Short bio");
+  });
+
+  it("omits the custom name when it repeats the .h name", async () => {
+    profileSlot.hashpackName = "wunno.h";
+    profileSlot.displayName = "Wunno.h";
+    await renderProfile(SELF);
+    expect(host!.querySelector('[data-testid="profile-handle"]')?.textContent).toContain("wunno.h");
+    expect(host!.querySelector('[data-testid="profile-display-name"]')).toBeNull();
+  });
+
+  it("shows an account id in mono on a public profile with no .h name", async () => {
+    wallet.address = "0x1111111111111111111111111111111111111111";
+    await renderProfile("0.0.9690555");
+    const handle = host!.querySelector('[data-testid="profile-handle"]') as HTMLElement;
+    expect(handle.textContent).toContain("0.0.9690555");
+    expect(handle.className).toContain("font-mono");
+    expect(host!.querySelector('[data-testid="profile-display-name"]')?.textContent).toBe("Ada");
+    expect(host!.querySelector('[data-testid="profile-gear"]')).toBeNull();
   });
 });
