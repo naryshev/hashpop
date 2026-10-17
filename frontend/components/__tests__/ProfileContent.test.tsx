@@ -6,12 +6,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const SELF = "0xabc0000000000000000000000000000000000001";
 const PUBLIC = "0xdef0000000000000000000000000000000000002";
 
-const { wallet } = vi.hoisted(() => ({
+const { wallet, profileSlot, nav } = vi.hoisted(() => ({
   wallet: {
     address: "0xabc0000000000000000000000000000000000001" as string | null,
     accountId: null as string | null,
     disconnect: vi.fn(async () => {}),
   },
+  profileSlot: {
+    hashpackName: null as string | null,
+    displayName: "Ada",
+  },
+  nav: { pathname: "/profile/self" },
 }));
 
 vi.mock("next/link", () => ({
@@ -28,6 +33,7 @@ vi.mock("next/link", () => ({
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ back: vi.fn(), push: vi.fn() }),
+  usePathname: () => nav.pathname,
 }));
 
 vi.mock("../../lib/hashpackWallet", () => ({
@@ -49,8 +55,14 @@ vi.mock("../../hooks/useCancelListing", () => ({
 }));
 
 vi.mock("../../lib/profiles", () => ({
-  useProfile: () => undefined,
-  profileDisplayName: () => null,
+  useProfile: () =>
+    profileSlot.hashpackName
+      ? { hashpackName: profileSlot.hashpackName, address: "", displayName: null }
+      : undefined,
+  profileDisplayName: (profile?: { hashpackName?: string | null }) => {
+    const name = profile?.hashpackName?.trim();
+    return name ? name : null;
+  },
   profileAvatarUrl: () => null,
 }));
 
@@ -73,6 +85,9 @@ beforeEach(() => {
   wallet.address = SELF;
   wallet.accountId = null;
   wallet.disconnect.mockClear();
+  profileSlot.hashpackName = null;
+  profileSlot.displayName = "Ada";
+  nav.pathname = "/profile/self";
   active = [
     {
       id: "coat-1",
@@ -90,7 +105,7 @@ beforeEach(() => {
       if (url.includes("/profile")) {
         return json({
           address: SELF,
-          displayName: "Ada",
+          displayName: profileSlot.displayName,
           bio: "Short bio",
           avatarUrl: null,
           kyc: { status: "VERIFIED" },
@@ -170,7 +185,10 @@ describe("ProfileContent", () => {
   it("renders the own-profile dossier from real stats, earnings, and shop tabs", async () => {
     await renderProfile(SELF);
     const text = host!.textContent ?? "";
-    expect(host!.querySelector('[data-testid="profile-handle"]')?.textContent).toContain("Ada");
+    const handle = host!.querySelector('[data-testid="profile-handle"]') as HTMLElement;
+    expect(handle.textContent).toContain("0xabc0…0001");
+    expect(handle.className).toContain("font-mono");
+    expect(host!.querySelector('[data-testid="profile-display-name"]')?.textContent).toBe("Ada");
     expect(host!.querySelector('[data-testid="profile-tab-shop"]')?.textContent).toBe("Shop");
     expect(host!.querySelector('[data-testid="profile-tab-sold"]')?.textContent).toBe("Sold");
     expect(host!.querySelector('[data-testid="profile-tab-purchased"]')?.textContent).toBe(
@@ -304,10 +322,16 @@ describe("ProfileContent", () => {
     await renderProfile(SELF);
     expect(host!.textContent).not.toContain("Your profile");
     const gear = host!.querySelector('[data-testid="profile-gear"]') as HTMLButtonElement;
+    const header = host!.querySelector('[data-testid="profile-owner-header"]') as HTMLElement;
     await act(async () => {
       gear.click();
     });
-    const menu = host!.querySelector('[data-testid="profile-gear-menu"]') as HTMLElement;
+    const menu = document.body.querySelector('[data-testid="profile-gear-menu"]') as HTMLElement;
+    expect(menu.parentElement).toBe(document.body);
+    expect(header.contains(menu)).toBe(false);
+    expect(menu.className).toContain("fixed");
+    expect(menu.className).toContain("z-[80]");
+    expect(menu.className).toContain("backdrop-blur-material");
     expect(menu.textContent).toContain("Edit profile");
     expect(menu.querySelector('a[href="/dashboard"]')?.textContent).toContain("My Hashpop");
     expect(menu.querySelector('a[href="/offers"]')?.textContent).toContain("Offers");
@@ -317,9 +341,123 @@ describe("ProfileContent", () => {
     const signOut = Array.from(menu.querySelectorAll("button")).find(
       (button) => button.textContent === "Sign out",
     ) as HTMLButtonElement;
+    expect(signOut).toBeTruthy();
     await act(async () => {
       signOut.click();
     });
     expect(wallet.disconnect).toHaveBeenCalledOnce();
+    expect(document.body.querySelector('[data-testid="profile-gear-menu"]')).toBeNull();
+  });
+
+  it("places a portaled gear menu inside the viewport and closes on Esc, outside click, and route change", async () => {
+    const previousWidth = window.innerWidth;
+    const previousHeight = window.innerHeight;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 760 });
+    try {
+      await renderProfile(SELF);
+      const gear = host!.querySelector('[data-testid="profile-gear"]') as HTMLButtonElement;
+      gear.getBoundingClientRect = () =>
+        ({
+          top: 700,
+          right: 380,
+          bottom: 744,
+          left: 336,
+          width: 44,
+          height: 44,
+          x: 336,
+          y: 700,
+          toJSON() {
+            return {};
+          },
+        }) as DOMRect;
+      await act(async () => {
+        gear.click();
+      });
+      const menu = document.body.querySelector('[data-testid="profile-gear-menu"]') as HTMLElement;
+      Object.defineProperty(menu, "offsetWidth", { configurable: true, value: 208 });
+      Object.defineProperty(menu, "scrollHeight", { configurable: true, value: 320 });
+      await act(async () => {
+        window.dispatchEvent(new Event("resize"));
+      });
+      expect(menu.style.top).toBe("376px");
+      expect(menu.style.left).toBe("172px");
+      expect(menu.style.maxHeight).toBe("");
+      expect(menu.style.visibility).toBe("visible");
+
+      Object.defineProperty(window, "innerHeight", { configurable: true, value: 220 });
+      await act(async () => {
+        window.dispatchEvent(new Event("resize"));
+      });
+      expect(Number.parseFloat(menu.style.maxHeight)).toBeGreaterThan(0);
+      expect(Number.parseFloat(menu.style.top)).toBeGreaterThanOrEqual(8);
+      const bottom = Number.parseFloat(menu.style.top) + Number.parseFloat(menu.style.maxHeight);
+      expect(bottom).toBeLessThanOrEqual(220 - 8);
+
+      await act(async () => {
+        menu.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+      });
+      expect(document.body.querySelector('[data-testid="profile-gear-menu"]')).toBe(menu);
+
+      await act(async () => {
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      });
+      expect(document.body.querySelector('[data-testid="profile-gear-menu"]')).toBeNull();
+      expect(document.activeElement).toBe(gear);
+
+      await act(async () => {
+        gear.click();
+      });
+      await act(async () => {
+        document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+      });
+      expect(document.body.querySelector('[data-testid="profile-gear-menu"]')).toBeNull();
+
+      await act(async () => {
+        gear.click();
+      });
+      expect(document.body.querySelector('[data-testid="profile-gear-menu"]')).toBeTruthy();
+      nav.pathname = "/offers";
+      await act(async () => {
+        root!.render(createElement(ProfileContent, { address: SELF }));
+      });
+      expect(document.body.querySelector('[data-testid="profile-gear-menu"]')).toBeNull();
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: previousWidth });
+      Object.defineProperty(window, "innerHeight", { configurable: true, value: previousHeight });
+    }
+  });
+
+  it("puts a .h name in the title and the custom name above the bio", async () => {
+    profileSlot.hashpackName = "wunno.h";
+    profileSlot.displayName = "Admin";
+    await renderProfile(SELF);
+    const handle = host!.querySelector('[data-testid="profile-handle"]') as HTMLElement;
+    expect(handle.textContent).toContain("wunno.h");
+    expect(handle.className).toContain("font-display");
+    expect(handle.className).not.toContain("font-mono");
+    const name = host!.querySelector('[data-testid="profile-display-name"]') as HTMLElement;
+    expect(name.textContent).toBe("Admin");
+    expect(name.className).toContain("font-sans");
+    expect(name.className).toContain("font-semibold");
+    expect(host!.textContent).toContain("Short bio");
+  });
+
+  it("omits the custom name when it repeats the .h name", async () => {
+    profileSlot.hashpackName = "wunno.h";
+    profileSlot.displayName = "Wunno.h";
+    await renderProfile(SELF);
+    expect(host!.querySelector('[data-testid="profile-handle"]')?.textContent).toContain("wunno.h");
+    expect(host!.querySelector('[data-testid="profile-display-name"]')).toBeNull();
+  });
+
+  it("shows an account id in mono on a public profile with no .h name", async () => {
+    wallet.address = "0x1111111111111111111111111111111111111111";
+    await renderProfile("0.0.9690555");
+    const handle = host!.querySelector('[data-testid="profile-handle"]') as HTMLElement;
+    expect(handle.textContent).toContain("0.0.9690555");
+    expect(handle.className).toContain("font-mono");
+    expect(host!.querySelector('[data-testid="profile-display-name"]')?.textContent).toBe("Ada");
+    expect(host!.querySelector('[data-testid="profile-gear"]')).toBeNull();
   });
 });
