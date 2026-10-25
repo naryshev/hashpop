@@ -8,7 +8,7 @@ import { decodeEvents } from "../indexer/decoder";
 import { saveUpload } from "../storage";
 import { decryptJson, encryptJson, secretBoxConfigured } from "../lib/secretBox";
 import { listingVariantsForDb } from "../listingVariants";
-import { trimmedOrNull } from "../listingText";
+import { patchListingTitle, syncListingTitle, trimmedOrNull } from "../listingText";
 import { authenticateAdmin, isAdminAddress, listAdminIdentities } from "../adminAuth";
 import {
   adminListingsWhere,
@@ -570,7 +570,14 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         : imageUrlStr
           ? [imageUrlStr]
           : [];
-    const titleStr = typeof title === "string" && title.trim() ? title.trim() : null;
+    const syncedTitle = syncListingTitle(title);
+    if (syncedTitle?.empty) {
+      log.warn(
+        { listingId: fallbackListingId },
+        "Sync listing received an empty title; storing the trimmed value",
+      );
+    }
+    const titleWrite = syncedTitle?.value;
     const subtitleStr = typeof subtitle === "string" && subtitle.trim() ? subtitle.trim() : null;
     // Present whitespace-only copy is stored as null. An omitted field is left unchanged.
     const descriptionWrite = description === undefined ? undefined : trimmedOrNull(description);
@@ -618,7 +625,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         ...(txHashStr != null && { txHash: txHashStr }),
         ...(imageUrlStr != null && { imageUrl: imageUrlStr }),
         ...(mediaList.length > 0 && { mediaUrls: mediaList }),
-        ...(titleStr != null && { title: titleStr }),
+        ...(titleWrite !== undefined && { title: titleWrite }),
         ...(subtitleStr != null && { subtitle: subtitleStr }),
         ...(descriptionWrite !== undefined && { description: descriptionWrite }),
         ...(categoryStr != null && { category: categoryStr }),
@@ -638,7 +645,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         ...(txHashStr != null && { txHash: txHashStr }),
         ...(imageUrlStr != null && { imageUrl: imageUrlStr }),
         ...(mediaList.length > 0 && { mediaUrls: mediaList }),
-        ...(titleStr != null && { title: titleStr }),
+        ...(titleWrite !== undefined && { title: titleWrite }),
         ...(subtitleStr != null && { subtitle: subtitleStr }),
         ...(descriptionWrite !== undefined && { description: descriptionWrite }),
         ...(categoryStr != null && { category: categoryStr }),
@@ -751,7 +758,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           txHash: evmTxHash,
           ...(imageUrlStr != null && { imageUrl: imageUrlStr }),
           ...(mediaList.length > 0 && { mediaUrls: mediaList }),
-          ...(titleStr != null && { title: titleStr }),
+          ...(titleWrite !== undefined && { title: titleWrite }),
           ...(subtitleStr != null && { subtitle: subtitleStr }),
           ...(descriptionWrite !== undefined && { description: descriptionWrite }),
           ...(categoryStr != null && { category: categoryStr }),
@@ -771,7 +778,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           txHash: evmTxHash,
           ...(imageUrlStr != null && { imageUrl: imageUrlStr }),
           ...(mediaList.length > 0 && { mediaUrls: mediaList }),
-          ...(titleStr != null && { title: titleStr }),
+          ...(titleWrite !== undefined && { title: titleWrite }),
           ...(subtitleStr != null && { subtitle: subtitleStr }),
           ...(descriptionWrite !== undefined && { description: descriptionWrite }),
           ...(categoryStr != null && { category: categoryStr }),
@@ -1838,6 +1845,10 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       if (sellerLower !== listing.seller.toLowerCase()) {
         return res.status(403).json({ error: "Only the seller can edit this listing" });
       }
+      const titlePatch = patchListingTitle(title);
+      if (!titlePatch.ok) {
+        return res.status(400).json({ error: "Title is required." });
+      }
       const update: {
         title?: string | null;
         subtitle?: string | null;
@@ -1857,7 +1868,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         locationLng?: number | null;
         variants?: ReturnType<typeof listingVariantsForDb>;
       } = {};
-      if (title !== undefined) update.title = trimmedOrNull(title);
+      if (titlePatch.value !== undefined) update.title = titlePatch.value;
       if (subtitle !== undefined) update.subtitle = subtitle === "" ? null : subtitle;
       if (description !== undefined) update.description = trimmedOrNull(description);
       if (category !== undefined) update.category = category === "" ? null : category;
