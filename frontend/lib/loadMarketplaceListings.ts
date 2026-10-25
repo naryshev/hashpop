@@ -30,9 +30,26 @@ function isActiveStatus(status?: string): boolean {
   return normalizeListingStatus(status) === "LISTED";
 }
 
+/** Shown in the grid. Never include status codes, stacks, or infra hints. */
+export const LISTINGS_UNAVAILABLE_COPY = "Listings are taking a moment to load. Try again.";
+
+function logListingsFailure(detail: unknown) {
+  console.error("[marketplace] failed to load listings", detail);
+}
+
+/** Next throws this while prerendering a no-store fetch. It must propagate. */
+function isDynamicServerUsage(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "digest" in error &&
+    (error as { digest?: unknown }).digest === "DYNAMIC_SERVER_USAGE"
+  );
+}
+
 export async function loadInitialMarketplaceListings(): Promise<{
   items: ListingItem[];
-  error: string | null;
+  error: boolean;
 }> {
   try {
     const [listingsRes, countsRes] = await Promise.all([
@@ -49,14 +66,8 @@ export async function loadInitialMarketplaceListings(): Promise<{
     ]);
     if (!listingsRes.ok) {
       const body = await listingsRes.json().catch(() => ({}) as { error?: string });
-      return {
-        items: [],
-        error:
-          body?.error ||
-          (listingsRes.status === 503
-            ? "Backend or database unavailable."
-            : "Failed to load listings."),
-      };
+      logListingsFailure({ status: listingsRes.status, body });
+      return { items: [], error: true };
     }
     const data = (await listingsRes.json()) as { listings?: ListingItem[] };
     const counts: Record<string, number> = countsRes.ok
@@ -76,8 +87,10 @@ export async function loadInitialMarketplaceListings(): Promise<{
         new Date((a.createdAt as string) || 0).getTime()
       );
     });
-    return { items: sorted, error: null };
+    return { items: sorted, error: false };
   } catch (e) {
-    return { items: [], error: e instanceof Error ? e.message : "Failed to load listings." };
+    if (isDynamicServerUsage(e)) throw e;
+    logListingsFailure(e);
+    return { items: [], error: true };
   }
 }

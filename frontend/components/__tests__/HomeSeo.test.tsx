@@ -15,12 +15,13 @@ describe("homepage SEO copy", () => {
     expect(SEO_COPY.rootTitle).toBe("Hashpop — Reputation, chat & escrow on your wallet");
   });
 
-  it("server-renders one h1, three h2s, and the three links", () => {
+  it("server-renders one h1, the section h2s, and the three links", () => {
     const html =
       renderToStaticMarkup(createElement(HomeIntro)) +
       renderToStaticMarkup(createElement(HomeAbout));
     expect(html.match(/<h1[\s>]/g)).toHaveLength(1);
-    expect(html.match(/<h2[\s>]/g)).toHaveLength(3);
+    expect(html.match(/<h2[\s>]/g)).toHaveLength(4);
+    expect(html).toContain(">About Hashpop</h2>");
     expect(html).toContain(HOMEPAGE_SEO.h1);
     expect(html).toContain("Reputation. Chat. Escrow. On your wallet.");
     expect(html).toContain("How HBAR escrow works");

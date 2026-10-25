@@ -48,10 +48,10 @@ export function HomeIntro() {
 
 export function HomeAbout() {
   return (
-    <section data-testid="home-about" aria-label={HOME_SECTION_LABEL} className="mt-8 md:mt-12">
-      <p className="mb-3 font-display text-[15px] font-semibold leading-5 tracking-normal text-white">
+    <section data-testid="home-about" className="mt-6">
+      <h2 className="mb-3 font-display text-[20px] font-semibold leading-[26px] tracking-normal text-white">
         {HOME_SECTION_LABEL}
-      </p>
+      </h2>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3 md:gap-4">
         {HOME_SECTIONS.map((section) => (
           <article key={section.id} className={`${material.regular} rounded-glass-lg p-4 md:p-5`}>
