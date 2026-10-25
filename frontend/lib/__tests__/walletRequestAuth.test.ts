@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { canonicalRequestPath, canonicalWalletAuthMessage } from "../walletAuthMessage";
-import { authorizedFetch } from "../walletRequestAuth";
+import { authorizedFetch, requiresFreshSignature } from "../walletRequestAuth";
 
 const libDir = path.resolve(process.cwd(), "lib");
 
@@ -37,8 +37,12 @@ describe("wallet write signatures", () => {
   });
 
   it("asks HashConnect for a string message and sends the signature headers", async () => {
-    const signMessages = vi.fn(async () => ({ signature: new Uint8Array([1, 2, 3]) }));
-    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    const signMessages = vi.fn(async (_accountId: string, _message: string) => ({
+      signature: new Uint8Array([1, 2, 3]),
+    }));
+    const fetchMock = vi.fn(
+      async (_input: string, _init?: RequestInit) => new Response("{}", { status: 200 }),
+    );
     vi.stubGlobal("fetch", fetchMock);
     try {
       await authorizedFetch(
@@ -57,12 +61,28 @@ describe("wallet write signatures", () => {
       expect(message).toContain("method:PATCH");
       expect(message).toContain("path:/api/listing/abc");
       expect(message).toContain("account:0.0.5");
-      const headers = fetchMock.mock.calls[0][1].headers as Headers;
-      expect(headers.get("x-hashpop-account")).toBe("0.0.5");
-      expect(headers.get("x-hashpop-signature")).toMatch(/^0x010203$/);
+      const init = fetchMock.mock.calls[0][1];
+      if (!init || !(init.headers instanceof Headers)) {
+        throw new Error("expected fetch headers");
+      }
+      expect(init.headers.get("x-hashpop-account")).toBe("0.0.5");
+      expect(init.headers.get("x-hashpop-signature")).toMatch(/^0x010203$/);
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+
+  it("keeps a fresh signature on high-value writes and a session everywhere else", () => {
+    expect(requiresFreshSignature("PATCH", "http://localhost:4000/api/listing/abc")).toBe(true);
+    expect(requiresFreshSignature("POST", "/api/sync-cancel")).toBe(true);
+    expect(requiresFreshSignature("POST", "/api/listing/abc/cancel-offchain")).toBe(true);
+    expect(requiresFreshSignature("POST", "/api/sync-price-update")).toBe(true);
+    expect(requiresFreshSignature("POST", "/api/listing/abc/shipping-address")).toBe(true);
+    expect(requiresFreshSignature("PATCH", "/api/user/0xabc/profile")).toBe(true);
+    expect(requiresFreshSignature("GET", "/api/messages/inbox?address=0xabc")).toBe(false);
+    expect(requiresFreshSignature("POST", "/api/messages")).toBe(false);
+    expect(requiresFreshSignature("POST", "/api/sync-purchase")).toBe(false);
+    expect(requiresFreshSignature("GET", "/api/listings")).toBe(false);
   });
 
   it("does not put HashConnect on the first-load import graph", () => {

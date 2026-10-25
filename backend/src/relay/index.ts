@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import type { Logger } from "pino";
+import { resolveMirrorBase } from "../mirrorUrl";
 
 export function relayRouter(log: Logger): Router {
   const router = Router();
@@ -17,7 +18,13 @@ export function relayRouter(log: Logger): Router {
     ) {
       return res.status(400).json({ error: "Invalid evmAddress; use 0x followed by 40 hex chars" });
     }
-    const mirrorUrl = process.env.MIRROR_URL || "https://testnet.mirrornode.hedera.com";
+    let mirrorUrl: string;
+    try {
+      mirrorUrl = resolveMirrorBase();
+    } catch (err: unknown) {
+      log.error({ err }, "Mirror URL is not configured");
+      return res.status(503).json({ error: "Mirror node is not configured" });
+    }
     try {
       const r = await fetch(`${mirrorUrl}/api/v1/accounts/${evmAddress.trim().toLowerCase()}`);
       if (!r.ok) return res.status(404).json({ error: "Account not found for this EVM address" });

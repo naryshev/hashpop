@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AddressDisplay } from "./AddressDisplay";
 import { useHashpackWallet } from "../lib/hashpackWallet";
-import { useAuthorizedFetch } from "../lib/walletRequestAuth";
+import { useAuthorizedFetch, useSessionFetch } from "../lib/walletRequestAuth";
 import { getApiUrl } from "../lib/apiUrl";
 import { markThreadRead } from "../lib/unreadThreads";
 import { useEncryptionKey } from "../lib/useEncryptionKey";
@@ -264,6 +264,7 @@ function StatePill({ stateKey, size = "sm" }: { stateKey: StateKey; size?: "sm" 
 export function MessagesPageContent({ embedded = false }: { embedded?: boolean } = {}) {
   const { address } = useHashpackWallet();
   const authedFetch = useAuthorizedFetch();
+  const sessionFetch = useSessionFetch();
   const searchParams = useSearchParams();
 
   const [conversations, setConversations] = useState<InboxConversation[]>([]);
@@ -378,14 +379,14 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
   const fetchInbox = useCallback(() => {
     if (!address) return;
     setInboxLoading(true);
-    fetch(`${getApiUrl()}/api/messages/inbox?address=${encodeURIComponent(address)}`)
+    sessionFetch(`${getApiUrl()}/api/messages/inbox?address=${encodeURIComponent(address)}`)
       .then((res) => res.json())
       .then((data: { conversations?: InboxConversation[] }) =>
         setConversations(data.conversations ?? []),
       )
       .catch(() => setConversations([]))
       .finally(() => setInboxLoading(false));
-  }, [address]);
+  }, [address, sessionFetch]);
 
   useEffect(() => {
     fetchInbox();
@@ -545,7 +546,7 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
     if (selectedThread.listingId) {
       q.set("listingId", selectedThread.listingId);
     }
-    fetch(`${getApiUrl()}/api/messages/thread?${q}`)
+    sessionFetch(`${getApiUrl()}/api/messages/thread?${q}`)
       .then((res) => res.json())
       .then((data: { messages?: Message[] }) => {
         setThreadMessages(data.messages ?? []);
@@ -555,7 +556,7 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
         setThreadMessages([]);
       })
       .finally(() => setThreadLoading(false));
-  }, [address, selectedThread]);
+  }, [address, selectedThread, sessionFetch]);
 
   const sendReply = useCallback(async () => {
     if (!address || !selectedThread || !replyBody.trim() || sending) return;
@@ -577,7 +578,7 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
       if (selectedThread.listingId) {
         q.set("listingId", selectedThread.listingId);
       }
-      const res = await fetch(`${getApiUrl()}/api/messages/thread?${q}`);
+      const res = await sessionFetch(`${getApiUrl()}/api/messages/thread?${q}`);
       const data = await res.json();
       setThreadMessages(data.messages ?? []);
       setDecryptedBodies({});
@@ -585,7 +586,7 @@ export function MessagesPageContent({ embedded = false }: { embedded?: boolean }
     } finally {
       setSending(false);
     }
-  }, [address, selectedThread, replyBody, sending, fetchInbox, authedFetch]);
+  }, [address, selectedThread, replyBody, sending, fetchInbox, authedFetch, sessionFetch]);
 
   const getDisplayBody = (m: Message): string => {
     if (m.encrypted) {

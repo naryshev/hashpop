@@ -5,7 +5,7 @@ import { marketplaceAbi, marketplaceAddress } from "../lib/contracts";
 import { listingIdToBytes32 } from "../lib/bytes32";
 import { useRobustContractWrite } from "../hooks/useRobustContractWrite";
 import { useHashpackWallet } from "../lib/hashpackWallet";
-import { useAuthorizedFetch } from "../lib/walletRequestAuth";
+import { useAuthorizedFetch, useSessionFetch } from "../lib/walletRequestAuth";
 import { activeHederaChain } from "../lib/hederaChains";
 import { getApiUrl } from "../lib/apiUrl";
 import { getTransactionErrorMessage } from "../lib/transactionError";
@@ -36,6 +36,7 @@ export function DealRoomOfferCards({
 }) {
   const { address } = useHashpackWallet();
   const authedFetch = useAuthorizedFetch();
+  const sessionFetch = useSessionFetch();
   const { send, isPending } = useRobustContractWrite();
   const chainId = activeHederaChain.id;
   const usdRate = useHbarUsd();
@@ -46,14 +47,16 @@ export function DealRoomOfferCards({
 
   const fetchOffers = useCallback(async () => {
     try {
-      const res = await fetch(`${getApiUrl()}/api/listing/${encodeURIComponent(listingId)}/offers`);
+      const res = await sessionFetch(
+        `${getApiUrl()}/api/listing/${encodeURIComponent(listingId)}/offers`,
+      );
       if (!res.ok) throw new Error(String(res.status));
       const data = (await res.json()) as { offers: Offer[] };
       setOffers(data.offers || []);
     } catch {
       setOffers([]);
     }
-  }, [listingId]);
+  }, [listingId, sessionFetch]);
 
   useEffect(() => {
     void fetchOffers();

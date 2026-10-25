@@ -205,6 +205,17 @@ model AuthNonce {
   @@index([expiresAt])
 }
 
+/// HashPack session issued after one signature. Disconnect deletes the row.
+model WalletSession {
+  id        String   @id
+  accountId String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+  @@index([accountId])
+}
+
 /// Who performed a seller/owner write, after the wallet signature checked out.
 model WalletAuditLog {
   id         String   @id @default(cuid())

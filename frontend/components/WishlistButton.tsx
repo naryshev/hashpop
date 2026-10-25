@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useHashpackWallet } from "../lib/hashpackWallet";
-import { useAuthorizedFetch } from "../lib/walletRequestAuth";
+import { useAuthorizedFetch, useSessionFetch } from "../lib/walletRequestAuth";
 
 import { getApiUrl } from "../lib/apiUrl";
 import { material } from "../lib/materials";
@@ -31,18 +31,19 @@ export function WishlistButton({
 }: WishlistButtonProps) {
   const { address } = useHashpackWallet();
   const authedFetch = useAuthorizedFetch();
+  const sessionFetch = useSessionFetch();
   const [inWishlist, setInWishlist] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!address || !itemId) return;
-    fetch(`${getApiUrl()}/api/wishlist?address=${encodeURIComponent(address)}`)
+    sessionFetch(`${getApiUrl()}/api/wishlist?address=${encodeURIComponent(address)}`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((data: { items?: { itemId: string }[] }) => {
         setInWishlist((data.items || []).some((i) => i.itemId === itemId));
       })
       .catch(() => {});
-  }, [address, itemId]);
+  }, [address, itemId, sessionFetch]);
 
   const toggle = async (e: React.MouseEvent) => {
     e.preventDefault();

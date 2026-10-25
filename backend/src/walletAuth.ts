@@ -7,13 +7,16 @@ import {
   verifyHederaSignedMessage,
   type AccountKey,
 } from "./adminAuth";
+import { resolveMirrorBase } from "./mirrorUrl";
 
 /** Messages older than this are rejected. */
 export const WALLET_AUTH_MAX_AGE_MS = 5 * 60 * 1000;
 /** Small clock skew. Timestamps further ahead than this are rejected. */
 export const WALLET_AUTH_FUTURE_SKEW_MS = 30 * 1000;
-const ACCOUNT_CACHE_MS = 60 * 1000;
+/** Positive mirror-key cache. Misses stay short so a recovered node is retried. */
+export const MIRROR_ACCOUNT_CACHE_MS = 5 * 60 * 1000;
 const ACCOUNT_MISS_CACHE_MS = 15 * 1000;
+export const MIRROR_FETCH_TIMEOUT_MS = 2_500;
 const HEDERA_ACCOUNT_RE = /^\d+\.\d+\.\d+$/;
 
 export type WalletIdentity = {
@@ -37,7 +40,7 @@ export type NonceStore = {
 };
 
 export type WalletAuthFailure = { ok: false; status: number; error: string };
-export type WalletAuthSuccess = { ok: true; wallet: WalletIdentity };
+export type WalletAuthSuccess = { ok: true; wallet: WalletIdentity; sessionId?: string };
 export type WalletAuthResult = WalletAuthSuccess | WalletAuthFailure;
 
 export type WalletGuardDeps = {
@@ -51,6 +54,7 @@ declare global {
     interface Request {
       rawBody?: Buffer;
       wallet?: WalletIdentity;
+      walletSessionId?: string;
     }
   }
 }
@@ -152,18 +156,18 @@ export function clearWalletAccountCache(): void {
 /** Mirror `/api/v1/accounts/{id}` with a short cache. Handles ED25519 and ECDSA keys. */
 export async function fetchMirrorAccount(
   accountId: string,
-  mirrorBase = process.env.MIRROR_URL || "https://testnet.mirrornode.hedera.com",
+  mirrorBase = resolveMirrorBase(),
 ): Promise<AccountIdentity | null> {
   const id = accountId.trim();
   const cacheKey = id.toLowerCase();
   const cached = accountCache.get(cacheKey);
   const now = Date.now();
   if (cached) {
-    const ttl = cached.value?.key ? ACCOUNT_CACHE_MS : ACCOUNT_MISS_CACHE_MS;
+    const ttl = cached.value?.key ? MIRROR_ACCOUNT_CACHE_MS : ACCOUNT_MISS_CACHE_MS;
     if (now - cached.at < ttl) return cached.value;
   }
   const url = `${mirrorBase.replace(/\/$/, "")}/api/v1/accounts/${encodeURIComponent(id)}`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(8_000) });
+  const res = await fetch(url, { signal: AbortSignal.timeout(MIRROR_FETCH_TIMEOUT_MS) });
   if (!res.ok) {
     const miss = { key: null, evmAddress: null };
     accountCache.set(cacheKey, { at: now, value: miss });

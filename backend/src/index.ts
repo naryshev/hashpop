@@ -11,6 +11,7 @@ import { startIndexer } from "./indexer";
 import { startSettlementEngine } from "./settlement";
 import { apiRouter } from "./api";
 import { relayRouter } from "./relay";
+import { resolveMirrorBase } from "./mirrorUrl";
 
 const app = express();
 const uploadsDir = path.join(process.cwd(), "uploads");
@@ -82,7 +83,7 @@ app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
   res.setHeader(
     "Access-Control-Allow-Headers",
-    "Content-Type, x-admin-token, x-hashpop-account, x-hashpop-issued-at, x-hashpop-nonce, x-hashpop-signature",
+    "Content-Type, x-admin-token, x-hashpop-account, x-hashpop-issued-at, x-hashpop-nonce, x-hashpop-signature, x-hashpop-session",
   );
   if (req.method === "OPTIONS") return res.sendStatus(204);
   next();
@@ -101,6 +102,11 @@ app.use("/api/relay", relayRouter(log));
 app.get("/health", (_, res) => res.json({ ok: true, timestamp: new Date().toISOString() }));
 
 const port = Number(process.env.PORT || 4000);
+
+if (process.env.NODE_ENV === "production") {
+  // Fail the process instead of silently talking to testnet.
+  resolveMirrorBase();
+}
 
 // Auto-apply pending Prisma migrations on startup
 try {

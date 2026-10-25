@@ -1,6 +1,5 @@
 import axios from "axios";
-
-const MIRROR_BASE = process.env.MIRROR_URL || "https://testnet.mirrornode.hedera.com";
+import { resolveMirrorBase } from "../mirrorUrl";
 
 export async function fetchMirrorEvents(
   marketplaceAddr: string,
@@ -30,9 +29,10 @@ async function fetchContractLogs(contractAddress: string, since: number): Promis
     params.order = "desc";
   }
 
+  const mirrorBase = resolveMirrorBase();
   const addrForUrl = normalizeAddressForUrl(contractAddress);
   const tryUrl = (addr: string) => {
-    const url = `${MIRROR_BASE}/api/v1/contracts/${addr}/results/logs`;
+    const url = `${mirrorBase}/api/v1/contracts/${addr}/results/logs`;
     return axios.get(url, { params }).then((res) => res.data.logs || []);
   };
 

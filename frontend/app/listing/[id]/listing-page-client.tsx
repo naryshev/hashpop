@@ -39,7 +39,7 @@ import { useUpdateListingPrice } from "../../../hooks/useUpdateListingPrice";
 import { compressImage } from "../../../lib/compressImage";
 import { listingIdToBytes32 } from "../../../lib/bytes32";
 import { useHashpackWallet } from "../../../lib/hashpackWallet";
-import { useAuthorizedFetch } from "../../../lib/walletRequestAuth";
+import { useAuthorizedFetch, useSessionFetch } from "../../../lib/walletRequestAuth";
 import { ConnectWalletButton } from "../../../components/ConnectWalletButton";
 import { activeHederaChain } from "../../../lib/hederaChains";
 import { readListingCompat } from "../../../lib/marketplaceRead";
@@ -213,6 +213,7 @@ export default function ListingPage({
   const router = useRouter();
   const { address, accountId } = useHashpackWallet();
   const authedFetch = useAuthorizedFetch();
+  const sessionFetch = useSessionFetch();
   const chainId = activeHederaChain.id;
   const {
     cancel,
@@ -381,13 +382,13 @@ export default function ListingPage({
 
   useEffect(() => {
     if (!address || !id) return;
-    fetch(`${getApiUrl()}/api/wishlist?address=${encodeURIComponent(address)}`)
+    sessionFetch(`${getApiUrl()}/api/wishlist?address=${encodeURIComponent(address)}`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((data: { items?: { itemId: string }[] }) => {
         setInWishlist((data.items || []).some((i) => i.itemId === id));
       })
       .catch(() => {});
-  }, [address, id]);
+  }, [address, id, sessionFetch]);
 
   // "N watching" under the title, from the shared wishlist counts endpoint.
   useEffect(() => {
@@ -430,7 +431,7 @@ export default function ListingPage({
     const other = myAddr === buyerAddr ? listing.seller : listing.buyer;
     setChatLoading(true);
     const q = new URLSearchParams({ address, other, listingId: id });
-    fetch(`${getApiUrl()}/api/messages/thread?${q}`)
+    sessionFetch(`${getApiUrl()}/api/messages/thread?${q}`)
       .then((res) => res.json())
       .then(
         (data: {
@@ -447,7 +448,7 @@ export default function ListingPage({
       )
       .catch(() => setChatMessages([]))
       .finally(() => setChatLoading(false));
-  }, [id, address, accountId, listing?.buyer, listing?.seller]);
+  }, [id, address, accountId, listing?.buyer, listing?.seller, sessionFetch]);
 
   useEffect(() => {
     if (!listing?.category || !listing?.id) return;
@@ -493,7 +494,7 @@ export default function ListingPage({
       });
       setChatReply("");
       const q = new URLSearchParams({ address, other, listingId: id });
-      const res = await fetch(`${getApiUrl()}/api/messages/thread?${q}`);
+      const res = await sessionFetch(`${getApiUrl()}/api/messages/thread?${q}`);
       const data = (await res.json()) as {
         messages?: Array<{
           id: string;

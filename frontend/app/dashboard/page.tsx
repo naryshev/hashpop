@@ -11,7 +11,7 @@ import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { formatListingDate } from "../../lib/formatDate";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
-import { useAuthorizedFetch } from "../../lib/walletRequestAuth";
+import { useAuthorizedFetch, useSessionFetch } from "../../lib/walletRequestAuth";
 import { profileAvatarUrl, profileDisplayName, useProfile } from "../../lib/profiles";
 import { getApiUrl } from "../../lib/apiUrl";
 import { OnboardingChecklist } from "../../components/OnboardingChecklist";
@@ -69,6 +69,7 @@ function SoldItemCard({
   usdRate: number | null;
 }) {
   const authedFetch = useAuthorizedFetch();
+  const sessionFetch = useSessionFetch();
   const [expanded, setExpanded] = useState(false);
   const [msgs, setMsgs] = useState<ChatMsg[]>([]);
   const [msgsLoading, setMsgsLoading] = useState(false);
@@ -84,7 +85,7 @@ function SoldItemCard({
     setMsgsLoading(true);
     try {
       const q = new URLSearchParams({ address: myAddress, other: sale.buyer, listingId: targetId });
-      const res = await fetch(`${getApiUrl()}/api/messages/thread?${q}`);
+      const res = await sessionFetch(`${getApiUrl()}/api/messages/thread?${q}`);
       const data = (await res.json()) as { messages?: ChatMsg[] };
       setMsgs(data.messages ?? []);
     } catch {
@@ -92,7 +93,7 @@ function SoldItemCard({
     } finally {
       setMsgsLoading(false);
     }
-  }, [sale.buyer, targetId, myAddress]);
+  }, [sale.buyer, targetId, myAddress, sessionFetch]);
 
   useEffect(() => {
     if (expanded) void fetchMsgs();
@@ -269,6 +270,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const { address, accountId, balanceTinybar } = useHashpackWallet();
   const authedFetch = useAuthorizedFetch();
+  const sessionFetch = useSessionFetch();
   const [mounted, setMounted] = useState(false);
   const [stats, setStats] = useState<any>(null);
   const [activeListings, setActiveListings] = useState<any[]>([]);
@@ -446,7 +448,7 @@ export default function DashboardPage() {
           if (cancelled) return;
           setActiveListings([]);
         }),
-      fetch(`${getApiUrl()}/api/wishlist?address=${encodeURIComponent(address)}`)
+      sessionFetch(`${getApiUrl()}/api/wishlist?address=${encodeURIComponent(address)}`)
         .then((res) => (res.ok ? res.json() : Promise.reject()))
         .then((data: { items?: { itemId: string; itemType: string }[] }) => {
           const items = data.items ?? [];
@@ -469,7 +471,7 @@ export default function DashboardPage() {
         .catch(() => {
           if (!cancelled) setWishlistItems([]);
         }),
-      fetch(`${getApiUrl()}/api/user/${address}/purchases`)
+      sessionFetch(`${getApiUrl()}/api/user/${address}/purchases`)
         .then((res) => (res.ok ? res.json() : Promise.reject(res)))
         .then(async (data: { purchases?: SaleItem[] & { listingId?: string }[] }) => {
           if (cancelled) return;
@@ -515,7 +517,7 @@ export default function DashboardPage() {
             setEscrowTinybar(0);
           }
         }),
-      fetch(`${getApiUrl()}/api/user/${address}/offers`)
+      sessionFetch(`${getApiUrl()}/api/user/${address}/offers`)
         .then((res) => (res.ok ? res.json() : Promise.reject(res)))
         .then(
           (data: {
@@ -558,7 +560,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [address]);
+  }, [address, sessionFetch]);
 
   return (
     <main className="min-h-screen">

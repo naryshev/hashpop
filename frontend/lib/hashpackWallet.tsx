@@ -15,6 +15,7 @@ import {
 } from "react";
 import type { MutableRefObject } from "react";
 import type { HashConnect } from "hashconnect";
+import { revokeWalletAuthSession } from "./walletAuthSession";
 import { activeHederaChain } from "./hederaChains";
 import {
   INIT_TIMEOUT_MESSAGE,
@@ -463,6 +464,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
 
       const disconnectHandler = () => {
         if (!mounted) return;
+        void revokeWalletAuthSession();
         resetWalletState(true);
       };
 
@@ -742,6 +744,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
 
   const disconnect = useCallback(async () => {
     try {
+      await revokeWalletAuthSession();
       if (hashconnect) {
         await hashconnect.disconnect();
       }

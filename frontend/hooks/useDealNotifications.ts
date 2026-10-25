@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getApiUrl } from "../lib/apiUrl";
 import { useHashpackWallet } from "../lib/hashpackWallet";
+import { useSessionFetch } from "../lib/walletRequestAuth";
 import {
   buildDealNotifications,
   DEAL_UPDATES_SEEN_EVENT,
@@ -46,6 +47,7 @@ export function useDealNotifications(): {
   loading: boolean;
 } {
   const { address } = useHashpackWallet();
+  const sessionFetch = useSessionFetch();
   const [items, setItems] = useState<DealNotification[]>([]);
   const [seenAt, setSeenAt] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -73,8 +75,8 @@ export function useDealNotifications(): {
       if (first) setLoading(true);
       try {
         const [oRes, pRes, rRes] = await Promise.allSettled([
-          fetch(`${api}/api/user/${encodeURIComponent(lower)}/offers`),
-          fetch(`${api}/api/user/${encodeURIComponent(lower)}/purchases`),
+          sessionFetch(`${api}/api/user/${encodeURIComponent(lower)}/offers`),
+          sessionFetch(`${api}/api/user/${encodeURIComponent(lower)}/purchases`),
           fetch(`${api}/api/ratings/${encodeURIComponent(lower)}`),
         ]);
         if (stopped) return;
@@ -105,7 +107,7 @@ export function useDealNotifications(): {
       stopped = true;
       clearInterval(iv);
     };
-  }, [address]);
+  }, [address, sessionFetch]);
 
   const unseen = unreadDealNotifications(items, seenAt);
   return {

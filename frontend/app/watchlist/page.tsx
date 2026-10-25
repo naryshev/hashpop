@@ -4,6 +4,7 @@ import { listingHref } from "../../lib/listingUrl";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
+import { useSessionFetch } from "../../lib/walletRequestAuth";
 import { getApiUrl } from "../../lib/apiUrl";
 import { formatPriceForDisplay } from "../../lib/formatPrice";
 import { formatHbarWithUsd } from "../../lib/hbarUsd";
@@ -48,6 +49,7 @@ function getStatusStyle(status?: string): { label: string; className: string; pu
 
 export default function WatchlistPage() {
   const { address } = useHashpackWallet();
+  const sessionFetch = useSessionFetch();
   const usdRate = useHbarUsd();
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<WatchItem[]>([]);
@@ -60,7 +62,7 @@ export default function WatchlistPage() {
     }
     setLoading(true);
     Promise.all([
-      fetch(`${getApiUrl()}/api/wishlist?address=${encodeURIComponent(address)}`)
+      sessionFetch(`${getApiUrl()}/api/wishlist?address=${encodeURIComponent(address)}`)
         .then((r) => (r.ok ? r.json() : Promise.reject()))
         .then((data: { items?: { itemId: string; itemType: string }[] }) => data.items ?? []),
       fetch(`${getApiUrl()}/api/wishlist/counts`)
@@ -86,7 +88,7 @@ export default function WatchlistPage() {
       .then((rows) => setItems(rows))
       .catch(() => setItems([]))
       .finally(() => setLoading(false));
-  }, [address]);
+  }, [address, sessionFetch]);
 
   return (
     <main className="min-h-screen">
