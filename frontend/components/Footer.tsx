@@ -16,16 +16,27 @@ export function Footer() {
           USD values are approximate, based on the current HBAR price and updated as it fluctuates.
           All payments are made in HBAR.
         </p>
-        <div className="flex flex-wrap items-center justify-between gap-y-2">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+        <div className="flex items-start justify-between gap-x-4 gap-y-2">
+          <nav
+            aria-label="Legal"
+            className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-1 text-sm"
+          >
+            <Link href="/about" className="text-chrome hover:text-white">
+              About
+            </Link>
+            <Link href="/help" className="text-chrome hover:text-white">
+              Help
+            </Link>
             <Link href="/terms" className="text-chrome hover:text-white">
               Terms of Service
             </Link>
             <Link href="/privacy" className="text-chrome hover:text-white">
               Privacy Policy
             </Link>
-          </div>
-          <p className="text-xs text-silver/50">Hashpop &copy; {new Date().getFullYear()}</p>
+          </nav>
+          <p className="shrink-0 text-xs text-silver/50">
+            Hashpop &copy; {new Date().getFullYear()}
+          </p>
         </div>
       </div>
     </footer>

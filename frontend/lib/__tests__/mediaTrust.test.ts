@@ -55,7 +55,7 @@ describe("gridTrustChips", () => {
     ).toEqual([
       { kind: "completion", label: "98%", tone: "mint" },
       { kind: "meetup", label: "Meetup", tone: "silver" },
-      { kind: "escrow", label: "Escrow", tone: "silver" },
+      { kind: "escrow", label: "Protected", tone: "silver" },
     ]);
   });
 
@@ -78,7 +78,7 @@ describe("gridTrustChips", () => {
         successfulCompletions: 0,
         totalSales: 0,
       }),
-    ).toEqual([{ kind: "escrow", label: "Escrow", tone: "silver" }]);
+    ).toEqual([{ kind: "escrow", label: "Protected", tone: "silver" }]);
 
     expect(
       gridTrustChips({

@@ -24,7 +24,7 @@ export type ListingCardItem = {
   watchlistCount?: number;
   /** Existing listing flag. False = meetup, true = escrow. Omitted = no fulfillment chip. */
   requireEscrow?: boolean | null;
-  /** Meetup-with-contract. With requireEscrow, both Meetup and Escrow chips show. */
+  /** Meetup-with-contract. With requireEscrow, both Meetup and Protected chips show. */
   meetup?: boolean | null;
   /** Preformatted distance. Omitted when unknown — never invent km. */
   distanceLabel?: string | null;

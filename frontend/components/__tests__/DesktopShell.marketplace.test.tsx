@@ -101,6 +101,7 @@ describe("DesktopShell marketplace chrome", () => {
       expect(document.body.textContent).not.toContain("Connect");
       expect(document.querySelector('[data-testid="mobile-top-bar"]')).toBeNull();
       expect(document.body.textContent).toContain("page");
+      expect(document.querySelector("footer")).toBeTruthy();
     },
   );
 
@@ -122,6 +123,7 @@ describe("DesktopShell marketplace chrome", () => {
     expect(shellHeader?.className).toContain("h-0");
     expect(shellHeader?.className).toContain("md:h-14");
     expect(shellHeader?.className).not.toContain(" h-14 ");
+    expect(document.querySelector("footer")).toBeNull();
   });
 
   it.each(["/cart", "/messages", "/offers", "/create", "/dashboard", "/profile/0.0.1234"])(
@@ -232,6 +234,33 @@ describe("DesktopShell marketplace chrome", () => {
     await renderShell();
     expect(document.querySelector('[data-testid="marketplace-desktop-header"]')).toBeNull();
     expect(document.querySelector('nav[aria-label="Primary navigation"]')).toBeTruthy();
+  });
+
+  it("uses the shared marketplace desktop header on /about", async () => {
+    nav.pathname = "/about";
+    await renderShell();
+    const header = document.querySelector(
+      '[data-testid="marketplace-desktop-header"]',
+    ) as HTMLElement;
+    expect(header).toBeTruthy();
+    expect(header.className).toContain("hp-desktop-bar");
+    expect(header.className).toContain("md:h-[72px]");
+    expect(document.querySelector('nav[aria-label="Primary navigation"]')).toBeNull();
+    expect(document.body.textContent).not.toContain("Search listings");
+    expect(document.body.textContent).not.toContain("Sign in");
+    const input = header.querySelector(
+      'input[aria-label="Search marketplace"]',
+    ) as HTMLInputElement;
+    expect(input.placeholder).toBe("Search marketplace…");
+    expect(document.querySelector('[data-testid="marketplace-desktop-create"]')?.textContent).toBe(
+      "Create",
+    );
+    expect(document.querySelector('[data-testid="marketplace-desktop-profile"]')).toBeTruthy();
+    const brand = document.querySelector('[data-testid="marketplace-brand-header"]') as HTMLElement;
+    expect(brand).toBeTruthy();
+    expect(brand.parentElement?.parentElement?.className).toContain("md:hidden");
+    expect(document.querySelector('[data-testid="mobile-top-bar"]')).toBeNull();
+    expect(document.querySelector("footer")).toBeTruthy();
   });
 
   it("links the desktop account chip to the profile", async () => {

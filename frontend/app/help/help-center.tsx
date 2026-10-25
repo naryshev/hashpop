@@ -52,7 +52,10 @@ export default function HelpCenter({ faqs }: { faqs: { category: string; items: 
             <p className="text-silver">No articles matched “{query}”.</p>
           ) : (
             filtered.map((group) => (
-              <section key={group.category}>
+              <section
+                key={group.category}
+                id={group.category === "Selling & shipping" ? "selling" : undefined}
+              >
                 <h2 className="mb-2 text-xs font-bold uppercase tracking-widest text-silver">
                   {group.category}
                 </h2>

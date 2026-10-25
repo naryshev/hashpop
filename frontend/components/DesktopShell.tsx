@@ -168,14 +168,21 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
 
   const fallbackTitle = pathnameTitle(pathname);
   const showFooter =
-    pathname === "/" || pathname === "/marketplace" || pathname.startsWith("/marketplace");
+    pathname === "/" ||
+    pathname === "/about" ||
+    pathname === "/marketplace" ||
+    pathname.startsWith("/marketplace");
   // `/` and `/marketplace` render the marketplace slim header. Listing, Terms,
-  // and Privacy reuse that same MarketplaceDesktopHeader. Keep this shell bar
-  // off those routes so the icon row, Connect chip, and Sign in pill do not
-  // stack on top.
+  // Privacy, and /about reuse that same MarketplaceDesktopHeader. Keep this
+  // shell bar off those routes so the icon row, Connect chip, and Sign in pill
+  // do not stack on top.
   const marketplaceHome = pathname === "/" || pathname === "/marketplace";
   const sharedMarketplaceHeader =
-    pathname.startsWith("/listing/") || pathname === "/terms" || pathname === "/privacy";
+    pathname === "/about" ||
+    pathname.startsWith("/listing/") ||
+    pathname === "/terms" ||
+    pathname === "/privacy";
+  const aboutPage = pathname === "/about";
 
   // Mobile page header lives here in the shell — OUTSIDE the route-keyed fade
   // wrapper below — so it stays put on page switches while the content still
@@ -191,6 +198,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
     "/offers",
     "/create",
     "/dashboard",
+    "/about",
   ];
   const profileRoute = pathname.startsWith("/profile/");
   const legalRoute = pathname === "/terms" || pathname === "/privacy";
@@ -201,6 +209,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
     pathname === "/offers" ||
     pathname === "/create" ||
     pathname === "/dashboard" ||
+    aboutPage ||
     profileRoute ||
     legalRoute;
   const accountHref = effectiveConnected ? profileHref(address, accountId) : null;
@@ -221,8 +230,8 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col">
-      {/* Shared marketplace slim bar on listing, terms, and privacy. Search
-          submits to the marketplace, the same destination as the shell's
+      {/* Shared marketplace slim bar on /about, listing, terms, and privacy.
+          Search submits to the marketplace, the same destination as the shell's
           fallback field. Hidden below md, so listing mobile chrome is unchanged. */}
       {sharedMarketplaceHeader && (
         <MarketplaceDesktopHeader
@@ -362,7 +371,8 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
           (marketplaceBrandHeader ? (
             // Top inset lives on MarketplaceBrandHeader (hp-brand-safe-top).
             // No bottom margin: Marketplace's mb-3 sits under the search row,
-            // which these routes do not render.
+            // which these routes do not render. Desktop /about uses
+            // MarketplaceDesktopHeader, so this row stays mobile-only.
             <div className="px-3 md:hidden">
               <MarketplaceBrandHeader />
             </div>
@@ -372,8 +382,8 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
             </div>
           ))}
         {/* Content takes the available height so the footer (marketplace
-            only) stays pinned to the bottom. Keyed on pathname so each route
-            change eases in gently instead of snapping. */}
+            and /about, both viewports) stays pinned to the bottom. Keyed on
+            pathname so each route change eases in gently instead of snapping. */}
         <div key={pathname} className="flex-1 animate-[fadeSlideUp_0.5s_ease-out]">
           {children}
         </div>

@@ -371,6 +371,10 @@ describe("sitemap.xml", () => {
     expect(urls).toContain("https://hashpop.io/categories");
     expect(urls).toContain("https://hashpop.io/privacy");
     expect(urls).toContain("https://hashpop.io/terms");
+    expect(urls).toContain("https://hashpop.io/about");
+    const about = entries.find((entry) => entry.url === "https://hashpop.io/about");
+    expect(about?.changeFrequency).toBe("weekly");
+    expect(about?.priority).toBe(0.6);
     expect(urls).toContain("https://hashpop.io/marketplace?category=Watches");
     expect(urls).toContain(
       `https://hashpop.io/marketplace?category=${encodeURIComponent("Men's Clothing")}`,
