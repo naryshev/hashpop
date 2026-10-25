@@ -390,6 +390,34 @@ a,
    they must not reserve their 56px / 72px height: a wallet webview that
    forces `header { display: block }` would otherwise paint an empty dark
    band (that height, plus the safe-area pad) above the logo. */
+/* iOS Safari zooms a focused field whose computed font-size is under 16px.
+   Beat the small text utilities on the control itself. Larger sizes
+   (text-base and up, including the offer amount) stay as written.
+   Zoom stays enabled in the viewport; this is what keeps inputs from jumping. */
+input.text-xs,
+input.text-sm,
+textarea.text-xs,
+textarea.text-sm,
+select.text-xs,
+select.text-sm,
+input[class~="text-[15px]"],
+input[class~="text-[14px]"],
+input[class~="text-[13px]"],
+input[class~="text-[12px]"],
+input[class~="text-[11px]"],
+textarea[class~="text-[15px]"],
+textarea[class~="text-[14px]"],
+textarea[class~="text-[13px]"],
+textarea[class~="text-[12px]"],
+textarea[class~="text-[11px]"],
+select[class~="text-[15px]"],
+select[class~="text-[14px]"],
+select[class~="text-[13px]"],
+select[class~="text-[12px]"],
+select[class~="text-[11px]"] {
+  font-size: 16px;
+}
+
 @media (max-width: 767px) {
   .hp-desktop-bar {
     display: none !important;

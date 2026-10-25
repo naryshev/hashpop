@@ -47,6 +47,8 @@ import { LocationPicker, type LocationValue } from "../../../components/Location
 import { OffersPanel } from "../../../components/OffersPanel";
 
 import { getApiUrl } from "../../../lib/apiUrl";
+import { listingDescriptionChangeError } from "../../../lib/listingDescription";
+import { listingImageAlt } from "../../../lib/listingImageAlt";
 
 function SellerProfileMeta({ seller }: { seller: string }) {
   return (
@@ -586,6 +588,9 @@ export default function ListingPage({
 
   const displayId = formatListingId(id);
   const displayTitle = listing?.title || displayId || "Untitled";
+  const editDescriptionError = listing
+    ? listingDescriptionChangeError(listing.description, editDescription)
+    : null;
   const walletAddressCandidates = [
     address?.toLowerCase(),
     accountId ? accountIdToLongZeroAddress(accountId).toLowerCase() : null,
@@ -687,6 +692,11 @@ export default function ListingPage({
 
   const doSaveEditListing = async () => {
     if (!address || !listing) return;
+    const descriptionError = listingDescriptionChangeError(listing.description, editDescription);
+    if (descriptionError) {
+      setEditError(descriptionError);
+      return;
+    }
     setEditError(null);
     setEditSaving(true);
     let priceUpdateFailed = false;
@@ -883,12 +893,14 @@ export default function ListingPage({
   // desktop (`hidden lg:block`) at the top of the right column. Secondary
   // blocks (want-to-sell, description, location) also render in two places
   // so they sit under the photo on desktop and below the buy stack on mobile.
+  // The mobile copy is the only h1. The desktop copy is an h2 with the same
+  // type styles so the title is not a second h1.
   const titleBlockJsx = (
     <div>
       <div className="flex flex-wrap items-start gap-2">
-        <h1 className="min-w-0 flex-1 text-2xl font-semibold tracking-normal text-white">
+        <h2 className="min-w-0 flex-1 text-2xl font-semibold tracking-normal text-white">
           {editing ? editTitle || displayTitle : displayTitle}
-        </h1>
+        </h2>
         {!isListed && !isUnconfirmed && (
           <span className="mt-1 flex-shrink-0 rounded-full border border-white/10 bg-white/10 px-2.5 py-0.5 text-xs font-medium text-silver">
             Archived
@@ -1314,7 +1326,11 @@ export default function ListingPage({
                   />
                 ) : (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={mainImageUrl} alt="" className="h-full w-full object-contain" />
+                  <img
+                    src={mainImageUrl}
+                    alt={listingImageAlt(displayTitle, safeMediaIndex)}
+                    className="h-full w-full object-contain"
+                  />
                 )}
                 {galleryItems.length > 1 && (
                   <>
@@ -1417,7 +1433,11 @@ export default function ListingPage({
                         />
                       ) : (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={item.url} alt="" className="h-full w-full object-cover" />
+                        <img
+                          src={item.url}
+                          alt={listingImageAlt(displayTitle, i)}
+                          className="h-full w-full object-cover"
+                        />
                       )}
                       {editing && i === 0 && (
                         <span className="pointer-events-none absolute bottom-0 left-0 bg-black/70 px-1 text-[9px] font-bold uppercase text-chrome">
@@ -1472,7 +1492,7 @@ export default function ListingPage({
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={mainImageUrl}
-                        alt={displayTitle}
+                        alt={listingImageAlt(displayTitle, safeMediaIndex)}
                         className="h-full w-full object-contain"
                       />
                     )}
@@ -1691,9 +1711,15 @@ export default function ListingPage({
                   <textarea
                     value={editDescription}
                     onChange={(e) => setEditDescription(e.target.value)}
-                    className="input-frost mt-1 w-full text-sm min-h-[80px] resize-y"
+                    className="input-frost mt-1 w-full text-base min-h-[80px] resize-y"
                     placeholder="Condition notes, what’s included, any flaws."
+                    aria-invalid={editDescriptionError ? true : undefined}
                   />
+                  {editDescriptionError ? (
+                    <span className="mt-1 block text-xs text-rose-400" role="alert">
+                      {editDescriptionError}
+                    </span>
+                  ) : null}
                 </label>
                 <div>
                   <span className="text-xs font-semibold text-white">Condition</span>
@@ -2146,7 +2172,7 @@ export default function ListingPage({
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={thumb}
-                          alt=""
+                          alt={listingImageAlt(item.title, 0)}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
                       ) : (

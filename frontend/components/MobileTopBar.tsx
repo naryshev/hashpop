@@ -26,9 +26,9 @@ export function MobileTopBar({ className = "" }: { className?: string }) {
 
   return (
     <div className={`flex items-center justify-between gap-3 sm:hidden ${className}`}>
-      <Link href="/marketplace" className="flex items-center gap-2" aria-label="Hashpop home">
+      <Link href="/marketplace" className="flex items-center gap-2" aria-label="Hashpop">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/hashpop-cart-3d.PNG" alt="" className="h-7 w-auto object-contain" />
+        <img src="/hashpop-cart-3d.PNG" alt="Hashpop" className="h-7 w-auto object-contain" />
         <span className="font-display text-lg font-extrabold tracking-tight text-[#00ffa3]">
           Hashpop
         </span>

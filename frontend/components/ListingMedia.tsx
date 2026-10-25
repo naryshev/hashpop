@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { listingImageAlt } from "../lib/listingImageAlt";
 import { getListingMediaUrls } from "../lib/listingMedia";
 
 /** Standard height for card media so all marketplace/home cards are the same size */
 const CARD_MEDIA_HEIGHT = "260px";
 
 type ListingMediaProps = {
-  listing: { imageUrl?: string | null; mediaUrls?: string[] | null };
+  listing: { title?: string | null; imageUrl?: string | null; mediaUrls?: string[] | null };
   className?: string;
   aspectRatio?: "square" | "video";
   /** If true, show all images in a horizontal scrollable strip; otherwise show first only */
@@ -97,7 +98,7 @@ export function ListingMedia({
               <img
                 key={i}
                 src={url}
-                alt={`Listing ${i + 1}`}
+                alt={listingImageAlt(listing.title, i)}
                 className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ease-in-out ${
                   i === current ? "opacity-100" : "opacity-0"
                 }`}
@@ -115,7 +116,7 @@ export function ListingMedia({
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={urls[0]}
-        alt="Listing"
+        alt={listingImageAlt(listing.title, 0)}
         className="absolute inset-0 h-full w-full object-cover"
         onError={() => setFailed(new Set([0]))}
       />
@@ -150,7 +151,7 @@ export function ListingMedia({
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={urls[0]}
-        alt="Listing"
+        alt={listingImageAlt(listing.title, 0)}
         className={`rounded-glass-lg border border-white/10 object-cover w-full h-full min-h-0 ${!cardSize ? ratioClass : ""} ${!cardSize ? className : ""}`}
         onError={() => setFailed(new Set([0]))}
       />
@@ -184,7 +185,7 @@ export function ListingMedia({
               <img
                 key={i}
                 src={url}
-                alt={`Listing ${i + 1}`}
+                alt={listingImageAlt(listing.title, i)}
                 className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ease-in-out ${
                   i === current ? "opacity-100" : "opacity-0"
                 }`}
@@ -227,7 +228,7 @@ export function ListingMedia({
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={currentUrl}
-            alt={`Listing ${safeIndex + 1}`}
+            alt={listingImageAlt(listing.title, safeIndex)}
             className="w-full h-full object-cover min-h-0"
             onError={() => setFailed((prev) => new Set([...prev, safeIndex]))}
           />
@@ -283,7 +284,7 @@ export function ListingMedia({
             <img
               key={i}
               src={url}
-              alt={`Listing ${i + 1}`}
+              alt={listingImageAlt(listing.title, i)}
               className={`flex-shrink-0 object-cover rounded-lg ${ratioClass}`}
               style={{ minWidth: 280, maxHeight: 240 }}
               onError={() => setFailed((prev) => new Set([...prev, i]))}

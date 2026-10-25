@@ -9,6 +9,7 @@ import Script from "next/script";
 import { SEO_COPY } from "../lib/seo/copy";
 import { serializeJsonLd, siteJsonLd } from "../lib/seo/jsonld";
 import { socialImages } from "../lib/seo/metadata";
+import { siteViewport } from "../lib/seo/viewport";
 
 export const metadata: Metadata = {
   title: SEO_COPY.rootTitle,
@@ -38,14 +39,7 @@ export const metadata: Metadata = {
   },
 };
 
-export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
-  viewportFit: "cover",
-  themeColor: "#0b111b",
-};
+export const viewport: Viewport = siteViewport;
 
 // Runs before hydration: surfaces fatal boot errors on the splash so failures
 // in webviews without devtools (e.g. wallet dapp browsers) are screenshotable.

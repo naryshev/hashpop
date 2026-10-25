@@ -74,7 +74,7 @@ export function MarketplaceBrandHeader() {
         className="grid h-14 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center"
       >
         <div aria-hidden />
-        <Link href="/marketplace" aria-label="Hashpop home" className="flex flex-col items-center">
+        <Link href="/marketplace" aria-label="Hashpop" className="flex flex-col items-center">
           <HashpopWordmark />
           <span
             data-testid="marketplace-wordmark"

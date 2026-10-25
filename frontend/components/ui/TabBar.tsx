@@ -68,6 +68,7 @@ function TabCell({
         className={className}
       >
         {inner}
+        <span className="sr-only">{item.label}</span>
       </Link>
     );
   }
