@@ -889,18 +889,23 @@ export default function ListingPage({
     setSelectedMediaIndex((prev) => (prev + 1) % galleryItems.length);
   };
 
-  // Title block is rendered twice: mobile (`lg:hidden`) above the gallery,
-  // desktop (`hidden lg:block`) at the top of the right column. Secondary
-  // blocks (want-to-sell, description, location) also render in two places
-  // so they sit under the photo on desktop and below the buy stack on mobile.
-  // The mobile copy is the only h1. The desktop copy is an h2 with the same
-  // type styles so the title is not a second h1.
+  // Title block is rendered twice: mobile above the gallery, desktop
+  // (`hidden lg:block`) at the top of the right column. Secondary blocks
+  // (want-to-sell, description, location) also render in two places so they
+  // sit under the photo on desktop and below the buy stack on mobile.
+  // One h1 lives in the mobile block and becomes sr-only at lg, where that
+  // block's parent used to be display:none. The desktop title is the same
+  // type, but a non-heading aria-hidden copy so the outline has one title.
+  const titleText = editing ? editTitle || displayTitle : displayTitle;
   const titleBlockJsx = (
     <div>
       <div className="flex flex-wrap items-start gap-2">
-        <h2 className="min-w-0 flex-1 text-2xl font-semibold tracking-normal text-white">
-          {editing ? editTitle || displayTitle : displayTitle}
-        </h2>
+        <div
+          aria-hidden="true"
+          className="min-w-0 flex-1 text-2xl font-semibold tracking-normal text-white"
+        >
+          {titleText}
+        </div>
         {!isListed && !isUnconfirmed && (
           <span className="mt-1 flex-shrink-0 rounded-full border border-white/10 bg-white/10 px-2.5 py-0.5 text-xs font-medium text-silver">
             Archived
@@ -952,25 +957,29 @@ export default function ListingPage({
   const mobileTitleBlockJsx = (
     <div>
       <div className="flex flex-wrap items-start gap-2">
-        <h1 className="min-w-0 flex-1 text-2xl font-semibold tracking-normal text-white">
-          {editing ? editTitle || displayTitle : displayTitle}
+        <h1 className="min-w-0 flex-1 text-2xl font-semibold tracking-normal text-white lg:sr-only">
+          {titleText}
         </h1>
         {!isListed && !isUnconfirmed && (
-          <span className="mt-1 flex-shrink-0 rounded-full border border-white/10 bg-white/10 px-2.5 py-0.5 text-xs font-medium text-silver">
+          <span className="mt-1 flex-shrink-0 rounded-full border border-white/10 bg-white/10 px-2.5 py-0.5 text-xs font-medium text-silver lg:hidden">
             Archived
           </span>
         )}
       </div>
-      {watchCount > 0 && <p className="mt-1 text-sm text-silver/60">{watchCount} watching</p>}
-      {displaySubtitle && !editing && <p className="mt-1 text-sm text-silver">{displaySubtitle}</p>}
-      {attributesLine && (
-        <p className="mt-0.5 text-sm text-silver/70">
-          {editing
-            ? [editCondition, editYearOfProduction].filter(Boolean).join(" | ")
-            : attributesLine}
-        </p>
-      )}
-      {offerPriceJsx}
+      <div className="lg:hidden">
+        {watchCount > 0 && <p className="mt-1 text-sm text-silver/60">{watchCount} watching</p>}
+        {displaySubtitle && !editing && (
+          <p className="mt-1 text-sm text-silver">{displaySubtitle}</p>
+        )}
+        {attributesLine && (
+          <p className="mt-0.5 text-sm text-silver/70">
+            {editing
+              ? [editCondition, editYearOfProduction].filter(Boolean).join(" | ")
+              : attributesLine}
+          </p>
+        )}
+        {offerPriceJsx}
+      </div>
     </div>
   );
 
@@ -1397,8 +1406,12 @@ export default function ListingPage({
           )}
         </nav>
 
-        <div className="mb-3 space-y-3 lg:hidden">
-          {listing.seller && <MobileSellerChrome seller={listing.seller} />}
+        <div className="mb-3 space-y-3 lg:mb-0 lg:h-0 lg:space-y-0">
+          {listing.seller && (
+            <div className="lg:hidden">
+              <MobileSellerChrome seller={listing.seller} />
+            </div>
+          )}
           {mobileTitleBlockJsx}
         </div>
 
