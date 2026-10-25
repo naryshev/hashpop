@@ -200,7 +200,7 @@ describe("Product / Offer JSON-LD", () => {
       availability: "https://schema.org/InStock",
       itemCondition: "https://schema.org/UsedCondition",
       url: "https://hashpop.io/listing/lst-1",
-      priceValidUntil: "2026-10-26T00:00:00.000Z",
+      priceValidUntil: "2026-10-26",
       additionalProperty: {
         "@type": "PropertyValue",
         name: "Price (HBAR)",

@@ -49,7 +49,7 @@ describe("JSON-LD builders", () => {
       availability: "https://schema.org/InStock",
       itemCondition: "https://schema.org/NewCondition",
       url: "https://hashpop.io/listing/lst-1",
-      priceValidUntil: "2026-10-26T12:00:00.000Z",
+      priceValidUntil: "2026-10-26",
     });
     expect(offers[0]?.additionalProperty).toEqual({
       "@type": "PropertyValue",

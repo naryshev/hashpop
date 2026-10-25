@@ -94,8 +94,9 @@ export function schemaItemCondition(condition?: string | null): string | undefin
   return ITEM_CONDITION[key];
 }
 
+/** Date-only (YYYY-MM-DD), one day after `now`. Google's priceValidUntil examples use this form. */
 export function offerPriceValidUntil(now = new Date()): string {
-  return new Date(now.getTime() + DAY_MS).toISOString();
+  return new Date(now.getTime() + DAY_MS).toISOString().slice(0, 10);
 }
 
 export function listingImageUrls(listing: {
