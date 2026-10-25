@@ -37,6 +37,15 @@ describe("help center answers", () => {
     expect(openDetails.length).toBe(0);
     expect(container.querySelectorAll("details").length).toBe(answers.length);
     const faq = faqPageJsonLd(FAQS);
+    expect(faq.mainEntity.map((item) => item.name)).toEqual(
+      FAQS.flatMap((group) => group.items.map((item) => item.q)),
+    );
     expect(faq.mainEntity.map((item) => item.acceptedAnswer.text)).toEqual(answers);
+    expect(faq.mainEntity).toHaveLength(12);
+    const helpCopy = `${container.textContent}\n${JSON.stringify(faq)}`;
+    expect(helpCopy).not.toMatch(/escrow/i);
+    expect(helpCopy).not.toContain("Hashpop smart contract");
+    expect(container.textContent).toContain("How do protected payments work?");
+    expect(container.textContent).toContain("Protection is optional and set per listing.");
   });
 });

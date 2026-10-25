@@ -30,7 +30,7 @@ export default function HelpCenter({ faqs }: { faqs: { category: string; items: 
             Help Center
           </h1>
           <p className="mt-2 text-sm text-silver">
-            Answers to common questions about escrow, HBAR, HashPack, disputes and more.
+            Answers to common questions about protected payments, HBAR, HashPack, disputes and more.
           </p>
         </header>
 

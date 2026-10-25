@@ -21,11 +21,11 @@ export const FAQS: { category: string; items: Faq[] }[] = [
     ],
   },
   {
-    category: "Buying & escrow",
+    category: "Buying & protected payments",
     items: [
       {
-        q: "How does escrow work?",
-        a: "When you buy an item that requires escrow, your HBAR is locked in the Hashpop smart contract instead of going straight to the seller. The seller ships the item and adds tracking; once you confirm receipt, the funds are released to the seller. If the seller never ships, escrow auto-refunds you after the timeout window.",
+        q: "How do protected payments work?",
+        a: "When a listing offers a protected payment, your HBAR is held by an on-chain smart contract instead of going straight to the seller. Hashpop does not hold the funds. The seller ships the item and adds tracking; once you confirm receipt, the contract releases the funds to the seller. If the seller never ships, the payment auto-refunds you after the timeout. Protection is optional and set per listing.",
       },
       {
         q: 'What does "PENDING" status mean?',
@@ -33,11 +33,11 @@ export const FAQS: { category: string; items: Faq[] }[] = [
       },
       {
         q: "How do I confirm I received an item?",
-        a: 'Open Purchases → Bought, find the order, and click "Confirm receipt" once the item arrives. This releases the escrowed payment to the seller. If you don\'t act, escrow auto-releases after the timeout.',
+        a: 'Open Purchases → Bought, find the order, and click "Confirm receipt" once the item arrives. On a listing with a protected payment, this releases the funds to the seller. If you don\'t act, the payment auto-releases after the timeout.',
       },
       {
         q: "What is the return policy?",
-        a: "Hashpop is a peer-to-peer marketplace for private sales, so there is no platform-wide return guarantee. Escrow protects you against non-delivery: if the seller doesn't ship, you're refunded. For item disputes after delivery, open a dispute so both parties and support can review.",
+        a: "Hashpop is a peer-to-peer marketplace for private sales, so there is no platform-wide return guarantee. When a listing offers a protected payment, non-delivery is covered: if the seller doesn't ship, the smart contract refunds you. For item disputes after delivery, open a dispute so both parties and support can review.",
       },
     ],
   },
@@ -46,7 +46,7 @@ export const FAQS: { category: string; items: Faq[] }[] = [
     items: [
       {
         q: "How do I add tracking after a sale?",
-        a: 'Open Purchases → Sold (or the order detail page), click "Mark as shipped", and enter the carrier and tracking number. The buyer immediately sees the tracking info with a link to the carrier\'s tracking page, and the escrow tracker advances to "Awaiting confirmation".',
+        a: 'Open Purchases → Sold (or the order detail page), click "Mark as shipped", and enter the carrier and tracking number. The buyer immediately sees the tracking info with a link to the carrier\'s tracking page, and the order tracker advances to "Awaiting confirmation".',
       },
       {
         q: "What makes a good listing?",
@@ -59,7 +59,7 @@ export const FAQS: { category: string; items: Faq[] }[] = [
     items: [
       {
         q: "How do I dispute a transaction?",
-        a: "If something goes wrong after the seller marks an item as shipped, open the order and click \"Open dispute\". This freezes the escrow, notifies both parties, and creates a structured support ticket so the team can help resolve it. Don't confirm receipt if you haven't received the item.",
+        a: "If something goes wrong after the seller marks an item as shipped, open the order and click \"Open dispute\". This freezes the protected payment, notifies both parties, and creates a structured support ticket so the team can help resolve it. Don't confirm receipt if you haven't received the item.",
       },
       {
         q: "What is KYC verification and why verify?",
