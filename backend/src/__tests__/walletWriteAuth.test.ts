@@ -3,7 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Server } from "node:http";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import express from "express";
 import { SigningKey, Wallet, getBytes, hexlify, keccak256 } from "ethers";
 import { prefixHederaMessage, type AccountKey } from "../adminAuth";
@@ -191,16 +191,37 @@ const prisma = {
   rating: {
     create: async ({ data }: { data: Record<string, unknown> }) => ({ id: "r", ...data }),
   },
-  walletAuditLog: { create: async () => ({ id: "audit" }) },
+  walletAuditLog: {
+    create: async (args: { data: Record<string, unknown> }) => {
+      auditRows.push(args.data);
+      return auditCreate(args);
+    },
+  },
   authNonce: {
     create: async () => ({}),
     deleteMany: async () => ({ count: 0 }),
   },
 };
 
+const auditRows: Array<Record<string, unknown>> = [];
+const auditLines: Array<Record<string, unknown>> = [];
+const auditFailures: Array<Record<string, unknown>> = [];
+let auditCreate: (args: { data: Record<string, unknown> }) => Promise<unknown> = async () => ({
+  id: "audit",
+});
+
+function noteAudit(obj: unknown, msg?: string) {
+  if (msg === "wallet.audit" && obj && typeof obj === "object") {
+    auditLines.push(obj as Record<string, unknown>);
+  }
+  if (msg === "Wallet audit log write failed" && obj && typeof obj === "object") {
+    auditFailures.push(obj as Record<string, unknown>);
+  }
+}
+
 const log = {
-  info() {},
-  warn() {},
+  info: noteAudit,
+  warn: noteAudit,
   error() {},
   debug() {},
 };
@@ -1089,5 +1110,160 @@ describe("mirror account keys", () => {
     );
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.wallet.aliases).toContain(wallet.address.toLowerCase());
+  });
+});
+
+describe("wallet audit log", () => {
+  const secretMarker = "super-secret-signature";
+  const bodyMarker = "audit-body-must-not-be-logged";
+
+  async function settleAudit() {
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+
+  function lastLine(): Record<string, unknown> {
+    const line = auditLines.at(-1);
+    if (!line) throw new Error("no wallet.audit line");
+    return line;
+  }
+
+  beforeEach(() => {
+    auditRows.length = 0;
+    auditLines.length = 0;
+    auditFailures.length = 0;
+    auditCreate = async () => ({ id: "audit" });
+  });
+
+  it("records a verified write with the same fields in the table and the log", async () => {
+    const path = `/api/listing/${LISTING}`;
+    const body = { sellerAddress: OWNER, title: bodyMarker };
+    const headers = authHeaders({ method: "PATCH", path, body });
+    const res = await call("PATCH", path, body, {
+      ...headers,
+      "x-forwarded-for": "203.0.113.9, 10.0.0.8",
+      "user-agent": "HashpopAudit/1",
+    });
+    await settleAudit();
+    expect(res.status).toBe(200);
+    const row = auditRows.at(-1);
+    expect(row).toMatchObject({
+      method: "PATCH",
+      path: `/api/listing/${LISTING}`,
+      resourceId: LISTING,
+      accountId: OWNER_ACCOUNT,
+      evmAddress: OWNER,
+      accountVerified: true,
+      outcome: "allowed",
+      ip: "203.0.113.9",
+      userAgent: "HashpopAudit/1",
+    });
+    expect(row?.createdAt).toBeInstanceOf(Date);
+    expect(lastLine()).toMatchObject({
+      method: "PATCH",
+      route: `/api/listing/${LISTING}`,
+      resourceId: LISTING,
+      accountId: OWNER_ACCOUNT,
+      evmAddress: OWNER,
+      accountVerified: true,
+      outcome: "allowed",
+      ip: "203.0.113.9",
+      userAgent: "HashpopAudit/1",
+    });
+    const dumped = JSON.stringify({ row, line: lastLine() });
+    expect(dumped).not.toContain(bodyMarker);
+    expect(dumped).not.toContain(headers["x-hashpop-signature"]);
+    expect(dumped).not.toContain(headers["x-hashpop-nonce"]);
+  });
+
+  it("records a rejected signature with the claimed account, not the body seller", async () => {
+    const path = `/api/listing/${LISTING}`;
+    const body = { sellerAddress: OWNER, title: bodyMarker };
+    const res = await call("PATCH", path, body, {
+      "x-hashpop-account": OWNER_ACCOUNT,
+      "x-hashpop-signature": secretMarker,
+      "x-forwarded-for": "198.51.100.4",
+      "user-agent": "HashpopAudit/2",
+    });
+    await settleAudit();
+    expect(res.status).toBe(401);
+    expect(auditRows.at(-1)).toMatchObject({
+      method: "PATCH",
+      path: `/api/listing/${LISTING}`,
+      resourceId: LISTING,
+      accountId: OWNER_ACCOUNT,
+      accountVerified: false,
+      outcome: "unauthorized",
+      ip: "198.51.100.4",
+      userAgent: "HashpopAudit/2",
+    });
+    expect(lastLine().outcome).toBe("unauthorized");
+    const dumped = JSON.stringify({ row: auditRows.at(-1), line: lastLine() });
+    expect(dumped).not.toContain(secretMarker);
+    expect(dumped).not.toContain(bodyMarker);
+  });
+
+  it("records a 403 with the verified account", async () => {
+    const path = `/api/listing/${LISTING}`;
+    const body = { sellerAddress: OWNER, title: bodyMarker };
+    const headers = authHeaders({
+      method: "PATCH",
+      path,
+      body,
+      accountId: BUYER_ACCOUNT,
+      privateKey: buyerKeys.privateKey,
+    });
+    const res = await call("PATCH", path, body, headers);
+    await settleAudit();
+    expect(res.status).toBe(403);
+    expect(auditRows.at(-1)).toMatchObject({
+      accountId: BUYER_ACCOUNT,
+      evmAddress: BUYER,
+      accountVerified: true,
+      outcome: "forbidden",
+      resourceId: LISTING,
+    });
+    expect(JSON.stringify(lastLine())).not.toContain(headers["x-hashpop-signature"]);
+  });
+
+  it("attributes a tampered session from the token payload without logging the token", async () => {
+    const minted = await call(
+      "POST",
+      "/api/wallet/session",
+      {},
+      authHeaders({ method: "POST", path: "/api/wallet/session", body: {} }),
+    );
+    const token = minted.json.token as string;
+    const tampered = `${token.slice(0, -4)}zzzz`;
+    auditRows.length = 0;
+    auditLines.length = 0;
+    const res = await call("GET", "/api/messages/inbox", undefined, {
+      "x-hashpop-session": tampered,
+    });
+    await settleAudit();
+    expect(res.status).toBe(401);
+    expect(auditRows.at(-1)).toMatchObject({
+      method: "GET",
+      path: "/api/messages/inbox",
+      accountId: OWNER_ACCOUNT,
+      evmAddress: OWNER,
+      accountVerified: false,
+      outcome: "unauthorized",
+    });
+    const dumped = JSON.stringify({ row: auditRows.at(-1), line: lastLine() });
+    expect(dumped).not.toContain(tampered);
+    expect(dumped).not.toContain(token);
+  });
+
+  it("keeps serving the request when the audit table is missing", async () => {
+    auditCreate = async () => {
+      const err = new Error("relation WalletAuditLog does not exist");
+      (err as { code?: string }).code = "P2021";
+      throw err;
+    };
+    const res = await call("POST", "/api/user/register/", { address: OWNER });
+    await settleAudit();
+    expect(res.status).toBe(401);
+    expect(auditFailures.at(-1)).toMatchObject({ code: "P2021" });
+    expect(lastLine().outcome).toBe("unauthorized");
   });
 });

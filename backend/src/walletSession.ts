@@ -73,6 +73,28 @@ export function issueWalletSessionToken(
   return `${payload}.${signPayload(payload, secret)}`;
 }
 
+/**
+ * Read the account a session token claims, without checking the signature.
+ * Used only so a rejected request can be attributed. Never log `token`.
+ */
+export function peekWalletSessionAccount(
+  token: string,
+): { accountId: string; evmAddress: string | null } | null {
+  const payload = token.split(".")[0];
+  if (!payload || token.split(".").length !== 2) return null;
+  try {
+    const body = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
+      accountId?: unknown;
+      evmAddress?: unknown;
+    };
+    if (typeof body.accountId !== "string" || !body.accountId.trim()) return null;
+    const evmAddress = typeof body.evmAddress === "string" ? body.evmAddress : null;
+    return { accountId: body.accountId.trim(), evmAddress };
+  } catch {
+    return null;
+  }
+}
+
 export function readWalletSessionToken(
   token: string,
   secret: string,

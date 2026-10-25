@@ -216,17 +216,26 @@ model WalletSession {
   @@index([accountId])
 }
 
-/// Who performed a seller/owner write, after the wallet signature checked out.
+/// Who called a protected route. Rows cover verified writes and rejected 401/403s.
+/// No signatures, session tokens, or message bodies.
 model WalletAuditLog {
-  id         String   @id @default(cuid())
-  method     String
-  path       String
-  resourceId String?
-  accountId  String
-  evmAddress String
-  createdAt  DateTime @default(now())
+  id              String   @id @default(cuid())
+  method          String
+  path            String
+  resourceId      String?
+  /// Verified Hedera account, or the claimed account when verification failed.
+  accountId       String
+  evmAddress      String?
+  /// False when `accountId` is only what the caller claimed.
+  accountVerified Boolean  @default(false)
+  /// allowed, unauthorized, forbidden, or error.
+  outcome         String
+  ip              String?
+  userAgent       String?
+  createdAt       DateTime @default(now())
 
   @@index([createdAt])
   @@index([accountId])
+  @@index([outcome])
 }
 

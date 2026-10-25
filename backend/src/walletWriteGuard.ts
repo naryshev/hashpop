@@ -10,6 +10,7 @@ import {
 } from "./walletAuth";
 import {
   authenticateWalletSession,
+  peekWalletSessionAccount,
   prismaSessionStore,
   sessionSecretFromEnv,
   WALLET_SESSION_HEADER,
@@ -318,22 +319,133 @@ function resourceId(req: Request): string | null {
   return str(body.listingId) || str(body.itemId) || str(body.saleId) || str(req.query.itemId);
 }
 
-function auditWrite(res: Response, req: Request, wallet: WalletIdentity, deps: GuardDeps): void {
+function headerText(req: Request, name: string): string {
+  const value = req.headers[name];
+  if (Array.isArray(value)) return value[0]?.trim() ?? "";
+  return value?.trim() ?? "";
+}
+
+/** First hop of `x-forwarded-for`. The proxy appends itself after this. */
+function clientIp(req: Request): string | null {
+  const hop = headerText(req, "x-forwarded-for").split(",")[0]?.trim() ?? "";
+  if (!hop || hop.length > 64 || /[\r\n]/.test(hop)) return null;
+  return hop;
+}
+
+function userAgentOf(req: Request): string | null {
+  const agent = headerText(req, "user-agent");
+  if (!agent) return null;
+  return agent.slice(0, 256);
+}
+
+function auditRoute(req: Request): string {
+  const route = `${req.baseUrl || ""}${req.path || "/"}`.split("?")[0];
+  return route || "/";
+}
+
+type AuditOutcome = "allowed" | "unauthorized" | "forbidden" | "error";
+
+function outcomeFor(status: number): AuditOutcome {
+  if (status === 401) return "unauthorized";
+  if (status === 403) return "forbidden";
+  if (status >= 400) return "error";
+  return "allowed";
+}
+
+/** Account the caller claimed, when we could not verify a signature or session. */
+function claimedIdentity(req: Request): { accountId: string; evmAddress: string | null } {
+  const account = headerText(req, "x-hashpop-account");
+  if (/^\d+\.\d+\.\d+$/.test(account)) return { accountId: account, evmAddress: null };
+  const peeked = peekWalletSessionAccount(headerText(req, WALLET_SESSION_HEADER));
+  if (peeked) return peeked;
+  return { accountId: "unknown", evmAddress: null };
+}
+
+/**
+ * Persist and log one audit row. The row never includes signatures, session
+ * tokens, nonces, or message bodies. A missing table is a warning, not a 500.
+ */
+function recordWalletAudit(
+  req: Request,
+  deps: GuardDeps,
+  identity: { accountId: string; evmAddress: string | null; verified: boolean },
+  outcome: AuditOutcome,
+): void {
+  const timestamp = new Date();
+  const entry = {
+    method: (req.method || "GET").toUpperCase(),
+    path: auditRoute(req),
+    resourceId: resourceId(req),
+    accountId: identity.accountId || "unknown",
+    evmAddress: identity.evmAddress,
+    accountVerified: identity.verified,
+    outcome,
+    ip: clientIp(req),
+    userAgent: userAgentOf(req),
+    createdAt: timestamp,
+  };
+  const line = {
+    method: entry.method,
+    route: entry.path,
+    resourceId: entry.resourceId,
+    accountId: entry.accountId,
+    evmAddress: entry.evmAddress,
+    accountVerified: entry.accountVerified,
+    outcome: entry.outcome,
+    ip: entry.ip,
+    userAgent: entry.userAgent,
+    timestamp: timestamp.toISOString(),
+  };
+  if (outcome === "allowed") deps.log.info(line, "wallet.audit");
+  else deps.log.warn(line, "wallet.audit");
+
+  const table = deps.prisma.walletAuditLog;
+  if (!table || typeof table.create !== "function") {
+    deps.log.warn({ code: "missing" }, "Wallet audit log write failed");
+    return;
+  }
+  try {
+    void table.create({ data: entry }).catch((err: unknown) => {
+      const code = (err as { code?: string } | null)?.code ?? "error";
+      deps.log.warn({ code }, "Wallet audit log write failed");
+    });
+  } catch (err) {
+    const code = (err as { code?: string } | null)?.code ?? "error";
+    deps.log.warn({ code }, "Wallet audit log write failed");
+  }
+}
+
+function rejectProtected(
+  req: Request,
+  res: Response,
+  deps: GuardDeps,
+  status: number,
+  error: string,
+  identity: { accountId: string; evmAddress: string | null; verified: boolean },
+): void {
+  if (status === 401 || status === 403) {
+    recordWalletAudit(req, deps, identity, outcomeFor(status));
+  }
+  res.status(status).json({ error });
+}
+
+/** Verified writes, and any 401/403 the handler still returns after auth. */
+function auditAfterAuth(
+  res: Response,
+  req: Request,
+  wallet: WalletIdentity,
+  deps: GuardDeps,
+): void {
   res.on("finish", () => {
-    if (res.statusCode >= 400 || req.method === "GET") return;
-    void deps.prisma.walletAuditLog
-      .create({
-        data: {
-          method: req.method,
-          path: req.path,
-          resourceId: resourceId(req),
-          accountId: wallet.accountId,
-          evmAddress: wallet.evmAddress,
-        },
-      })
-      .catch((err: unknown) => {
-        deps.log.warn({ err }, "Wallet audit log write failed");
-      });
+    const status = res.statusCode;
+    const write = req.method !== "GET" && req.method !== "HEAD";
+    if (!write && status !== 401 && status !== 403) return;
+    recordWalletAudit(
+      req,
+      deps,
+      { accountId: wallet.accountId, evmAddress: wallet.evmAddress, verified: true },
+      outcomeFor(status),
+    );
   });
 }
 
@@ -352,7 +464,10 @@ export function createWalletRouteAuth(deps: GuardDeps): (kind: WalletRouteKind) 
           now: deps.now?.() ?? Date.now(),
         });
         if (!auth.ok) {
-          res.status(auth.status).json({ error: auth.error });
+          rejectProtected(req, res, deps, auth.status, auth.error, {
+            ...claimedIdentity(req),
+            verified: false,
+          });
           return;
         }
         req.wallet = auth.wallet;
@@ -379,7 +494,10 @@ export function createWalletRouteAuth(deps: GuardDeps): (kind: WalletRouteKind) 
               now: deps.now?.() ?? Date.now(),
             });
     if (!auth.ok) {
-      res.status(auth.status).json({ error: auth.error });
+      rejectProtected(req, res, deps, auth.status, auth.error, {
+        ...claimedIdentity(req),
+        verified: false,
+      });
       return;
     }
     req.wallet = auth.wallet;
@@ -394,10 +512,14 @@ export function createWalletRouteAuth(deps: GuardDeps): (kind: WalletRouteKind) 
       return;
     }
     if (!allowed.ok) {
-      res.status(allowed.status).json({ error: allowed.error });
+      rejectProtected(req, res, deps, allowed.status, allowed.error, {
+        accountId: auth.wallet.accountId,
+        evmAddress: auth.wallet.evmAddress,
+        verified: true,
+      });
       return;
     }
-    auditWrite(res, req, auth.wallet, deps);
+    auditAfterAuth(res, req, auth.wallet, deps);
     next();
   };
 }
