@@ -167,12 +167,13 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
   }, [effectiveConnected, unreadThreads]);
 
   const fallbackTitle = pathnameTitle(pathname);
-  const showFooter = pathname === "/marketplace" || pathname.startsWith("/marketplace");
-  // Marketplace home renders its own slim header (cart mark + wordmark, glass
-  // search, Create / cart / bell / profile). Listing, Terms, and Privacy reuse
-  // that same MarketplaceDesktopHeader. Keep this shell bar off those routes
-  // so the icon row, Connect chip, and Sign in pill do not stack on top.
-  const marketplaceHome = pathname === "/marketplace";
+  const showFooter =
+    pathname === "/" || pathname === "/marketplace" || pathname.startsWith("/marketplace");
+  // `/` and `/marketplace` render the marketplace slim header. Listing, Terms,
+  // and Privacy reuse that same MarketplaceDesktopHeader. Keep this shell bar
+  // off those routes so the icon row, Connect chip, and Sign in pill do not
+  // stack on top.
+  const marketplaceHome = pathname === "/" || pathname === "/marketplace";
   const sharedMarketplaceHeader =
     pathname.startsWith("/listing/") || pathname === "/terms" || pathname === "/privacy";
 

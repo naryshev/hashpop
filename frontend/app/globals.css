@@ -248,6 +248,35 @@ a,
 }
 
 @layer components {
+  /*
+   * Homepage lede. The full sentence is always in the DOM. On viewports
+   * below 768px it clamps to two lines until the native <details> toggle
+   * (More) is open. Desktop shows the whole lede and hides the toggle.
+   */
+  @media (max-width: 767px) {
+    .home-intro:not(:has(details[open])) .home-lede {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      overflow: hidden;
+    }
+  }
+  /* Desktop line length only. Mobile stays clamped; the block stays in flow. */
+  @media (min-width: 768px) {
+    .home-lede {
+      max-width: 640px;
+    }
+  }
+  .home-intro summary::-webkit-details-marker {
+    display: none;
+  }
+  .home-intro details[open] .home-more-label {
+    display: none;
+  }
+  .home-intro details:not([open]) .home-less-label {
+    display: none;
+  }
+
   .glass {
     @apply rounded-glass border border-white/10 bg-white/5 backdrop-blur-glass;
   }

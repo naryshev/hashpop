@@ -113,7 +113,7 @@ export function PwaInstallPrompt() {
             </p>
             <p className="mt-4 max-w-xs text-sm text-silver">
               Add Hashpop to your home screen for one-tap access to the on-chain marketplace — buy,
-              sell and track escrow anywhere.
+              sell and track protected payments anywhere.
             </p>
           </div>
           {installEvent && (

@@ -1,7 +1,66 @@
-import { redirect } from "next/navigation";
+import { Suspense, type ReactNode } from "react";
+import type { Metadata } from "next";
+import { HomeAbout, HomeIntro } from "../components/home/HomeSeo";
+import { loadInitialMarketplaceListings } from "../lib/loadMarketplaceListings";
+import { HOMEPAGE_SEO } from "../lib/seo/homepage";
+import { socialImages } from "../lib/seo/metadata";
+import MarketplacePageClient from "./marketplace/marketplace-page-client";
 
-// The dedicated landing page has been retired — visitors go straight into the
-// marketplace.
-export default function Home() {
-  redirect("/marketplace");
+// Homepage title, description, and social cards. Other routes keep SEO_COPY.
+// Next 14 resolves a root URL to its origin, so metadata canonical and
+// openGraph.url both emit https://hashpop.io with no slash. The tags below
+// are the homepage canonical and og:url, both with the trailing slash.
+const HOMEPAGE_URL = "https://hashpop.io/";
+const images = socialImages();
+
+export const metadata: Metadata = {
+  title: { absolute: HOMEPAGE_SEO.title },
+  description: HOMEPAGE_SEO.description,
+  openGraph: {
+    type: "website",
+    siteName: "Hashpop",
+    title: HOMEPAGE_SEO.title,
+    description: HOMEPAGE_SEO.description,
+    images: images.openGraph,
+  },
+  twitter: {
+    card: "summary_large_image",
+    site: "@hashpop",
+    creator: "@hashpop",
+    title: HOMEPAGE_SEO.title,
+    description: HOMEPAGE_SEO.description,
+    images: images.twitter,
+  },
+};
+
+export const dynamic = "force-dynamic";
+
+function ListingsFallback() {
+  return (
+    <main className="min-h-screen">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+        <p className="text-silver">Loading listings…</p>
+      </div>
+    </main>
+  );
+}
+
+export default async function Home() {
+  const { items, error } = await loadInitialMarketplaceListings();
+  const intro: ReactNode = <HomeIntro />;
+  const about: ReactNode = <HomeAbout />;
+  return (
+    <>
+      <link rel="canonical" href={HOMEPAGE_URL} />
+      <meta property="og:url" content={HOMEPAGE_URL} />
+      <Suspense fallback={<ListingsFallback />}>
+        <MarketplacePageClient
+          initialItems={items}
+          initialError={error}
+          intro={intro}
+          about={about}
+        />
+      </Suspense>
+    </>
+  );
 }

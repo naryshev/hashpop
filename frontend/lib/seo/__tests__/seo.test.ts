@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SEO_COPY } from "../copy";
+import { HOMEPAGE_SEO } from "../homepage";
 import { apexRedirectUrl, isNoIndexPath } from "../host";
 import { listingOfferPriceLabel } from "../../hbarUsd";
 import {
@@ -27,24 +28,35 @@ import { buildSitemap, PUBLIC_SITEMAP_PATHS } from "../sitemap";
 
 describe("SEO copy", () => {
   it("keeps the research strings verbatim", () => {
-    expect(SEO_COPY.rootTitle).toBe("Hashpop — Reputation, chat & escrow on your wallet");
+    expect(SEO_COPY.rootTitle).toBe(
+      "Hashpop — Reputation, chat & protected payments on your wallet",
+    );
     expect(SEO_COPY.rootDescription).toBe(
-      "Buy and sell real stuff on Hedera with wallet reputation, encrypted deal chat, and HBAR escrow. Meetups with a contract.",
+      "Buy and sell real stuff on Hedera with wallet reputation, encrypted deal chat, and optional protected payments in HBAR. Meetups with a contract.",
     );
     expect(SEO_COPY.marketplaceTitle).toBe("Marketplace · Hashpop");
     expect(SEO_COPY.marketplaceDescription).toBe(
-      "Browse listings settled in HBAR — escrow, wallet chat, and portable reputation. Meet locally with a contract or ship.",
+      "Browse listings settled in HBAR — optional protected payments, wallet chat, and portable reputation. Meet locally with a contract or ship.",
     );
     expect(SEO_COPY.marketplaceOgDescription).toBe(
-      "P2P marketplace on Hedera: escrow, chat, and reputation on your wallet.",
+      "P2P marketplace on Hedera: optional protected payments, chat, and reputation on your wallet.",
     );
     expect(SEO_COPY.listingTitle("Vintage Camera", "84")).toBe("Vintage Camera · 84 ℏ · Hashpop");
     expect(SEO_COPY.listingDescriptionFallback("Vintage Camera", "84")).toBe(
-      "Vintage Camera for 84 ℏ on Hashpop — escrow-backed P2P.",
+      "Vintage Camera for 84 ℏ on Hashpop — peer-to-peer on Hedera.",
+    );
+    expect(SEO_COPY.listingDescriptionFallback("Vintage Camera", "84", true)).toBe(
+      "Vintage Camera for 84 ℏ on Hashpop — on-chain protected payment.",
     );
     expect(SEO_COPY.categoriesTitle).toBe("Browse Categories · Hashpop");
     expect(SEO_COPY.categoriesDescription).toBe(
-      "Shop Hashpop by category — electronics, vehicles, fashion, collectibles, and more. Escrow and wallet reputation built in.",
+      "Shop Hashpop by category — electronics, vehicles, fashion, collectibles, and more. Optional protected payments and wallet reputation built in.",
+    );
+    expect(SEO_COPY.helpDescription).toBe(
+      "Hashpop help center: how protected payments work, what HBAR is, connecting HashPack, disputes, returns and more.",
+    );
+    expect(SEO_COPY.supportDescription).toBe(
+      "Get Hashpop support for a listing, a protected payment, or a meetup. Open a ticket with the steps and wallet details.",
     );
   });
 });
@@ -118,7 +130,7 @@ describe("listing metadata", () => {
     expect(meta.title).toEqual({ absolute: "Vintage Camera · 84 ℏ · Hashpop" });
     expect(String(meta.description).length).toBeLessThanOrEqual(155);
     expect(meta.description).toContain("rangefinder");
-    expect(meta.description).not.toMatch(/escrow-backed P2P/);
+    expect(meta.description).not.toMatch(/peer-to-peer on Hedera/);
     expect(meta.alternates?.canonical).toBe("https://hashpop.io/listing/lst-1");
     expect(meta.openGraph?.url).toBe("https://hashpop.io/listing/lst-1");
     expect(meta.openGraph && "type" in meta.openGraph ? meta.openGraph.type : undefined).toBe(
@@ -141,13 +153,25 @@ describe("listing metadata", () => {
     expect(meta.alternates?.canonical).toBe("https://hashpop.io/listing/lst-1");
   });
 
-  it("uses the escrow-backed sentence when the listing has no description", () => {
+  it("uses the protected-payment sentence when that listing has no description", () => {
     const meta = listingMetadata("lst-1", {
       ...listing,
       description: "   ",
       subtitle: null,
     });
-    expect(meta.description).toBe("Vintage Camera for 84 ℏ on Hashpop — escrow-backed P2P.");
+    expect(meta.description).toBe(
+      "Vintage Camera for 84 ℏ on Hashpop — on-chain protected payment.",
+    );
+  });
+
+  it("does not call an unprotected listing a protected payment", () => {
+    const meta = listingMetadata("lst-1", {
+      ...listing,
+      requireEscrow: false,
+      description: "   ",
+      subtitle: null,
+    });
+    expect(meta.description).toBe("Vintage Camera for 84 ℏ on Hashpop — peer-to-peer on Hedera.");
   });
 
   it("keeps a confirmed miss noindex without a second robots tag", () => {
@@ -381,13 +405,13 @@ describe("site JSON-LD", () => {
       name: "Hashpop",
       url: "https://hashpop.io",
       logo: ORGANIZATION_LOGO_URL,
-      description: SEO_COPY.rootDescription,
+      description: HOMEPAGE_SEO.description,
     });
     expect(ORGANIZATION_LOGO_URL).toBe("https://hashpop.io/hashpop-cart-3d.PNG");
     expect(data["@graph"][1]).toMatchObject({
       name: "Hashpop",
       url: WEBSITE_URL,
-      description: SEO_COPY.marketplaceDescription,
+      description: HOMEPAGE_SEO.websiteDescription,
     });
     expect(WEBSITE_URL).toBe("https://hashpop.io/");
     expect(data["@graph"][1].potentialAction).toEqual({
@@ -400,6 +424,7 @@ describe("site JSON-LD", () => {
     });
     expect(SEARCH_URL_TEMPLATE).toBe("https://hashpop.io/marketplace?q={search_term_string}");
     expect(data["@graph"].some((node) => node["@type"] === "Product")).toBe(false);
+    expect(JSON.stringify(data)).not.toMatch(/escrow/i);
   });
 });
 

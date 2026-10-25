@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Fuse from "fuse.js";
 import { ListingCard } from "../../components/ListingCard";
@@ -32,6 +32,9 @@ import {
   MarketplaceFilterDrawer,
   RAIL_PRICE_CEILING,
 } from "../../components/MarketplaceBrowseRail";
+import { LISTINGS_UNAVAILABLE_COPY, type ListingItem } from "../../lib/loadMarketplaceListings";
+
+export type { ListingItem };
 
 function parsePostedWithinDays(value: string): number | null {
   if (!value) return null;
@@ -63,32 +66,18 @@ function parseSortMode(value: string | null): SortMode {
   return "recent";
 }
 
-export type ListingItem = {
-  id: string;
-  price?: string;
-  title?: string | null;
-  subtitle?: string | null;
-  description?: string | null;
-  category?: string | null;
-  condition?: string | null;
-  watchlistCount?: number;
-  seller?: string;
-  imageUrl?: string | null;
-  mediaUrls?: string[];
-  city?: string | null;
-  createdAt?: string;
-  status?: string;
-  onChainConfirmed?: boolean;
-  requireEscrow?: boolean | null;
-  itemType: "listing";
-};
-
 export default function MarketplacePageClient({
   initialItems,
   initialError,
+  intro = null,
+  about = null,
 }: {
   initialItems: ListingItem[];
-  initialError: string | null;
+  initialError: boolean;
+  /** Server-rendered homepage intro. Omitted on /marketplace. */
+  intro?: ReactNode;
+  /** Server-rendered homepage about section. Omitted on /marketplace. */
+  about?: ReactNode;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -141,27 +130,39 @@ export default function MarketplacePageClient({
   // recover when the server-side fetch timed out or failed (bounded TTFB),
   // and so refreshes can revalidate without a full reload.
   const [items, setItems] = useState<ListingItem[]>(initialItems);
-  const [listingsError, setListingsError] = useState<string | null>(initialError);
+  const [listingsError, setListingsError] = useState(initialError);
+  const [retrying, setRetrying] = useState(false);
+
+  const reloadListings = async (isCancelled?: () => boolean) => {
+    setRetrying(true);
+    try {
+      const response = await fetch(`${getApiUrl()}/api/listings`, { cache: "no-store" });
+      if (!response.ok) throw new Error(`listings request failed (${response.status})`);
+      const data = (await response.json()) as { listings?: ListingItem[] };
+      const list = (data.listings ?? []).map((l) => ({
+        ...l,
+        itemType: "listing" as const,
+      }));
+      if (isCancelled?.()) return;
+      setItems(list);
+      setListingsError(false);
+    } catch (error) {
+      console.error("[marketplace] failed to load listings", error);
+      if (isCancelled?.()) return;
+      setListingsError(true);
+    } finally {
+      if (!isCancelled?.()) setRetrying(false);
+    }
+  };
+
   useEffect(() => {
     if (initialItems.length > 0) return;
     let cancelled = false;
-    fetch(`${getApiUrl()}/api/listings`, { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : Promise.reject(r)))
-      .then((data: { listings?: ListingItem[] }) => {
-        if (cancelled) return;
-        const list = (data.listings ?? []).map((l) => ({
-          ...l,
-          itemType: "listing" as const,
-        }));
-        if (list.length > 0) {
-          setItems(list);
-          setListingsError(null);
-        }
-      })
-      .catch(() => {});
+    void reloadListings(() => cancelled);
     return () => {
       cancelled = true;
     };
+    // Retry is explicit. The mount recovery only runs when SSR had nothing to show.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // Warm the profile cache for every seller in one batched request so cards
@@ -481,6 +482,7 @@ export default function MarketplacePageClient({
             <div className="max-h-[calc(100dvh-5.5rem)] overflow-y-auto">{renderBrowseRail()}</div>
           </aside>
           <div className="min-w-0">
+            {intro}
             <MarketplaceDesktopToolbar
               resultCount={filteredItems.length}
               sortMode={sortMode}
@@ -489,10 +491,19 @@ export default function MarketplacePageClient({
               onOpenFilters={() => setDesktopFilterOpen(true)}
             />
             {listingsError ? (
-              <p className="text-amber-400/90 text-sm">
-                {listingsError} Ensure the backend is running and PostgreSQL is up (e.g.{" "}
-                <code className="text-chrome">docker compose up -d db</code>).
-              </p>
+              <div className="rounded-glass-lg border border-white/10 bg-white/[0.04] px-4 py-6 text-center">
+                <p className="font-sans text-[15px] font-normal leading-[22px] text-white/70">
+                  {LISTINGS_UNAVAILABLE_COPY}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void reloadListings()}
+                  disabled={retrying}
+                  className="btn-mint mt-4 inline-flex h-11 items-center rounded-full px-5 text-[15px] font-semibold disabled:opacity-60"
+                >
+                  Try again
+                </button>
+              </div>
             ) : filteredItems.length === 0 ? (
               <p className="text-silver">
                 {query && categoryQuery
@@ -508,7 +519,7 @@ export default function MarketplacePageClient({
             ) : (
               <>
                 {/* Mobile 2-up: 12px page margins, 8px gutter. Desktop is the same soft-trust grid. */}
-                <div className="grid grid-cols-2 gap-2 md:hidden">
+                <div data-testid="listing-grid" className="grid grid-cols-2 gap-2 md:hidden">
                   {filteredItems.map((item) => (
                     <ListingCard
                       key={`${item.itemType}-${item.id}`}
@@ -518,7 +529,10 @@ export default function MarketplacePageClient({
                     />
                   ))}
                 </div>
-                <div className="hidden gap-4 md:grid md:grid-cols-2 xl:grid-cols-3">
+                <div
+                  data-testid="listing-grid"
+                  className="hidden gap-4 md:grid md:grid-cols-2 xl:grid-cols-3"
+                >
                   {filteredItems.map((item) => (
                     <ListingCard
                       key={`${item.itemType}-${item.id}`}
@@ -532,6 +546,7 @@ export default function MarketplacePageClient({
             )}
           </div>
         </div>
+        {about}
       </div>
       <MarketplaceFilterDrawer open={desktopFilterOpen} onClose={() => setDesktopFilterOpen(false)}>
         {renderBrowseRail()}

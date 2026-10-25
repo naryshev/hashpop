@@ -3,6 +3,7 @@ import { usdPriceFromHbar } from "../hbarUsd";
 import { getListingMediaUrls } from "../listingMedia";
 import { SEO_COPY } from "./copy";
 import { absoluteUrl, CANONICAL_ORIGIN } from "./host";
+import { HOMEPAGE_SEO } from "./homepage";
 import { listingCanonicalPath, type SeoListing } from "./metadata";
 
 /** Google merchant listings require an ISO 4217 currency. HBAR is not one. */
@@ -169,13 +170,13 @@ export function siteJsonLd() {
         name: SEO_COPY.siteName,
         url: CANONICAL_ORIGIN,
         logo: ORGANIZATION_LOGO_URL,
-        description: SEO_COPY.rootDescription,
+        description: HOMEPAGE_SEO.description,
       },
       {
         "@type": "WebSite",
         name: SEO_COPY.siteName,
         url: WEBSITE_URL,
-        description: SEO_COPY.marketplaceDescription,
+        description: HOMEPAGE_SEO.websiteDescription,
         potentialAction: {
           "@type": "SearchAction",
           target: {
