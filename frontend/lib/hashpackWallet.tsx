@@ -22,9 +22,12 @@ import {
   INIT_TIMEOUT_MS,
   MISSING_WC_PROJECT_ID_MESSAGE,
   bootstrapHashConnect,
+  consumeHashPackDeepLinkOpened,
   getWalletConnectProjectId,
   isInitTimeoutError,
+  isWalletSessionReady,
   pairingStoreHasActiveSession,
+  registerHashConnectBeginInit,
   scheduleIdle,
   shouldBootstrapHashConnectOnLoad,
   shouldRetryHashConnectInit,
@@ -397,6 +400,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
     disconnect: (() => void) | null;
   }>({ pairing: null, disconnect: null });
   const wireClientRef = useRef<(hc: HashConnect) => Promise<HashConnect | null>>(async () => null);
+  const signedOutRef = useRef(false);
 
   const resetWalletState = useCallback((clearConnectorData = false) => {
     setAccountId(null);
@@ -420,11 +424,12 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
     let mounted = true;
     setIsReady(false);
     setHashconnect(null);
+    // A stored session only decides whether to restore. Address stays empty
+    // until HashConnect is actually ready, so a failed init cannot look signed in.
+    setAccountId(null);
+    setAddress(null);
+    setBalanceTinybar(null);
     const restored = readStoredWalletSession(network);
-    if (restored) {
-      setAccountId(restored.accountId);
-      setAddress(restored.address ?? accountIdToLongZeroAddress(restored.accountId));
-    }
     const projectId = getWalletConnectProjectId();
     if (!projectId) {
       setError(MISSING_WC_PROJECT_ID_MESSAGE);
@@ -443,7 +448,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
       }
 
       const pairingHandler = async (session: { accountIds: string[] }) => {
-        if (!mounted) return;
+        if (!mounted || signedOutRef.current) return;
         const first = normalizeAccountId(session.accountIds[0] ?? null);
         setAccountId(first);
         setError(null);
@@ -451,7 +456,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
         setNicknameRequired(false);
         if (first) {
           const mirrorData = await fetchMirrorAccount(first, network);
-          if (!mounted) return;
+          if (!mounted || signedOutRef.current) return;
           const normalized = mirrorData.evmAddress ?? accountIdToLongZeroAddress(first);
           setAddress(normalized);
           setBalanceTinybar(mirrorData.balanceTinybar);
@@ -475,7 +480,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
       hc.pairingEvent.on(pairingHandler);
       hc.disconnectionEvent.on(disconnectHandler);
 
-      if (!mounted) return null;
+      if (!mounted || signedOutRef.current) return null;
       setHashconnect(hc);
       setIsReady(true);
       setError(null);
@@ -483,7 +488,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
       if (first) {
         setAccountId(first);
         const mirrorData = await fetchMirrorAccount(first, network);
-        if (!mounted) return null;
+        if (!mounted || signedOutRef.current) return null;
         const normalized = mirrorData.evmAddress ?? accountIdToLongZeroAddress(first);
         setAddress(normalized);
         setBalanceTinybar(mirrorData.balanceTinybar);
@@ -496,9 +501,9 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
       // links) — and keep it FRESH: pairing URIs expire after ~5 minutes,
       // and handing the wallet a stale one produces an unpairable prompt.
       const refreshPairingUri = () => {
-        if (!mounted || (hc.connectedAccountIds?.length ?? 0) > 0) return;
+        if (!mounted || signedOutRef.current || (hc.connectedAccountIds?.length ?? 0) > 0) return;
         void getPairingUri(hc).then((uri) => {
-          if (uri && mounted) {
+          if (uri && mounted && !signedOutRef.current) {
             mobilePairingUriRef.current = uri;
             mobilePairingUriAtRef.current = Date.now();
             setPairingUri(uri);
@@ -527,8 +532,8 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
 
           const result = await bootstrapHashConnect({
             createClient: (forceFresh) => getOrCreateHashConnect(network, projectId, forceFresh),
-            wipeStorage: clearWalletConnectorStorage,
           });
+          if (signedOutRef.current) return null;
 
           if (result.timedOut) {
             // UI circuit breaker: leave "Loading wallet…" without killing the
@@ -540,6 +545,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
             if (!result.pending) return null;
             try {
               const late = await result.pending;
+              if (signedOutRef.current) return null;
               return await wireClient(late);
             } catch {
               return null;
@@ -547,17 +553,26 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
           }
 
           if (!result.client) {
-            if (mounted) {
+            if (mounted && !signedOutRef.current) {
+              setAccountId(null);
+              setAddress(null);
+              setBalanceTinybar(null);
+              setHashconnect(null);
               setError(result.error ?? "Failed to initialize HashPack connection.");
               setIsReady(true);
             }
             return null;
           }
 
+          if (signedOutRef.current) return null;
           return await wireClient(result.client);
         } catch (e) {
-          if (!mounted) return null;
+          if (!mounted || signedOutRef.current) return null;
           const msg = e instanceof Error ? e.message : "Failed to initialize HashPack connection.";
+          setAccountId(null);
+          setAddress(null);
+          setBalanceTinybar(null);
+          setHashconnect(null);
           setError(msg);
           setIsReady(true);
           return null;
@@ -578,6 +593,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
       hasSavedSession: !!restored,
       hasActivePairing: pairingStoreHasActiveSession(pairingRaw),
     });
+    const unregisterPreload = registerHashConnectBeginInit(beginInit);
     let cancelIdle = () => {};
     if (bootstrapTiming === "never") {
       // Signed-out visitors: HashConnect stays out of the first load.
@@ -593,6 +609,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
 
     return () => {
       mounted = false;
+      unregisterPreload();
       cancelIdle();
       initPromiseRef.current = null;
       // Unregister event listeners to prevent memory leaks and duplicate handlers.
@@ -614,6 +631,8 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
 
   const connect = useCallback(async () => {
     if (connectInFlightRef.current) return;
+    signedOutRef.current = false;
+    const openedInGesture = consumeHashPackDeepLinkOpened();
     connectInFlightRef.current = true;
     setIsConnecting(true);
     setNotDetected(false);
@@ -646,7 +665,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
           INIT_TIMEOUT_MESSAGE,
         ).catch(async (e) => {
           if (!shouldRetryHashConnectInit(e)) return null;
-          clearWalletConnectorStorage();
+          // Retry without deleting stored wallet keys or the WalletConnect pairing.
           return getOrCreateHashConnect(network, projectId, true).catch(() => null);
         });
         if (hc) {
@@ -654,6 +673,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
           hc = wired;
         }
       }
+      if (signedOutRef.current) return;
       if (!hc) {
         setError(INIT_TIMEOUT_MESSAGE);
         return;
@@ -670,21 +690,24 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
         cachedUri.startsWith("wc:") &&
         Date.now() - mobilePairingUriAtRef.current < PAIRING_URI_MAX_AGE_MS;
       const pairingUri = cacheFresh ? cachedUri : await getPairingUri(hc);
+      if (signedOutRef.current) return;
       if (!pairingUri) {
         setError("Could not create a HashPack pairing URI. Refresh and try again.");
         return;
       }
       mobilePairingUriRef.current = pairingUri;
       mobilePairingUriAtRef.current = Date.now();
+      setPairingUri(pairingUri);
 
       const channel = selectHashPackConnectChannel({
         mobile: isMobileBrowser(),
         framed: isFramed(),
       });
 
-      // hashpack:// only on mobile. Desktop Chrome has no protocol handler;
-      // navigating there fails the launch and drops the extension handshake.
-      if (channel === "deeplink") openHashPackDeepLink(pairingUri);
+      // hashpack:// has to run inside the click. After this await the gesture
+      // is gone, so a mobile tap that raced init stops here and the button
+      // stays enabled for a second tap once pairingUri is set.
+      if (channel === "deeplink" && !openedInGesture) return;
 
       const extensionClient = hc as unknown as {
         findLocalWallets?: () => Promise<unknown>;
@@ -776,12 +799,18 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
   }, [hashconnect, network]);
 
   const disconnect = useCallback(async () => {
+    signedOutRef.current = true;
+    const pending = initPromiseRef.current;
     try {
       await revokeWalletAuthSession();
-      if (hashconnect) {
-        await hashconnect.disconnect();
-      }
+      if (pending) await pending.catch(() => null);
+      const hc = hashconnect ?? sharedHashconnect;
+      if (hc) await hc.disconnect();
     } finally {
+      setHashconnect(null);
+      setPairingUri(null);
+      mobilePairingUriRef.current = null;
+      mobilePairingUriAtRef.current = 0;
       resetWalletState(true);
     }
   }, [hashconnect, resetWalletState]);
@@ -793,7 +822,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
       accountId,
       balanceTinybar,
       isReady,
-      isConnected: !!address && !!accountId,
+      isConnected: isWalletSessionReady({ hashconnect, address, accountId }),
       isConnecting,
       error,
       notDetected,

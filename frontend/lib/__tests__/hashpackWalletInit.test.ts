@@ -1,12 +1,20 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   INIT_TIMEOUT_MESSAGE,
   INIT_TIMEOUT_MS,
   MISSING_WC_PROJECT_ID_MESSAGE,
+  WALLET_PRELOAD_AFTER_LOAD_MS,
   bootstrapHashConnect,
+  consumeHashPackDeepLinkOpened,
   getWalletConnectProjectId,
   isInitTimeoutError,
+  isWalletSessionReady,
+  noteHashPackDeepLinkOpened,
   pairingStoreHasActiveSession,
+  registerHashConnectBeginInit,
+  requestHashConnectPreloadNow,
+  resetHashConnectPreloadForTests,
+  retainHashConnectPreload,
   shouldBootstrapHashConnectOnLoad,
   shouldRetryHashConnectInit,
   withTimeout,
@@ -169,7 +177,6 @@ describe("bootstrapHashConnect", () => {
     const hung = new Promise<string>((resolve) => {
       resolveClient = resolve;
     });
-    let wiped = false;
     let createCalls = 0;
 
     const resultP = bootstrapHashConnect({
@@ -178,9 +185,6 @@ describe("bootstrapHashConnect", () => {
         return hung;
       },
       timeoutMs: 1_000,
-      wipeStorage: () => {
-        wiped = true;
-      },
     });
 
     await vi.advanceTimersByTimeAsync(1_000);
@@ -190,26 +194,73 @@ describe("bootstrapHashConnect", () => {
     expect(result.client).toBeNull();
     expect(result.error).toBe(INIT_TIMEOUT_MESSAGE);
     expect(result.pending).not.toBeNull();
-    expect(wiped).toBe(false);
     expect(createCalls).toBe(1);
 
     resolveClient("late-hc");
     await expect(result.pending).resolves.toBe("late-hc");
   });
 
-  it("wipes storage and retries a stale pairing error, not a hang", async () => {
-    let wiped = false;
+  it("retries a stale pairing error without wiping stored keys", async () => {
     const result = await bootstrapHashConnect({
       createClient: async (forceFresh) => {
         if (!forceFresh) throw new Error("Record was recently deleted");
         return "fresh-hc";
       },
-      wipeStorage: () => {
-        wiped = true;
-      },
     });
-    expect(wiped).toBe(true);
     expect(result.client).toBe("fresh-hc");
     expect(result.timedOut).toBe(false);
+  });
+});
+
+describe("isWalletSessionReady", () => {
+  it("requires a live HashConnect instance", () => {
+    expect(isWalletSessionReady({ hashconnect: null, address: "0xabc", accountId: "0.0.1" })).toBe(
+      false,
+    );
+    expect(isWalletSessionReady({ hashconnect: {}, address: null, accountId: "0.0.1" })).toBe(
+      false,
+    );
+    expect(isWalletSessionReady({ hashconnect: {}, address: "0xabc", accountId: "0.0.1" })).toBe(
+      true,
+    );
+  });
+});
+
+describe("wallet preload", () => {
+  beforeEach(() => {
+    resetHashConnectPreloadForTests();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    resetHashConnectPreloadForTests();
+    vi.useRealTimers();
+  });
+
+  it("does not start init until the load quiet window has passed", () => {
+    const start = vi.fn();
+    registerHashConnectBeginInit(start);
+    const release = retainHashConnectPreload();
+    vi.advanceTimersByTime(WALLET_PRELOAD_AFTER_LOAD_MS - 1);
+    expect(start).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    // requestIdleCallback is absent in jsdom, so the idle fallback is 1ms.
+    vi.advanceTimersByTime(1);
+    expect(start).toHaveBeenCalledOnce();
+    release();
+  });
+
+  it("starts init immediately when the sign-in modal asks", () => {
+    const start = vi.fn();
+    registerHashConnectBeginInit(start);
+    requestHashConnectPreloadNow();
+    expect(start).toHaveBeenCalledOnce();
+  });
+
+  it("records a deep link only for the next connect", () => {
+    expect(consumeHashPackDeepLinkOpened()).toBe(false);
+    noteHashPackDeepLinkOpened();
+    expect(consumeHashPackDeepLinkOpened()).toBe(true);
+    expect(consumeHashPackDeepLinkOpened()).toBe(false);
   });
 });

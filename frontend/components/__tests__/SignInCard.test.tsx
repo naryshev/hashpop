@@ -3,20 +3,23 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HASHPACK_NICKNAME_REQUIRED_MESSAGE } from "../../lib/hashpackSessionAlias";
 
-const wallet = {
-  connect: vi.fn(async () => {}),
-  isConnecting: false,
-  isReady: true,
-  error: null as string | null,
-  isConnected: false,
-  notDetected: false,
-  nicknameRequired: false,
-  pairingUri: "wc:abc@2?relay-protocol=irn&symKey=deadbeef",
-};
+const { wallet, openHashPackDeepLink } = vi.hoisted(() => ({
+  wallet: {
+    connect: vi.fn(async () => {}),
+    isConnecting: false,
+    isReady: true,
+    error: null as string | null,
+    isConnected: false,
+    notDetected: false,
+    nicknameRequired: false,
+    pairingUri: "wc:abc@2?relay-protocol=irn&symKey=deadbeef" as string | null,
+  },
+  openHashPackDeepLink: vi.fn(),
+}));
 
 vi.mock("../../lib/hashpackWallet", () => ({
   useHashpackWallet: () => wallet,
-  openHashPackDeepLink: () => {},
+  openHashPackDeepLink,
 }));
 
 import { SignInCard } from "../ui/SignInCard";
@@ -42,6 +45,9 @@ describe("SignInCard HashPack approval states", () => {
     wallet.notDetected = false;
     wallet.nicknameRequired = false;
     wallet.error = null;
+    wallet.pairingUri = "wc:abc@2?relay-protocol=irn&symKey=deadbeef";
+    wallet.connect.mockClear();
+    openHashPackDeepLink.mockClear();
   });
 
   afterEach(async () => {
@@ -63,6 +69,45 @@ describe("SignInCard HashPack approval states", () => {
     expect(host?.textContent).toContain("social profile username");
     expect(host?.textContent).not.toContain("nickname is empty");
     expect(host?.textContent).not.toContain("HashPack not detected");
+  });
+
+  it("opens HashPack in the tap when a pairing URI is already cached", async () => {
+    const previous = navigator.userAgent;
+    Object.defineProperty(navigator, "userAgent", {
+      value: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)",
+      configurable: true,
+    });
+    await renderCard();
+    const button = [...(host?.querySelectorAll("button") ?? [])].find((node) =>
+      node.textContent?.includes("Continue with HashPack"),
+    );
+    await act(async () => {
+      button?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(openHashPackDeepLink).toHaveBeenCalledWith(wallet.pairingUri);
+    Object.defineProperty(navigator, "userAgent", { value: previous, configurable: true });
+  });
+
+  it("does not open HashPack before a pairing URI exists", async () => {
+    wallet.pairingUri = null;
+    const previous = navigator.userAgent;
+    Object.defineProperty(navigator, "userAgent", {
+      value: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)",
+      configurable: true,
+    });
+    await renderCard();
+    const button = [...(host?.querySelectorAll("button") ?? [])].find((node) =>
+      node.textContent?.includes("Continue with HashPack"),
+    );
+    await act(async () => {
+      button?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(openHashPackDeepLink).not.toHaveBeenCalled();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(wallet.connect).toHaveBeenCalledOnce();
+    Object.defineProperty(navigator, "userAgent", { value: previous, configurable: true });
   });
 
   it("still offers install guidance when no extension answered", async () => {

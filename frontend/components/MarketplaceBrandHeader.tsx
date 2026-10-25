@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { User } from "lucide-react";
 import { useHashpackWallet } from "../lib/hashpackWallet";
+import { useHashConnectPreload } from "../lib/useHashConnectPreload";
 import { useSignInModal } from "../lib/signInModal";
 import { profileAvatarUrl, useProfile } from "../lib/profiles";
 import { material } from "../lib/materials";
@@ -18,6 +19,7 @@ export function profileHref(address: string | null, accountId: string | null): s
 
 export function ProfileAvatarButton({ testId = "marketplace-profile" }: { testId?: string }) {
   const { accountId, address, isConnected } = useHashpackWallet();
+  useHashConnectPreload();
   const { openSignIn } = useSignInModal();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);

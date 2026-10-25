@@ -1,6 +1,7 @@
 "use client";
 
 import { useHashpackWallet } from "../lib/hashpackWallet";
+import { useHashConnectPreload } from "../lib/useHashConnectPreload";
 import { useSignInModal } from "../lib/signInModal";
 
 type ConnectWalletButtonProps = {
@@ -22,6 +23,7 @@ export function ConnectWalletButton({
   onPress,
 }: ConnectWalletButtonProps) {
   const { isConnecting, isReady, error } = useHashpackWallet();
+  useHashConnectPreload();
   const { openSignIn } = useSignInModal();
 
   const handleClick = () => {
