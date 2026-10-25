@@ -91,6 +91,14 @@ export const HOME_SECTIONS: HomeSection[] = [
         { kind: "link", href: "/help", text: "help center" },
         { kind: "text", text: " has the answers." },
       ],
+      [
+        { kind: "text", text: "Buying close to home? Open " },
+        { kind: "link", href: "/marketplace", text: "Nearby" },
+        {
+          kind: "text",
+          text: " to find listings on a map and meet up with escrow already locked. Selling? Your listings, sales and reviews all live on your public profile, so every deal you close makes the next one easier.",
+        },
+      ],
     ],
   },
 ];

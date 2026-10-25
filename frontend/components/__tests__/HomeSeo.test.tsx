@@ -31,7 +31,14 @@ describe("homepage SEO copy", () => {
     expect(html).toContain("Browse the marketplace");
     expect(html).toContain("<details");
     expect(html).toContain("Hashpop is a peer-to-peer marketplace");
-    expect(homeCopyWordCount()).toBeGreaterThan(200);
-    expect(homeCopyWordCount()).toBeLessThan(350);
+    expect(html).toContain("Buying close to home? Open ");
+    expect(html).toContain(">Nearby</a>");
+    expect(html).toContain("makes the next one easier.");
+    const nearby = html.indexOf("Buying close to home?");
+    const cta = html.indexOf("Browse the marketplace");
+    expect(nearby).toBeGreaterThan(html.indexOf("Get started"));
+    expect(nearby).toBeLessThan(cta);
+    expect(homeCopyWordCount()).toBeGreaterThan(250);
+    expect(homeCopyWordCount()).toBeLessThan(360);
   });
 });
