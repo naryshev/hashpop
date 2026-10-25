@@ -35,7 +35,8 @@ describe("about and help FAQ questions", () => {
     const duplicates = publishedAboutFaqs()
       .map((faq) => faq.question)
       .filter((question) => help.has(normalizeQuestion(question)));
-    expect(help.has(normalizeQuestion("How does escrow work?"))).toBe(true);
+    expect(help.has(normalizeQuestion("How do protected payments work?"))).toBe(true);
+    expect(help.has(normalizeQuestion("How does escrow work?"))).toBe(false);
     expect(duplicates).toEqual([]);
   });
 });
