@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useHashpackWallet } from "../lib/hashpackWallet";
+import { useHashConnectPreload } from "../lib/useHashConnectPreload";
 import { useSignInModal } from "../lib/signInModal";
 import { NotificationBell } from "./NotificationBell";
 import { profileHref } from "./MarketplaceBrandHeader";
@@ -16,6 +17,7 @@ import { profileHref } from "./MarketplaceBrandHeader";
  */
 export function MobileTopBar({ className = "" }: { className?: string }) {
   const { accountId, address, isConnected } = useHashpackWallet();
+  useHashConnectPreload();
   const { openSignIn } = useSignInModal();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);

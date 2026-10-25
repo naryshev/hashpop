@@ -31,9 +31,18 @@ export function isInitTimeoutError(error: unknown): boolean {
   return error instanceof Error && error.message === INIT_TIMEOUT_MESSAGE;
 }
 
-/** Stale pairing errors are worth a storage wipe + retry. A hung relay is not. */
+/** Retry a failed init. A hung relay is not retried, and a retry must not delete stored keys. */
 export function shouldRetryHashConnectInit(error: unknown): boolean {
   return !isInitTimeoutError(error);
+}
+
+/** Signed-in UI requires a live HashConnect instance plus the restored account. */
+export function isWalletSessionReady(state: {
+  hashconnect: unknown;
+  address: string | null;
+  accountId: string | null;
+}): boolean {
+  return Boolean(state.hashconnect && state.address && state.accountId);
 }
 
 export type HashConnectBootstrapTiming = "now" | "idle" | "never";
@@ -72,6 +81,106 @@ export function pairingStoreHasActiveSession(
   } catch {
     return false;
   }
+}
+
+/**
+ * Wait until the load event, then stay quiet long enough for a Lighthouse
+ * trace to close, then run `task` from requestIdleCallback. Wallet chunks
+ * stay off the critical path. Do not call this with scheduleIdle's 1ms
+ * fallback — that fires while the lab trace is still open.
+ */
+export const WALLET_PRELOAD_AFTER_LOAD_MS = 6_000;
+
+export function scheduleWalletPreload(task: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  let cancelled = false;
+  let cancelIdle = () => {};
+  let timer: number | undefined;
+  const arm = () => {
+    if (cancelled) return;
+    timer = window.setTimeout(() => {
+      if (cancelled) return;
+      cancelIdle = scheduleIdle(task);
+    }, WALLET_PRELOAD_AFTER_LOAD_MS);
+  };
+  if (document.readyState === "complete") arm();
+  else window.addEventListener("load", arm, { once: true });
+  return () => {
+    cancelled = true;
+    window.removeEventListener("load", arm);
+    if (timer !== undefined) window.clearTimeout(timer);
+    cancelIdle();
+  };
+}
+
+type HashConnectStarter = () => void;
+
+let hashConnectStarter: HashConnectStarter | null = null;
+let preloadMode: "now" | "quiet" | null = null;
+let cancelQuietPreload: (() => void) | null = null;
+let preloadListeners = 0;
+let deepLinkOpenedInGesture = false;
+
+/** The provider registers the real init. Late calls still run a queued preload. */
+export function registerHashConnectBeginInit(start: HashConnectStarter): () => void {
+  hashConnectStarter = start;
+  if (preloadMode === "now") start();
+  return () => {
+    if (hashConnectStarter === start) hashConnectStarter = null;
+  };
+}
+
+/** Sign-in modal is open: init immediately. The modal is not on the lab critical path. */
+export function requestHashConnectPreloadNow(): void {
+  preloadMode = "now";
+  cancelQuietPreload?.();
+  cancelQuietPreload = null;
+  hashConnectStarter?.();
+}
+
+/**
+ * A Connect, Buy, or Make offer control mounted. Share one delayed preload
+ * across every mounted control.
+ */
+export function retainHashConnectPreload(): () => void {
+  preloadListeners += 1;
+  if (preloadMode !== "now" && preloadListeners === 1) {
+    preloadMode = "quiet";
+    cancelQuietPreload?.();
+    cancelQuietPreload = scheduleWalletPreload(() => {
+      hashConnectStarter?.();
+    });
+  }
+  return () => {
+    preloadListeners = Math.max(0, preloadListeners - 1);
+    if (preloadListeners === 0 && preloadMode === "quiet") {
+      cancelQuietPreload?.();
+      cancelQuietPreload = null;
+      preloadMode = null;
+    }
+  };
+}
+
+/** Click handler opened hashpack:// inside the user gesture. */
+export function noteHashPackDeepLinkOpened(): void {
+  deepLinkOpenedInGesture = true;
+}
+
+/** True once, then cleared. connect() uses this so it never navigates after an await. */
+export function consumeHashPackDeepLinkOpened(): boolean {
+  const opened = deepLinkOpenedInGesture;
+  deepLinkOpenedInGesture = false;
+  return opened;
+}
+
+/** Test isolation. Not used by the app. */
+export function resetHashConnectPreloadForTests(): void {
+  cancelQuietPreload?.();
+  cancelQuietPreload = null;
+  hashConnectStarter = null;
+  preloadMode = null;
+  preloadListeners = 0;
+  deepLinkOpenedInGesture = false;
 }
 
 /** Run after the browser is idle. Falls back to a short timeout. */
@@ -122,10 +231,8 @@ export type BootstrapHashConnectResult<T> = {
 export async function bootstrapHashConnect<T>(options: {
   createClient: (forceFresh: boolean) => Promise<T>;
   timeoutMs?: number;
-  wipeStorage?: () => void;
 }): Promise<BootstrapHashConnectResult<T>> {
   const timeoutMs = options.timeoutMs ?? INIT_TIMEOUT_MS;
-  const wipeStorage = options.wipeStorage ?? (() => {});
   const first = options.createClient(false);
 
   try {
@@ -143,7 +250,8 @@ export async function bootstrapHashConnect<T>(options: {
         pending: null,
       };
     }
-    wipeStorage();
+    // Retry the client only. Stored wallet keys and WalletConnect pairings
+    // stay put until the user signs out.
     try {
       const client = await withTimeout(options.createClient(true), timeoutMs, INIT_TIMEOUT_MESSAGE);
       return { client, timedOut: false, error: null, pending: null };

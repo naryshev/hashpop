@@ -4,6 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Wallet, Copy, Check, QrCode, ChevronUp, AlertTriangle, ArrowRight } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { HASHPACK_NICKNAME_REQUIRED_MESSAGE } from "../../lib/hashpackSessionAlias";
+import {
+  noteHashPackDeepLinkOpened,
+  requestHashConnectPreloadNow,
+} from "../../lib/hashpackWalletInit";
 import { useHashpackWallet, openHashPackDeepLink } from "../../lib/hashpackWallet";
 
 type SignInCardProps = {
@@ -36,19 +40,24 @@ export function SignInCard({ onConnected, className }: SignInCardProps) {
     if (isConnected) onConnected?.();
   }, [isConnected, onConnected]);
 
+  // The modal is already open, so init now. A marketplace visit only preloads
+  // after the lab quiet window; this covers a tap that happens sooner.
+  useEffect(() => {
+    requestHashConnectPreloadNow();
+  }, []);
+
   const handleConnectPress = useCallback(() => {
     const now = Date.now();
     if (now - lastPressAtRef.current < 300) return;
     lastPressAtRef.current = now;
 
-    if (pairingUri) {
-      const isMobile = /Android|iPhone|iPad|iPod/i.test(
-        typeof navigator !== "undefined" ? navigator.userAgent : "",
-      );
-      if (isMobile) {
-        openHashPackDeepLink(pairingUri);
-        setDeepLinkFired(true);
-      }
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(
+      typeof navigator !== "undefined" ? navigator.userAgent : "",
+    );
+    if (pairingUri && isMobile) {
+      openHashPackDeepLink(pairingUri);
+      noteHashPackDeepLinkOpened();
+      setDeepLinkFired(true);
     }
 
     window.setTimeout(() => {
