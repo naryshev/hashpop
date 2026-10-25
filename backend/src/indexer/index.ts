@@ -422,30 +422,72 @@ export function itemListedPersistAction(
   return "update";
 }
 
+export type ItemListedStore = {
+  findUnique(id: string): Promise<ItemListedSnapshot | null>;
+  create(data: { id: string; seller: string } & ItemListedSnapshot): Promise<unknown>;
+  update(id: string, data: ItemListedSnapshot): Promise<unknown>;
+};
+
+/**
+ * Read, then skip, update, or create. A second poller can insert between the
+ * read and the create; Prisma P2002 falls back to the same update-or-skip
+ * decision instead of failing the poll.
+ */
+export async function persistItemListed(
+  store: ItemListedStore,
+  listing: { id: string; seller: string } & ItemListedSnapshot,
+): Promise<"create" | "update" | "skip"> {
+  const next: ItemListedSnapshot = {
+    price: listing.price,
+    status: listing.status,
+    onChainConfirmed: listing.onChainConfirmed,
+  };
+  const existing = await store.findUnique(listing.id);
+  const action = itemListedPersistAction(existing, next);
+  if (action === "skip") return "skip";
+  if (action === "update") {
+    await store.update(listing.id, next);
+    return "update";
+  }
+  try {
+    await store.create({ id: listing.id, seller: listing.seller, ...next });
+    return "create";
+  } catch (err) {
+    if (!isUniqueViolation(err)) throw err;
+    const raced = await store.findUnique(listing.id);
+    const fallback = itemListedPersistAction(raced, next);
+    if (fallback === "skip") return "skip";
+    if (fallback === "update") {
+      await store.update(listing.id, next);
+      return "update";
+    }
+    throw err;
+  }
+}
+
+function isUniqueViolation(err: unknown): boolean {
+  return typeof err === "object" && err !== null && (err as { code?: unknown }).code === "P2002";
+}
+
 async function handleEvent(event: any, prisma: PrismaClient, log: Logger) {
   switch (event.type) {
     case "ItemListed": {
       const listingId = normalizeListingId(event.listingId);
       const seller = (event.seller || "").toLowerCase();
       const price = chainAmountToHbar(event.price);
-      const next = { price, status: "LISTED", onChainConfirmed: true };
-      const existing = await prisma.listing.findUnique({
-        where: { id: listingId },
-        select: { price: true, status: true, onChainConfirmed: true },
-      });
-      const action = itemListedPersistAction(existing, next);
-      if (action === "skip") break;
-      if (action === "create") {
-        await prisma.listing.create({
-          data: { id: listingId, seller, ...next },
-        });
-      } else {
-        await prisma.listing.update({
-          where: { id: listingId },
-          data: next,
-        });
-      }
-      log.info({ listingId, seller }, "Listing indexed");
+      const action = await persistItemListed(
+        {
+          findUnique: (id) =>
+            prisma.listing.findUnique({
+              where: { id },
+              select: { price: true, status: true, onChainConfirmed: true },
+            }),
+          create: (data) => prisma.listing.create({ data }),
+          update: (id, data) => prisma.listing.update({ where: { id }, data }),
+        },
+        { id: listingId, seller, price, status: "LISTED", onChainConfirmed: true },
+      );
+      if (action !== "skip") log.info({ listingId, seller }, "Listing indexed");
       break;
     }
 
