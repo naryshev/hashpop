@@ -1,10 +1,11 @@
 import axios from "axios";
+import { mirrorLogQuery } from "./cursor";
 
 const MIRROR_BASE = process.env.MIRROR_URL || "https://testnet.mirrornode.hedera.com";
 
 export async function fetchMirrorEvents(
   marketplaceAddr: string,
-  sinceTimestamp: number,
+  sinceTimestamp: number | string,
 ): Promise<any[]> {
   try {
     const logs = await fetchContractLogs(marketplaceAddr, sinceTimestamp);
@@ -21,14 +22,8 @@ function normalizeAddressForUrl(addr: string): string {
   return hex.toLowerCase();
 }
 
-async function fetchContractLogs(contractAddress: string, since: number): Promise<any[]> {
-  const params: Record<string, string | number> = { limit: 100 };
-  if (since > 0) {
-    params.timestamp = `gt:${since}`;
-    params.order = "asc";
-  } else {
-    params.order = "desc";
-  }
+async function fetchContractLogs(contractAddress: string, since: number | string): Promise<any[]> {
+  const params = mirrorLogQuery(since);
 
   const addrForUrl = normalizeAddressForUrl(contractAddress);
   const tryUrl = (addr: string) => {
