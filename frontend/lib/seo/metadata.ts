@@ -79,7 +79,11 @@ export function listingPriceLabel(price: string | null | undefined): string {
 export function listingMetaDescription(listing: SeoListing | null): string {
   const title = listing?.title?.trim() || "Listing";
   const price = listingPriceLabel(listing?.price);
-  const fallback = SEO_COPY.listingDescriptionFallback(title, price);
+  const fallback = SEO_COPY.listingDescriptionFallback(
+    title,
+    price,
+    listing?.requireEscrow === true,
+  );
   const body = (listing?.description || listing?.subtitle || "").replace(/\s+/g, " ").trim();
   if (!body) return fallback;
   return truncateMeta(body, META_DESCRIPTION_MAX);

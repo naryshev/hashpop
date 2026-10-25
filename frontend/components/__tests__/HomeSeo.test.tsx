@@ -15,7 +15,9 @@ describe("homepage SEO copy", () => {
     expect(HOMEPAGE_SEO.h1).not.toMatch(/escrow/i);
     expect(HOMEPAGE_SEO.description).not.toMatch(/escrow/i);
     expect(HOMEPAGE_SEO.websiteDescription).not.toMatch(/escrow/i);
-    expect(SEO_COPY.rootTitle).toBe("Hashpop — Reputation, chat & escrow on your wallet");
+    expect(SEO_COPY.rootTitle).toBe(
+      "Hashpop — Reputation, chat & protected payments on your wallet",
+    );
   });
 
   it("server-renders one h1, the section h2s, and the three links", () => {
