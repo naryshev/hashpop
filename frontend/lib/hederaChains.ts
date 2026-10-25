@@ -1,4 +1,5 @@
 import { defineChain } from "viem";
+import { ACTIVE_HEDERA_CHAIN_ID } from "./hederaNetwork";
 
 const hederaTestnet = defineChain({
   id: 296,
@@ -27,7 +28,4 @@ const hederaMainnet = defineChain({
 });
 
 /** Active Hedera chain: mainnet if NEXT_PUBLIC_HEDERA_NETWORK=mainnet, else testnet. */
-export const activeHederaChain =
-  typeof process !== "undefined" && process.env.NEXT_PUBLIC_HEDERA_NETWORK === "mainnet"
-    ? hederaMainnet
-    : hederaTestnet;
+export const activeHederaChain = ACTIVE_HEDERA_CHAIN_ID === 295 ? hederaMainnet : hederaTestnet;

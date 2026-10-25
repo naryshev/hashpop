@@ -36,6 +36,59 @@ export function shouldRetryHashConnectInit(error: unknown): boolean {
   return !isInitTimeoutError(error);
 }
 
+export type HashConnectBootstrapTiming = "now" | "idle" | "never";
+
+/**
+ * Signed-out visitors must not download or init HashConnect on page load.
+ * A framed HashPack dapp browser still inits immediately (pairing is the
+ * iframe postMessage channel). A saved session or live WalletConnect pairing
+ * restores after idle so returning users stay signed in.
+ */
+export function shouldBootstrapHashConnectOnLoad(options: {
+  framed: boolean;
+  hasSavedSession: boolean;
+  hasActivePairing: boolean;
+}): HashConnectBootstrapTiming {
+  if (options.framed) return "now";
+  if (options.hasSavedSession || options.hasActivePairing) return "idle";
+  return "never";
+}
+
+/** True when WalletConnect's pairing store still has a non-expired pairing. */
+export function pairingStoreHasActiveSession(
+  raw: string | null,
+  nowSec = Math.floor(Date.now() / 1000),
+): boolean {
+  if (!raw) return false;
+  try {
+    const parsed = JSON.parse(raw) as Array<{ active?: boolean; expiry?: number }>;
+    if (!Array.isArray(parsed)) return false;
+    return parsed.some((entry) => {
+      if (!entry || typeof entry !== "object") return false;
+      if (entry.active === false) return false;
+      if (typeof entry.expiry === "number" && entry.expiry <= nowSec) return false;
+      return true;
+    });
+  } catch {
+    return false;
+  }
+}
+
+/** Run after the browser is idle. Falls back to a short timeout. */
+export function scheduleIdle(task: () => void, timeoutMs = 2000): () => void {
+  if (typeof window === "undefined") return () => {};
+  const host = window as Window & {
+    requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+    cancelIdleCallback?: (id: number) => void;
+  };
+  if (typeof host.requestIdleCallback === "function") {
+    const id = host.requestIdleCallback(task, { timeout: timeoutMs });
+    return () => host.cancelIdleCallback?.(id);
+  }
+  const id = window.setTimeout(task, 1);
+  return () => window.clearTimeout(id);
+}
+
 export async function withTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number,

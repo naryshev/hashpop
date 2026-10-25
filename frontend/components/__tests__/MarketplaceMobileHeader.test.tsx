@@ -68,6 +68,18 @@ let root: Root | undefined;
 let host: HTMLElement | undefined;
 
 /** Sheet exit keeps the dialog mounted for ~220ms. Poll until AnimatePresence unmounts it. */
+async function waitForPresent(selector: string) {
+  const deadline = Date.now() + 2000;
+  while (!document.querySelector(selector)) {
+    if (Date.now() > deadline) {
+      throw new Error(`Timed out waiting for ${selector}`);
+    }
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+  }
+}
+
 async function waitForAbsent(selector: string) {
   const deadline = Date.now() + 1000;
   while (document.querySelector(selector)) {
@@ -307,6 +319,7 @@ describe("MarketplaceMobileHeader", () => {
     await act(async () => {
       sliders.click();
     });
+    await waitForPresent('[role="dialog"][aria-label="Sort"]');
     expect(document.querySelector('[role="dialog"][aria-label="Sort"]')).toBeTruthy();
     expect(document.querySelector('[role="dialog"][aria-label="Filters"]')).toBeNull();
     await act(async () => {
@@ -320,6 +333,7 @@ describe("MarketplaceMobileHeader", () => {
     await act(async () => {
       filterButton.click();
     });
+    await waitForPresent('[role="dialog"][aria-label="Filters"]');
     const filtersDialog = document.querySelector(
       '[role="dialog"][aria-label="Filters"]',
     ) as HTMLElement;

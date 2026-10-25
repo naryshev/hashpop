@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { QRCodeSVG } from "qrcode.react";
 import { X } from "lucide-react";
 
 const SEEN_KEY = "hashpop.pwaPromptSeen";
@@ -20,8 +19,20 @@ type BeforeInstallPromptEvent = Event & {
  */
 export function PwaInstallPrompt() {
   const [open, setOpen] = useState(false);
+  const [QRCodeSVG, setQRCodeSVG] = useState<typeof import("qrcode.react").QRCodeSVG | null>(null);
   const [origin, setOrigin] = useState("https://hashpop.io");
   const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
+
+  useEffect(() => {
+    if (!open || QRCodeSVG) return;
+    let cancelled = false;
+    void import("qrcode.react").then((mod) => {
+      if (!cancelled) setQRCodeSVG(() => mod.QRCodeSVG);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, QRCodeSVG]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -131,19 +142,21 @@ export function PwaInstallPrompt() {
         <div className="flex flex-col items-center justify-center gap-4 bg-[linear-gradient(160deg,#0b3b8f,#0b69d4)] p-8 text-center">
           <p className="text-sm font-semibold text-white/90">Scan with your phone&apos;s camera</p>
           <div className="rounded-2xl bg-white p-3 shadow-lg">
-            <QRCodeSVG
-              value={origin}
-              size={168}
-              bgColor="#ffffff"
-              fgColor="#0b111b"
-              level="M"
-              imageSettings={{
-                src: "/hashpop-cart-3d.PNG",
-                height: 32,
-                width: 32,
-                excavate: true,
-              }}
-            />
+            {QRCodeSVG ? (
+              <QRCodeSVG
+                value={origin}
+                size={168}
+                bgColor="#ffffff"
+                fgColor="#0b111b"
+                level="M"
+                imageSettings={{
+                  src: "/hashpop-cart-3d.PNG",
+                  height: 32,
+                  width: 32,
+                  excavate: true,
+                }}
+              />
+            ) : null}
           </div>
           <p className="max-w-[200px] text-xs text-white/80">
             Open the link, then tap{" "}

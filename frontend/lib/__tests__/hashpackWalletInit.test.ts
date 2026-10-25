@@ -6,6 +6,8 @@ import {
   bootstrapHashConnect,
   getWalletConnectProjectId,
   isInitTimeoutError,
+  pairingStoreHasActiveSession,
+  shouldBootstrapHashConnectOnLoad,
   shouldRetryHashConnectInit,
   withTimeout,
 } from "../hashpackWalletInit";
@@ -86,6 +88,61 @@ describe("init failure policy", () => {
 
   it("exposes an actionable missing-project-id message", () => {
     expect(MISSING_WC_PROJECT_ID_MESSAGE).toMatch(/NEXT_PUBLIC_WC_PROJECT_ID/);
+  });
+});
+
+describe("shouldBootstrapHashConnectOnLoad", () => {
+  it("does not init HashConnect for a signed-out visitor", () => {
+    expect(
+      shouldBootstrapHashConnectOnLoad({
+        framed: false,
+        hasSavedSession: false,
+        hasActivePairing: false,
+      }),
+    ).toBe("never");
+  });
+
+  it("restores a saved session or pairing after idle", () => {
+    expect(
+      shouldBootstrapHashConnectOnLoad({
+        framed: false,
+        hasSavedSession: true,
+        hasActivePairing: false,
+      }),
+    ).toBe("idle");
+    expect(
+      shouldBootstrapHashConnectOnLoad({
+        framed: false,
+        hasSavedSession: false,
+        hasActivePairing: true,
+      }),
+    ).toBe("idle");
+  });
+
+  it("inits immediately inside the HashPack dapp browser", () => {
+    expect(
+      shouldBootstrapHashConnectOnLoad({
+        framed: true,
+        hasSavedSession: false,
+        hasActivePairing: false,
+      }),
+    ).toBe("now");
+  });
+});
+
+describe("pairingStoreHasActiveSession", () => {
+  it("ignores empty, expired, and inactive pairings", () => {
+    expect(pairingStoreHasActiveSession(null)).toBe(false);
+    expect(pairingStoreHasActiveSession("not-json")).toBe(false);
+    expect(
+      pairingStoreHasActiveSession(JSON.stringify([{ active: false, expiry: 9_999 }]), 100),
+    ).toBe(false);
+    expect(pairingStoreHasActiveSession(JSON.stringify([{ active: true, expiry: 50 }]), 100)).toBe(
+      false,
+    );
+    expect(pairingStoreHasActiveSession(JSON.stringify([{ active: true, expiry: 500 }]), 100)).toBe(
+      true,
+    );
   });
 });
 

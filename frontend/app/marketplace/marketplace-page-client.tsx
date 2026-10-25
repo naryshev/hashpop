@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Fuse from "fuse.js";
 import { ListingCard } from "../../components/ListingCard";
 import { parseHbarAmount } from "../../lib/formatPrice";
 import { canonicalizeCategory, CATEGORY_GROUPS } from "../../lib/categories";
@@ -132,6 +131,8 @@ export default function MarketplacePageClient({
   const [items, setItems] = useState<ListingItem[]>(initialItems);
   const [listingsError, setListingsError] = useState(initialError);
   const [retrying, setRetrying] = useState(false);
+  // fuse.js is only the fuzzy fallback. Keep it out of the default first load.
+  const [FuseCtor, setFuseCtor] = useState<typeof import("fuse.js").default | null>(null);
 
   const reloadListings = async (isCancelled?: () => boolean) => {
     setRetrying(true);
@@ -177,6 +178,18 @@ export default function MarketplacePageClient({
     window.dispatchEvent(new Event("hashpop:ready"));
   }, []);
 
+  const fuzzyNeeded = Boolean(query || categoryQuery);
+  useEffect(() => {
+    if (!fuzzyNeeded || FuseCtor) return;
+    let cancelled = false;
+    void import("fuse.js").then((mod) => {
+      if (!cancelled) setFuseCtor(() => mod.default);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [fuzzyNeeded, FuseCtor]);
+
   const filteredItems = useMemo(() => {
     // Listing type (all / physical / digital) narrows before category/query.
     let typeMatched = items;
@@ -194,8 +207,8 @@ export default function MarketplacePageClient({
       );
       if (strict.length > 0) {
         categoryMatched = strict;
-      } else {
-        const catFuse = new Fuse(typeMatched, {
+      } else if (FuseCtor) {
+        const catFuse = new FuseCtor(typeMatched, {
           includeScore: true,
           threshold: 0.3,
           ignoreLocation: true,
@@ -218,19 +231,21 @@ export default function MarketplacePageClient({
         queryMatched = substringHits;
       } else {
         // Tight fuzzy fallback (threshold 0.2 ≈ only near-exact matches)
-        const fuse = new Fuse(categoryMatched, {
-          includeScore: true,
-          threshold: 0.2,
-          minMatchCharLength: 3,
-          ignoreLocation: true,
-          keys: [
-            { name: "title", weight: 0.55 },
-            { name: "subtitle", weight: 0.15 },
-            { name: "description", weight: 0.2 },
-            { name: "category", weight: 0.1 },
-          ],
-        });
-        queryMatched = fuse.search(query).map((r) => r.item);
+        if (FuseCtor) {
+          const fuse = new FuseCtor(categoryMatched, {
+            includeScore: true,
+            threshold: 0.2,
+            minMatchCharLength: 3,
+            ignoreLocation: true,
+            keys: [
+              { name: "title", weight: 0.55 },
+              { name: "subtitle", weight: 0.15 },
+              { name: "description", weight: 0.2 },
+              { name: "category", weight: 0.1 },
+            ],
+          });
+          queryMatched = fuse.search(query).map((r) => r.item);
+        }
       }
     }
 
@@ -283,6 +298,7 @@ export default function MarketplacePageClient({
     postedWithinQuery,
     conditionQuery,
     sortMode,
+    FuseCtor,
   ]);
 
   const submitSearch = (e: React.FormEvent) => {
@@ -520,12 +536,13 @@ export default function MarketplacePageClient({
               <>
                 {/* Mobile 2-up: 12px page margins, 8px gutter. Desktop is the same soft-trust grid. */}
                 <div data-testid="listing-grid" className="grid grid-cols-2 gap-2 md:hidden">
-                  {filteredItems.map((item) => (
+                  {filteredItems.map((item, index) => (
                     <ListingCard
                       key={`${item.itemType}-${item.id}`}
                       item={item}
                       density="compact"
                       variant="softTrust"
+                      priority={index === 0}
                     />
                   ))}
                 </div>

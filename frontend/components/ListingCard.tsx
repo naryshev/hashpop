@@ -195,9 +195,11 @@ function TrustChipRow({ chips, compact }: { chips: GridTrustChip[]; compact: boo
 function SoftTrustCard({
   item,
   density,
+  priority = false,
 }: {
   item: ListingCardItem;
   density: "compact" | "regular" | "nearby";
+  priority?: boolean;
 }) {
   const nearby = density === "nearby";
   const compact = density === "compact";
@@ -232,7 +234,7 @@ function SoftTrustCard({
             data-media="nearby"
             className="relative h-full w-[88px] shrink-0 overflow-hidden bg-[#0b111b]"
           >
-            <ListingMedia listing={item} bleed />
+            <ListingMedia listing={item} bleed priority={priority} sizes="88px" />
           </div>
           <div className="flex min-w-0 flex-1 flex-col justify-center px-2.5 py-1.5">
             <div className="flex items-start gap-1">
@@ -293,7 +295,13 @@ function SoftTrustCard({
             data-media="grid"
             className="relative aspect-[4/3] overflow-hidden rounded-[14px] bg-[#0b111b]"
           >
-            <ListingMedia listing={item} bleed slideshow={compact ? undefined : "hover"} />
+            <ListingMedia
+              listing={item}
+              bleed
+              priority={priority}
+              sizes="(max-width: 768px) 46vw, (max-width: 1280px) 30vw, 320px"
+              slideshow={compact ? undefined : "hover"}
+            />
           </div>
         </div>
         <div
@@ -359,13 +367,16 @@ export function ListingCard({
   item,
   density = "regular",
   variant = "glass",
+  priority = false,
 }: {
   item: ListingCardItem;
   density?: "compact" | "regular" | "nearby";
   variant?: ListingCardVariant;
+  /** Mark the route's LCP photo. Only the first visible card should set this. */
+  priority?: boolean;
 }) {
   if (variant === "softTrust" || variant === "mediaTrust") {
-    return <SoftTrustCard item={item} density={density} />;
+    return <SoftTrustCard item={item} density={density} priority={priority} />;
   }
 
   const compact = density === "compact";
