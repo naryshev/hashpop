@@ -7,11 +7,14 @@ import { HOMEPAGE_SEO } from "../../lib/seo/homepage";
 import { SEO_COPY } from "../../lib/seo/copy";
 
 describe("homepage SEO copy", () => {
-  it("keeps escrow in the shared title and H1", () => {
-    expect(HOMEPAGE_SEO.title).toBe("Hashpop – P2P Marketplace on Hedera | HBAR Escrow");
-    expect(HOMEPAGE_SEO.h1).toBe("Buy and sell real stuff on Hedera, with HBAR escrow");
-    expect(HOMEPAGE_SEO.title).toContain("Escrow");
-    expect(HOMEPAGE_SEO.h1).toContain("escrow");
+  it("uses protected payments in the shared title, H1, and description", () => {
+    expect(HOMEPAGE_SEO.title).toBe("Hashpop – P2P Hedera Marketplace | Protected HBAR Payments");
+    expect(HOMEPAGE_SEO.h1).toBe("Buy and sell real stuff on Hedera, with protected HBAR payments");
+    expect(HOMEPAGE_SEO.title.length).toBeLessThanOrEqual(60);
+    expect(HOMEPAGE_SEO.title).not.toMatch(/escrow/i);
+    expect(HOMEPAGE_SEO.h1).not.toMatch(/escrow/i);
+    expect(HOMEPAGE_SEO.description).not.toMatch(/escrow/i);
+    expect(HOMEPAGE_SEO.websiteDescription).not.toMatch(/escrow/i);
     expect(SEO_COPY.rootTitle).toBe("Hashpop — Reputation, chat & escrow on your wallet");
   });
 
@@ -23,8 +26,10 @@ describe("homepage SEO copy", () => {
     expect(html.match(/<h2[\s>]/g)).toHaveLength(4);
     expect(html).toContain(">About Hashpop</h2>");
     expect(html).toContain(HOMEPAGE_SEO.h1);
-    expect(html).toContain("Reputation. Chat. Escrow. On your wallet.");
-    expect(html).toContain("How HBAR escrow works");
+    expect(html).toContain("Reputation. Chat. Protected payments. On your wallet.");
+    expect(html).toContain("How protected HBAR payments work");
+    expect(html).toContain("If the listing offers protected payments:");
+    expect(html).not.toMatch(/escrow/i);
     expect(html).toContain("Get started");
     expect(html).toContain('href="/marketplace"');
     expect(html).toContain('href="/categories"');

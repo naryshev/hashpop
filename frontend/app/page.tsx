@@ -3,13 +3,33 @@ import type { Metadata } from "next";
 import { HomeAbout, HomeIntro } from "../components/home/HomeSeo";
 import { loadInitialMarketplaceListings } from "../lib/loadMarketplaceListings";
 import { HOMEPAGE_SEO } from "../lib/seo/homepage";
+import { socialImages } from "../lib/seo/metadata";
 import MarketplacePageClient from "./marketplace/marketplace-page-client";
 
-// Title only. Description, Open Graph, and Twitter stay on the root layout.
+// Homepage title, description, and social cards. Other routes keep SEO_COPY.
 // Next 14 rewrites alternates.canonical "/" to https://hashpop.io (no slash)
 // because the pathname is "/". The link below is the homepage canonical.
+const images = socialImages();
+
 export const metadata: Metadata = {
   title: { absolute: HOMEPAGE_SEO.title },
+  description: HOMEPAGE_SEO.description,
+  openGraph: {
+    type: "website",
+    siteName: "Hashpop",
+    title: HOMEPAGE_SEO.title,
+    description: HOMEPAGE_SEO.description,
+    url: "https://hashpop.io/",
+    images: images.openGraph,
+  },
+  twitter: {
+    card: "summary_large_image",
+    site: "@hashpop",
+    creator: "@hashpop",
+    title: HOMEPAGE_SEO.title,
+    description: HOMEPAGE_SEO.description,
+    images: images.twitter,
+  },
 };
 
 export const dynamic = "force-dynamic";

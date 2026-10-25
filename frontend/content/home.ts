@@ -7,7 +7,7 @@
 import { HOMEPAGE_SEO } from "../lib/seo/homepage";
 
 export const HOME_LEDE =
-  "Hashpop is a peer-to-peer marketplace for physical goods, built on Hedera. Sign in with your wallet, chat with the other side, and let on-chain HBAR escrow hold the money until the deal is done. No blind trust, and no platform holding your funds or your identity.";
+  "Hashpop is a peer-to-peer marketplace for physical goods, built on Hedera. Sign in with your wallet, chat with the other side, and, when the seller offers it, lock the money in a protected on-chain HBAR payment until the deal is done. No blind trust, and no platform holding your funds or your identity.";
 
 export const HOME_SECTION_LABEL = "About Hashpop";
 
@@ -31,7 +31,7 @@ export type HomeSection = {
 export const HOME_SECTIONS: HomeSection[] = [
   {
     id: "reputation",
-    title: "Reputation. Chat. Escrow. On your wallet.",
+    title: "Reputation. Chat. Protected payments. On your wallet.",
     paragraphs: [
       [
         {
@@ -43,7 +43,7 @@ export const HOME_SECTIONS: HomeSection[] = [
   },
   {
     id: "escrow",
-    title: "How HBAR escrow works",
+    title: "How protected HBAR payments work",
     steps: [
       [
         { kind: "strong", text: "Make an offer or buy." },
@@ -52,10 +52,10 @@ export const HOME_SECTIONS: HomeSection[] = [
         { kind: "text", text: " and pay in HBAR." },
       ],
       [
-        { kind: "strong", text: "Funds lock in escrow." },
+        { kind: "strong", text: "If the listing offers protected payments:" },
         {
           kind: "text",
-          text: " Your HBAR sits in an on-chain escrow contract. The seller can see it's there, but neither side can touch it.",
+          text: " Your HBAR sits in an on-chain contract. The seller can see it's there, but neither side can touch it.",
         },
       ],
       [
@@ -69,7 +69,7 @@ export const HOME_SECTIONS: HomeSection[] = [
         { kind: "strong", text: "Confirm and release." },
         {
           kind: "text",
-          text: " Once you have the item, escrow releases the HBAR to the seller and both sides leave a review.",
+          text: " Once you have the item, the protected payment releases the HBAR to the seller and both sides leave a review.",
         },
       ],
     ],
@@ -86,7 +86,7 @@ export const HOME_SECTIONS: HomeSection[] = [
         { kind: "link", href: "/categories", text: "category" },
         {
           kind: "text",
-          text: ", and message a seller about anything you like. Selling is just as quick: snap a few photos, set a price in HBAR and publish. Questions about wallets, escrow or disputes? The ",
+          text: ", and message a seller about anything you like. Selling is just as quick: snap a few photos, set a price in HBAR and publish. Questions about wallets, protected payments or disputes? The ",
         },
         { kind: "link", href: "/help", text: "help center" },
         { kind: "text", text: " has the answers." },
@@ -96,7 +96,7 @@ export const HOME_SECTIONS: HomeSection[] = [
         { kind: "link", href: "/marketplace", text: "Nearby" },
         {
           kind: "text",
-          text: " to find listings on a map and meet up with escrow already locked. Selling? Your listings, sales and reviews all live on your public profile, so every deal you close makes the next one easier.",
+          text: " to find listings on a map and meet up with a protected payment already locked when the listing offers one. Selling? Your listings, sales and reviews all live on your public profile, so every deal you close makes the next one easier.",
         },
       ],
     ],

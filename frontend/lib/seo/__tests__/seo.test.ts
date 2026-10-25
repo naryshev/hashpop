@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SEO_COPY } from "../copy";
+import { HOMEPAGE_SEO } from "../homepage";
 import { apexRedirectUrl, isNoIndexPath } from "../host";
 import { listingOfferPriceLabel } from "../../hbarUsd";
 import {
@@ -381,13 +382,13 @@ describe("site JSON-LD", () => {
       name: "Hashpop",
       url: "https://hashpop.io",
       logo: ORGANIZATION_LOGO_URL,
-      description: SEO_COPY.rootDescription,
+      description: HOMEPAGE_SEO.description,
     });
     expect(ORGANIZATION_LOGO_URL).toBe("https://hashpop.io/hashpop-cart-3d.PNG");
     expect(data["@graph"][1]).toMatchObject({
       name: "Hashpop",
       url: WEBSITE_URL,
-      description: SEO_COPY.marketplaceDescription,
+      description: HOMEPAGE_SEO.websiteDescription,
     });
     expect(WEBSITE_URL).toBe("https://hashpop.io/");
     expect(data["@graph"][1].potentialAction).toEqual({
@@ -400,6 +401,7 @@ describe("site JSON-LD", () => {
     });
     expect(SEARCH_URL_TEMPLATE).toBe("https://hashpop.io/marketplace?q={search_term_string}");
     expect(data["@graph"].some((node) => node["@type"] === "Product")).toBe(false);
+    expect(JSON.stringify(data)).not.toMatch(/escrow/i);
   });
 });
 
