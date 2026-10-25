@@ -86,7 +86,7 @@ describe("about copy", () => {
       `Sellers can offer ${BRAND.escrowTerm}, which hold the funds in an on-chain contract.`,
     );
     expect(userFacingAboutCopy()).not.toMatch(/\bescrow\b/i);
-    expect(userFacingAboutCopy()).not.toContain("Look for the");
+    expect(userFacingAboutCopy()).toContain("Look for the Protected badge before you pay.");
   });
 
   it("hides only unconfirmed sentences, and keeps the surrounding answers", () => {
@@ -155,6 +155,7 @@ describe("about FAQPage JSON-LD", () => {
     );
     const json = JSON.stringify(data);
     expect(json).toContain(FEE_SENTENCE);
+    expect(json).toContain("Look for the Protected badge before you pay.");
     for (const fact of ABOUT_UNCONFIRMED) {
       if (fact.confirmed) continue;
       expect(json).not.toContain(fact.text);

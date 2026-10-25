@@ -86,7 +86,7 @@ const ABOUT_FAQS: { question: string; answer: AboutSpan[] }[] = [
     answer: [
       {
         type: "text",
-        text: "Paying a stranger directly in crypto is risky, and consumer guides are right to warn about it: once it's sent, it's gone. Hashpop changes the order. On listings with {ESCROW}, your HBAR goes into an on-chain contract first; the seller can see it's there, and it only releases when you confirm you got the item. You can also check the seller's completed deals and reviews before you pay. No marketplace can promise zero risk, so start small with new trading partners and read our ",
+        text: "Paying a stranger directly in crypto is risky, and consumer guides are right to warn about it: once it's sent, it's gone. Hashpop changes the order. On listings with {ESCROW}, your HBAR goes into an on-chain contract first; the seller can see it's there, and it only releases when you confirm you got the item. Look for the Protected badge before you pay. You can also check the seller's completed deals and reviews before you pay. No marketplace can promise zero risk, so start small with new trading partners and read our ",
       },
       { type: "link", href: "/help", text: "help center" },
       { type: "text", text: " if anything feels off." },

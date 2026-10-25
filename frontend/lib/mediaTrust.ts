@@ -5,7 +5,7 @@
  * (`successfulCompletions`, `totalSales`) plus the listing's fulfillment
  * flags. KYC, deal counts, and stars are never grid chips.
  *
- * Order: completion % → Meetup → Escrow. Omit what does not apply.
+ * Order: completion % → Meetup → Protected. Omit what does not apply.
  * Pending/Sold and an in-flight profile omit the whole row (no flicker).
  */
 
@@ -33,7 +33,7 @@ export type GridTrustInput = {
   requireEscrow?: boolean | null;
   /**
    * Explicit meetup capability. With `requireEscrow === true`, both
-   * Meetup and Escrow show (meetup-with-contract).
+   * Meetup and Protected show (meetup-with-contract).
    */
   meetup?: boolean | null;
   successfulCompletions?: number | null;
@@ -83,6 +83,6 @@ export function gridTrustChips(input: GridTrustInput): GridTrustChip[] {
   const meetup = input.meetup === true || input.requireEscrow === false;
   const escrow = input.requireEscrow === true;
   if (meetup) chips.push({ kind: "meetup", label: "Meetup", tone: "silver" });
-  if (escrow) chips.push({ kind: "escrow", label: "Escrow", tone: "silver" });
+  if (escrow) chips.push({ kind: "escrow", label: "Protected", tone: "silver" });
   return chips;
 }

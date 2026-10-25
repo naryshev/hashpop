@@ -213,7 +213,8 @@ describe("ListingCard softTrust", () => {
       },
     });
     const chips = [...document.querySelectorAll<HTMLElement>('[data-testid="grid-trust-chip"]')];
-    expect(chips.map((chip) => chip.textContent)).toEqual(["98%", "Meetup", "Escrow"]);
+    expect(chips.map((chip) => chip.textContent)).toEqual(["98%", "Meetup", "Protected"]);
+    expect(chips[2]?.getAttribute("aria-label")).toBe("Protected");
     expect(chips.every((chip) => !chip.hidden)).toBe(true);
     const distance = document.querySelector('[data-testid="listing-distance"]') as HTMLElement;
     expect(distance.className).toContain("text-white/70");
@@ -241,7 +242,7 @@ describe("ListingCard softTrust", () => {
         }
         if (this.dataset.testid === "grid-trust-chip") {
           const label = this.textContent ?? "";
-          const right = label.includes("Escrow") ? 180 : label.includes("Meetup") ? 90 : 36;
+          const right = label.includes("Protected") ? 180 : label.includes("Meetup") ? 90 : 36;
           return {
             x: 0,
             y: 0,
@@ -282,7 +283,7 @@ describe("ListingCard softTrust", () => {
       });
       const chips = [...document.querySelectorAll('[data-testid="grid-trust-chip"]')];
       expect(chips.map((chip) => chip.textContent)).toEqual(["98%", "Meetup"]);
-      expect(document.body.textContent).not.toContain("Escrow");
+      expect(document.body.textContent).not.toContain("Protected");
       const row = document.querySelector('[data-testid="trust-chip-row"]') as HTMLElement;
       expect(row.className).not.toContain("overflow-hidden");
     } finally {
@@ -290,7 +291,7 @@ describe("ListingCard softTrust", () => {
     }
   });
 
-  it("shows completion, Meetup, and Escrow together on the desktop card", async () => {
+  it("shows completion, Meetup, and Protected together on the desktop card", async () => {
     loadedProfile(49, 50);
     await renderCard({
       variant: "softTrust",
@@ -315,7 +316,8 @@ describe("ListingCard softTrust", () => {
     expect(price.className).toContain("text-[15px]");
     expect(price.className).toContain("text-chrome");
     const chips = [...document.querySelectorAll('[data-testid="grid-trust-chip"]')];
-    expect(chips.map((chip) => chip.textContent)).toEqual(["98%", "Meetup", "Escrow"]);
+    expect(chips.map((chip) => chip.textContent)).toEqual(["98%", "Meetup", "Protected"]);
+    expect((chips[2] as HTMLElement).getAttribute("aria-label")).toBe("Protected");
     expect(chips.every((chip) => chip.querySelector("svg"))).toBe(true);
     const row = document.querySelector('[data-testid="trust-chip-row"]') as HTMLElement;
     expect(row.className).toContain("flex-nowrap");
@@ -370,7 +372,7 @@ describe("ListingCard softTrust", () => {
     );
   });
 
-  it("keeps a low completion percent on silver glass and still shows Escrow", async () => {
+  it("keeps a low completion percent on silver glass and still shows Protected", async () => {
     loadedProfile(8, 10);
     await renderCard({
       variant: "softTrust",
@@ -384,7 +386,8 @@ describe("ListingCard softTrust", () => {
       },
     });
     const chips = [...document.querySelectorAll('[data-testid="grid-trust-chip"]')];
-    expect(chips.map((chip) => chip.textContent)).toEqual(["80%", "Escrow"]);
+    expect(chips.map((chip) => chip.textContent)).toEqual(["80%", "Protected"]);
+    expect((chips[1] as HTMLElement).getAttribute("aria-label")).toBe("Protected");
     expect((chips[0] as HTMLElement).className).toContain("text-silver");
     expect((chips[0] as HTMLElement).className).not.toContain("text-chrome");
     expect((chips[0] as HTMLElement).className).not.toContain("bg-[#00ffa3]/10");
