@@ -8,6 +8,7 @@ import { decodeEvents } from "../indexer/decoder";
 import { saveUpload } from "../storage";
 import { decryptJson, encryptJson, secretBoxConfigured } from "../lib/secretBox";
 import { listingVariantsForDb } from "../listingVariants";
+import { trimmedOrNull } from "../listingText";
 import { authenticateAdmin, isAdminAddress, listAdminIdentities } from "../adminAuth";
 import {
   adminListingsWhere,
@@ -571,8 +572,8 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           : [];
     const titleStr = typeof title === "string" && title.trim() ? title.trim() : null;
     const subtitleStr = typeof subtitle === "string" && subtitle.trim() ? subtitle.trim() : null;
-    const descriptionStr =
-      typeof description === "string" && description.trim() ? description.trim() : null;
+    // Present whitespace-only copy is stored as null. An omitted field is left unchanged.
+    const descriptionWrite = description === undefined ? undefined : trimmedOrNull(description);
     const categoryStr = typeof category === "string" && category.trim() ? category.trim() : null;
     const conditionStr =
       typeof condition === "string" && condition.trim() ? condition.trim() : null;
@@ -619,7 +620,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         ...(mediaList.length > 0 && { mediaUrls: mediaList }),
         ...(titleStr != null && { title: titleStr }),
         ...(subtitleStr != null && { subtitle: subtitleStr }),
-        ...(descriptionStr != null && { description: descriptionStr }),
+        ...(descriptionWrite !== undefined && { description: descriptionWrite }),
         ...(categoryStr != null && { category: categoryStr }),
         ...(conditionStr != null && { condition: conditionStr }),
         ...(yearStr != null && { yearOfProduction: yearStr }),
@@ -639,7 +640,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         ...(mediaList.length > 0 && { mediaUrls: mediaList }),
         ...(titleStr != null && { title: titleStr }),
         ...(subtitleStr != null && { subtitle: subtitleStr }),
-        ...(descriptionStr != null && { description: descriptionStr }),
+        ...(descriptionWrite !== undefined && { description: descriptionWrite }),
         ...(categoryStr != null && { category: categoryStr }),
         ...(conditionStr != null && { condition: conditionStr }),
         ...(yearStr != null && { yearOfProduction: yearStr }),
@@ -752,7 +753,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           ...(mediaList.length > 0 && { mediaUrls: mediaList }),
           ...(titleStr != null && { title: titleStr }),
           ...(subtitleStr != null && { subtitle: subtitleStr }),
-          ...(descriptionStr != null && { description: descriptionStr }),
+          ...(descriptionWrite !== undefined && { description: descriptionWrite }),
           ...(categoryStr != null && { category: categoryStr }),
           ...(conditionStr != null && { condition: conditionStr }),
           ...(yearStr != null && { yearOfProduction: yearStr }),
@@ -772,7 +773,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           ...(mediaList.length > 0 && { mediaUrls: mediaList }),
           ...(titleStr != null && { title: titleStr }),
           ...(subtitleStr != null && { subtitle: subtitleStr }),
-          ...(descriptionStr != null && { description: descriptionStr }),
+          ...(descriptionWrite !== undefined && { description: descriptionWrite }),
           ...(categoryStr != null && { category: categoryStr }),
           ...(conditionStr != null && { condition: conditionStr }),
           ...(yearStr != null && { yearOfProduction: yearStr }),
@@ -1856,9 +1857,9 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         locationLng?: number | null;
         variants?: ReturnType<typeof listingVariantsForDb>;
       } = {};
-      if (title !== undefined) update.title = title === "" ? null : title;
+      if (title !== undefined) update.title = trimmedOrNull(title);
       if (subtitle !== undefined) update.subtitle = subtitle === "" ? null : subtitle;
-      if (description !== undefined) update.description = description === "" ? null : description;
+      if (description !== undefined) update.description = trimmedOrNull(description);
       if (category !== undefined) update.category = category === "" ? null : category;
       if (condition !== undefined) update.condition = condition === "" ? null : condition;
       if (yearOfProduction !== undefined)
