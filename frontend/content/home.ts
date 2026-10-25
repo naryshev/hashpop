@@ -7,7 +7,7 @@
 import { HOMEPAGE_SEO } from "../lib/seo/homepage";
 
 export const HOME_LEDE =
-  "Hashpop is a peer-to-peer marketplace for physical goods, built on Hedera. Sign in with your wallet, chat with the other side, and, when the seller offers it, lock the money in on-chain HBAR escrow until the deal is done. No blind trust, and no platform holding your funds or your identity.";
+  "Hashpop is a peer-to-peer marketplace for physical goods, built on Hedera. Sign in with your wallet, chat with the other side, and, when the seller offers it, lock the money in a protected on-chain HBAR payment until the deal is done. No blind trust, and no platform holding your funds or your identity.";
 
 export const HOME_SECTION_LABEL = "About Hashpop";
 
@@ -43,19 +43,19 @@ export const HOME_SECTIONS: HomeSection[] = [
   },
   {
     id: "escrow",
-    title: "How HBAR escrow works",
+    title: "How protected HBAR payments work",
     steps: [
       [
         { kind: "strong", text: "Make an offer or buy." },
         { kind: "text", text: " Pick something in the " },
         { kind: "link", href: "/marketplace", text: "marketplace" },
-        { kind: "text", text: " and pay in HBAR. If the listing offers escrow:" },
+        { kind: "text", text: " and pay in HBAR. If the listing offers protected payments:" },
       ],
       [
-        { kind: "strong", text: "Funds lock in escrow." },
+        { kind: "strong", text: "Funds lock in an on-chain contract." },
         {
           kind: "text",
-          text: " Your HBAR sits in an on-chain escrow contract. The seller can see it's there, but neither side can touch it.",
+          text: " The seller can see the HBAR is there, but neither side can touch it.",
         },
       ],
       [
@@ -69,7 +69,7 @@ export const HOME_SECTIONS: HomeSection[] = [
         { kind: "strong", text: "Confirm and release." },
         {
           kind: "text",
-          text: " Once you have the item, escrow releases the HBAR to the seller and both sides leave a review.",
+          text: " Once you have the item, the protected payment releases the HBAR to the seller and both sides leave a review.",
         },
       ],
     ],
