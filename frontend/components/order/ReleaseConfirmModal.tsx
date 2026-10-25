@@ -42,7 +42,7 @@ export function ReleaseConfirmModal({
       }
     >
       <p className="text-[13px] leading-relaxed text-muted">
-        This pays the seller from the protected payment and closes the trade on-chain.{" "}
+        This releases the held payment to the seller and closes the trade on-chain.{" "}
         <strong className="text-fg">It cannot be undone.</strong> Only release after you&apos;ve
         received and inspected the item.
       </p>
