@@ -78,7 +78,8 @@ const feeFact = ABOUT_UNCONFIRMED[2];
 
 /**
  * /how-it-works, /sell, and /listing/create are not routes on main.
- * The deal answer links to /help. The sell sentence stays plain text.
+ * The deal answer links to /help. The sell sentence links to the
+ * Selling & shipping section on /help (#selling).
  */
 const ABOUT_FAQS: { question: string; answer: AboutSpan[] }[] = [
   {
@@ -133,7 +134,7 @@ const ABOUT_FAQS: { question: string; answer: AboutSpan[] }[] = [
       },
       {
         type: "text",
-        text: "Every transaction also pays a small Hedera network fee, which is usually a fraction of a cent. USD values shown on Hashpop are approximate, based on the current HBAR price; all payments are made in HBAR.",
+        text: "Every transaction pays a small Hedera network fee, which is usually a fraction of a cent. USD values shown on Hashpop are approximate, based on the current HBAR price; all payments are made in HBAR.",
       },
     ],
   },
@@ -153,8 +154,10 @@ const ABOUT_FAQS: { question: string; answer: AboutSpan[] }[] = [
     answer: [
       {
         type: "text",
-        text: "Yes. Connect your wallet, snap a few photos, write an honest description and set a price in HBAR. On a direct sale you are paid when the buyer pays. When you offer {ESCROW}, you are paid when the buyer confirms. See Selling on Hashpop for what you can and can't list.",
+        text: "Yes. Connect your wallet, snap a few photos, write an honest description and set a price in HBAR. On a direct sale you are paid when the buyer pays. When you offer {ESCROW}, you are paid when the buyer confirms. See ",
       },
+      { type: "link", href: "/help#selling", text: "Selling on Hashpop" },
+      { type: "text", text: " for what you can and can't list." },
     ],
   },
   {

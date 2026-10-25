@@ -87,6 +87,22 @@ describe("about copy", () => {
     );
     expect(userFacingAboutCopy()).not.toMatch(/\bescrow\b/i);
     expect(userFacingAboutCopy()).toContain("Look for the Protected badge before you pay.");
+    expect(ABOUT_PAGE.why[1]).toContain("can wait");
+    expect(ABOUT_PAGE.why[1]).toContain("you can have a contract");
+    expect(ABOUT_PAGE.pillars[0]?.body).not.toMatch(/protected payments/i);
+    expect(ABOUT_PAGE.pillars[3]?.body).toContain("When a listing offers protected payments");
+    const faqs = publishedAboutFaqs();
+    const answer = (question: string) =>
+      faqs.find((faq) => faq.question === question)?.answerText ?? "";
+    expect(answer("Is it safe to pay for things in crypto?")).toContain(
+      "On listings with protected payments",
+    );
+    expect(answer("Who holds my money while a deal is open, and what if it goes wrong?")).toContain(
+      "When a listing offers protected payments",
+    );
+    expect(answer("How do local meetups work?")).toContain(
+      "if the listing offers protected payments",
+    );
   });
 
   it("hides only unconfirmed sentences, and keeps the surrounding answers", () => {
@@ -122,8 +138,9 @@ describe("about copy", () => {
       "A Hedera wallet. We support HashPack, the most popular one: install it, add a little HBAR, and connect. There are no passwords to create, and your wallet address is your account.",
     );
     expect(byQuestion["What does it cost?"]).toBe(
-      `${FEE_SENTENCE} Every transaction also pays a small Hedera network fee, which is usually a fraction of a cent. USD values shown on Hashpop are approximate, based on the current HBAR price; all payments are made in HBAR.`,
+      `${FEE_SENTENCE} Every transaction pays a small Hedera network fee, which is usually a fraction of a cent. USD values shown on Hashpop are approximate, based on the current HBAR price; all payments are made in HBAR.`,
     );
+    expect(byQuestion["What does it cost?"]).not.toContain(" also ");
 
     const published = JSON.stringify(faqs);
     for (const fact of hidden) {
@@ -134,6 +151,10 @@ describe("about copy", () => {
   it("points the deal FAQ at /help because /how-it-works is not a route", () => {
     const deal = publishedAboutFaqs().find((faq) => faq.question.startsWith("Who holds my money"));
     expect(deal?.links).toEqual([{ href: "/help", text: "How it works" }]);
+    const sell = publishedAboutFaqs().find((faq) =>
+      faq.question.startsWith("Can I sell items for crypto"),
+    );
+    expect(sell?.links).toEqual([{ href: "/help#selling", text: "Selling on Hashpop" }]);
     expect(JSON.stringify(publishedAboutFaqs())).not.toContain("/how-it-works");
     expect(JSON.stringify(publishedAboutFaqs())).not.toContain("/sell");
     expect(JSON.stringify(publishedAboutFaqs())).not.toContain("/listing/create");

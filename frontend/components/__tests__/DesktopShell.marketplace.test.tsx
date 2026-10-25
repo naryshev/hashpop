@@ -101,6 +101,7 @@ describe("DesktopShell marketplace chrome", () => {
       expect(document.body.textContent).not.toContain("Connect");
       expect(document.querySelector('[data-testid="mobile-top-bar"]')).toBeNull();
       expect(document.body.textContent).toContain("page");
+      expect(document.querySelector("footer")).toBeTruthy();
     },
   );
 
@@ -122,6 +123,7 @@ describe("DesktopShell marketplace chrome", () => {
     expect(shellHeader?.className).toContain("h-0");
     expect(shellHeader?.className).toContain("md:h-14");
     expect(shellHeader?.className).not.toContain(" h-14 ");
+    expect(document.querySelector("footer")).toBeNull();
   });
 
   it.each(["/cart", "/messages", "/offers", "/create", "/dashboard", "/profile/0.0.1234"])(
@@ -258,6 +260,7 @@ describe("DesktopShell marketplace chrome", () => {
     expect(brand).toBeTruthy();
     expect(brand.parentElement?.parentElement?.className).toContain("md:hidden");
     expect(document.querySelector('[data-testid="mobile-top-bar"]')).toBeNull();
+    expect(document.querySelector("footer")).toBeTruthy();
   });
 
   it("links the desktop account chip to the profile", async () => {

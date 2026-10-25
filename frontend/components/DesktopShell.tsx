@@ -168,7 +168,10 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
 
   const fallbackTitle = pathnameTitle(pathname);
   const showFooter =
-    pathname === "/" || pathname === "/marketplace" || pathname.startsWith("/marketplace");
+    pathname === "/" ||
+    pathname === "/about" ||
+    pathname === "/marketplace" ||
+    pathname.startsWith("/marketplace");
   // `/` and `/marketplace` render the marketplace slim header. Listing, Terms,
   // Privacy, and /about reuse that same MarketplaceDesktopHeader. Keep this
   // shell bar off those routes so the icon row, Connect chip, and Sign in pill
@@ -379,8 +382,8 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
             </div>
           ))}
         {/* Content takes the available height so the footer (marketplace
-            only) stays pinned to the bottom. Keyed on pathname so each route
-            change eases in gently instead of snapping. */}
+            and /about, both viewports) stays pinned to the bottom. Keyed on
+            pathname so each route change eases in gently instead of snapping. */}
         <div key={pathname} className="flex-1 animate-[fadeSlideUp_0.5s_ease-out]">
           {children}
         </div>
