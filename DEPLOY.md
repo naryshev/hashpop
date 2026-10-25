@@ -73,9 +73,24 @@ S3_ENDPOINT=
 ### Backend build/start
 
 - Build command: `npm install && npm run build`
-- Start command: `npm start`
+- Start command: `npm start`, which is `node dist/index.js`
 
-Run migrations once after DB is configured:
+Do not start the process with `prisma db push`, and do not pass `--accept-data-loss`. `db push` copies `schema.prisma` onto the database without recording a migration, and it can drop columns. The server applies `prisma migrate deploy` itself, before it listens.
+
+`backend/prisma/migrations/migration_lock.toml` has to be in the image. Without it, deploy cannot open the migration directory.
+
+On startup `backend/src/index.ts`:
+
+1. Logs `Applying pending database migrations…`.
+2. Runs `prisma migrate deploy`. The failure log includes the exit status, stdout, stderr, and the Prisma code such as `P3005`.
+3. A database created by `db push` has tables and no `_prisma_migrations` rows, so deploy fails with `P3005`. The process then checks that the tables and columns from the five historical migrations are present (`Listing.txHash`, location columns, `Offer`, moderation columns, and the original tables). If any of those are missing, it logs `Refusing to baseline` and does not mark anything applied.
+4. When the schema matches, it runs `prisma migrate resolve --applied` only for historical migrations that are not already recorded: `0_baseline`, `20260324_add_tx_hash`, `20260506_add_listing_location`, `20260508_add_offer`, `20260923_listing_moderation`. Later migrations are not marked applied. That includes `20261025_sync_schema_from_db_push` and, when that file is in the image, `20261025_reset_repolled_listing_updated_at`.
+5. Runs `prisma migrate deploy` again. Only those later migrations execute. On a database `db push` already synced, the schema migration uses `IF NOT EXISTS` and changes nothing. The `updatedAt = createdAt` backfill runs once and is recorded, so a later boot does not run it again.
+6. Logs `Database migrations applied`, then starts the HTTP server, indexer, and settlement loop.
+
+A database that already has `_prisma_migrations` but is missing some of those five names gets `resolve --applied` for the missing names only, after the same schema check.
+
+You can still run the same commands by hand against a database you own:
 
 ```bash
 cd backend

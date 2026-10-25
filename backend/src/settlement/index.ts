@@ -1,6 +1,8 @@
 import { ethers } from "ethers";
 import type { PrismaClient } from "../generated/prisma/client";
 import type { Logger } from "pino";
+import { finalizeLockedListing } from "./finalize";
+import { executeSettlementPlan, planV1, planV2 } from "./plan";
 
 /**
  * Settlement engine — moves escrow complexity off the user and onto the
@@ -143,105 +145,81 @@ export function startSettlementEngine(prisma: PrismaClient, log: Logger): void {
     }
   };
 
-  /** Mark the listing settled in the DB once the escrow reaches a final state. */
-  const finalizeListing = async (listingId: string, released: boolean, buyer?: string) => {
-    await prisma.listing.updateMany({
-      where: { id: listingId },
-      data: {
-        status: released ? "SOLD" : "REFUNDED",
-        exchangeConfirmedAt: new Date(),
-        ...(buyer && buyer !== ethers.ZeroAddress ? { buyer: buyer.toLowerCase() } : {}),
-      } as any,
-    });
-    // Close any open dispute — the escrow is settled either way.
-    await prisma.listing.updateMany({
-      where: { id: listingId, disputeStatus: "OPEN" },
-      data: { disputeStatus: "RESOLVED" } as any,
-    });
-    log.info({ listingId, outcome: released ? "released" : "refunded" }, "Escrow settled");
-  };
-
   const settleV1 = async (listing: InFlightListing, now: number) => {
     const idBytes = listingIdToBytes32(listing.id);
     const e = await escrow.escrows(idBytes);
     const [buyer, , , , timeoutAt, stateNum] = e;
-    if (!buyer || buyer === ethers.ZeroAddress) return; // no escrow (direct sale)
-    const state = Number(stateNum);
-    if (state === 2) {
-      // COMPLETE on-chain but DB still LOCKED — reconcile. v1 ends both the
-      // refund and release paths at COMPLETE, so treat it as released.
-      await finalizeListing(listing.id, true, buyer);
-      return;
-    }
-    // Don't auto-settle a listing that support is actively reviewing.
-    if (listing.disputeStatus === "OPEN") return;
-    if (now < Number(timeoutAt)) return;
-
-    // Pre-tx state decides the outcome: AWAITING_SHIPMENT → refund,
-    // AWAITING_CONFIRMATION → release (both end at COMPLETE on-chain).
-    const willRelease = state !== AWAITING_SHIPMENT;
-    const tx = await escrow.resolveTimeout(idBytes);
-    await tx.wait();
-    await finalizeListing(listing.id, willRelease, buyer);
+    const hasBuyer = Boolean(buyer) && buyer !== ethers.ZeroAddress;
+    const actions = planV1({
+      hasBuyer,
+      state: Number(stateNum),
+      now,
+      timeoutAt: Number(timeoutAt),
+      disputeStatus: listing.disputeStatus,
+    });
+    await executeSettlementPlan(actions, {
+      finalize: (release) => finalizeLockedListing(prisma, log, listing.id, release, buyer),
+      setDisputed: async () => undefined,
+      markShipped: async () => undefined,
+      resolveTimeout: async () => {
+        const tx = await escrow.resolveTimeout(idBytes);
+        await tx.wait();
+      },
+    });
   };
 
   const settleV2 = async (listing: InFlightListing, now: number) => {
     const idBytes = listingIdToBytes32(listing.id);
     const e = await escrow.escrows(idBytes);
     const [buyer, , , createdAt, shipDeadline, shippedAt, stateNum, disputed] = e;
-    if (!buyer || buyer === ethers.ZeroAddress) return; // no escrow (direct sale)
+    const hasBuyer = Boolean(buyer) && buyer !== ethers.ZeroAddress;
     const state = Number(stateNum);
-
-    if (state === 2 || state === 3) {
-      // Finalized on-chain (buyer confirmReceipt, another keeper, …) but the
-      // DB still shows LOCKED — reconcile.
-      await finalizeListing(listing.id, state === 2, buyer);
-      return;
-    }
-
-    // Mirror the DB dispute flag on-chain so the timeout rails freeze while
-    // support reviews and unfreeze once the dispute is closed.
     const dbDisputed = listing.disputeStatus === "OPEN";
-    if (dbDisputed !== Boolean(disputed)) {
-      const tx = await escrow.setDisputed(idBytes, dbDisputed);
-      await tx.wait();
-      log.info({ listingId: listing.id, disputed: dbDisputed }, "Escrow dispute flag synced");
+    const chainDisputed = Boolean(disputed);
+    // Timeout reads are only needed when the escrow is still open. Final
+    // states reconcile from the status already returned by escrows().
+    let hardTimeout = 0;
+    let autoReleaseWindow = 0;
+    if (hasBuyer && state !== 2 && state !== 3) {
+      if (dbDisputed || chainDisputed) {
+        hardTimeout = Number(await escrow.disputedHardTimeout());
+      } else if (state !== AWAITING_SHIPMENT) {
+        autoReleaseWindow = Number(await escrow.autoReleaseWindow());
+      }
     }
-
-    // Seller saved a tracking number → record shipment on-chain (arbiter
-    // signs; the seller never sends a transaction).
-    if (state === AWAITING_SHIPMENT && listing.trackingNumber && !dbDisputed) {
-      const tx = await escrow.markShipped(idBytes);
-      await tx.wait();
-      log.info(
-        { listingId: listing.id, tracking: listing.trackingNumber },
-        "Escrow marked shipped from tracking number",
-      );
-      return; // fresh state next sweep
-    }
-
-    // Contract timeout rails: no-ship refund, post-shipment auto-release,
-    // disputed hard-timeout refund. resolveTimeout picks the branch on-chain;
-    // we just precompute whether it is due and what the outcome will be.
-    let due = false;
-    let willRelease = false;
-    if (dbDisputed || disputed) {
-      const hardTimeout = Number(await escrow.disputedHardTimeout());
-      due = now >= Number(createdAt) + hardTimeout;
-      willRelease = false;
-    } else if (state === AWAITING_SHIPMENT) {
-      due = now >= Number(shipDeadline);
-      willRelease = false;
-    } else {
-      const autoRelease = Number(await escrow.autoReleaseWindow());
-      due = now >= Number(shippedAt) + autoRelease;
-      willRelease = true;
-    }
-    if (!due) return;
-
-    const tx = await escrow.resolveTimeout(idBytes);
-    await tx.wait();
-    await finalizeListing(listing.id, willRelease, buyer);
+    const actions = planV2({
+      hasBuyer,
+      state,
+      now,
+      createdAt: Number(createdAt),
+      shipDeadline: Number(shipDeadline),
+      shippedAt: Number(shippedAt),
+      chainDisputed,
+      dbDisputed,
+      hasTracking: Boolean(listing.trackingNumber),
+      hardTimeout,
+      autoReleaseWindow,
+    });
+    await executeSettlementPlan(actions, {
+      finalize: (release) => finalizeLockedListing(prisma, log, listing.id, release, buyer),
+      setDisputed: async (disputedFlag) => {
+        const tx = await escrow.setDisputed(idBytes, disputedFlag);
+        await tx.wait();
+        log.info({ listingId: listing.id, disputed: disputedFlag }, "Escrow dispute flag synced");
+      },
+      markShipped: async () => {
+        const tx = await escrow.markShipped(idBytes);
+        await tx.wait();
+        log.info(
+          { listingId: listing.id, tracking: listing.trackingNumber },
+          "Escrow marked shipped from tracking number",
+        );
+      },
+      resolveTimeout: async () => {
+        const tx = await escrow.resolveTimeout(idBytes);
+        await tx.wait();
+      },
+    });
   };
 
   void sweep();
