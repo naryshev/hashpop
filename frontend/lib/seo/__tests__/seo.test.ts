@@ -414,7 +414,7 @@ describe("sitemap.xml", () => {
       "2026-08-01T00:00:00.000Z",
     );
     const marketplace = entries.find((entry) => entry.url === "https://hashpop.io/marketplace");
-    expect(marketplace).toMatchObject({ priority: 1, changeFrequency: "daily" });
+    expect(marketplace).toMatchObject({ priority: 0.9, changeFrequency: "daily" });
     const watches = entries.find((entry) => entry.url.endsWith("category=Watches"));
     expect(watches).toMatchObject({ priority: 0.5, changeFrequency: "weekly" });
   });
@@ -454,6 +454,28 @@ describe("sitemap.xml", () => {
       entries.find((entry) => entry.url.endsWith("/listing/lst-none"))?.lastModified,
     ).toBeUndefined();
     expect(entries.some((entry) => entry.url.endsWith("category=Books"))).toBe(true);
+  });
+
+  it("uses createdAt when updatedAt is only the current time, and omits lastmod when both are missing", () => {
+    const now = Date.parse("2026-10-25T19:44:34.097Z");
+    const entries = buildSitemap(
+      [
+        {
+          id: "lst-touched",
+          status: "LISTED",
+          createdAt: "2026-09-15T21:54:28.821Z",
+          updatedAt: "2026-10-25T19:44:34.097Z",
+        },
+        { id: "lst-blank", status: "LISTED" },
+      ],
+      { now },
+    );
+    expect(entries.find((entry) => entry.url.endsWith("/listing/lst-touched"))?.lastModified).toBe(
+      "2026-09-15T21:54:28.821Z",
+    );
+    const blank = entries.find((entry) => entry.url.endsWith("/listing/lst-blank"));
+    expect(blank?.lastModified).toBeUndefined();
+    expect(JSON.stringify(blank)).not.toContain("2026-10-25T19:44:34");
   });
 
   it("caps listed URLs when the catalog is huge", () => {

@@ -411,6 +411,33 @@ function normalizeListingId(id: string): string | null {
   return canonicalListingId(id);
 }
 
+export type ItemListedSnapshot = {
+  price: string;
+  status: string;
+  onChainConfirmed: boolean;
+};
+
+/**
+ * ItemListed is replayed on every indexer poll. Writing the same price and
+ * status again bumps Prisma `@updatedAt` to now, which is not a modification.
+ */
+export function itemListedPersistAction(
+  existing: ItemListedSnapshot | null,
+  next: ItemListedSnapshot,
+): "create" | "update" | "skip" {
+  if (!existing) return "create";
+  // SOLD and REFUNDED are final. A replayed ItemListed must not reopen them.
+  if (isFinalizedListingStatus(existing.status)) return "skip";
+  if (
+    existing.price === next.price &&
+    existing.status === next.status &&
+    existing.onChainConfirmed === next.onChainConfirmed
+  ) {
+    return "skip";
+  }
+  return "update";
+}
+
 export async function handleEvent(event: any, prisma: PrismaClient, log: Logger) {
   const listingId = normalizeListingId(event.listingId);
   if (!listingId) {
@@ -420,32 +447,24 @@ export async function handleEvent(event: any, prisma: PrismaClient, log: Logger)
   switch (event.type) {
     case "ItemListed": {
       const seller = (event.seller || "").toLowerCase();
+      const price = chainAmountToHbar(event.price);
+      const next = { price, status: "LISTED", onChainConfirmed: true };
       const existing = await prisma.listing.findUnique({
         where: { id: listingId },
-        select: { status: true },
+        select: { price: true, status: true, onChainConfirmed: true },
       });
-      if (isFinalizedListingStatus(existing?.status)) {
-        log.debug(
-          { listingId, status: existing?.status },
-          "Indexer left finalized listing unchanged",
-        );
-        break;
+      const action = itemListedPersistAction(existing, next);
+      if (action === "skip") break;
+      if (action === "create") {
+        await prisma.listing.create({
+          data: { id: listingId, seller, ...next },
+        });
+      } else {
+        await prisma.listing.update({
+          where: { id: listingId },
+          data: next,
+        });
       }
-      await prisma.listing.upsert({
-        where: { id: listingId },
-        create: {
-          id: listingId,
-          seller,
-          price: chainAmountToHbar(event.price),
-          status: "LISTED",
-          onChainConfirmed: true,
-        },
-        update: {
-          price: chainAmountToHbar(event.price),
-          status: "LISTED",
-          onChainConfirmed: true,
-        },
-      });
       log.info({ listingId, seller }, "Listing indexed");
       break;
     }

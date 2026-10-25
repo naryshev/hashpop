@@ -59,9 +59,23 @@ function lastModified(value?: string | null): string | undefined {
   return date.toISOString();
 }
 
-/** updatedAt when the API sent a real timestamp, otherwise createdAt. */
-function listingLastModified(listing: SitemapListing): string | undefined {
-  return lastModified(listing.updatedAt) ?? lastModified(listing.createdAt);
+/**
+ * The indexer re-upserts ItemListed on each poll, and Prisma `@updatedAt`
+ * moves to the current time even when the row did not change. A timestamp
+ * this close to sitemap generation is that touch, not a modification.
+ */
+const UPDATED_AT_TOUCH_MS = 60_000;
+
+/**
+ * Real updatedAt from the feed. createdAt when updatedAt is missing or is
+ * only the current time. Omit lastmod when neither field is a timestamp.
+ * Never synthesize "now".
+ */
+function listingLastModified(listing: SitemapListing, now: number): string | undefined {
+  const updated = lastModified(listing.updatedAt);
+  const created = lastModified(listing.createdAt);
+  if (updated && Math.abs(Date.parse(updated) - now) >= UPDATED_AT_TOUCH_MS) return updated;
+  return created;
 }
 
 function staticChangeFrequency(path: string): "daily" | "weekly" {
@@ -69,13 +83,16 @@ function staticChangeFrequency(path: string): "daily" | "weekly" {
 }
 
 function staticPriority(path: string): number {
-  return path === "/" || path === "/marketplace" ? 1 : 0.6;
+  if (path === "/") return 1;
+  if (path === "/marketplace") return 0.9;
+  return 0.6;
 }
 
 export function buildSitemap(
   listings: SitemapListing[],
-  options?: { categoryPaths?: string[]; listingCap?: number },
+  options?: { categoryPaths?: string[]; listingCap?: number; now?: number },
 ): SitemapEntry[] {
+  const now = options?.now ?? Date.now();
   const categoryPaths = options?.categoryPaths ?? categorySitemapPaths(listings);
   const listingCap = options?.listingCap ?? SITEMAP_LISTING_CAP;
   const staticEntries: SitemapEntry[] = [
@@ -96,7 +113,7 @@ export function buildSitemap(
     const id = listing.id?.trim();
     if (!id) continue;
     if (!isActiveListingStatus(listing.status)) continue;
-    const modified = listingLastModified(listing);
+    const modified = listingLastModified(listing, now);
     listingEntries.push({
       url: absoluteUrl(listingCanonicalPath(id)),
       ...(modified ? { lastModified: modified } : {}),
