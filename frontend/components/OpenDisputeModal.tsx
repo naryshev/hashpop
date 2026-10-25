@@ -108,9 +108,9 @@ export function OpenDisputeModal({
         {!submitted ? (
           <>
             <p className="mt-1 text-xs text-silver">
-              Opening a dispute freezes the escrow so funds aren&apos;t released, notifies the other
-              party, and creates a support ticket. Only do this if there&apos;s a real problem with
-              the transaction.
+              Opening a dispute freezes the protected payment so funds aren&apos;t released,
+              notifies the other party, and creates a support ticket. Only do this if there&apos;s a
+              real problem with the transaction.
             </p>
             <textarea
               value={reason}
@@ -143,7 +143,7 @@ export function OpenDisputeModal({
         ) : (
           <>
             <p className="mt-2 rounded-lg border border-emerald-400/30 bg-emerald-400/[0.06] px-3 py-2 text-sm text-emerald-200">
-              Dispute opened. Escrow is frozen and the other party has been notified.
+              Dispute opened. The protected payment is frozen and the other party has been notified.
             </p>
             <p className="mt-3 text-xs text-silver">
               Finish by opening a ticket in Discord and pasting the details below so support can

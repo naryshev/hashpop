@@ -82,6 +82,6 @@ describe("AdminTrust", () => {
     );
     await act(async () => disputes?.click());
     expect(host?.textContent).toContain("No open disputes.");
-    expect(host?.textContent).toContain("Escrow disputes will land here.");
+    expect(host?.textContent).toContain("Disputes on protected payments will land here.");
   });
 });

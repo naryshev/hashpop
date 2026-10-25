@@ -81,7 +81,8 @@ export function orderStatusLine(opts: {
   if (phase === "disputed") {
     return {
       label: "On hold",
-      detail: "A dispute is under review — escrow timers are frozen until it's resolved.",
+      detail:
+        "A dispute is under review — timers on the protected payment stay frozen until it's resolved.",
       tone: "disputed",
     };
   }
@@ -129,7 +130,7 @@ export function orderStatusLine(opts: {
       label: "Refunded",
       detail:
         role === "seller"
-          ? "The escrow timed out and the buyer's payment was returned."
+          ? "The protected payment timed out and the buyer's payment was returned."
           : "Your payment was returned in full.",
       tone: "refunded",
     };
@@ -141,8 +142,8 @@ export function orderStatusLine(opts: {
       label: "Complete",
       detail:
         role === "seller"
-          ? "The buyer paid you directly — no escrow on this sale."
-          : "You paid the seller directly — no escrow on this sale.",
+          ? "The buyer paid you directly — this sale has no protected payment."
+          : "You paid the seller directly — this sale has no protected payment.",
       tone: "complete",
     };
   }
@@ -150,7 +151,7 @@ export function orderStatusLine(opts: {
     label: "Complete",
     detail:
       role === "seller"
-        ? "Funds were released from escrow to your wallet."
+        ? "Funds were released from the protected payment to your wallet."
         : "Funds were released to the seller. Trade closed.",
     tone: "complete",
   };

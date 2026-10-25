@@ -197,8 +197,8 @@ export default function OffersPage() {
 
             <p className="text-xs text-silver/70">
               {tab === "received"
-                ? "Offers buyers have placed on your listings. Accept to lock the sale (escrow), reject to refund the buyer."
-                : "Offers you've placed on other listings. Funds stay locked in escrow until the seller responds; you can cancel an active offer at any time."}
+                ? "Offers buyers have placed on your listings. Accept to lock the sale in a protected payment, or reject to refund the buyer."
+                : "Offers you've placed on other listings. Funds stay in a protected payment until the seller responds; you can cancel an active offer at any time."}
             </p>
 
             {error && (

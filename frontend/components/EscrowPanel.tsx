@@ -162,13 +162,13 @@ export function EscrowPanel({
       .then((r) => {
         if (r.ok) return r.json();
         if (r.status === 404) return null;
-        throw new Error("Failed to load escrow");
+        throw new Error("Failed to load the protected payment");
       })
       .then((data: EscrowView | null) => {
         setEscrow(data);
       })
       .catch((e) => {
-        setFetchError(e instanceof Error ? e.message : "Failed to load escrow");
+        setFetchError(e instanceof Error ? e.message : "Failed to load the protected payment");
         setEscrow(null);
       })
       .finally(() => setLoading(false));
@@ -297,7 +297,7 @@ export function EscrowPanel({
             status={{
               label: "Paid",
               detail:
-                "Your payment is secured on-chain. The escrow record is initializing — this can take a moment after purchase.",
+                "Your payment is held by an on-chain smart contract. The protected-payment record is initializing — this can take a moment after purchase.",
               tone: "waiting",
             }}
           />
@@ -357,7 +357,7 @@ export function EscrowPanel({
               <AddressDisplay address={escrow.seller} className="text-amber-300 text-xs" />
             </div>
             <div className="text-right">
-              <p className="text-[10px] uppercase tracking-wider text-white/40 mb-0.5">In escrow</p>
+              <p className="text-[10px] uppercase tracking-wider text-white/40 mb-0.5">Protected</p>
               <p className="font-mono text-xs font-semibold text-chrome">
                 {formatHbarWithUsd(formatContractAmountToHbar(escrow.amount), usdRate)}
               </p>
@@ -463,7 +463,7 @@ export function EscrowPanel({
         )}
         {phase === "refunded" && (
           <p className="text-center text-sm font-medium text-rose-300">
-            Escrow refunded — the buyer&apos;s payment was returned.
+            Protected payment refunded — the buyer&apos;s payment was returned.
           </p>
         )}
 

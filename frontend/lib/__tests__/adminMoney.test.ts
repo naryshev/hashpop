@@ -119,7 +119,7 @@ describe("money queues", () => {
   it("keeps frozen empty copy and view-only actions", () => {
     expect(MONEY_PAGE).toEqual({
       title: "Money",
-      sub: "Escrow and deals that need a release, refund, or look.",
+      sub: "Protected payments and deals that need a release, refund, or look.",
     });
     expect(MONEY_SEARCH_PLACEHOLDER).toBe("Search id, title, wallet…");
     expect(moneyEmptyCopy("deals", "")).toEqual(MONEY_EMPTY.deals);

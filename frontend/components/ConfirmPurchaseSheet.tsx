@@ -141,7 +141,7 @@ export function ConfirmPurchaseSheet({
         </div>
         {contractId && (
           <div className="flex items-center justify-between py-3">
-            <dt className="text-silver">{escrowed ? "Escrow contract" : "Contract"}</dt>
+            <dt className="text-silver">{escrowed ? "Protection contract" : "Contract"}</dt>
             <dd className="font-mono text-white">{contractId}</dd>
           </div>
         )}
@@ -151,7 +151,7 @@ export function ConfirmPurchaseSheet({
         <Lock size={14} className="mt-0.5 shrink-0 text-chrome" />
         <p className="text-[13px] leading-snug text-white/90">
           {escrowed
-            ? `${hbar}${HBAR_GAP}${HBAR} is held in on-chain escrow until you confirm delivery.`
+            ? `${hbar}${HBAR_GAP}${HBAR} is held by an on-chain smart contract until you confirm delivery.`
             : "Payment is sent directly to the seller on-chain."}
         </p>
       </div>

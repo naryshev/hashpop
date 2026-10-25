@@ -38,7 +38,7 @@ describe("deal-room frozen copy", () => {
   it("keeps empty-thread headline, body, chips, and placeholder", () => {
     expect(DEAL_ROOM_EMPTY_HEADLINE).toBe("This is the deal room");
     expect(DEAL_ROOM_EMPTY_BODY).toBe(
-      "Chat here. Lock escrow before you meet. Reputation updates when you both confirm.",
+      "Chat here. Lock a protected payment before you meet. Reputation updates when you both confirm.",
     );
     expect([...DEAL_ROOM_EMPTY_CHIPS]).toEqual([
       "Still available?",
@@ -47,8 +47,8 @@ describe("deal-room frozen copy", () => {
       "More photos?",
     ]);
     expect(DEAL_ROOM_PLACEHOLDER).toBe("Message about this listing…");
-    expect(LOCK_ESCROW_SHEET_TITLE).toBe("Lock escrow before you meet");
-    expect(LOCK_ESCROW_CTA).toBe("Lock escrow");
+    expect(LOCK_ESCROW_SHEET_TITLE).toBe("Lock a protected payment before you meet");
+    expect(LOCK_ESCROW_CTA).toBe("Lock protected payment");
     expect(LOCK_ESCROW_SECONDARY).toBe("Not now");
     expect(LOCK_ESCROW_SHEET_BODY).toBe(
       "Funds stay protected until you both confirm the exchange. Then reputation updates on both wallets.",
@@ -107,10 +107,10 @@ describe("meetupStructuredCard", () => {
 
 describe("escrowBarFromListing", () => {
   it("reads Listing status / requireEscrow / tracking / dispute / timestamps", () => {
-    expect(escrowBarFromListing(listingBase, undefined, "buyer").label).toBe("Escrow not locked");
+    expect(escrowBarFromListing(listingBase, undefined, "buyer").label).toBe("Not protected yet");
     expect(
       escrowBarFromListing({ ...listingBase, status: "LOCKED" }, undefined, "buyer").label,
-    ).toBe("Escrow locked");
+    ).toBe("Payment protected");
     expect(
       escrowBarFromListing(
         { ...listingBase, status: "LOCKED", shippedAt: "2026-09-01T00:00:00.000Z" },
@@ -139,7 +139,7 @@ describe("escrowSystemCards", () => {
       },
       { amount: "80", createdAt: "2026-09-01T00:00:00.000Z" },
     );
-    expect(cards.some((c) => /escrow locked/i.test(c.title))).toBe(true);
+    expect(cards.some((c) => /payment protected/i.test(c.title))).toBe(true);
     expect(cards.some((c) => /shipped/i.test(c.title))).toBe(true);
     expect(cards.every((c) => !("type" in c) && !("offerAmount" in c))).toBe(true);
   });

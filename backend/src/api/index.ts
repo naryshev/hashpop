@@ -1596,7 +1596,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
             toAddress: counterparty,
             listingId: id,
             encrypted: false,
-            body: `⚠️ A dispute was opened for "${listing.title ?? id}". Reason: ${reasonText} — escrow is frozen pending review. Please respond here or open a ticket in the Hashpop Discord.`,
+            body: `⚠️ A dispute was opened for "${listing.title ?? id}". Reason: ${reasonText} — the protected payment is frozen pending review. Please respond here or open a ticket in the Hashpop Discord.`,
           },
         });
       }

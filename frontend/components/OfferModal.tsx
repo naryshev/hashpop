@@ -179,7 +179,7 @@ export function OfferModal({ open, onClose, listingId, askingPriceHbar, onOfferS
         </button>
 
         <p className="mt-3 text-center text-[11px] text-black/50">
-          Funds lock in escrow until the seller accepts or rejects.
+          Funds lock in a protected payment until the seller accepts or rejects.
         </p>
       </div>
     </div>

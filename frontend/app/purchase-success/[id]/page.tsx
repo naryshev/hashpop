@@ -72,7 +72,9 @@ export default function PurchaseSuccessPage() {
             </svg>
           </div>
           <h1 className="text-2xl font-semibold tracking-normal text-white">
-            {listing?.requireEscrow === false ? "Purchase complete" : "Funds locked in escrow"}
+            {listing?.requireEscrow === false
+              ? "Purchase complete"
+              : "Funds locked in a protected payment"}
           </h1>
           <p className="text-silver text-sm mt-2 max-w-sm">
             The seller has been notified.
@@ -140,12 +142,22 @@ export default function PurchaseSuccessPage() {
           <p className="text-[10px] font-semibold text-white/40 uppercase tracking-widest mb-2">
             What happens next
           </p>
-          <p className="text-sm text-silver leading-relaxed">
-            <span className="font-semibold text-white">Your payment is secured in escrow.</span> The
-            seller has a week to ship — if they don&apos;t, you&apos;re refunded automatically. Once
-            shipped, the seller is paid after a short window unless you report a problem. You never
-            need to do anything unless something goes wrong.
-          </p>
+          {listing?.requireEscrow === false ? (
+            <p className="text-sm text-silver leading-relaxed">
+              <span className="font-semibold text-white">You paid the seller directly.</span> This
+              listing did not offer a protected payment, so the HBAR went to the seller on-chain
+              instead of being held by a smart contract.
+            </p>
+          ) : (
+            <p className="text-sm text-silver leading-relaxed">
+              <span className="font-semibold text-white">
+                Your payment is held by an on-chain smart contract.
+              </span>{" "}
+              The seller has a week to ship — if they don&apos;t, you&apos;re refunded
+              automatically. Once shipped, the seller is paid after a short window unless you report
+              a problem. You never need to do anything unless something goes wrong.
+            </p>
+          )}
         </div>
 
         {/* TX hash */}
@@ -181,7 +193,7 @@ export default function PurchaseSuccessPage() {
               href={listingHref(id)}
               className="btn-mint flex-1 py-3 text-center text-sm font-semibold"
             >
-              View listing & escrow
+              View listing &amp; payment protection
             </Link>
           )}
         </div>

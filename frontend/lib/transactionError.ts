@@ -98,7 +98,7 @@ export function getTransactionErrorMessage(error: unknown, options?: { chainId?:
     }
     if (/\blisting is locked\b|\blocked in escrow\b/i.test(combined)) {
       return clean(
-        "This listing is locked in escrow and cannot be edited or deleted until the transaction is completed.",
+        "This listing has a protected payment in progress and can't be edited or deleted until the transaction is completed.",
       );
     }
     if (/\blist is locked\b/i.test(combined)) {

@@ -2,7 +2,7 @@ import { dealStageFromRow, type DealStage, type ListingStatusTone } from "./admi
 
 export const MONEY_PAGE = {
   title: "Money",
-  sub: "Escrow and deals that need a release, refund, or look.",
+  sub: "Protected payments and deals that need a release, refund, or look.",
 } as const;
 
 export const MONEY_TABS = [
@@ -34,15 +34,15 @@ export const MONEY_RELEASED_CAP = 80;
 export const MONEY_EMPTY = {
   deals: {
     title: "No open deals.",
-    sub: "Escrow and in-flight sales show up here.",
+    sub: "Protected payments and in-flight sales show up here.",
   },
   disputes: {
     title: "No open disputes.",
-    sub: "Escrow disputes that need a money decision land here.",
+    sub: "Disputes on protected payments that need a money decision land here.",
   },
   released: {
     title: "No released deals yet.",
-    sub: "Completed and refunded escrow will show up here.",
+    sub: "Completed and refunded protected payments show up here.",
   },
 } as const;
 

@@ -33,7 +33,7 @@ export const TRUST_EMPTY = {
   },
   disputes: {
     title: "No open disputes.",
-    sub: "Escrow disputes will land here.",
+    sub: "Disputes on protected payments will land here.",
   },
 } as const;
 

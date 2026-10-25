@@ -18,7 +18,7 @@ export function profileEmptyCopy(surface: ProfileEmptySurface, isSelf: boolean):
     return isSelf
       ? {
           headline: "Your reputation starts with a deal",
-          body: "List real stuff. Chat in-wallet, lock escrow, meet or ship — then your score travels with you.",
+          body: "List real stuff. Chat in-wallet, lock a protected payment, meet or ship — then your score travels with you.",
           cta: PROFILE_LIST_CTA,
         }
       : {
@@ -30,7 +30,7 @@ export function profileEmptyCopy(surface: ProfileEmptySurface, isSelf: boolean):
     return isSelf
       ? {
           headline: "List real stuff",
-          body: "Meetups with a contract. Escrow on your wallet. Settled in HBAR.",
+          body: "Meetups with a contract. Optional protected payments on your wallet. Settled in HBAR.",
           cta: PROFILE_LIST_CTA,
         }
       : {
