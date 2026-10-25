@@ -96,7 +96,7 @@ export const AdminDeals = forwardRef<
                     <>
                       <p className="text-sm text-white">No open deals.</p>
                       <p className="mt-1 text-xs text-silver">
-                        Escrow and in-flight sales show up here.
+                        Protected payments and in-flight sales show up here.
                       </p>
                     </>
                   )}
@@ -159,7 +159,9 @@ export const AdminDeals = forwardRef<
             ) : (
               <>
                 <p className="text-sm text-white">No open deals.</p>
-                <p className="mt-1 text-xs text-silver">Escrow and in-flight sales show up here.</p>
+                <p className="mt-1 text-xs text-silver">
+                  Protected payments and in-flight sales show up here.
+                </p>
               </>
             )}
           </div>

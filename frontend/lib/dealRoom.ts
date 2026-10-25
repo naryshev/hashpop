@@ -2,7 +2,7 @@ import { formatPriceForDisplay, withHbarGlyph } from "./formatPrice";
 
 export const DEAL_ROOM_EMPTY_HEADLINE = "This is the deal room";
 export const DEAL_ROOM_EMPTY_BODY =
-  "Chat here. Lock escrow before you meet. Reputation updates when you both confirm.";
+  "Chat here. Lock a protected payment before you meet. Reputation updates when you both confirm.";
 export const DEAL_ROOM_EMPTY_CHIPS = [
   "Still available?",
   "Can we meet today?",
@@ -10,8 +10,8 @@ export const DEAL_ROOM_EMPTY_CHIPS = [
   "More photos?",
 ] as const;
 export const DEAL_ROOM_PLACEHOLDER = "Message about this listing…";
-export const LOCK_ESCROW_SHEET_TITLE = "Lock escrow before you meet";
-export const LOCK_ESCROW_CTA = "Lock escrow";
+export const LOCK_ESCROW_SHEET_TITLE = "Lock a protected payment before you meet";
+export const LOCK_ESCROW_CTA = "Lock protected payment";
 export const LOCK_ESCROW_SECONDARY = "Not now";
 export const LOCK_ESCROW_SHEET_BODY =
   "Funds stay protected until you both confirm the exchange. Then reputation updates on both wallets.";
@@ -113,7 +113,7 @@ export function escrowBarFromListing(
       label: "On hold",
       detail: listing.disputeReason?.trim()
         ? listing.disputeReason
-        : "A dispute is under review — escrow timers are frozen until it's resolved.",
+        : "A dispute is under review — timers on the protected payment stay frozen until it's resolved.",
       tone: "disputed",
     };
   }
@@ -152,26 +152,26 @@ export function escrowBarFromListing(
 
   if (status === "LOCKED") {
     return {
-      label: "Escrow locked",
+      label: "Payment protected",
       detail:
         role === "seller"
           ? "Funds are locked. Ship and add tracking to keep the deal moving."
-          : "Funds are locked in escrow until you confirm the exchange.",
+          : "Funds are held by the on-chain contract until you confirm the exchange.",
       tone: "active",
     };
   }
 
   if (listing.requireEscrow) {
     return {
-      label: "Escrow not locked",
-      detail: "Lock escrow before you meet so both sides are covered.",
+      label: "Not protected yet",
+      detail: "Lock a protected payment before you meet so both sides are covered.",
       tone: "waiting",
     };
   }
 
   return {
     label: listing.status || "Listed",
-    detail: "No escrow on this listing.",
+    detail: "This listing doesn't offer a protected payment.",
     tone: "waiting",
   };
 }
@@ -194,7 +194,7 @@ export function escrowSystemCards(
     const amount = sale?.amount ? ` · ${withHbarGlyph(formatPriceForDisplay(sale.amount))}` : "";
     cards.push({
       key: "escrow-locked",
-      title: "Escrow locked",
+      title: "Payment protected",
       body: `Funds are held on-chain${amount}.`,
     });
   }

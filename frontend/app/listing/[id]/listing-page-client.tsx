@@ -1823,11 +1823,11 @@ export default function ListingPage({
                 className="flex items-center justify-between gap-3 rounded-2xl border border-[#00ffa3]/25 bg-[#00ffa3]/[0.06] px-4 py-3.5 transition-colors hover:bg-[#00ffa3]/[0.1]"
               >
                 <div className="min-w-0">
-                  <p className="text-sm font-bold text-white">Order &amp; escrow</p>
+                  <p className="text-sm font-bold text-white">Order &amp; payment protection</p>
                   <p className="mt-0.5 text-xs text-silver">
                     {isSeller
-                      ? "Track the sale, add tracking, and follow the escrow."
-                      : "Track your order, shipping, and the escrow release."}
+                      ? "Track the sale, add tracking, and follow the protected payment."
+                      : "Track your order, shipping, and when the protected payment releases."}
                   </p>
                 </div>
                 <span className="shrink-0 text-lg text-[#00ffa3]" aria-hidden>
@@ -1988,7 +1988,7 @@ export default function ListingPage({
                     <dt className="text-silver/70">Shipping:</dt>
                     <dd className="text-silver">
                       {listing.requireEscrow
-                        ? "Seller ships once payment is locked in escrow."
+                        ? "Seller ships once the protected payment is locked."
                         : "Buyer arranges with seller after payment."}
                     </dd>
                   </div>
@@ -2003,8 +2003,8 @@ export default function ListingPage({
                     <dd className="text-silver">
                       {listing.requireEscrow ? (
                         <>
-                          Buyer-protected: escrow auto-refunds if the item isn&apos;t shipped or
-                          received.
+                          Buyer-protected: the payment auto-refunds if the item isn&apos;t shipped
+                          or received.
                         </>
                       ) : (
                         <>No returns — private sale.</>
@@ -2057,8 +2057,8 @@ export default function ListingPage({
               {isSeller && (isLockedOnChain || listing.status === "LOCKED") && (
                 <div className="mt-2 border border-amber-500/30 bg-amber-500/5 px-3 py-2">
                   <p className="text-xs text-amber-300/90">
-                    This listing is in escrow — it cannot be deleted until the transaction is
-                    complete or resolved.
+                    This listing has a protected payment in progress — it can&apos;t be deleted
+                    until the transaction is complete or resolved.
                   </p>
                 </div>
               )}

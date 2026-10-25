@@ -157,7 +157,7 @@ describe("dealDotTone", () => {
 describe("empty copy", () => {
   it("is frozen", () => {
     expect(DEAL_UPDATES_EMPTY_TITLE).toBe("No updates yet.");
-    expect(DEAL_UPDATES_EMPTY_BODY).toBe("Offers, escrow, and deal updates land here.");
+    expect(DEAL_UPDATES_EMPTY_BODY).toBe("Offers, protected payments, and deal updates land here.");
   });
 });
 

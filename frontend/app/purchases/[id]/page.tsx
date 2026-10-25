@@ -253,7 +253,7 @@ export default function PurchaseDetailPage() {
         >
           <p className="m-0 text-[15px] font-bold">This order is private</p>
           <p className="mt-1.5 text-[13px] text-muted">
-            Order and escrow details are only visible to the buyer and the seller.
+            Order and payment-protection details are only visible to the buyer and the seller.
           </p>
           <Link href="/marketplace" className="mt-3.5 inline-block text-[13px] text-chrome">
             ← Back to marketplace
@@ -611,7 +611,8 @@ function StatusBlock({
           {withHbarGlyph(hbar)} returned to the buyer
         </div>
         <div className="mt-1 text-[11px] text-muted">
-          The escrow timed out before shipment, so the payment was refunded automatically.
+          The protected payment timed out before shipment, so the payment was refunded
+          automatically.
         </div>
       </div>
     );
@@ -730,7 +731,7 @@ function Actions({
     );
   }
   if (phase === "disputed") {
-    return <StatusNote>Escrow is on hold while the dispute is reviewed.</StatusNote>;
+    return <StatusNote>The protected payment is on hold while the dispute is reviewed.</StatusNote>;
   }
   if (phase === "refunded") {
     return <StatusNote>Payment was returned to the buyer.</StatusNote>;

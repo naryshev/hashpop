@@ -190,7 +190,7 @@ export function BuyButton({
       );
       setConfirmDetail(
         contractIdForDetail
-          ? `escrow ${contractIdForDetail} · locking ${withHbarGlyph(payHbarForDetail)}`
+          ? `protection contract ${contractIdForDetail} · locking ${withHbarGlyph(payHbarForDetail)}`
           : `locking ${withHbarGlyph(payHbarForDetail)}`,
       );
       const txHash = await send({

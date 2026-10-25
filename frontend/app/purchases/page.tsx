@@ -208,7 +208,8 @@ export default function PurchasesPage() {
     <main className="min-h-screen">
       <div className="mx-auto max-w-4xl space-y-6 px-4 py-6 sm:px-6">
         <p className="text-xs text-silver/70">
-          Buys and sales at a glance — escrow settles itself on the dates shown.
+          Buys and sales at a glance. When a listing offers a protected payment, it settles itself
+          on the dates shown.
         </p>
 
         {!address ? (
@@ -423,8 +424,8 @@ export default function PurchasesPage() {
                             Disputed
                           </span>
                           <p className="text-xs text-amber-200/90">
-                            Escrow is frozen while this dispute is reviewed. Continue in the Hashpop
-                            Discord.
+                            The protected payment is frozen while this dispute is reviewed. Continue
+                            in the Hashpop Discord.
                           </p>
                         </div>
                       ) : (

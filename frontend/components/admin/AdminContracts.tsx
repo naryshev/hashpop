@@ -19,7 +19,7 @@ type ContractInfo = {
 const CONTRACTS: ContractInfo[] = [
   { label: "Marketplace", address: marketplaceAddress },
   { label: "AuctionHouse", address: auctionHouseAddress },
-  { label: "Escrow", address: escrowAddress },
+  { label: "Protection contract", address: escrowAddress },
 ];
 
 function ContractRow({ contract }: { contract: ContractInfo }) {

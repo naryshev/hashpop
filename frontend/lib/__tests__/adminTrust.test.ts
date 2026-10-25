@@ -41,7 +41,7 @@ describe("trust page copy", () => {
     });
     expect(TRUST_EMPTY.disputes).toEqual({
       title: "No open disputes.",
-      sub: "Escrow disputes will land here.",
+      sub: "Disputes on protected payments will land here.",
     });
   });
 });

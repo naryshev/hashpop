@@ -107,7 +107,7 @@ export function OffersPanel({ listingId, sellerAddress, onChanged }: Props) {
       <h3 className="mb-2 font-medium text-white">{isSeller ? "Pending offers" : "Your offer"}</h3>
       {!isSeller && (
         <p className="mb-2 text-xs text-silver/70">
-          Funds are locked in escrow until the seller accepts or rejects.
+          Funds are held in a protected payment until the seller accepts or rejects.
         </p>
       )}
       <ul className="space-y-3">

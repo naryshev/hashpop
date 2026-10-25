@@ -6,7 +6,7 @@ export type OrderState = "paid" | "shipped" | "delivered" | "released" | "disput
 export type OrderRole = "buyer" | "seller";
 
 export const STATE_LABEL: Record<OrderState, string> = {
-  paid: "Escrow funded",
+  paid: "Payment protected",
   shipped: "In transit",
   delivered: "Delivered",
   released: "Complete",

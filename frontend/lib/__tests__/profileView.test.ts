@@ -180,7 +180,7 @@ describe("profileEarnings", () => {
     expect(withEscrow[2]).toMatchObject({
       id: "escrow",
       amountLabel: withHbarGlyph("320"),
-      caption: "in escrow",
+      caption: "protected payment",
       detail: "From 3 open deals",
       fiatLabel: "≈ $16.00",
     });
@@ -210,7 +210,7 @@ describe("profile grid helpers", () => {
     });
     expect(profileTileBadge({ status: "COMPLETED" })?.tone).toBe("sold");
     expect(profileTileBadge({ status: "LOCKED", hasActiveOffer: true })).toEqual({
-      label: "In escrow",
+      label: "Protected",
       tone: "escrow",
     });
     expect(profileTileBadge({ status: "LISTED", hasActiveOffer: true })).toEqual({

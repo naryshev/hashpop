@@ -238,7 +238,7 @@ export function profileEarnings(input: {
     columns.push({
       id: "escrow",
       amountLabel: formatProfileHbar(input.openEscrow.hbar),
-      caption: "in escrow",
+      caption: "protected payment",
       detail: `From ${deals} open ${deals === 1 ? "deal" : "deals"}`,
       fiatLabel: formatProfileFiat(input.openEscrow.hbar, input.usdPerHbar),
     });
@@ -259,7 +259,7 @@ export function profileTileBadge(input: {
     .trim()
     .toUpperCase();
   if (status === "SOLD" || status === "COMPLETED") return { label: "Sold", tone: "sold" };
-  if (status === "LOCKED") return { label: "In escrow", tone: "escrow" };
+  if (status === "LOCKED") return { label: "Protected", tone: "escrow" };
   if (input.hasActiveOffer) return { label: "Offer", tone: "offer" };
   return null;
 }

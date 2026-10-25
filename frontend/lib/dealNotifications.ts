@@ -2,7 +2,7 @@ import { formatPriceForDisplay, withHbarGlyph } from "./formatPrice";
 import { listingHref } from "./listingUrl";
 
 export const DEAL_UPDATES_EMPTY_TITLE = "No updates yet.";
-export const DEAL_UPDATES_EMPTY_BODY = "Offers, escrow, and deal updates land here.";
+export const DEAL_UPDATES_EMPTY_BODY = "Offers, protected payments, and deal updates land here.";
 
 export const DEAL_UPDATES_SEEN_KEY = "hashpop.activity.seen.v1";
 export const DEAL_UPDATES_SEEN_EVENT = "hashpop:activity-seen";
@@ -191,7 +191,7 @@ export function buildDealNotifications(input: {
         id: `escrow-${s.id}`,
         kind: "escrow",
         when: created,
-        title: "Escrow locked",
+        title: "Payment protected",
         body: listingTitleText,
         href: saleHref(s.listingId),
         urgent: false,
@@ -217,7 +217,7 @@ export function buildDealNotifications(input: {
         id: `done-${s.id}`,
         kind: "escrow",
         when: completedAt,
-        title: "Escrow released",
+        title: "Protected payment released",
         body: listingTitleText,
         href: saleHref(s.listingId),
         urgent: false,

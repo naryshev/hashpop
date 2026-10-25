@@ -759,7 +759,7 @@ export default function DashboardPage() {
                   primary
                 />
                 <KPICard
-                  label="In escrow"
+                  label="Protected payments"
                   value={groupHbarAmount(String(Math.round(escrowTinybar / 1e8)))}
                   unit="ℏ"
                   sub={`${purchaseCount + soldItems.length} active orders`}
@@ -867,7 +867,7 @@ export default function DashboardPage() {
                               {row.status === "ACTIVE"
                                 ? "Active"
                                 : row.status === "LOCKED"
-                                  ? "In Escrow"
+                                  ? "Protected"
                                   : row.status || "Active"}
                             </span>
                           </Link>

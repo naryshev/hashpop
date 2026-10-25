@@ -763,7 +763,7 @@ function CreatePageContent() {
               </section>
 
               <section>
-                <SectionHeader title="Shipping & escrow" />
+                <SectionHeader title="Shipping & payment protection" />
                 <button
                   type="button"
                   onClick={() => setRequireEscrow(!requireEscrow)}
@@ -776,11 +776,11 @@ function CreatePageContent() {
                 >
                   <div className="flex-1">
                     <div className="text-sm font-semibold text-white">
-                      Require shipping + on-chain escrow
+                      Offer shipping with a protected payment
                     </div>
                     <div className="text-xs text-silver mt-0.5 leading-snug">
-                      Funds lock in the marketplace contract until the buyer confirms receipt.
-                      Tracking is required before escrow releases.
+                      The buyer&apos;s HBAR is held by an on-chain smart contract until they confirm
+                      receipt. Tracking is required before the protected payment releases.
                     </div>
                   </div>
                   <span
@@ -948,7 +948,7 @@ function ListingPreviewCard({
           {requireEscrow && (
             <>
               <span className="rounded-full bg-[#00ffa3]/10 text-chrome px-2 py-0.5 text-[10px]">
-                Escrow
+                Protected
               </span>
               <span className="rounded-full bg-[#00ffa3]/10 text-chrome px-2 py-0.5 text-[10px]">
                 + Ships

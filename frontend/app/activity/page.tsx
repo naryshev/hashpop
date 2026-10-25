@@ -194,7 +194,9 @@ export default function ActivityPage() {
                 id: `done-${s.id}`,
                 kind: isSeller ? "sale" : "purchase",
                 when: completedAt,
-                title: isSeller ? `Escrow released for "${title}"` : `Received "${title}"`,
+                title: isSeller
+                  ? `Protected payment released for "${title}"`
+                  : `Received "${title}"`,
                 counterparty: counterparty ?? undefined,
                 href: s.listingId ? listingHref(s.listingId) : undefined,
               });

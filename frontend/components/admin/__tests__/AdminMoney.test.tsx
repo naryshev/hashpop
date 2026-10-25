@@ -127,7 +127,9 @@ describe("AdminMoney", () => {
     await renderMoney();
 
     expect(host?.textContent).toContain("Money");
-    expect(host?.textContent).toContain("Escrow and deals that need a release, refund, or look.");
+    expect(host?.textContent).toContain(
+      "Protected payments and deals that need a release, refund, or look.",
+    );
     expect(host?.querySelector("input")?.getAttribute("placeholder")).toBe(
       "Search id, title, wallet…",
     );
@@ -205,17 +207,19 @@ describe("AdminMoney", () => {
     );
     await renderMoney();
     expect(host?.textContent).toContain("No open deals.");
-    expect(host?.textContent).toContain("Escrow and in-flight sales show up here.");
+    expect(host?.textContent).toContain("Protected payments and in-flight sales show up here.");
     expect(host?.querySelector("[data-money-kpi='disputed']")).toBeNull();
     expect(host?.querySelector("[data-money-badge='disputes']")).toBeNull();
 
     await act(async () => buttonNamed("Disputes")?.click());
     expect(host?.textContent).toContain("No open disputes.");
-    expect(host?.textContent).toContain("Escrow disputes that need a money decision land here.");
+    expect(host?.textContent).toContain(
+      "Disputes on protected payments that need a money decision land here.",
+    );
 
     await act(async () => buttonNamed("Released")?.click());
     expect(host?.textContent).toContain("No released deals yet.");
-    expect(host?.textContent).toContain("Completed and refunded escrow will show up here.");
+    expect(host?.textContent).toContain("Completed and refunded protected payments show up here.");
   });
 
   it("lets KPI cards filter the deals table", async () => {
