@@ -19,7 +19,11 @@ export const HOME_CTA = {
 export type HomeRun =
   | { kind: "text"; text: string }
   | { kind: "strong"; text: string }
-  | { kind: "link"; href: "/marketplace" | "/categories" | "/help"; text: string };
+  | {
+      kind: "link";
+      href: "/marketplace" | "/marketplace?view=nearby" | "/categories" | "/help";
+      text: string;
+    };
 
 export type HomeSection = {
   id: string;
@@ -93,8 +97,8 @@ export const HOME_SECTIONS: HomeSection[] = [
       ],
       [
         { kind: "text", text: "Buying close to home? Open " },
-        // Nearby is the mobile dock overlay. It has no route, query, or tab URL.
-        { kind: "link", href: "/marketplace", text: "Nearby" },
+        // Nearby is the BottomNav overlay. This query opens it on load.
+        { kind: "link", href: "/marketplace?view=nearby", text: "Nearby" },
         {
           kind: "text",
           text: " to find listings on a map and meet up with a protected payment already locked when the listing offers one. Selling? Your listings, sales and reviews all live on your public profile, so every deal you close makes the next one easier.",

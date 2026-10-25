@@ -1,12 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Map as MapIcon, MessageSquare, Plus, ShoppingCart, Store } from "lucide-react";
 import { useCart } from "../lib/cart";
 import { useUnreadCount } from "../hooks/useUnreadCount";
+import { hrefWithoutNearbyView, isNearbyView } from "../lib/nearbyView";
 import { NearbyMap } from "./NearbyMap";
 import { TabBar, type TabBarItem } from "./ui/TabBar";
+
+/** Reads `?view=nearby` under Suspense so the dock itself can still server-render. */
+function NearbyFromUrl({
+  onOpen,
+  searchRef,
+}: {
+  onOpen: () => void;
+  searchRef: { current: string };
+}) {
+  const searchParams = useSearchParams();
+  searchRef.current = searchParams.toString();
+  const nearby = isNearbyView(searchParams);
+  useEffect(() => {
+    if (nearby) onOpen();
+  }, [nearby, onOpen]);
+  return null;
+}
 
 /**
  * Mobile primary nav. Owns routing, cart badge, Nearby overlay, and the
@@ -14,9 +32,21 @@ import { TabBar, type TabBarItem } from "./ui/TabBar";
  */
 export function BottomNav() {
   const pathname = usePathname();
+  const router = useRouter();
   const { count: cartCount } = useCart();
   const unreadThreads = useUnreadCount();
   const [mapOpen, setMapOpen] = useState(false);
+  const searchRef = useRef("");
+  const openNearby = useCallback(() => setMapOpen(true), []);
+
+  const closeNearby = useCallback(() => {
+    setMapOpen(false);
+    const current = searchRef.current;
+    if (!isNearbyView(new URLSearchParams(current))) return;
+    router.replace(hrefWithoutNearbyView(pathname, new URLSearchParams(current)), {
+      scroll: false,
+    });
+  }, [pathname, router]);
 
   // Full-screen surfaces (an open message thread) hide the bar entirely —
   // their own back button is the only navigation.
@@ -77,8 +107,10 @@ export function BottomNav() {
         activeId={activeId}
         hidden={immersive || pathname.startsWith("/admin") || pathname.startsWith("/area51")}
         onSelect={(id) => {
-          if (id === "nearby") setMapOpen((open) => !open);
-          else setMapOpen(false);
+          if (id === "nearby") {
+            if (mapOpen) closeNearby();
+            else setMapOpen(true);
+          } else closeNearby();
         }}
         centerAction={{
           id: "create",
@@ -87,7 +119,10 @@ export function BottomNav() {
           icon: <Plus className="h-6 w-6" strokeWidth={2.6} />,
         }}
       />
-      <NearbyMap open={mapOpen} onClose={() => setMapOpen(false)} />
+      <Suspense fallback={null}>
+        <NearbyFromUrl onOpen={openNearby} searchRef={searchRef} />
+      </Suspense>
+      <NearbyMap open={mapOpen} onClose={closeNearby} />
     </>
   );
 }

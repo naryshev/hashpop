@@ -5,6 +5,8 @@ import { BottomNav } from "../BottomNav";
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/marketplace",
+  useRouter: () => ({ replace: () => undefined }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock("next/link", () => ({

@@ -45,7 +45,7 @@ describe("homepage SEO copy", () => {
     expect(html).toContain("<details");
     expect(html).toContain("Hashpop is a peer-to-peer marketplace");
     expect(html).toContain("Buying close to home? Open ");
-    expect(html).toMatch(/<a[^>]*href="\/marketplace"[^>]*>Nearby<\/a>/);
+    expect(html).toMatch(/<a[^>]*href="\/marketplace\?view=nearby"[^>]*>Nearby<\/a>/);
     expect(html).toContain("makes the next one easier.");
     const nearby = html.indexOf("Buying close to home?");
     const cta = html.indexOf("Browse the marketplace");
