@@ -92,7 +92,13 @@ export default function MarketplacePageClient({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [searchInput, setSearchInput] = useState("");
+  const query = searchParams.get("q")?.trim() ?? "";
+  const [searchInput, setSearchInput] = useState(query);
+  // Both header search fields read this value. Keep them on ?q= across
+  // client navigations (listing search, back/forward), not only first mount.
+  useEffect(() => {
+    setSearchInput(query);
+  }, [query]);
   const [filterOpen, setFilterOpen] = useState(false);
   const [desktopFilterOpen, setDesktopFilterOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
@@ -116,7 +122,6 @@ export default function MarketplacePageClient({
   const [filterPostedWithin, setFilterPostedWithin] = useState("");
   const [filterCondition, setFilterCondition] = useState("");
   const [filterLocation, setFilterLocation] = useState("");
-  const query = searchParams.get("q")?.trim() ?? "";
   const categoryQuery = canonicalizeCategory(searchParams.get("category")?.trim() ?? "");
   const minPriceQuery = searchParams.get("minPrice")?.trim() ?? "";
   const maxPriceQuery = searchParams.get("maxPrice")?.trim() ?? "";
