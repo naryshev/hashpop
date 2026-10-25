@@ -9,7 +9,7 @@ function RingO() {
     <svg
       xmlns="http://www.w3.org/2000/svg"
       viewBox="117.95 7.19 20.64 20.76"
-      aria-hidden
+      aria-hidden="true"
       className="ml-[0.1em] mr-[0.12em] h-[0.72em] w-[0.72em] shrink-0 translate-y-[0.06em]"
     >
       <g id="ring-o" data-testid="hashpop-ring-o" fill="var(--color-chrome)">
@@ -46,9 +46,10 @@ export function HashpopWordmark({
         className,
       )}
     >
-      <span aria-hidden>Hashp</span>
+      <span aria-hidden="true">Hashp</span>
       <RingO />
-      <span aria-hidden>p</span>
+      <span aria-hidden="true">p</span>
+      <span className="sr-only">Hashpop</span>
     </span>
   );
 }

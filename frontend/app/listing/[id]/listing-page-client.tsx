@@ -47,6 +47,14 @@ import { LocationPicker, type LocationValue } from "../../../components/Location
 import { OffersPanel } from "../../../components/OffersPanel";
 
 import { getApiUrl } from "../../../lib/apiUrl";
+import { listingImageAlt } from "../../../lib/listingImageAlt";
+import { ListingFetchFallback } from "../../../components/ListingFetchFallback";
+import {
+  LISTING_CLIENT_FETCH_TIMEOUT_MS,
+  LISTING_CLIENT_MAX_ATTEMPTS,
+  LISTING_CLIENT_RETRY_DELAY_MS,
+  resolveListingRefresh,
+} from "../../../lib/listingLoad";
 
 function SellerProfileMeta({ seller }: { seller: string }) {
   return (
@@ -119,9 +127,12 @@ export type Listing = {
 
 export default function ListingPage({
   initialListing = null,
+  initialOutcome = "unavailable",
   usdPerHbar = null,
 }: {
   initialListing?: Listing | null;
+  /** Server already classified a miss via notFound(). Null here is a transient failure. */
+  initialOutcome?: "ready" | "unavailable";
   /** Server HBAR/USD snapshot shared with the Product Offer. */
   usdPerHbar?: number | null;
 }) {
@@ -138,7 +149,12 @@ export default function ListingPage({
   const params = useParams();
   const id = (params.id as string) || "";
   const [listing, setListing] = useState<Listing | null>(initialListing);
-  const [loading, setLoading] = useState(initialListing == null);
+  const [phase, setPhase] = useState<"loading" | "ready" | "missing" | "unavailable">(
+    initialListing ? "ready" : initialOutcome === "ready" ? "missing" : "unavailable",
+  );
+  const listingRef = useRef(listing);
+  listingRef.current = listing;
+  const requestGen = useRef(0);
   const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
@@ -256,51 +272,46 @@ export default function ListingPage({
     onChainPriceHbar != null &&
     Math.abs(parseHbarAmount(apiPriceHbar) - parseHbarAmount(onChainPriceHbar)) > 0.0001;
 
-  const fetchListing = useCallback(
-    (attempt = 0, clearFirst = true) => {
-      if (!id) return;
-      // Retry transient failures (slow backend, RPC hiccups, fresh listings
-      // that haven't synced yet) before declaring the listing not found.
-      const maxRetries = 4;
-      const retryDelayMs = 1600;
-      if (attempt === 0 && clearFirst) {
-        setLoading(true);
-        setListing(null);
+  const refreshListing = useCallback(
+    async (opts?: { showLoading?: boolean }) => {
+      if (!id) {
+        setPhase("missing");
+        return;
       }
-      const retryOrGiveUp = () => {
-        if (attempt < maxRetries) {
-          setTimeout(() => fetchListing(attempt + 1, false), retryDelayMs);
-        } else {
-          setLoading(false);
+      const gen = ++requestGen.current;
+      const known = listingRef.current;
+      // Loading is only for an explicit retry of a page we could not render.
+      // A background refresh of a listing we already have must not blank it.
+      if (opts?.showLoading && !known) setPhase("loading");
+      try {
+        const result = await resolveListingRefresh({
+          url: `${getApiUrl()}/api/listing/${encodeURIComponent(id)}`,
+          timeoutMs: LISTING_CLIENT_FETCH_TIMEOUT_MS,
+          // A visible Loading… retry is one timed attempt. The first paint of a
+          // miss already shows the error, and recovers in the background.
+          maxAttempts: known || opts?.showLoading ? 1 : LISTING_CLIENT_MAX_ATTEMPTS,
+          retryDelayMs: LISTING_CLIENT_RETRY_DELAY_MS,
+        });
+        if (gen !== requestGen.current) return;
+        if (result.phase === "ready") {
+          setListing(result.listing as Listing);
+          setPhase("ready");
+          return;
         }
-      };
-      fetch(`${getApiUrl()}/api/listing/${encodeURIComponent(id)}`)
-        .then((res) => {
-          if (res.ok) return res.json().then((data: { listing: Listing }) => data.listing);
-          return Promise.reject(res);
-        })
-        .then((listingData) => {
-          if (listingData) {
-            setListing(listingData);
-            setLoading(false);
-            return;
-          }
-          retryOrGiveUp();
-        })
-        .catch(() => retryOrGiveUp());
+        if (listingRef.current) return;
+        setListing(null);
+        setPhase(result.phase);
+      } catch {
+        if (gen !== requestGen.current || listingRef.current) return;
+        setPhase("unavailable");
+      }
     },
     [id],
   );
 
   useEffect(() => {
-    if (!id) {
-      setLoading(false);
-      return;
-    }
-    // Keep the server-rendered listing in the first HTML. A clear-first
-    // refetch would replace that crawlable shell with "Loading…".
-    fetchListing(0, initialListing == null);
-  }, [id, fetchListing, initialListing]);
+    void refreshListing();
+  }, [refreshListing]);
 
   useEffect(() => {
     if (!listing) return;
@@ -558,29 +569,15 @@ export default function ListingPage({
     }
   };
 
-  if (loading) {
+  if (phase !== "ready" || !listing) {
+    const fallbackPhase = phase === "ready" ? "missing" : phase;
     return (
-      <main className="min-h-screen">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-          <p className="text-silver">Loading…</p>
-        </div>
-      </main>
-    );
-  }
-
-  if (!listing) {
-    return (
-      <main className="min-h-screen">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-          <p className="text-silver">Listing not found.</p>
-          <Link
-            href="/marketplace"
-            className="text-chrome hover:text-white underline mt-2 inline-block"
-          >
-            Back to marketplace
-          </Link>
-        </div>
-      </main>
+      <ListingFetchFallback
+        phase={fallbackPhase}
+        onRetry={() => {
+          void refreshListing({ showLoading: true });
+        }}
+      />
     );
   }
 
@@ -788,7 +785,7 @@ export default function ListingPage({
       setListing(updated.listing);
       if (priceUpdateTxHash) {
         // Refresh in background so the UI reflects synced/on-chain price quickly.
-        fetchListing(0, false);
+        void refreshListing();
       }
       if (!priceUpdateFailed) {
         setEditing(false);
@@ -879,16 +876,23 @@ export default function ListingPage({
     setSelectedMediaIndex((prev) => (prev + 1) % galleryItems.length);
   };
 
-  // Title block is rendered twice: mobile (`lg:hidden`) above the gallery,
-  // desktop (`hidden lg:block`) at the top of the right column. Secondary
-  // blocks (want-to-sell, description, location) also render in two places
-  // so they sit under the photo on desktop and below the buy stack on mobile.
+  // Title block is rendered twice: mobile above the gallery, desktop
+  // (`hidden lg:block`) at the top of the right column. Secondary blocks
+  // (want-to-sell, description, location) also render in two places so they
+  // sit under the photo on desktop and below the buy stack on mobile.
+  // One h1 lives in the mobile block and becomes sr-only at lg, where that
+  // block's parent used to be display:none. The desktop title is the same
+  // type, but a non-heading aria-hidden copy so the outline has one title.
+  const titleText = editing ? editTitle || displayTitle : displayTitle;
   const titleBlockJsx = (
     <div>
       <div className="flex flex-wrap items-start gap-2">
-        <h1 className="min-w-0 flex-1 text-2xl font-semibold tracking-normal text-white">
-          {editing ? editTitle || displayTitle : displayTitle}
-        </h1>
+        <div
+          aria-hidden="true"
+          className="min-w-0 flex-1 text-2xl font-semibold tracking-normal text-white"
+        >
+          {titleText}
+        </div>
         {!isListed && !isUnconfirmed && (
           <span className="mt-1 flex-shrink-0 rounded-full border border-white/10 bg-white/10 px-2.5 py-0.5 text-xs font-medium text-silver">
             Archived
@@ -940,25 +944,29 @@ export default function ListingPage({
   const mobileTitleBlockJsx = (
     <div>
       <div className="flex flex-wrap items-start gap-2">
-        <h1 className="min-w-0 flex-1 text-2xl font-semibold tracking-normal text-white">
-          {editing ? editTitle || displayTitle : displayTitle}
+        <h1 className="min-w-0 flex-1 text-2xl font-semibold tracking-normal text-white lg:sr-only">
+          {titleText}
         </h1>
         {!isListed && !isUnconfirmed && (
-          <span className="mt-1 flex-shrink-0 rounded-full border border-white/10 bg-white/10 px-2.5 py-0.5 text-xs font-medium text-silver">
+          <span className="mt-1 flex-shrink-0 rounded-full border border-white/10 bg-white/10 px-2.5 py-0.5 text-xs font-medium text-silver lg:hidden">
             Archived
           </span>
         )}
       </div>
-      {watchCount > 0 && <p className="mt-1 text-sm text-silver/60">{watchCount} watching</p>}
-      {displaySubtitle && !editing && <p className="mt-1 text-sm text-silver">{displaySubtitle}</p>}
-      {attributesLine && (
-        <p className="mt-0.5 text-sm text-silver/70">
-          {editing
-            ? [editCondition, editYearOfProduction].filter(Boolean).join(" | ")
-            : attributesLine}
-        </p>
-      )}
-      {offerPriceJsx}
+      <div className="lg:hidden">
+        {watchCount > 0 && <p className="mt-1 text-sm text-silver/60">{watchCount} watching</p>}
+        {displaySubtitle && !editing && (
+          <p className="mt-1 text-sm text-silver">{displaySubtitle}</p>
+        )}
+        {attributesLine && (
+          <p className="mt-0.5 text-sm text-silver/70">
+            {editing
+              ? [editCondition, editYearOfProduction].filter(Boolean).join(" | ")
+              : attributesLine}
+          </p>
+        )}
+        {offerPriceJsx}
+      </div>
     </div>
   );
 
@@ -1314,7 +1322,11 @@ export default function ListingPage({
                   />
                 ) : (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={mainImageUrl} alt="" className="h-full w-full object-contain" />
+                  <img
+                    src={mainImageUrl}
+                    alt={listingImageAlt(displayTitle, safeMediaIndex)}
+                    className="h-full w-full object-contain"
+                  />
                 )}
                 {galleryItems.length > 1 && (
                   <>
@@ -1381,8 +1393,12 @@ export default function ListingPage({
           )}
         </nav>
 
-        <div className="mb-3 space-y-3 lg:hidden">
-          {listing.seller && <MobileSellerChrome seller={listing.seller} />}
+        <div className="mb-3 space-y-3 lg:mb-0 lg:h-0 lg:space-y-0">
+          {listing.seller && (
+            <div className="lg:hidden">
+              <MobileSellerChrome seller={listing.seller} />
+            </div>
+          )}
           {mobileTitleBlockJsx}
         </div>
 
@@ -1417,7 +1433,11 @@ export default function ListingPage({
                         />
                       ) : (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={item.url} alt="" className="h-full w-full object-cover" />
+                        <img
+                          src={item.url}
+                          alt={listingImageAlt(displayTitle, i)}
+                          className="h-full w-full object-cover"
+                        />
                       )}
                       {editing && i === 0 && (
                         <span className="pointer-events-none absolute bottom-0 left-0 bg-black/70 px-1 text-[9px] font-bold uppercase text-chrome">
@@ -1472,7 +1492,7 @@ export default function ListingPage({
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={mainImageUrl}
-                        alt={displayTitle}
+                        alt={listingImageAlt(displayTitle, safeMediaIndex)}
                         className="h-full w-full object-contain"
                       />
                     )}
@@ -1691,7 +1711,7 @@ export default function ListingPage({
                   <textarea
                     value={editDescription}
                     onChange={(e) => setEditDescription(e.target.value)}
-                    className="input-frost mt-1 w-full text-sm min-h-[80px] resize-y"
+                    className="input-frost mt-1 w-full text-base min-h-[80px] resize-y"
                     placeholder="Condition notes, what’s included, any flaws."
                   />
                 </label>
@@ -1826,14 +1846,18 @@ export default function ListingPage({
                   requireEscrow={!!listing.requireEscrow}
                   trackingNumber={listing.trackingNumber ?? null}
                   trackingCarrier={listing.trackingCarrier ?? null}
-                  onEscrowUpdated={() => fetchListing(0, false)}
+                  onEscrowUpdated={() => {
+                    void refreshListing();
+                  }}
                 />
               )}
             {listing && isListed && (
               <OffersPanel
                 listingId={listing.id}
                 sellerAddress={listing.seller}
-                onChanged={() => fetchListing(0, false)}
+                onChanged={() => {
+                  void refreshListing();
+                }}
               />
             )}
             {listing && isListed && !isSeller && listingVariants.length > 0 && (
@@ -1870,7 +1894,7 @@ export default function ListingPage({
                 onOfferSubmitted={() => {
                   // Refresh listing so the buyer's banner updates and the
                   // seller (if same browser session) sees the new offer.
-                  fetchListing(0, false);
+                  void refreshListing();
                 }}
               />
             )}
@@ -2146,7 +2170,7 @@ export default function ListingPage({
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={thumb}
-                          alt=""
+                          alt={listingImageAlt(item.title, 0)}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
                       ) : (

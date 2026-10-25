@@ -195,7 +195,9 @@ describe("MarketplaceMobileHeader", () => {
     expect(wordmark.className).toContain("tracking-[0.08em]");
     expect(wordmark.className).toContain("text-white/60");
     expect(wordmark.className).toContain("text-[12px]");
-    const home = document.querySelector('a[aria-label="Hashpop home"]') as HTMLElement;
+    const home = document.querySelector('a[aria-label="Hashpop"]') as HTMLElement;
+    expect(home.querySelector(".sr-only")?.textContent).toBe("Hashpop");
+    expect(home.querySelector('[aria-hidden="true"]')?.textContent).toBe("Hashp");
     expect(home.parentElement?.className).toContain("grid-cols-");
     expect(document.body.textContent).not.toContain("Sign in");
     const profileButton = document.querySelector(

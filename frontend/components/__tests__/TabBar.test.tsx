@@ -63,6 +63,9 @@ describe("TabBar badges", () => {
     expect(cart?.getAttribute("aria-label")).toBe("Cart, 3");
     expect(messages?.getAttribute("aria-label")).toBe("Messages, 9+");
     expect(cart?.querySelector("[data-dock-badge]")?.textContent).toBe("3");
+    expect(document.querySelector('a[href="/marketplace"] .sr-only')?.textContent).toBe(
+      "Marketplace",
+    );
     expect(messages?.querySelector("[data-dock-badge]")?.textContent).toBe("9+");
   });
 

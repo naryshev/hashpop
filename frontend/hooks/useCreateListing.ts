@@ -107,7 +107,12 @@ export function useCreateListing(options?: UseCreateListingOptions) {
       }),
     }).catch(() => null);
     if (!syncRes?.ok) {
-      throw new Error("Listing was created on-chain but could not be saved. Please try again.");
+      const body = syncRes ? await syncRes.json().catch(() => ({})) : {};
+      const message =
+        body && typeof body === "object" && "error" in body && typeof body.error === "string"
+          ? body.error
+          : "Listing was created on-chain but could not be saved. Please try again.";
+      throw new Error(message);
     }
     setIsSuccess(true);
     return idBytes;

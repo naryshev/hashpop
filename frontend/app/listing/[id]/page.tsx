@@ -1,8 +1,13 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { fetchHbarUsdSnapshot, HBAR_USD_REVALIDATE_SECONDS } from "../../../lib/hbarUsd";
 import { fetchPublicListing } from "../../../lib/seo/fetchListing";
 import { listingJsonLd, serializeJsonLd } from "../../../lib/seo/jsonld";
-import { listingMetadata } from "../../../lib/seo/metadata";
+import {
+  listingMetadata,
+  listingNotFoundMetadata,
+  listingUnavailableMetadata,
+} from "../../../lib/seo/metadata";
 import ListingPageClient, { type Listing } from "./listing-page-client";
 
 export const revalidate = HBAR_USD_REVALIDATE_SECONDS;
@@ -12,14 +17,27 @@ type ListingPageProps = {
 };
 
 export async function generateMetadata({ params }: ListingPageProps): Promise<Metadata> {
-  const listing = await fetchPublicListing(params.id);
-  return listingMetadata(params.id, listing);
+  const result = await fetchPublicListing(params.id);
+  if (result.status === "not_found") return listingNotFoundMetadata();
+  if (result.status === "unavailable") return listingUnavailableMetadata();
+  return listingMetadata(params.id, result.listing);
 }
 
 export default async function ListingPage({ params }: ListingPageProps) {
-  const listing = await fetchPublicListing(params.id);
-  const usdPerHbar = listing ? await fetchHbarUsdSnapshot() : null;
-  const jsonLd = listing ? listingJsonLd(params.id, listing, { usdPerHbar }) : null;
+  const result = await fetchPublicListing(params.id);
+  if (result.status === "not_found") notFound();
+  if (result.status === "unavailable") {
+    return (
+      <ListingPageClient
+        key={params.id}
+        initialListing={null}
+        initialOutcome="unavailable"
+        usdPerHbar={null}
+      />
+    );
+  }
+  const usdPerHbar = await fetchHbarUsdSnapshot();
+  const jsonLd = listingJsonLd(params.id, result.listing, { usdPerHbar });
   return (
     <>
       {jsonLd ? (
@@ -30,7 +48,8 @@ export default async function ListingPage({ params }: ListingPageProps) {
       ) : null}
       <ListingPageClient
         key={params.id}
-        initialListing={listing as Listing | null}
+        initialListing={result.listing as Listing}
+        initialOutcome="ready"
         usdPerHbar={usdPerHbar}
       />
     </>

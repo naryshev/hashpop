@@ -223,42 +223,110 @@ function SoftTrustCard({
         data-density="nearby"
         className={cn(
           material.regular,
-          "flex h-[104px] flex-row items-stretch overflow-hidden rounded-[16px] border-white/12",
+          "relative flex h-[104px] flex-row items-stretch overflow-hidden rounded-[16px] border-white/12",
         )}
       >
-        <div
-          data-testid="soft-trust-media"
-          data-media="nearby"
-          className="relative h-full w-[88px] shrink-0 overflow-hidden bg-[#0b111b]"
-        >
-          <Link href={listingHref(item.id)} className="absolute inset-0 block">
+        <Link href={listingHref(item.id)} className="flex min-w-0 flex-1 flex-row items-stretch">
+          <div
+            data-testid="soft-trust-media"
+            data-media="nearby"
+            className="relative h-full w-[88px] shrink-0 overflow-hidden bg-[#0b111b]"
+          >
             <ListingMedia listing={item} bleed />
-          </Link>
-        </div>
-        <Link
-          href={listingHref(item.id)}
-          className="flex min-w-0 flex-1 flex-col justify-center px-2.5 py-1.5"
-        >
-          <div className="flex items-start gap-1">
-            <h2 className="min-w-0 flex-1 truncate text-[13px] font-semibold leading-tight text-white">
-              {title}
-            </h2>
-            <WishlistButton itemId={item.id} itemType="listing" compact surface="neutral" />
           </div>
+          <div className="flex min-w-0 flex-1 flex-col justify-center px-2.5 py-1.5">
+            <div className="flex items-start gap-1">
+              <h2 className="min-w-0 flex-1 truncate text-[13px] font-semibold leading-tight text-white">
+                {title}
+              </h2>
+              <span aria-hidden="true" className="h-11 w-11 shrink-0" />
+            </div>
+            {meta ? (
+              <p data-testid="listing-card-meta" className="truncate text-[11px] text-silver/75">
+                {meta}
+              </p>
+            ) : null}
+            {capsule ? (
+              <div className="mt-1 flex h-5 items-center">
+                <span className={statusCapsule[capsule]}>{statusLabel[capsule]}</span>
+              </div>
+            ) : chips.length > 0 ? (
+              <TrustChipRow chips={chips} compact />
+            ) : null}
+            <div className="mt-0.5 flex items-baseline justify-between gap-2">
+              <p className="font-mono text-[14px] font-bold text-chrome">
+                {formatPriceForDisplay(item.price || "0")}
+                <span className="italic">{"\u2009ℏ"}</span>
+              </p>
+              {distance ? (
+                <span
+                  data-testid="listing-distance"
+                  className="inline-flex shrink-0 items-center gap-0.5 text-[11px] text-white/70"
+                >
+                  <MapPin size={12} aria-hidden className="shrink-0 text-chrome" />
+                  {distance}
+                </span>
+              ) : null}
+            </div>
+          </div>
+        </Link>
+        <div className="absolute right-2.5 top-1.5 z-10">
+          <WishlistButton itemId={item.id} itemType="listing" compact surface="neutral" />
+        </div>
+      </article>
+    );
+  }
+
+  return (
+    <article
+      data-variant="softTrust"
+      className={cn(
+        material.regular,
+        "relative flex h-full flex-col overflow-hidden border-white/12 shadow-[0_8px_24px_rgba(0,0,0,0.28)] transition-transform active:scale-[0.98]",
+        compact ? "rounded-[20px]" : "rounded-[18px]",
+      )}
+    >
+      <Link href={listingHref(item.id)} className="flex min-w-0 flex-1 flex-col">
+        <div className="px-1.5 pt-1.5">
+          <div
+            data-testid="soft-trust-media"
+            data-media="grid"
+            className="relative aspect-[4/3] overflow-hidden rounded-[14px] bg-[#0b111b]"
+          >
+            <ListingMedia listing={item} bleed slideshow={compact ? undefined : "hover"} />
+          </div>
+        </div>
+        <div
+          className={cn(
+            "flex w-full min-w-0 flex-1 flex-col pb-[11px] pt-2",
+            compact ? "px-2" : "px-2.5",
+          )}
+        >
+          <h2 className="line-clamp-2 min-h-9 text-[13px] font-semibold leading-snug text-white">
+            {title}
+          </h2>
           {meta ? (
-            <p data-testid="listing-card-meta" className="truncate text-[11px] text-silver/75">
+            <p
+              data-testid="listing-card-meta"
+              className="mt-0.5 truncate text-[12px] text-silver/75"
+            >
               {meta}
             </p>
           ) : null}
           {capsule ? (
-            <div className="mt-1 flex h-5 items-center">
+            <div className="mt-1.5 flex h-6 items-center">
               <span className={statusCapsule[capsule]}>{statusLabel[capsule]}</span>
             </div>
           ) : chips.length > 0 ? (
-            <TrustChipRow chips={chips} compact />
+            <TrustChipRow chips={chips} compact={compact} />
           ) : null}
-          <div className="mt-0.5 flex items-baseline justify-between gap-2">
-            <p className="font-mono text-[14px] font-bold text-chrome">
+          <div className="mt-auto flex items-baseline justify-between gap-2 pt-1.5">
+            <p
+              className={cn(
+                "font-mono font-bold text-chrome",
+                compact ? "text-[14px]" : "text-[15px]",
+              )}
+            >
               {formatPriceForDisplay(item.price || "0")}
               <span className="italic">{"\u2009ℏ"}</span>
             </p>
@@ -272,77 +340,11 @@ function SoftTrustCard({
               </span>
             ) : null}
           </div>
-        </Link>
-      </article>
-    );
-  }
-
-  return (
-    <article
-      data-variant="softTrust"
-      className={cn(
-        material.regular,
-        "flex h-full flex-col overflow-hidden border-white/12 shadow-[0_8px_24px_rgba(0,0,0,0.28)] transition-transform active:scale-[0.98]",
-        compact ? "rounded-[20px]" : "rounded-[18px]",
-      )}
-    >
-      <div className="px-1.5 pt-1.5">
-        <div
-          data-testid="soft-trust-media"
-          data-media="grid"
-          className="relative aspect-[4/3] overflow-hidden rounded-[14px] bg-[#0b111b]"
-        >
-          <Link href={listingHref(item.id)} className="absolute inset-0 block">
-            <ListingMedia listing={item} bleed slideshow={compact ? undefined : "hover"} />
-          </Link>
-          <div className="absolute right-1.5 top-1.5 z-10">
-            <WishlistButton itemId={item.id} itemType="listing" compact surface="neutral" />
-          </div>
-        </div>
-      </div>
-      <Link
-        href={listingHref(item.id)}
-        className={cn(
-          "flex w-full min-w-0 flex-1 flex-col pb-[11px] pt-2",
-          compact ? "px-2" : "px-2.5",
-        )}
-      >
-        <h2 className="line-clamp-2 min-h-9 text-[13px] font-semibold leading-snug text-white">
-          {title}
-        </h2>
-        {meta ? (
-          <p data-testid="listing-card-meta" className="mt-0.5 truncate text-[12px] text-silver/75">
-            {meta}
-          </p>
-        ) : null}
-        {capsule ? (
-          <div className="mt-1.5 flex h-6 items-center">
-            <span className={statusCapsule[capsule]}>{statusLabel[capsule]}</span>
-          </div>
-        ) : chips.length > 0 ? (
-          <TrustChipRow chips={chips} compact={compact} />
-        ) : null}
-        <div className="mt-auto flex items-baseline justify-between gap-2 pt-1.5">
-          <p
-            className={cn(
-              "font-mono font-bold text-chrome",
-              compact ? "text-[14px]" : "text-[15px]",
-            )}
-          >
-            {formatPriceForDisplay(item.price || "0")}
-            <span className="italic">{"\u2009ℏ"}</span>
-          </p>
-          {distance ? (
-            <span
-              data-testid="listing-distance"
-              className="inline-flex shrink-0 items-center gap-0.5 text-[11px] text-white/70"
-            >
-              <MapPin size={12} aria-hidden className="shrink-0 text-chrome" />
-              {distance}
-            </span>
-          ) : null}
         </div>
       </Link>
+      <div className="absolute right-3 top-3 z-10">
+        <WishlistButton itemId={item.id} itemType="listing" compact surface="neutral" />
+      </div>
     </article>
   );
 }
@@ -373,7 +375,7 @@ export function ListingCard({
     <article
       className={cn(
         material.regular,
-        "flex flex-col overflow-hidden transition-colors hover:border-chrome/40",
+        "relative flex flex-col overflow-hidden transition-colors hover:border-chrome/40",
         compact ? "rounded-[20px]" : "rounded-[16px]",
       )}
     >
@@ -390,9 +392,6 @@ export function ListingCard({
           <span className={cn("absolute left-2.5 top-2.5 z-10", statusCapsule[status])}>
             {statusLabel[status]}
           </span>
-          <div className="absolute right-1 top-1 z-10">
-            <WishlistButton itemId={item.id} itemType="listing" compact />
-          </div>
         </div>
         <div className="flex flex-1 flex-col p-3 pb-1">
           <h2 className="line-clamp-2 text-[15px] font-semibold leading-snug text-white">
@@ -409,6 +408,9 @@ export function ListingCard({
           </div>
         </div>
       </Link>
+      <div className="absolute right-1 top-1 z-10">
+        <WishlistButton itemId={item.id} itemType="listing" compact />
+      </div>
       {item.seller && (
         <div className="px-3 pb-3">
           <TrustStrip density="inline" address={item.seller} />

@@ -87,6 +87,7 @@ function TopNavBtn({
     return (
       <Link href={href} className={className} aria-label={label} title={label}>
         {children}
+        <span className="sr-only">{label}</span>
       </Link>
     );
   }
@@ -245,11 +246,11 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
           <Link
             href="/marketplace"
             className="flex h-10 w-10 shrink-0 items-center justify-center"
-            aria-label="Hashpop home"
+            aria-label="Hashpop"
             title="Hashpop"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/hashpop-cart-3d.PNG" alt="" className="h-7 w-auto object-contain" />
+            <img src="/hashpop-cart-3d.PNG" alt="Hashpop" className="h-7 w-auto object-contain" />
           </Link>
           <div ref={centerSlotRef} className="flex items-center" data-topbar-slot="center" />
           {!centerFilled && (
@@ -268,7 +269,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
                   value={fallbackQuery}
                   onChange={(e) => setFallbackQuery(e.target.value)}
                   placeholder="Search listings"
-                  className="flex-1 bg-transparent text-sm text-white placeholder:text-silver/50 focus:outline-none"
+                  className="flex-1 bg-transparent text-base text-white placeholder:text-silver/50 focus:outline-none"
                 />
               </div>
             </form>

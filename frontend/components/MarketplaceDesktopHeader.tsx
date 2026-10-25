@@ -38,7 +38,7 @@ export function MarketplaceDesktopHeader({
       <Link
         href="/marketplace"
         data-testid="marketplace-desktop-brand"
-        aria-label="Hashpop home"
+        aria-label="Hashpop"
         className="flex shrink-0 items-center gap-2.5"
       >
         {/* Product cart-H (same asset as the shell and splash). Not the outline cart. */}
@@ -65,7 +65,7 @@ export function MarketplaceDesktopHeader({
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Search marketplace…"
             aria-label="Search marketplace"
-            className="min-w-0 flex-1 bg-transparent pl-2 text-[15px] text-white placeholder:text-white/45 focus:outline-none"
+            className="min-w-0 flex-1 bg-transparent pl-2 text-base text-white placeholder:text-white/45 focus:outline-none"
           />
         </div>
       </form>

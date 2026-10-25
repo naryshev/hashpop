@@ -644,7 +644,7 @@ function CreatePageContent() {
                     <textarea
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      className="input-frost mt-1 w-full min-h-[100px] resize-y"
+                      className="input-frost mt-1 w-full min-h-[100px] resize-y text-base"
                       placeholder="What makes it worth buying? Condition notes, what's included, any flaws."
                     />
                   </label>

@@ -104,6 +104,12 @@ describe("DesktopShell marketplace chrome", () => {
     nav.pathname = "/purchases";
     await renderShell();
     expect(document.querySelector('nav[aria-label="Primary navigation"]')).toBeTruthy();
+    const marketplace = document.querySelector(
+      'nav[aria-label="Primary navigation"] a[href="/marketplace"]',
+    );
+    expect(marketplace?.querySelector(".sr-only")?.textContent).toBe("Marketplace");
+    const logo = document.querySelector("header.hp-desktop-bar img") as HTMLImageElement;
+    expect(logo.getAttribute("alt")).toBe("Hashpop");
     expect(document.body.textContent).toContain("Sign in");
     expect(document.querySelector('[data-testid="mobile-top-bar"]')).toBeTruthy();
     expect(document.querySelector('[data-testid="marketplace-brand-header"]')).toBeNull();
@@ -141,6 +147,14 @@ describe("DesktopShell marketplace chrome", () => {
       expect(document.querySelector('[data-testid="marketplace-filter-button"]')).toBeNull();
       expect(wordmark.textContent).not.toBe("cart");
       expect(wordmark.textContent).not.toBe("messages");
+      const logo = document.querySelector('[data-testid="marketplace-logo"]') as HTMLElement;
+      expect(logo.querySelector(".sr-only")?.textContent).toBe("Hashpop");
+      expect(logo.getAttribute("aria-label")).toBe("Hashpop");
+      const visual = [...logo.querySelectorAll("[aria-hidden='true']")].map(
+        (node) => node.textContent,
+      );
+      expect(visual.join("")).toBe("Hashpp");
+      expect(logo.textContent?.replace(/\s+/g, "")).toContain("Hashpop");
     },
   );
 

@@ -16,6 +16,9 @@ import {
   FALLBACK_OG_IMAGE,
   FALLBACK_TWITTER_IMAGE,
   listingMetadata,
+  listingNotFoundDocumentMetadata,
+  listingNotFoundMetadata,
+  listingUnavailableMetadata,
   marketplaceMetadata,
   staticPageMetadata,
 } from "../metadata";
@@ -118,7 +121,9 @@ describe("listing metadata", () => {
     expect(meta.description).not.toMatch(/escrow-backed P2P/);
     expect(meta.alternates?.canonical).toBe("https://hashpop.io/listing/lst-1");
     expect(meta.openGraph?.url).toBe("https://hashpop.io/listing/lst-1");
-    expect(meta.openGraph?.type).toBe("website");
+    expect(meta.openGraph && "type" in meta.openGraph ? meta.openGraph.type : undefined).toBe(
+      "website",
+    );
     expect(meta.openGraph?.images).toEqual([{ url: "https://cdn.hashpop.io/camera.jpg" }]);
     expect(
       listingMetadata("lst-1", { ...listing, imageUrl: null, mediaUrls: [] }).openGraph?.images,
@@ -145,11 +150,24 @@ describe("listing metadata", () => {
     expect(meta.description).toBe("Vintage Camera for 84 ℏ on Hashpop — escrow-backed P2P.");
   });
 
-  it("falls back when the listing is missing without a generic Hashpop title", () => {
-    const meta = listingMetadata("missing", null);
+  it("keeps a confirmed miss noindex without a second robots tag", () => {
+    const meta = listingNotFoundMetadata();
+    expect(meta.robots).toMatchObject({ index: false, follow: true });
+    const documentMeta = listingNotFoundDocumentMetadata();
+    expect(documentMeta.robots).toBeUndefined();
+    expect(documentMeta.title).toEqual(meta.title);
+    expect(documentMeta.description).toBe(meta.description);
+    expect(documentMeta.alternates?.canonical).toBeUndefined();
+  });
+
+  it("does not publish a self-canonical when the listing cannot be loaded", () => {
+    const meta = listingUnavailableMetadata();
     expect(meta.title).toEqual({ absolute: SEO_COPY.listingFallbackTitle });
-    expect(meta.alternates?.canonical).toBe("https://hashpop.io/listing/missing");
-    expect(meta.description).toBe("Listing for 0 ℏ on Hashpop — escrow-backed P2P.");
+    expect(meta.robots).toMatchObject({ index: false, follow: false });
+    expect(meta.alternates?.canonical).toBeUndefined();
+    expect(
+      meta.openGraph && "url" in meta.openGraph ? meta.openGraph.url : undefined,
+    ).toBeUndefined();
   });
 });
 

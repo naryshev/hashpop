@@ -4,7 +4,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { NearbyMap } from "../NearbyMap";
 
 const { searchGeocode } = vi.hoisted(() => ({
-  searchGeocode: vi.fn(async () => ({ available: true, suggestions: [] as unknown[] })),
+  searchGeocode: vi.fn(
+    async (
+      _query: string,
+      _proximity?: { lat: number; lng: number },
+      _options?: { country?: "us" },
+    ) => ({ available: true, suggestions: [] as unknown[] }),
+  ),
 }));
 
 vi.mock("next/dynamic", () => ({
@@ -26,7 +32,11 @@ vi.mock("../../lib/geocode", () => ({
   GEOCODE_DEBOUNCE_MS: 0,
   SEARCH_UNAVAILABLE_COPY: "Search unavailable",
   probeGeocodeAvailable: async () => true,
-  searchGeocode: (...args: unknown[]) => searchGeocode(...args),
+  searchGeocode: (
+    query: string,
+    proximity?: { lat: number; lng: number },
+    options?: { country?: "us" },
+  ) => searchGeocode(query, proximity, options),
 }));
 
 vi.mock("../../lib/profiles", () => ({

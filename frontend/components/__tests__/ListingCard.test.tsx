@@ -152,11 +152,13 @@ describe("ListingCard softTrust", () => {
     expect(media.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const heart = document.querySelector('[data-testid="wishlist"]') as HTMLElement;
     expect(heart).toBeTruthy();
+    expect(heart.tagName).toBe("BUTTON");
     expect(heart.dataset.surface).toBe("neutral");
-    expect(
-      media.compareDocumentPosition(document.querySelector('[data-testid="wishlist"]')!) &
-        Node.DOCUMENT_POSITION_CONTAINED_BY,
-    ).toBeTruthy();
+    const links = card.querySelectorAll("a");
+    expect(links).toHaveLength(1);
+    expect(links[0].getAttribute("href")).toBe("/listing/lst-1");
+    expect(links[0].contains(heart)).toBe(false);
+    expect(card.contains(heart)).toBe(true);
     expect(document.querySelector('[data-testid="trust-strip"]')).toBeNull();
     const chips = [...document.querySelectorAll('[data-testid="grid-trust-chip"]')];
     expect(chips.map((chip) => chip.textContent)).toEqual(["Meetup"]);
@@ -172,6 +174,24 @@ describe("ListingCard softTrust", () => {
     expect(document.body.textContent).not.toContain("Active");
     expect(document.body.textContent).not.toContain("KYC");
     expect(document.body.textContent).not.toContain("ETH");
+  });
+
+  it("uses the title for the cover alt and photo N for extra frames", async () => {
+    await renderCard({
+      variant: "softTrust",
+      density: "regular",
+      item: {
+        id: "lst-galaxy",
+        title: "Galaxy Gas",
+        price: "5",
+        mediaUrls: ["https://example.com/a.jpg", "https://example.com/b.jpg"],
+      },
+    });
+    const card = document.querySelector('[data-variant="softTrust"]') as HTMLElement;
+    expect(card.querySelectorAll("a")).toHaveLength(1);
+    const alts = [...card.querySelectorAll("img")].map((img) => img.getAttribute("alt"));
+    expect(alts).toContain("Galaxy Gas");
+    expect(alts).toContain("Galaxy Gas, photo 2");
   });
 
   it("mounts all three compact chips when the row is wide enough", async () => {
@@ -192,7 +212,7 @@ describe("ListingCard softTrust", () => {
         distanceLabel: "1.2 km",
       },
     });
-    const chips = [...document.querySelectorAll('[data-testid="grid-trust-chip"]')];
+    const chips = [...document.querySelectorAll<HTMLElement>('[data-testid="grid-trust-chip"]')];
     expect(chips.map((chip) => chip.textContent)).toEqual(["98%", "Meetup", "Escrow"]);
     expect(chips.every((chip) => !chip.hidden)).toBe(true);
     const distance = document.querySelector('[data-testid="listing-distance"]') as HTMLElement;
