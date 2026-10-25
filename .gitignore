@@ -48,3 +48,9 @@ docker-compose.override.yml
 
 # Claude Code local worktrees (accidentally committed once as a gitlink)
 .claude/worktrees/
+
+# Local SSH keys and certificates
+/key
+/key.pub
+*.pem
+id_*
