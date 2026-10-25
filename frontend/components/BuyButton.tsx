@@ -238,7 +238,7 @@ export function BuyButton({
   const purchaseOffset = descriptionSlot || hasCallout ? "mt-3" : "mt-4";
 
   return (
-    <div className="mx-auto w-full max-w-[360px]">
+    <div className="mx-auto w-full max-w-[360px] lg:mx-0 lg:max-w-none">
       <p className="flex items-baseline gap-2 text-left">
         <span className="font-mono text-[34px] font-bold leading-none tracking-tight text-chrome">
           {priceHbarDisplay}

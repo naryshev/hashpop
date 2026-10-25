@@ -159,6 +159,63 @@ describe("DesktopShell marketplace chrome", () => {
     expect(document.querySelector('nav[aria-label="Primary navigation"]')).toBeTruthy();
   });
 
+  it.each(["/listing/lst-galaxy", "/terms", "/privacy"])(
+    "uses the shared marketplace desktop header on %s",
+    async (pathname) => {
+      nav.pathname = pathname;
+      await renderShell();
+      const header = document.querySelector(
+        '[data-testid="marketplace-desktop-header"]',
+      ) as HTMLElement;
+      expect(header).toBeTruthy();
+      expect(header.className).toContain("hp-desktop-bar");
+      expect(header.className).toContain("md:h-[72px]");
+      expect(document.querySelector('nav[aria-label="Primary navigation"]')).toBeNull();
+      expect(document.body.textContent).not.toContain("Search listings");
+      expect(document.body.textContent).not.toContain("Sign in");
+      const input = header.querySelector(
+        'input[aria-label="Search marketplace"]',
+      ) as HTMLInputElement;
+      expect(input.placeholder).toBe("Search marketplace…");
+      expect(
+        document.querySelector('[data-testid="marketplace-desktop-create"]')?.textContent,
+      ).toBe("Create");
+      expect(document.querySelector('[data-testid="marketplace-desktop-profile"]')).toBeTruthy();
+    },
+  );
+
+  it.each(["/terms", "/privacy"])(
+    "uses the marketplace brand header on mobile for %s",
+    async (pathname) => {
+      nav.pathname = pathname;
+      await renderShell();
+      const brand = document.querySelector(
+        '[data-testid="marketplace-brand-header"]',
+      ) as HTMLElement;
+      expect(brand).toBeTruthy();
+      expect(brand.parentElement?.className).toBe("hp-brand-safe-top");
+      expect(brand.parentElement?.parentElement?.className).toContain("md:hidden");
+      expect(document.querySelector('[data-testid="mobile-top-bar"]')).toBeNull();
+      expect(document.querySelector('[data-testid="marketplace-search-field"]')).toBeNull();
+      expect(document.querySelector('[data-testid="marketplace-filter-button"]')).toBeNull();
+    },
+  );
+
+  it("leaves listing mobile on its own chrome", async () => {
+    nav.pathname = "/listing/lst-galaxy";
+    await renderShell();
+    expect(document.querySelector('[data-testid="marketplace-brand-header"]')).toBeNull();
+    expect(document.querySelector('[data-testid="mobile-top-bar"]')).toBeNull();
+    expect(document.querySelector('[data-testid="marketplace-desktop-header"]')).toBeTruthy();
+  });
+
+  it("keeps the shell bar on purchases", async () => {
+    nav.pathname = "/purchases";
+    await renderShell();
+    expect(document.querySelector('[data-testid="marketplace-desktop-header"]')).toBeNull();
+    expect(document.querySelector('nav[aria-label="Primary navigation"]')).toBeTruthy();
+  });
+
   it("links the desktop account chip to the profile", async () => {
     wallet.isConnected = true;
     wallet.address = "0xabc";
