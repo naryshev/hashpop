@@ -48,6 +48,13 @@ import { OffersPanel } from "../../../components/OffersPanel";
 
 import { getApiUrl } from "../../../lib/apiUrl";
 import { listingImageAlt } from "../../../lib/listingImageAlt";
+import { ListingFetchFallback } from "../../../components/ListingFetchFallback";
+import {
+  LISTING_CLIENT_FETCH_TIMEOUT_MS,
+  LISTING_CLIENT_MAX_ATTEMPTS,
+  LISTING_CLIENT_RETRY_DELAY_MS,
+  resolveListingRefresh,
+} from "../../../lib/listingLoad";
 
 function SellerProfileMeta({ seller }: { seller: string }) {
   return (
@@ -120,9 +127,12 @@ export type Listing = {
 
 export default function ListingPage({
   initialListing = null,
+  initialOutcome = "unavailable",
   usdPerHbar = null,
 }: {
   initialListing?: Listing | null;
+  /** Server already classified a miss via notFound(). Null here is a transient failure. */
+  initialOutcome?: "ready" | "unavailable";
   /** Server HBAR/USD snapshot shared with the Product Offer. */
   usdPerHbar?: number | null;
 }) {
@@ -139,7 +149,12 @@ export default function ListingPage({
   const params = useParams();
   const id = (params.id as string) || "";
   const [listing, setListing] = useState<Listing | null>(initialListing);
-  const [loading, setLoading] = useState(initialListing == null);
+  const [phase, setPhase] = useState<"loading" | "ready" | "missing" | "unavailable">(
+    initialListing ? "ready" : initialOutcome === "ready" ? "missing" : "unavailable",
+  );
+  const listingRef = useRef(listing);
+  listingRef.current = listing;
+  const requestGen = useRef(0);
   const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
@@ -257,51 +272,46 @@ export default function ListingPage({
     onChainPriceHbar != null &&
     Math.abs(parseHbarAmount(apiPriceHbar) - parseHbarAmount(onChainPriceHbar)) > 0.0001;
 
-  const fetchListing = useCallback(
-    (attempt = 0, clearFirst = true) => {
-      if (!id) return;
-      // Retry transient failures (slow backend, RPC hiccups, fresh listings
-      // that haven't synced yet) before declaring the listing not found.
-      const maxRetries = 4;
-      const retryDelayMs = 1600;
-      if (attempt === 0 && clearFirst) {
-        setLoading(true);
-        setListing(null);
+  const refreshListing = useCallback(
+    async (opts?: { showLoading?: boolean }) => {
+      if (!id) {
+        setPhase("missing");
+        return;
       }
-      const retryOrGiveUp = () => {
-        if (attempt < maxRetries) {
-          setTimeout(() => fetchListing(attempt + 1, false), retryDelayMs);
-        } else {
-          setLoading(false);
+      const gen = ++requestGen.current;
+      const known = listingRef.current;
+      // Loading is only for an explicit retry of a page we could not render.
+      // A background refresh of a listing we already have must not blank it.
+      if (opts?.showLoading && !known) setPhase("loading");
+      try {
+        const result = await resolveListingRefresh({
+          url: `${getApiUrl()}/api/listing/${encodeURIComponent(id)}`,
+          timeoutMs: LISTING_CLIENT_FETCH_TIMEOUT_MS,
+          // A visible Loading… retry is one timed attempt. The first paint of a
+          // miss already shows the error, and recovers in the background.
+          maxAttempts: known || opts?.showLoading ? 1 : LISTING_CLIENT_MAX_ATTEMPTS,
+          retryDelayMs: LISTING_CLIENT_RETRY_DELAY_MS,
+        });
+        if (gen !== requestGen.current) return;
+        if (result.phase === "ready") {
+          setListing(result.listing as Listing);
+          setPhase("ready");
+          return;
         }
-      };
-      fetch(`${getApiUrl()}/api/listing/${encodeURIComponent(id)}`)
-        .then((res) => {
-          if (res.ok) return res.json().then((data: { listing: Listing }) => data.listing);
-          return Promise.reject(res);
-        })
-        .then((listingData) => {
-          if (listingData) {
-            setListing(listingData);
-            setLoading(false);
-            return;
-          }
-          retryOrGiveUp();
-        })
-        .catch(() => retryOrGiveUp());
+        if (listingRef.current) return;
+        setListing(null);
+        setPhase(result.phase);
+      } catch {
+        if (gen !== requestGen.current || listingRef.current) return;
+        setPhase("unavailable");
+      }
     },
     [id],
   );
 
   useEffect(() => {
-    if (!id) {
-      setLoading(false);
-      return;
-    }
-    // Keep the server-rendered listing in the first HTML. A clear-first
-    // refetch would replace that crawlable shell with "Loading…".
-    fetchListing(0, initialListing == null);
-  }, [id, fetchListing, initialListing]);
+    void refreshListing();
+  }, [refreshListing]);
 
   useEffect(() => {
     if (!listing) return;
@@ -559,29 +569,15 @@ export default function ListingPage({
     }
   };
 
-  if (loading) {
+  if (phase !== "ready" || !listing) {
+    const fallbackPhase = phase === "ready" ? "missing" : phase;
     return (
-      <main className="min-h-screen">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-          <p className="text-silver">Loading…</p>
-        </div>
-      </main>
-    );
-  }
-
-  if (!listing) {
-    return (
-      <main className="min-h-screen">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-          <p className="text-silver">Listing not found.</p>
-          <Link
-            href="/marketplace"
-            className="text-chrome hover:text-white underline mt-2 inline-block"
-          >
-            Back to marketplace
-          </Link>
-        </div>
-      </main>
+      <ListingFetchFallback
+        phase={fallbackPhase}
+        onRetry={() => {
+          void refreshListing({ showLoading: true });
+        }}
+      />
     );
   }
 
@@ -789,7 +785,7 @@ export default function ListingPage({
       setListing(updated.listing);
       if (priceUpdateTxHash) {
         // Refresh in background so the UI reflects synced/on-chain price quickly.
-        fetchListing(0, false);
+        void refreshListing();
       }
       if (!priceUpdateFailed) {
         setEditing(false);
@@ -1850,14 +1846,18 @@ export default function ListingPage({
                   requireEscrow={!!listing.requireEscrow}
                   trackingNumber={listing.trackingNumber ?? null}
                   trackingCarrier={listing.trackingCarrier ?? null}
-                  onEscrowUpdated={() => fetchListing(0, false)}
+                  onEscrowUpdated={() => {
+                    void refreshListing();
+                  }}
                 />
               )}
             {listing && isListed && (
               <OffersPanel
                 listingId={listing.id}
                 sellerAddress={listing.seller}
-                onChanged={() => fetchListing(0, false)}
+                onChanged={() => {
+                  void refreshListing();
+                }}
               />
             )}
             {listing && isListed && !isSeller && listingVariants.length > 0 && (
@@ -1894,7 +1894,7 @@ export default function ListingPage({
                 onOfferSubmitted={() => {
                   // Refresh listing so the buyer's banner updates and the
                   // seller (if same browser session) sees the new offer.
-                  fetchListing(0, false);
+                  void refreshListing();
                 }}
               />
             )}

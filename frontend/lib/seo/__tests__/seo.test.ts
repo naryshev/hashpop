@@ -16,6 +16,7 @@ import {
   FALLBACK_OG_IMAGE,
   FALLBACK_TWITTER_IMAGE,
   listingMetadata,
+  listingUnavailableMetadata,
   marketplaceMetadata,
   staticPageMetadata,
 } from "../metadata";
@@ -145,11 +146,14 @@ describe("listing metadata", () => {
     expect(meta.description).toBe("Vintage Camera for 84 ℏ on Hashpop — escrow-backed P2P.");
   });
 
-  it("falls back when the listing is missing without a generic Hashpop title", () => {
-    const meta = listingMetadata("missing", null);
+  it("does not publish a self-canonical when the listing cannot be loaded", () => {
+    const meta = listingUnavailableMetadata();
     expect(meta.title).toEqual({ absolute: SEO_COPY.listingFallbackTitle });
-    expect(meta.alternates?.canonical).toBe("https://hashpop.io/listing/missing");
-    expect(meta.description).toBe("Listing for 0 ℏ on Hashpop — escrow-backed P2P.");
+    expect(meta.robots).toMatchObject({ index: false, follow: false });
+    expect(meta.alternates?.canonical).toBeUndefined();
+    expect(
+      meta.openGraph && "url" in meta.openGraph ? meta.openGraph.url : undefined,
+    ).toBeUndefined();
   });
 });
 

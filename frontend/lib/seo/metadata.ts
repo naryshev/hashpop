@@ -109,13 +109,13 @@ export function marketplaceMetadata(): Metadata {
   };
 }
 
-export function listingMetadata(id: string, listing: SeoListing | null): Metadata {
+export function listingMetadata(id: string, listing: SeoListing): Metadata {
   const url = absoluteUrl(listingCanonicalPath(id));
-  const title = listing?.title?.trim()
+  const title = listing.title?.trim()
     ? SEO_COPY.listingTitle(listing.title.trim(), listingPriceLabel(listing.price))
     : SEO_COPY.listingFallbackTitle;
   const description = listingMetaDescription(listing);
-  const images = socialImages(listing ? primaryListingImage(listing) : undefined);
+  const images = socialImages(primaryListingImage(listing));
   return {
     title: { absolute: title },
     description,
@@ -133,6 +133,50 @@ export function listingMetadata(id: string, listing: SeoListing | null): Metadat
       title,
       description,
       images: images.twitter,
+    },
+  };
+}
+
+/** Confirmed miss. Noindex, and no canonical that claims this URL is a listing. */
+export function listingNotFoundMetadata(): Metadata {
+  const title = "Listing not found · Hashpop";
+  const description = "This listing doesn't exist or was removed.";
+  return {
+    title: { absolute: title },
+    description,
+    robots: { index: false, follow: true },
+    openGraph: {
+      title,
+      description,
+      type: "website",
+      siteName: SEO_COPY.siteName,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+    },
+  };
+}
+
+/** Transient listing failure. Noindex, and no canonical that claims this URL is the listing. */
+export function listingUnavailableMetadata(): Metadata {
+  const title = SEO_COPY.listingFallbackTitle;
+  const description = "This Hashpop listing could not be loaded. Try again in a moment.";
+  return {
+    title: { absolute: title },
+    description,
+    robots: { index: false, follow: false },
+    openGraph: {
+      title,
+      description,
+      type: "website",
+      siteName: SEO_COPY.siteName,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
     },
   };
 }
