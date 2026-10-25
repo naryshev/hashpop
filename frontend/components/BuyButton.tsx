@@ -5,11 +5,11 @@ import { marketplaceAbi, marketplaceAddress } from "../lib/contracts";
 import {
   formatContractAmountToHbar,
   formatPriceForDisplay,
-  parseHbarAmount,
   withHbarGlyph,
 } from "../lib/formatPrice";
 import { getTransactionErrorMessage } from "../lib/transactionError";
 import { useHbarUsd } from "../hooks/useHbarUsd";
+import { usdPriceFromHbar } from "../lib/hbarUsd";
 import { listingIdToBytes32 } from "../lib/bytes32";
 import { useRobustContractWrite } from "../hooks/useRobustContractWrite";
 import { useHashpackWallet } from "../lib/hashpackWallet";
@@ -41,6 +41,7 @@ export function BuyButton({
   onMessage,
   onOfferSubmitted,
   descriptionSlot,
+  usdPerHbar,
 }: {
   listingId: string;
   price: string;
@@ -54,6 +55,8 @@ export function BuyButton({
   onOfferSubmitted?: (txHash: string, amountHbar: string) => void;
   /** Rendered between the price and Purchase (description, then callouts). */
   descriptionSlot?: React.ReactNode;
+  /** SSR HBAR/USD snapshot. When set, the visible USD matches the Product Offer. */
+  usdPerHbar?: number | null;
 }) {
   const idBytes = useMemo(() => listingIdToBytes32(listingId), [listingId]);
 
@@ -214,7 +217,8 @@ export function BuyButton({
     }
   };
 
-  const usdRate = useHbarUsd();
+  const liveUsdRate = useHbarUsd();
+  const usdRate = usdPerHbar != null && usdPerHbar > 0 ? usdPerHbar : liveUsdRate;
   const listingHbar =
     onChainListing && priceWei > 0n
       ? formatContractAmountToHbar(priceWei.toString())
@@ -229,10 +233,7 @@ export function BuyButton({
     !variantBlocked;
 
   const priceHbarDisplay = formatPriceForDisplay(variantPrice || _price || "0");
-  const priceUsd =
-    usdRate && usdRate > 0 && !Number.isNaN(parseHbarAmount(priceHbarDisplay))
-      ? (parseHbarAmount(priceHbarDisplay) * usdRate).toFixed(2)
-      : null;
+  const priceUsd = usdPriceFromHbar(priceHbarDisplay, usdRate);
   const hasCallout = notOnChain || isLegacyWeiListing || variantBlocked;
   const purchaseOffset = descriptionSlot || hasCallout ? "mt-3" : "mt-4";
 

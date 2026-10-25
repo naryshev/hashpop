@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { SEO_COPY } from "../copy";
 import { apexRedirectUrl, isNoIndexPath } from "../host";
-import { listingJsonLd, serializeJsonLd, siteJsonLd } from "../jsonld";
+import { listingOfferPriceLabel } from "../../hbarUsd";
+import {
+  faqPageJsonLd,
+  listingJsonLd,
+  ORGANIZATION_LOGO_URL,
+  SEARCH_URL_TEMPLATE,
+  serializeJsonLd,
+  siteJsonLd,
+  WEBSITE_URL,
+} from "../jsonld";
+import { FAQS } from "../../help/faqs";
 import {
   FALLBACK_OG_IMAGE,
   FALLBACK_TWITTER_IMAGE,
@@ -156,62 +166,119 @@ describe("static page metadata", () => {
 });
 
 describe("Product / Offer JSON-LD", () => {
-  it("describes the listing as a Product with an HBAR Offer", () => {
-    const data = listingJsonLd("lst-1", {
-      id: "lst-1",
-      title: "Vintage Camera",
-      description: "Rangefinder",
-      price: "84.5",
-      status: "LISTED",
-      requireEscrow: false,
-      imageUrl: null,
-      mediaUrls: ["https://cdn.hashpop.io/camera.jpg"],
-      category: "Cameras",
-    });
+  const now = new Date("2026-10-25T00:00:00.000Z");
+  const rate = 0.1;
+
+  it("replaces the HBAR Offer with one USD Offer and keeps HBAR beside it", () => {
+    const data = listingJsonLd(
+      "lst-1",
+      {
+        id: "lst-1",
+        title: "Vintage Camera",
+        description: "Rangefinder",
+        price: "84.5",
+        status: "LISTED",
+        requireEscrow: false,
+        condition: "Like new",
+        imageUrl: null,
+        mediaUrls: ["https://cdn.hashpop.io/camera.jpg"],
+        category: "Cameras",
+      },
+      { usdPerHbar: rate, now },
+    );
     expect(data["@context"]).toBe("https://schema.org");
     expect(data["@type"]).toBe("Product");
     expect(data.name).toBe("Vintage Camera");
     expect(data.image).toEqual(["https://cdn.hashpop.io/camera.jpg"]);
-    expect(data.offers).toMatchObject({
+    expect(data.itemCondition).toBe("https://schema.org/UsedCondition");
+    expect(data.description).toContain("Rangefinder");
+    expect(data.description).toContain("Price (HBAR): 84.5.");
+    expect(data.offers).toEqual({
       "@type": "Offer",
-      priceCurrency: "HBAR",
-      price: "84.5",
+      priceCurrency: "USD",
+      price: "8.45",
       availability: "https://schema.org/InStock",
+      itemCondition: "https://schema.org/UsedCondition",
       url: "https://hashpop.io/listing/lst-1",
+      priceValidUntil: "2026-10-26",
     });
+    expect(data.offers).not.toHaveProperty("additionalProperty");
+    expect(data.additionalProperty).toEqual({
+      "@type": "PropertyValue",
+      name: "Price (HBAR)",
+      value: "84.5",
+    });
+    expect(listingOfferPriceLabel("84.5", rate)).toBe("84.5 ℏ (≈ $8.45 USD)");
+    const serialized = serializeJsonLd(data);
+    expect(serialized).not.toContain('"priceCurrency":"HBAR"');
+    expect(serialized).not.toContain("priceSpecification");
+    expect(serialized.match(/"@type":"Offer"/g)).toHaveLength(1);
   });
 
-  it("normalizes legacy wei prices to HBAR", () => {
+  it("omits offers when the USD rate is missing", () => {
     const data = listingJsonLd("a", {
       id: "a",
-      title: "Wei",
-      price: "2000000000000000000",
+      title: "No rate",
+      price: "5",
       status: "LISTED",
+      condition: "New",
     });
-    expect(data.offers.price).toBe("2");
-    expect(data.offers.priceCurrency).toBe("HBAR");
+    expect(data.offers).toBeUndefined();
+    expect(data.itemCondition).toBe("https://schema.org/NewCondition");
+    expect(serializeJsonLd(data)).not.toContain("priceCurrency");
+    expect(listingOfferPriceLabel("5", null)).toBeNull();
   });
 
-  it("maps sold and locked listings to schema availability", () => {
+  it("converts legacy wei to HBAR for the note and prices the Offer in USD", () => {
+    const data = listingJsonLd(
+      "a",
+      {
+        id: "a",
+        title: "Wei",
+        price: "2000000000000000000",
+        status: "LISTED",
+      },
+      { usdPerHbar: 0.5, now },
+    );
+    expect(data.offers?.price).toBe("1.00");
+    expect(data.offers?.priceCurrency).toBe("USD");
+    expect(data.offers).not.toHaveProperty("additionalProperty");
+    expect(data.additionalProperty.value).toBe("2");
+  });
+
+  it("maps active listings to InStock and everything else to SoldOut or Discontinued", () => {
+    const priced = { usdPerHbar: 1, now };
     expect(
-      listingJsonLd("a", { id: "a", title: "Sold", price: "2", status: "SOLD" }).offers
-        .availability,
+      listingJsonLd("a", { id: "a", title: "Live", price: "2", status: "LISTED" }, priced).offers
+        ?.availability,
+    ).toBe("https://schema.org/InStock");
+    expect(
+      listingJsonLd("a", { id: "a", title: "Sold", price: "2", status: "SOLD" }, priced).offers
+        ?.availability,
     ).toBe("https://schema.org/SoldOut");
     expect(
-      listingJsonLd("a", { id: "a", title: "Locked", price: "2", status: "LOCKED" }).offers
-        .availability,
-    ).toBe("https://schema.org/LimitedAvailability");
+      listingJsonLd("a", { id: "a", title: "Locked", price: "2", status: "LOCKED" }, priced).offers
+        ?.availability,
+    ).toBe("https://schema.org/SoldOut");
+    expect(
+      listingJsonLd("a", { id: "a", title: "Cancelled", price: "2", status: "CANCELLED" }, priced)
+        .offers?.availability,
+    ).toBe("https://schema.org/Discontinued");
   });
 
   it("escapes script-breaking characters when serialized", () => {
     const serialized = serializeJsonLd(
-      listingJsonLd("a", {
-        id: "a",
-        title: "Safe",
-        description: "</script><script>alert(1)</script>",
-        price: "1",
-        status: "LISTED",
-      }),
+      listingJsonLd(
+        "a",
+        {
+          id: "a",
+          title: "Safe",
+          description: "</script><script>alert(1)</script>",
+          price: "1",
+          status: "LISTED",
+        },
+        { usdPerHbar: 1, now },
+      ),
     );
     expect(serialized).not.toContain("</script>");
     expect(serialized).toContain("\\u003c");
@@ -289,17 +356,47 @@ describe("sitemap.xml", () => {
 });
 
 describe("site JSON-LD", () => {
-  it("publishes Organization and WebSite", () => {
+  it("publishes one Organization and one WebSite on the apex", () => {
     const data = siteJsonLd();
     expect(data["@graph"].map((node) => node["@type"])).toEqual(["Organization", "WebSite"]);
     expect(data["@graph"][0]).toMatchObject({
       name: "Hashpop",
       url: "https://hashpop.io",
+      logo: ORGANIZATION_LOGO_URL,
       description: SEO_COPY.rootDescription,
     });
+    expect(ORGANIZATION_LOGO_URL).toBe("https://hashpop.io/hashpop-cart-3d.PNG");
     expect(data["@graph"][1]).toMatchObject({
-      url: "https://hashpop.io/marketplace",
+      name: "Hashpop",
+      url: WEBSITE_URL,
       description: SEO_COPY.marketplaceDescription,
     });
+    expect(WEBSITE_URL).toBe("https://hashpop.io/");
+    expect(data["@graph"][1].potentialAction).toEqual({
+      "@type": "SearchAction",
+      target: {
+        "@type": "EntryPoint",
+        urlTemplate: SEARCH_URL_TEMPLATE,
+      },
+      "query-input": "required name=search_term_string",
+    });
+    expect(SEARCH_URL_TEMPLATE).toBe("https://hashpop.io/marketplace?q={search_term_string}");
+    expect(data["@graph"].some((node) => node["@type"] === "Product")).toBe(false);
+  });
+});
+
+describe("FAQPage JSON-LD", () => {
+  it("mirrors the visible help questions and answers in order", () => {
+    const data = faqPageJsonLd(FAQS);
+    const visible = FAQS.flatMap((group) => group.items);
+    expect(data["@type"]).toBe("FAQPage");
+    expect(data.mainEntity).toHaveLength(visible.length);
+    data.mainEntity.forEach((entity, index) => {
+      expect(entity.name).toBe(visible[index]?.q);
+      expect(entity.acceptedAnswer.text).toBe(visible[index]?.a);
+    });
+    expect(data.mainEntity[0]?.name).toBe("How do I connect HashPack?");
+    const serialized = serializeJsonLd(data);
+    expect(serialized).not.toContain("</script>");
   });
 });
