@@ -8,12 +8,12 @@ Before is production `https://hashpop.io` (main, including `#113` `79136fe` and 
 
 ## Priority routes
 
-| Route | | Perf | FCP | LCP | TBT | CLS | First Load JS | Runtime JS |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `/marketplace` | before | 47 | 1.53s | 23.72s | 1.74s | 0 | 193 kB | ~1600 kB |
-| `/marketplace` | after, 3 runs, grid hydrated | 96 | 1.07s | 2.73s | 8ms | 0.001 | 145 kB | ~423 kB |
-| `/support` | before | 49 | 1.53s | 23.57s | 1.49s | 0 | 90.4 kB | ~1589 kB |
-| `/support` | after, median of 3 | 93 | 1.22s | 3.17s | 12ms | 0 | 90.2 kB | ~423 kB |
+| Route          |                              | Perf |   FCP |    LCP |   TBT |   CLS | First Load JS | Runtime JS |
+| -------------- | ---------------------------- | ---: | ----: | -----: | ----: | ----: | ------------: | ---------: |
+| `/marketplace` | before                       |   47 | 1.53s | 23.72s | 1.74s |     0 |        193 kB |   ~1600 kB |
+| `/marketplace` | after, 3 runs, grid hydrated |   96 | 1.07s |  2.73s |   8ms | 0.001 |        145 kB |    ~423 kB |
+| `/support`     | before                       |   49 | 1.53s | 23.57s | 1.49s |     0 |       90.4 kB |   ~1589 kB |
+| `/support`     | after, median of 3           |   93 | 1.22s |  3.17s |  12ms |     0 |       90.2 kB |    ~423 kB |
 
 First Load JS is gzip from `next build` and does not include dynamic chunks. Runtime JS is transfer size of `Script` requests in the Lighthouse network log. Production downloaded HashConnect chunks of about 530 kB, 327 kB, and 171 kB on both routes. Those requests are absent after this change. The splash file `/hashpop-cart-3d.PNG` went from 3,879,975 bytes to 111,328 bytes.
 
@@ -29,17 +29,17 @@ A follow-up commit put the card grid in the static HTML (`useSearchParams` had b
 
 Vercel mobile curves, p10 ≈ 90 and median ≈ 50: FCP 1.8s–3s, LCP 2.5s–4s, INP 200ms–500ms, CLS 0.1–0.25. Weights: FCP 15%, LCP 30%, INP 30%, CLS 25%. Scored with the Lighthouse log-normal (`QUANTILE_AT_VALUE`).
 
-| Route | INP input | RES |
-| --- | --- | ---: |
-| `/marketplace` before | TBT 1.74s | 41 |
-| `/marketplace` before | max-potential-FID 591ms | 52 |
-| `/support` before | TBT 1.49s | 41 |
-| `/support` before | max-potential-FID 582ms | 52 |
-| `/support` after (median of 3) | TBT 12ms | 92 |
-| `/support` after | max-potential-FID 60ms | 92 |
-| `/marketplace` after (median of 3, hydrated grid) | TBT 8ms | 95 |
-| `/marketplace` final run, LCP 3.03s | TBT 16ms | 93 |
-| `/marketplace` final run, LCP 4.85s | TBT 33ms | 79 |
+| Route                                             | INP input               | RES |
+| ------------------------------------------------- | ----------------------- | --: |
+| `/marketplace` before                             | TBT 1.74s               |  41 |
+| `/marketplace` before                             | max-potential-FID 591ms |  52 |
+| `/support` before                                 | TBT 1.49s               |  41 |
+| `/support` before                                 | max-potential-FID 582ms |  52 |
+| `/support` after (median of 3)                    | TBT 12ms                |  92 |
+| `/support` after                                  | max-potential-FID 60ms  |  92 |
+| `/marketplace` after (median of 3, hydrated grid) | TBT 8ms                 |  95 |
+| `/marketplace` final run, LCP 3.03s               | TBT 16ms                |  93 |
+| `/marketplace` final run, LCP 4.85s               | TBT 33ms                |  79 |
 
 CLS stays at the top of the curve. The lab estimate clears 90 when LCP is about 3.2s or better and main-thread tasks stay under 200ms. It does not clear 90 on the 4.85s marketplace sample. Field INP is not in this table.
 
