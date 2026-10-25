@@ -38,6 +38,3 @@ export const SEO_COPY = {
 
 /** First ~155 characters of a listing description. */
 export const META_DESCRIPTION_MAX = 155;
-
-/** schema.org Offer currency. Listings are priced in HBAR (ℏ), not fiat. */
-export const OFFER_PRICE_CURRENCY = "HBAR" as const;

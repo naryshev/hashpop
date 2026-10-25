@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { getApiUrl } from "../apiUrl";
+import { HBAR_USD_REVALIDATE_SECONDS } from "../hbarUsd";
 import type { SeoListing } from "./metadata";
 
 /**
@@ -17,7 +18,7 @@ export const fetchPublicListing = cache(async (id: string): Promise<SeoListing |
   }
   try {
     const res = await fetch(`${getApiUrl()}/api/listing/${encodeURIComponent(trimmed)}`, {
-      next: { revalidate: 60 },
+      next: { revalidate: HBAR_USD_REVALIDATE_SECONDS },
       signal: AbortSignal.timeout(4000),
     });
     if (!res.ok) return null;

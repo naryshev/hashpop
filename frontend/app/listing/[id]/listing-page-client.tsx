@@ -30,7 +30,7 @@ import {
   parseHbarAmount,
   withHbarGlyph,
 } from "../../../lib/formatPrice";
-import { formatHbarWithUsd } from "../../../lib/hbarUsd";
+import { formatHbarWithUsd, listingOfferPriceLabel } from "../../../lib/hbarUsd";
 import { useHbarUsd } from "../../../hooks/useHbarUsd";
 import { formatListingDate } from "../../../lib/formatDate";
 import { useCancelListing } from "../../../hooks/useCancelListing";
@@ -119,8 +119,11 @@ export type Listing = {
 
 export default function ListingPage({
   initialListing = null,
+  usdPerHbar = null,
 }: {
   initialListing?: Listing | null;
+  /** Server HBAR/USD snapshot shared with the Product Offer. */
+  usdPerHbar?: number | null;
 }) {
   const accountIdToLongZeroAddress = (value: string): `0x${string}` => {
     const [shardRaw, realmRaw, numRaw] = value.split(".");
@@ -204,7 +207,8 @@ export default function ListingPage({
   const [forceDeleting, setForceDeleting] = useState(false);
   const { updatePriceOnChain, isPending: priceUpdatePending } = useUpdateListingPrice();
   const walletConnected = !!address;
-  const usdRate = useHbarUsd();
+  const liveUsdRate = useHbarUsd();
+  const usdRate = usdPerHbar != null && usdPerHbar > 0 ? usdPerHbar : liveUsdRate;
 
   const item = listing;
 
@@ -857,6 +861,13 @@ export default function ListingPage({
 
   const mainImageUrl = galleryItems[safeMediaIndex]?.url ?? null;
   const categoryLabel = listing?.category || "Marketplace";
+  const offerPriceLabel = listingOfferPriceLabel(listing?.price, usdPerHbar);
+  const offerPriceJsx =
+    offerPriceLabel && !editing ? (
+      <p data-testid="listing-offer-price" className="mt-2 font-mono text-base text-white">
+        {offerPriceLabel}
+      </p>
+    ) : null;
 
   const showPrevMedia = () => {
     if (galleryItems.length <= 1) return;
@@ -920,6 +931,7 @@ export default function ListingPage({
             : attributesLine}
         </p>
       )}
+      {offerPriceJsx}
     </div>
   );
 
@@ -946,6 +958,7 @@ export default function ListingPage({
             : attributesLine}
         </p>
       )}
+      {offerPriceJsx}
     </div>
   );
 
@@ -1835,6 +1848,7 @@ export default function ListingPage({
                 listingId={listing.id}
                 price={listing.price}
                 variantPrice={listingVariants.length > 0 ? buyPrice : undefined}
+                usdPerHbar={usdPerHbar}
                 inWishlist={inWishlist}
                 onToggleWishlist={() => {
                   void toggleWishlist();
