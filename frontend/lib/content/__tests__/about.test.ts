@@ -43,13 +43,19 @@ describe("about and help FAQ questions", () => {
 describe("about copy", () => {
   it("keeps escrow as one swappable term", () => {
     expect(BRAND.escrowTerm).toBe("escrow");
+    expect(BRAND.escrowTermCap).toBe("Escrow");
     expect(applyEscrowTerm("on-chain {ESCROW} contract")).toBe(
       `on-chain ${BRAND.escrowTerm} contract`,
     );
+    expect(applyEscrowTerm("{ESCROW_CAP} we never hold.")).toBe(
+      `${BRAND.escrowTermCap} we never hold.`,
+    );
     expect(ABOUT_PAGE.h1).toBe("Real stuff. Real people. Paid in HBAR.");
-    expect(ABOUT_PAGE.lede).toContain(`on-chain ${BRAND.escrowTerm} contract`);
+    expect(ABOUT_PAGE.lede).toContain(
+      `an optional on-chain ${BRAND.escrowTerm} contract, all tied to your wallet.`,
+    );
     expect(ABOUT_PAGE.pillars.map((pillar) => pillar.lead)).toContain(
-      `${BRAND.escrowTerm} that we never hold.`,
+      `${BRAND.escrowTermCap} we never hold.`,
     );
     expect(ABOUT_PAGE.description).toContain(`on-chain ${BRAND.escrowTerm} contract`);
   });

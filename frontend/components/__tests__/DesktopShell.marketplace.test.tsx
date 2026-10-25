@@ -234,15 +234,29 @@ describe("DesktopShell marketplace chrome", () => {
     expect(document.querySelector('nav[aria-label="Primary navigation"]')).toBeTruthy();
   });
 
-  it("uses the brand row without search on /about at desktop and mobile", async () => {
+  it("uses the shared marketplace desktop header on /about", async () => {
     nav.pathname = "/about";
     await renderShell();
+    const header = document.querySelector(
+      '[data-testid="marketplace-desktop-header"]',
+    ) as HTMLElement;
+    expect(header).toBeTruthy();
+    expect(header.className).toContain("hp-desktop-bar");
+    expect(header.className).toContain("md:h-[72px]");
+    expect(document.querySelector('nav[aria-label="Primary navigation"]')).toBeNull();
+    expect(document.body.textContent).not.toContain("Search listings");
+    expect(document.body.textContent).not.toContain("Sign in");
+    const input = header.querySelector(
+      'input[aria-label="Search marketplace"]',
+    ) as HTMLInputElement;
+    expect(input.placeholder).toBe("Search marketplace…");
+    expect(document.querySelector('[data-testid="marketplace-desktop-create"]')?.textContent).toBe(
+      "Create",
+    );
+    expect(document.querySelector('[data-testid="marketplace-desktop-profile"]')).toBeTruthy();
     const brand = document.querySelector('[data-testid="marketplace-brand-header"]') as HTMLElement;
     expect(brand).toBeTruthy();
-    expect(brand.parentElement?.parentElement?.className).not.toContain("md:hidden");
-    expect(document.querySelector("header.hp-desktop-bar")).toBeNull();
-    expect(document.querySelector('nav[aria-label="Primary navigation"]')).toBeNull();
-    expect(document.querySelector("input")).toBeNull();
+    expect(brand.parentElement?.parentElement?.className).toContain("md:hidden");
     expect(document.querySelector('[data-testid="mobile-top-bar"]')).toBeNull();
   });
 
