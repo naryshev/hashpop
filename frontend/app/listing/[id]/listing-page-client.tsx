@@ -39,6 +39,7 @@ import { useUpdateListingPrice } from "../../../hooks/useUpdateListingPrice";
 import { compressImage } from "../../../lib/compressImage";
 import { listingIdToBytes32 } from "../../../lib/bytes32";
 import { useHashpackWallet } from "../../../lib/hashpackWallet";
+import { useAuthorizedFetch } from "../../../lib/walletRequestAuth";
 import { ConnectWalletButton } from "../../../components/ConnectWalletButton";
 import { activeHederaChain } from "../../../lib/hederaChains";
 import { readListingCompat } from "../../../lib/marketplaceRead";
@@ -211,6 +212,7 @@ export default function ListingPage({
   const [similarListings, setSimilarListings] = useState<SimilarItem[]>([]);
   const router = useRouter();
   const { address, accountId } = useHashpackWallet();
+  const authedFetch = useAuthorizedFetch();
   const chainId = activeHederaChain.id;
   const {
     cancel,
@@ -336,7 +338,7 @@ export default function ListingPage({
   useEffect(() => {
     if (!cancelSuccess) return;
     if (cancelTxHash) {
-      fetch(`${getApiUrl()}/api/sync-cancel`, {
+      authedFetch(`${getApiUrl()}/api/sync-cancel`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ txHash: cancelTxHash }),
@@ -344,7 +346,7 @@ export default function ListingPage({
     }
     const t = setTimeout(() => router.push("/dashboard"), 2200);
     return () => clearTimeout(t);
-  }, [cancelSuccess, cancelTxHash, router]);
+  }, [cancelSuccess, cancelTxHash, router, authedFetch]);
 
   useEffect(() => {
     const urls = editImageFiles.map((f) => URL.createObjectURL(f));
@@ -479,7 +481,7 @@ export default function ListingPage({
     const other = myAddr === buyerAddr ? listing.seller : listing.buyer;
     setChatSending(true);
     try {
-      await fetch(`${getApiUrl()}/api/messages`, {
+      await authedFetch(`${getApiUrl()}/api/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -513,13 +515,13 @@ export default function ListingPage({
     const itemType = "listing";
     try {
       if (inWishlist) {
-        await fetch(
+        await authedFetch(
           `${getApiUrl()}/api/wishlist?address=${encodeURIComponent(address)}&itemId=${encodeURIComponent(id)}`,
           { method: "DELETE" },
         );
         setInWishlist(false);
       } else {
-        await fetch(`${getApiUrl()}/api/wishlist`, {
+        await authedFetch(`${getApiUrl()}/api/wishlist`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ address, itemId: id, itemType }),
@@ -543,7 +545,7 @@ export default function ListingPage({
     setReportSubmitting(true);
     setReportMessage(null);
     try {
-      const res = await fetch(
+      const res = await authedFetch(
         `${getApiUrl()}/api/listing/${encodeURIComponent(listing.id)}/report`,
         {
           method: "POST",
@@ -702,7 +704,7 @@ export default function ListingPage({
       if (priceChanged) {
         try {
           priceUpdateTxHash = await updatePriceOnChain(listing.id, newPriceDisplay);
-          const syncRes = await fetch(`${getApiUrl()}/api/sync-price-update`, {
+          const syncRes = await authedFetch(`${getApiUrl()}/api/sync-price-update`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -738,7 +740,7 @@ export default function ListingPage({
           }
           const form = new FormData();
           form.append("image", compressed);
-          const up = await fetch(`${getApiUrl()}/api/upload-listing-image`, {
+          const up = await authedFetch(`${getApiUrl()}/api/upload-listing-image`, {
             method: "POST",
             body: form,
           });
@@ -772,11 +774,14 @@ export default function ListingPage({
         ...(mediaUrls !== undefined && { mediaUrls }),
       };
       // Price is now synced only from on-chain events/tx sync endpoint to avoid DB-on-chain divergence.
-      const res = await fetch(`${getApiUrl()}/api/listing/${encodeURIComponent(listing.id)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      const res = await authedFetch(
+        `${getApiUrl()}/api/listing/${encodeURIComponent(listing.id)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || "Update failed");
@@ -1228,7 +1233,7 @@ export default function ListingPage({
                         setDeleteError(null);
                         setForceDeleting(true);
                         try {
-                          const res = await fetch(
+                          const res = await authedFetch(
                             `${getApiUrl()}/api/listing/${encodeURIComponent(listing.id)}/cancel-offchain`,
                             {
                               method: "POST",
@@ -1261,7 +1266,7 @@ export default function ListingPage({
                       setDeleteError(null);
                       if (!listing?.onChainConfirmed) {
                         try {
-                          const res = await fetch(
+                          const res = await authedFetch(
                             `${getApiUrl()}/api/listing/${encodeURIComponent(listing!.id)}/cancel-offchain`,
                             {
                               method: "POST",

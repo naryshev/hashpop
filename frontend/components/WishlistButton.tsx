@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useHashpackWallet } from "../lib/hashpackWallet";
+import { useAuthorizedFetch } from "../lib/walletRequestAuth";
 
 import { getApiUrl } from "../lib/apiUrl";
 import { material } from "../lib/materials";
@@ -29,6 +30,7 @@ export function WishlistButton({
   surface = "default",
 }: WishlistButtonProps) {
   const { address } = useHashpackWallet();
+  const authedFetch = useAuthorizedFetch();
   const [inWishlist, setInWishlist] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -49,13 +51,13 @@ export function WishlistButton({
     setLoading(true);
     try {
       if (inWishlist) {
-        await fetch(
+        await authedFetch(
           `${getApiUrl()}/api/wishlist?address=${encodeURIComponent(address)}&itemId=${encodeURIComponent(itemId)}`,
           { method: "DELETE" },
         );
         setInWishlist(false);
       } else {
-        await fetch(`${getApiUrl()}/api/wishlist`, {
+        await authedFetch(`${getApiUrl()}/api/wishlist`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ address, itemId, itemType }),

@@ -19,6 +19,7 @@ import { AddressDisplay } from "./AddressDisplay";
 import { TrustStrip } from "./TrustStrip";
 import { getApiUrl } from "../lib/apiUrl";
 import { useHashpackWallet } from "../lib/hashpackWallet";
+import { useAuthorizedFetch } from "../lib/walletRequestAuth";
 import { compressImage } from "../lib/compressImage";
 import { useHbarUsd } from "../hooks/useHbarUsd";
 import { useCancelListing } from "../hooks/useCancelListing";
@@ -198,6 +199,7 @@ export function ProfileContent({
   const router = useRouter();
   const address = profileAddressKey(addressParam);
   const { address: connectedAddress, accountId } = useHashpackWallet();
+  const authedFetch = useAuthorizedFetch();
   const usdRate = useHbarUsd();
   const {
     cancel,
@@ -248,13 +250,13 @@ export function ProfileContent({
 
   useEffect(() => {
     if (!cancelSuccess || !cancelHash) return;
-    fetch(`${getApiUrl()}/api/sync-cancel`, {
+    authedFetch(`${getApiUrl()}/api/sync-cancel`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ txHash: cancelHash }),
     }).catch(() => {});
     setReloadKey((key) => key + 1);
-  }, [cancelSuccess, cancelHash]);
+  }, [cancelSuccess, cancelHash, authedFetch]);
 
   useEffect(() => {
     if (!address) return;
@@ -495,7 +497,7 @@ export function ProfileContent({
     setSaving(true);
     setSaveError(null);
     try {
-      const res = await fetch(`${getApiUrl()}/api/user/${address}/profile`, {
+      const res = await authedFetch(`${getApiUrl()}/api/user/${address}/profile`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -538,7 +540,7 @@ export function ProfileContent({
       const compressed = await compressImage(file);
       const form = new FormData();
       form.append("media", compressed);
-      const res = await fetch(`${getApiUrl()}/api/upload-listing-media`, {
+      const res = await authedFetch(`${getApiUrl()}/api/upload-listing-media`, {
         method: "POST",
         body: form,
       });
@@ -575,7 +577,7 @@ export function ProfileContent({
     setDelistError(null);
     try {
       for (const id of selected) {
-        const res = await fetch(
+        const res = await authedFetch(
           `${getApiUrl()}/api/listing/${encodeURIComponent(id)}/cancel-offchain`,
           {
             method: "POST",

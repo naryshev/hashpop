@@ -4,6 +4,7 @@ import { listingHref } from "../../lib/listingUrl";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
+import { useAuthorizedFetch } from "../../lib/walletRequestAuth";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { formatPriceForDisplay } from "../../lib/formatPrice";
@@ -74,6 +75,7 @@ function offerThumb(row: OfferRow): string | null {
 
 export default function OffersPage() {
   const { address } = useHashpackWallet();
+  const authedFetch = useAuthorizedFetch();
   const usdRate = useHbarUsd();
   const { send, isPending } = useRobustContractWrite();
   const chainId = activeHederaChain.id;
@@ -125,7 +127,7 @@ export default function OffersPage() {
         functionName: fn,
         args,
       });
-      await fetch(`${getApiUrl()}/api/sync-offer-action`, {
+      await authedFetch(`${getApiUrl()}/api/sync-offer-action`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ txHash, listingId: row.listingId, buyer: row.buyer, action }),

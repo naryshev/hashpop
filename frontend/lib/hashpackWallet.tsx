@@ -789,6 +789,21 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
   return <HashpackWalletContext.Provider value={value}>{children}</HashpackWalletContext.Provider>;
 }
 
+/**
+ * The same lazy HashConnect bootstrap the provider uses. Call this only when
+ * a write needs a signer and the context client is not ready yet — it does
+ * not run at import time.
+ */
+export async function ensureHashpackClient(): Promise<HashConnect | null> {
+  const projectId = getWalletConnectProjectId();
+  if (!projectId) return null;
+  try {
+    return await getOrCreateHashConnect(getNetwork(), projectId);
+  } catch {
+    return null;
+  }
+}
+
 export function useHashpackWallet(): HashpackWalletContextValue {
   const ctx = useContext(HashpackWalletContext);
   if (!ctx) {

@@ -195,3 +195,27 @@ model Offer {
 // Phase 2a stores listing moderation on Listing.moderationStatus.
 // User watch/restrict (2b) and populated escrow disputes (2c) stay out.
 
+/// One-time nonces for HashPack-signed write requests. Rows expire with the signature window.
+model AuthNonce {
+  nonce     String   @id
+  accountId String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
+/// Who performed a seller/owner write, after the wallet signature checked out.
+model WalletAuditLog {
+  id         String   @id @default(cuid())
+  method     String
+  path       String
+  resourceId String?
+  accountId  String
+  evmAddress String
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([accountId])
+}
+

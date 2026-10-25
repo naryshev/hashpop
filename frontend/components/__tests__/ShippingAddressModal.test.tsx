@@ -2,6 +2,17 @@ import { createElement, act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ShippingAddressModal } from "../ShippingAddressModal";
+
+vi.mock("../../lib/hashpackWallet", () => ({
+  useHashpackWallet: () => ({
+    address: "0xbuyer",
+    accountId: "0.0.1",
+    hashconnect: {
+      signMessages: async () => ({ signature: new Uint8Array([1, 2, 3]) }),
+    },
+  }),
+  ensureHashpackClient: async () => null,
+}));
 import { listingCta } from "../../lib/materials";
 
 let root: Root | undefined;
@@ -129,7 +140,11 @@ describe("ShippingAddressModal", () => {
     });
 
     const fetchMock = fetch as unknown as ReturnType<typeof vi.fn>;
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // Signing hashes the body before fetch, so the second POST lands after
+    // the click's act() has already flushed the first request.
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("http://localhost:4000/api/listing/a/shipping-address");
@@ -175,6 +190,10 @@ describe("ShippingAddressModal", () => {
       cta.click();
     });
 
+    const fetchMock = fetch as unknown as ReturnType<typeof vi.fn>;
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
     expect(saveButton().disabled).toBe(true);
     expect(saveButton().textContent).toMatch(/Saving/);
 

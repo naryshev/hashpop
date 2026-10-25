@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getApiUrl } from "../lib/apiUrl";
+import { useAuthorizedFetch } from "../lib/walletRequestAuth";
 import { listingCta } from "../lib/materials";
 import { Sheet } from "./ui/Sheet";
 
@@ -72,6 +73,7 @@ export function ShippingAddressModal({
   onConfirmed: () => void;
   onClose: () => void;
 }) {
+  const authedFetch = useAuthorizedFetch();
   const [fields, setFields] = useState<ShippingAddressFields>(EMPTY);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -109,7 +111,7 @@ export function ShippingAddressModal({
         phone: fields.phone.trim() || undefined,
       };
       for (const id of targets) {
-        const res = await fetch(
+        const res = await authedFetch(
           `${getApiUrl()}/api/listing/${encodeURIComponent(id)}/shipping-address`,
           {
             method: "POST",

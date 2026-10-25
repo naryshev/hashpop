@@ -16,6 +16,7 @@ function cartAmount(hbar: string, usdPerHbar: number | null): string {
 }
 import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
+import { useAuthorizedFetch } from "../../lib/walletRequestAuth";
 import { useSignInModal } from "../../lib/signInModal";
 import { useRobustContractWrite } from "../../hooks/useRobustContractWrite";
 import { marketplaceAbi, marketplaceAddress } from "../../lib/contracts";
@@ -43,6 +44,7 @@ type ItemState = "queued" | "signing" | "bought" | "failed";
 export default function CartPage() {
   const cart = useCart();
   const { address } = useHashpackWallet();
+  const authedFetch = useAuthorizedFetch();
   const { openSignIn } = useSignInModal();
   const usdRate = useHbarUsd();
   const chainId = activeHederaChain.id;
@@ -134,13 +136,13 @@ export default function CartPage() {
         args: [idBytes],
         value: priceWei,
       });
-      await fetch(`${getApiUrl()}/api/sync-purchase`, {
+      await authedFetch(`${getApiUrl()}/api/sync-purchase`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ txHash, listingId: listing.id }),
       }).catch(() => {});
     },
-    [send],
+    [send, authedFetch],
   );
 
   /** After the shipping address is on file: buy each item, one signature at a time. */

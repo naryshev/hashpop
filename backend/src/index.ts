@@ -80,11 +80,20 @@ app.use((req, res, next) => {
   const origin = getAllowedOrigin(req.headers.origin as string | undefined);
   if (origin) res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-admin-token");
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, x-admin-token, x-hashpop-account, x-hashpop-issued-at, x-hashpop-nonce, x-hashpop-signature",
+  );
   if (req.method === "OPTIONS") return res.sendStatus(204);
   next();
 });
-app.use(express.json());
+app.use(
+  express.json({
+    verify: (req, _res, buf) => {
+      (req as express.Request).rawBody = buf;
+    },
+  }),
+);
 app.use("/uploads", express.static(uploadsDir));
 app.use("/api", apiRouter(prisma, log, uploadsDir));
 app.use("/api/relay", relayRouter(log));

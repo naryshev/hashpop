@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Star } from "lucide-react";
 import { useHashpackWallet } from "../lib/hashpackWallet";
+import { useAuthorizedFetch } from "../lib/walletRequestAuth";
 import { getApiUrl } from "../lib/apiUrl";
 
 type Props = {
@@ -28,6 +29,7 @@ export function RateCounterpartyModal({
   onRated,
 }: Props) {
   const { hashconnect, accountId, address } = useHashpackWallet();
+  const authedFetch = useAuthorizedFetch();
   const [score, setScore] = useState(0);
   const [hover, setHover] = useState(0);
   const [comment, setComment] = useState("");
@@ -62,7 +64,7 @@ export function RateCounterpartyModal({
         throw new Error("Could not get a signature from your wallet.");
       }
 
-      const res = await fetch(`${getApiUrl()}/api/ratings`, {
+      const res = await authedFetch(`${getApiUrl()}/api/ratings`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

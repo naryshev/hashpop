@@ -11,6 +11,7 @@ import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { formatListingDate } from "../../lib/formatDate";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
+import { useAuthorizedFetch } from "../../lib/walletRequestAuth";
 import { profileAvatarUrl, profileDisplayName, useProfile } from "../../lib/profiles";
 import { getApiUrl } from "../../lib/apiUrl";
 import { OnboardingChecklist } from "../../components/OnboardingChecklist";
@@ -67,6 +68,7 @@ function SoldItemCard({
   myAddress: string;
   usdRate: number | null;
 }) {
+  const authedFetch = useAuthorizedFetch();
   const [expanded, setExpanded] = useState(false);
   const [msgs, setMsgs] = useState<ChatMsg[]>([]);
   const [msgsLoading, setMsgsLoading] = useState(false);
@@ -100,7 +102,7 @@ function SoldItemCard({
     if (!reply.trim() || sending || !sale.buyer || !targetId) return;
     setSending(true);
     try {
-      await fetch(`${getApiUrl()}/api/messages`, {
+      await authedFetch(`${getApiUrl()}/api/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -266,6 +268,7 @@ function timeAgo(d: Date | null): string {
 export default function DashboardPage() {
   const router = useRouter();
   const { address, accountId, balanceTinybar } = useHashpackWallet();
+  const authedFetch = useAuthorizedFetch();
   const [mounted, setMounted] = useState(false);
   const [stats, setStats] = useState<any>(null);
   const [activeListings, setActiveListings] = useState<any[]>([]);
@@ -371,7 +374,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!cancelSuccess) return;
     if (cancelTxHash) {
-      fetch(`${getApiUrl()}/api/sync-cancel`, {
+      authedFetch(`${getApiUrl()}/api/sync-cancel`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ txHash: cancelTxHash }),
@@ -381,14 +384,14 @@ export default function DashboardPage() {
     setCanForceCancel(false);
     setDeleteTarget(null);
     refreshActiveListings();
-  }, [cancelSuccess, cancelTxHash, refreshActiveListings]);
+  }, [cancelSuccess, cancelTxHash, refreshActiveListings, authedFetch]);
 
   const handleForceCancel = useCallback(async () => {
     if (!deleteTarget || forceDeleting) return;
     setDeleteError(null);
     setForceDeleting(true);
     try {
-      const res = await fetch(
+      const res = await authedFetch(
         `${getApiUrl()}/api/listing/${encodeURIComponent(deleteTarget.id)}/cancel-offchain`,
         {
           method: "POST",
@@ -407,7 +410,7 @@ export default function DashboardPage() {
     } finally {
       setForceDeleting(false);
     }
-  }, [deleteTarget, forceDeleting, address, refreshActiveListings]);
+  }, [deleteTarget, forceDeleting, address, refreshActiveListings, authedFetch]);
 
   useEffect(() => {
     let cancelled = false;
@@ -643,7 +646,7 @@ export default function DashboardPage() {
                     setCancellingId(deleteTarget.id);
                     if (!deleteTarget.onChainConfirmed) {
                       try {
-                        const res = await fetch(
+                        const res = await authedFetch(
                           `${getApiUrl()}/api/listing/${encodeURIComponent(deleteTarget.id)}/cancel-offchain`,
                           {
                             method: "POST",

@@ -6,6 +6,7 @@ import { stringToBytes32Hex, generateTimeBasedId } from "../lib/bytes32";
 import { parseUnits } from "viem";
 import { useRobustContractWrite } from "./useRobustContractWrite";
 import { useHashpackWallet } from "../lib/hashpackWallet";
+import { useAuthorizedFetch } from "../lib/walletRequestAuth";
 import { hederaPublicClient } from "../lib/hederaPublicClient";
 
 import { getApiUrl } from "../lib/apiUrl";
@@ -44,6 +45,7 @@ export function useCreateListing(options?: UseCreateListingOptions) {
   } = options || {};
   const { send, isPending, error, lastHash } = useRobustContractWrite();
   const { address } = useHashpackWallet();
+  const authedFetch = useAuthorizedFetch();
   const [isSuccess, setIsSuccess] = useState(false);
 
   const create = async (price: string): Promise<string> => {
@@ -83,7 +85,7 @@ export function useCreateListing(options?: UseCreateListingOptions) {
     const locationLat = locationLatRef?.current ?? undefined;
     const locationLng = locationLngRef?.current ?? undefined;
     const variants = variantsRef?.current ?? undefined;
-    const syncRes = await fetch(`${getApiUrl()}/api/sync-listing`, {
+    const syncRes = await authedFetch(`${getApiUrl()}/api/sync-listing`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

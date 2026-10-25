@@ -5,6 +5,7 @@ import { marketplaceAbi, marketplaceAddress } from "../lib/contracts";
 import { listingIdToBytes32 } from "../lib/bytes32";
 import { useRobustContractWrite } from "../hooks/useRobustContractWrite";
 import { useHashpackWallet } from "../lib/hashpackWallet";
+import { useAuthorizedFetch } from "../lib/walletRequestAuth";
 import { activeHederaChain } from "../lib/hederaChains";
 import { getApiUrl } from "../lib/apiUrl";
 import { getTransactionErrorMessage } from "../lib/transactionError";
@@ -34,6 +35,7 @@ export function DealRoomOfferCards({
   askingPriceHbar?: string | null;
 }) {
   const { address } = useHashpackWallet();
+  const authedFetch = useAuthorizedFetch();
   const { send, isPending } = useRobustContractWrite();
   const chainId = activeHederaChain.id;
   const usdRate = useHbarUsd();
@@ -72,7 +74,7 @@ export function DealRoomOfferCards({
         functionName: fn,
         args,
       });
-      await fetch(`${getApiUrl()}/api/sync-offer-action`, {
+      await authedFetch(`${getApiUrl()}/api/sync-offer-action`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ txHash, listingId, buyer: offer.buyer, action }),
