@@ -25,6 +25,7 @@ import { useTopBarSlotFilled, useTopBarSlotRef } from "../lib/topBar";
 import { cn } from "../lib/utils";
 import { Footer } from "./Footer";
 import { MarketplaceBrandHeader, profileHref } from "./MarketplaceBrandHeader";
+import { MarketplaceDesktopHeader } from "./MarketplaceDesktopHeader";
 import { MobileTopBar } from "./MobileTopBar";
 import { MessagesModal } from "./MessagesModal";
 import { NotificationBell } from "./NotificationBell";
@@ -167,15 +168,18 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
   const fallbackTitle = pathnameTitle(pathname);
   const showFooter = pathname === "/marketplace" || pathname.startsWith("/marketplace");
   // Marketplace home renders its own slim header (cart mark + wordmark, glass
-  // search, Create / cart / bell / profile). Keep this shell bar off that route
+  // search, Create / cart / bell / profile). Listing, Terms, and Privacy reuse
+  // that same MarketplaceDesktopHeader. Keep this shell bar off those routes
   // so the icon row, Connect chip, and Sign in pill do not stack on top.
   const marketplaceHome = pathname === "/marketplace";
+  const sharedMarketplaceHeader =
+    pathname.startsWith("/listing/") || pathname === "/terms" || pathname === "/privacy";
 
   // Mobile page header lives here in the shell — OUTSIDE the route-keyed fade
   // wrapper below — so it stays put on page switches while the content still
   // eases in. Marketplace renders its own mobile header (brand row + search).
-  // Cart, Messages, Offers, Create, My Hashpop, and profile share that same
-  // brand row (no search or filter). The top inset is hp-brand-safe-top.
+  // Cart, Messages, Offers, Create, My Hashpop, profile, Terms, and Privacy
+  // share that same brand row (no search or filter). The top inset is hp-brand-safe-top.
   // Focused screens (listing, order, activity…) keep their own back-button chrome.
   const MOBILE_HEADER_ROUTES = [
     "/marketplace",
@@ -187,14 +191,16 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
     "/dashboard",
   ];
   const profileRoute = pathname.startsWith("/profile/");
-  const showMobileHeader = MOBILE_HEADER_ROUTES.includes(pathname) || profileRoute;
+  const legalRoute = pathname === "/terms" || pathname === "/privacy";
+  const showMobileHeader = MOBILE_HEADER_ROUTES.includes(pathname) || profileRoute || legalRoute;
   const marketplaceBrandHeader =
     pathname === "/cart" ||
     pathname === "/messages" ||
     pathname === "/offers" ||
     pathname === "/create" ||
     pathname === "/dashboard" ||
-    profileRoute;
+    profileRoute ||
+    legalRoute;
   const accountHref = effectiveConnected ? profileHref(address, accountId) : null;
   const isAdminRoute = pathname.startsWith("/admin") || pathname.startsWith("/area51");
   // Full-screen surfaces (open message thread) hide all chrome.
@@ -213,11 +219,27 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col">
-      {/* Top bar — desktop only, and not on marketplace home (that route
-          paints MarketplaceDesktopHeader). Sticky so page content scrolls
-          beneath it. Height is 0 below md so a wallet webview that ignores
-          `hidden` cannot reserve a 56px band above the brand header. */}
-      {!marketplaceHome && (
+      {/* Shared marketplace slim bar on listing, terms, and privacy. Search
+          submits to the marketplace, the same destination as the shell's
+          fallback field. Hidden below md, so listing mobile chrome is unchanged. */}
+      {sharedMarketplaceHeader && (
+        <MarketplaceDesktopHeader
+          searchValue={fallbackQuery}
+          onSearchChange={setFallbackQuery}
+          onSearchSubmit={(event) => {
+            event.preventDefault();
+            const q = fallbackQuery.trim();
+            router.push(q ? `/marketplace?q=${encodeURIComponent(q)}` : "/marketplace");
+            setFallbackQuery("");
+          }}
+        />
+      )}
+
+      {/* Top bar — desktop only, and not on routes that paint
+          MarketplaceDesktopHeader. Sticky so page content scrolls beneath it.
+          Height is 0 below md so a wallet webview that ignores `hidden`
+          cannot reserve a 56px band above the brand header. */}
+      {!marketplaceHome && !sharedMarketplaceHeader && (
         <header className="hp-desktop-bar sticky top-0 z-20 hidden h-0 shrink-0 items-center gap-3 overflow-hidden border-0 border-white/5 bg-[#0b111b]/90 px-0 backdrop-blur-xl md:flex md:h-14 md:overflow-visible md:border-b md:px-3">
           {/* Logo, then the page's search (center slot), then the nav strip. */}
           <Link
