@@ -5,6 +5,7 @@ import { BootSplash } from "../components/BootSplash";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import { SEO_COPY } from "../lib/seo/copy";
 import { serializeJsonLd, siteJsonLd } from "../lib/seo/jsonld";
 import { socialImages } from "../lib/seo/metadata";
@@ -86,6 +87,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: BOOT_ERROR_CATCHER }} />
         <BootSplash />
         <ClientProviders>{children}</ClientProviders>
+        <Script
+          src="https://analytics.ahrefs.com/analytics.js"
+          data-key="JCojpQAKSQkgV5bQL67Ccg"
+          strategy="afterInteractive"
+        />
         <SpeedInsights />
         <Analytics />
       </body>
