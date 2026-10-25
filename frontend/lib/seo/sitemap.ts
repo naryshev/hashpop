@@ -5,7 +5,7 @@ import { listingCanonicalPath } from "./metadata";
 
 /**
  * Indexable routes that are not account-specific.
- * `/` is the homepage. `/marketplace` stays in the sitemap beside it.
+ * `/` is the homepage. `/about` is the about page. `/marketplace` stays beside them.
  */
 export const PUBLIC_SITEMAP_PATHS = [
   "/",

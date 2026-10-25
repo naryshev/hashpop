@@ -356,6 +356,17 @@ describe("robots.txt", () => {
 });
 
 describe("sitemap.xml", () => {
+  it("lists https://hashpop.io/ first at priority 1 and includes /about", () => {
+    const entries = buildSitemap([]);
+    expect(entries[0]).toMatchObject({
+      url: "https://hashpop.io/",
+      priority: 1,
+      changeFrequency: "daily",
+    });
+    const about = entries.find((entry) => entry.url === "https://hashpop.io/about");
+    expect(about).toMatchObject({ priority: 0.6, changeFrequency: "weekly" });
+  });
+
   it("includes the homepage at priority 1, existing static pages, and only active listing URLs", () => {
     const entries = buildSitemap([
       {
