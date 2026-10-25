@@ -91,14 +91,18 @@ describe("DesktopShell marketplace chrome", () => {
     host = undefined;
   });
 
-  it("hides the icon row, Connect chip, and Sign in pill on marketplace", async () => {
-    await renderShell();
-    expect(document.querySelector('nav[aria-label="Primary navigation"]')).toBeNull();
-    expect(document.body.textContent).not.toContain("Sign in");
-    expect(document.body.textContent).not.toContain("Connect");
-    expect(document.querySelector('[data-testid="mobile-top-bar"]')).toBeNull();
-    expect(document.body.textContent).toContain("page");
-  });
+  it.each(["/marketplace", "/"])(
+    "hides the icon row, Connect chip, and Sign in pill on %s",
+    async (pathname) => {
+      nav.pathname = pathname;
+      await renderShell();
+      expect(document.querySelector('nav[aria-label="Primary navigation"]')).toBeNull();
+      expect(document.body.textContent).not.toContain("Sign in");
+      expect(document.body.textContent).not.toContain("Connect");
+      expect(document.querySelector('[data-testid="mobile-top-bar"]')).toBeNull();
+      expect(document.body.textContent).toContain("page");
+    },
+  );
 
   it("keeps the shared desktop bar on other routes", async () => {
     nav.pathname = "/purchases";

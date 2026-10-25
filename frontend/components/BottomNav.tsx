@@ -28,7 +28,9 @@ export function BottomNav() {
   }, []);
 
   const isActive = (href: string) =>
-    pathname === href || (href !== "/" && pathname.startsWith(href));
+    pathname === href ||
+    (href === "/marketplace" && pathname === "/") ||
+    (href !== "/" && pathname.startsWith(href));
 
   const items: TabBarItem[] = [
     {

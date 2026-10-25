@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Fuse from "fuse.js";
 import { ListingCard } from "../../components/ListingCard";
@@ -32,6 +32,9 @@ import {
   MarketplaceFilterDrawer,
   RAIL_PRICE_CEILING,
 } from "../../components/MarketplaceBrowseRail";
+import { type ListingItem } from "../../lib/loadMarketplaceListings";
+
+export type { ListingItem };
 
 function parsePostedWithinDays(value: string): number | null {
   if (!value) return null;
@@ -63,32 +66,18 @@ function parseSortMode(value: string | null): SortMode {
   return "recent";
 }
 
-export type ListingItem = {
-  id: string;
-  price?: string;
-  title?: string | null;
-  subtitle?: string | null;
-  description?: string | null;
-  category?: string | null;
-  condition?: string | null;
-  watchlistCount?: number;
-  seller?: string;
-  imageUrl?: string | null;
-  mediaUrls?: string[];
-  city?: string | null;
-  createdAt?: string;
-  status?: string;
-  onChainConfirmed?: boolean;
-  requireEscrow?: boolean | null;
-  itemType: "listing";
-};
-
 export default function MarketplacePageClient({
   initialItems,
   initialError,
+  intro = null,
+  about = null,
 }: {
   initialItems: ListingItem[];
   initialError: string | null;
+  /** Server-rendered homepage intro. Omitted on /marketplace. */
+  intro?: ReactNode;
+  /** Server-rendered homepage about section. Omitted on /marketplace. */
+  about?: ReactNode;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -476,6 +465,8 @@ export default function MarketplacePageClient({
           }
         />
 
+        {intro}
+
         <div className="lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start lg:gap-5">
           <aside className="sticky top-[72px] z-10 hidden self-start lg:block">
             <div className="max-h-[calc(100dvh-5.5rem)] overflow-y-auto">{renderBrowseRail()}</div>
@@ -532,6 +523,7 @@ export default function MarketplacePageClient({
             )}
           </div>
         </div>
+        {about}
       </div>
       <MarketplaceFilterDrawer open={desktopFilterOpen} onClose={() => setDesktopFilterOpen(false)}>
         {renderBrowseRail()}
