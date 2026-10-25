@@ -51,12 +51,13 @@ describe("JSON-LD builders", () => {
       url: "https://hashpop.io/listing/lst-1",
       priceValidUntil: "2026-10-26",
     });
-    expect(offers[0]?.additionalProperty).toEqual({
+    expect(offers[0]).not.toHaveProperty("additionalProperty");
+    expect(offers[0]).not.toHaveProperty("priceSpecification");
+    expect(data.additionalProperty).toEqual({
       "@type": "PropertyValue",
       name: "Price (HBAR)",
       value: "5",
     });
-    expect(offers[0]).not.toHaveProperty("priceSpecification");
     expect(data.description).toBe("Brass arm Price (HBAR): 5.");
     expect(listingOfferPriceLabel("5", 0.2)).toBe("5 ℏ (≈ $1.00 USD)");
     const serialized = serializeJsonLd(data);
@@ -74,6 +75,11 @@ describe("JSON-LD builders", () => {
     });
     expect(nodesOfType(data, "Offer")).toHaveLength(0);
     expect(data).not.toHaveProperty("offers");
+    expect(data.additionalProperty).toEqual({
+      "@type": "PropertyValue",
+      name: "Price (HBAR)",
+      value: "5",
+    });
     expect(data.description).toContain("Price (HBAR): 5.");
     expect(serializeJsonLd(data)).not.toContain("priceCurrency");
     expect(serializeJsonLd(data)).not.toContain("priceSpecification");

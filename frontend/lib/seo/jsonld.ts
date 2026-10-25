@@ -38,11 +38,13 @@ export type ListingOfferJsonLd = {
   url: string;
   priceValidUntil: string;
   itemCondition?: string;
-  additionalProperty: {
-    "@type": "PropertyValue";
-    name: "Price (HBAR)";
-    value: string;
-  };
+};
+
+/** schema.org additionalProperty is defined on Product, not Offer. */
+export type PriceHbarProperty = {
+  "@type": "PropertyValue";
+  name: "Price (HBAR)";
+  value: string;
 };
 
 export type ListingJsonLd = {
@@ -55,6 +57,7 @@ export type ListingJsonLd = {
   image?: string[];
   category?: string;
   itemCondition?: string;
+  additionalProperty: PriceHbarProperty;
   offers?: ListingOfferJsonLd;
 };
 
@@ -108,7 +111,7 @@ export function listingImageUrls(listing: {
 
 /**
  * One Product for a listing URL. The Offer, when present, is a single USD price.
- * HBAR is recorded on additionalProperty and in the description, never as priceCurrency.
+ * HBAR is recorded on Product.additionalProperty and in the description, never as priceCurrency.
  * No offers property at all when the USD rate is missing.
  */
 export function listingJsonLd(
@@ -132,6 +135,11 @@ export function listingJsonLd(
     description,
     url,
     sku: listing.id || id,
+    additionalProperty: {
+      "@type": "PropertyValue",
+      name: "Price (HBAR)",
+      value: hbarPlain,
+    },
   };
   if (images.length > 0) data.image = images;
   if (listing.category?.trim()) data.category = listing.category.trim();
@@ -144,11 +152,6 @@ export function listingJsonLd(
       availability: schemaAvailability(listing.status),
       url,
       priceValidUntil: offerPriceValidUntil(options.now),
-      additionalProperty: {
-        "@type": "PropertyValue",
-        name: "Price (HBAR)",
-        value: hbarPlain,
-      },
     };
     if (itemCondition) offer.itemCondition = itemCondition;
     data.offers = offer;

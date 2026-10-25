@@ -201,11 +201,12 @@ describe("Product / Offer JSON-LD", () => {
       itemCondition: "https://schema.org/UsedCondition",
       url: "https://hashpop.io/listing/lst-1",
       priceValidUntil: "2026-10-26",
-      additionalProperty: {
-        "@type": "PropertyValue",
-        name: "Price (HBAR)",
-        value: "84.5",
-      },
+    });
+    expect(data.offers).not.toHaveProperty("additionalProperty");
+    expect(data.additionalProperty).toEqual({
+      "@type": "PropertyValue",
+      name: "Price (HBAR)",
+      value: "84.5",
     });
     expect(listingOfferPriceLabel("84.5", rate)).toBe("84.5 ℏ (≈ $8.45 USD)");
     const serialized = serializeJsonLd(data);
@@ -241,7 +242,8 @@ describe("Product / Offer JSON-LD", () => {
     );
     expect(data.offers?.price).toBe("1.00");
     expect(data.offers?.priceCurrency).toBe("USD");
-    expect(data.offers?.additionalProperty.value).toBe("2");
+    expect(data.offers).not.toHaveProperty("additionalProperty");
+    expect(data.additionalProperty.value).toBe("2");
   });
 
   it("maps active listings to InStock and everything else to SoldOut or Discontinued", () => {
