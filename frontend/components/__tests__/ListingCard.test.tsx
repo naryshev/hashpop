@@ -212,7 +212,7 @@ describe("ListingCard softTrust", () => {
         distanceLabel: "1.2 km",
       },
     });
-    const chips = [...document.querySelectorAll('[data-testid="grid-trust-chip"]')];
+    const chips = [...document.querySelectorAll<HTMLElement>('[data-testid="grid-trust-chip"]')];
     expect(chips.map((chip) => chip.textContent)).toEqual(["98%", "Meetup", "Escrow"]);
     expect(chips.every((chip) => !chip.hidden)).toBe(true);
     const distance = document.querySelector('[data-testid="listing-distance"]') as HTMLElement;

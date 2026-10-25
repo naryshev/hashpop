@@ -119,7 +119,9 @@ describe("listing metadata", () => {
     expect(meta.description).not.toMatch(/escrow-backed P2P/);
     expect(meta.alternates?.canonical).toBe("https://hashpop.io/listing/lst-1");
     expect(meta.openGraph?.url).toBe("https://hashpop.io/listing/lst-1");
-    expect(meta.openGraph?.type).toBe("website");
+    expect(meta.openGraph && "type" in meta.openGraph ? meta.openGraph.type : undefined).toBe(
+      "website",
+    );
     expect(meta.openGraph?.images).toEqual([{ url: "https://cdn.hashpop.io/camera.jpg" }]);
     expect(
       listingMetadata("lst-1", { ...listing, imageUrl: null, mediaUrls: [] }).openGraph?.images,

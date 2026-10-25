@@ -13,7 +13,7 @@ export type ListingLoadSettlement =
 type ListingResponse = {
   status: number;
   ok: boolean;
-  json: () => Promise<{ listing?: LoadedListing | null }>;
+  json: () => Promise<unknown>;
 };
 
 type FetchLike = (url: string, init: { signal: AbortSignal }) => Promise<ListingResponse>;
@@ -27,7 +27,7 @@ async function fetchListingAttempt(
     const res = await fetchImpl(url, { signal: AbortSignal.timeout(timeoutMs) });
     if (res.status === 404) return { phase: "missing" };
     if (!res.ok) return { phase: "unavailable" };
-    const data = await res.json();
+    const data = (await res.json()) as { listing?: LoadedListing | null };
     if (!data?.listing?.id) return { phase: "unavailable" };
     return { phase: "ready", listing: data.listing };
   } catch {

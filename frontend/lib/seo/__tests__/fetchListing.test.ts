@@ -25,7 +25,7 @@ describe("loadPublicListing", () => {
       listing: { id: "0xabc", title: "Galaxy Gas" },
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toContain("/api/listing/lst-galaxy");
     expect(init.cache).toBe("no-store");
   });
