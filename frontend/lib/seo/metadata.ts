@@ -159,6 +159,17 @@ export function listingNotFoundMetadata(): Metadata {
   };
 }
 
+/**
+ * Metadata exported by the listing not-found page.
+ * `notFound()` already inserts `<meta name="robots" content="noindex">`.
+ * Repeating robots here renders a second tag (`noindex, follow`).
+ */
+export function listingNotFoundDocumentMetadata(): Metadata {
+  const metadata = listingNotFoundMetadata();
+  const { robots, ...documentMetadata } = metadata;
+  return robots === undefined ? metadata : documentMetadata;
+}
+
 /** Transient listing failure. Noindex, and no canonical that claims this URL is the listing. */
 export function listingUnavailableMetadata(): Metadata {
   const title = SEO_COPY.listingFallbackTitle;

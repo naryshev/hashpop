@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { listingNotFoundMetadata } from "../../../lib/seo/metadata";
+import { listingNotFoundDocumentMetadata } from "../../../lib/seo/metadata";
 
-export const metadata = listingNotFoundMetadata();
+export const metadata = listingNotFoundDocumentMetadata();
 
 export default function ListingNotFound() {
   return (

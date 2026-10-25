@@ -16,6 +16,8 @@ import {
   FALLBACK_OG_IMAGE,
   FALLBACK_TWITTER_IMAGE,
   listingMetadata,
+  listingNotFoundDocumentMetadata,
+  listingNotFoundMetadata,
   listingUnavailableMetadata,
   marketplaceMetadata,
   staticPageMetadata,
@@ -146,6 +148,16 @@ describe("listing metadata", () => {
       subtitle: null,
     });
     expect(meta.description).toBe("Vintage Camera for 84 ℏ on Hashpop — escrow-backed P2P.");
+  });
+
+  it("keeps a confirmed miss noindex without a second robots tag", () => {
+    const meta = listingNotFoundMetadata();
+    expect(meta.robots).toMatchObject({ index: false, follow: true });
+    const documentMeta = listingNotFoundDocumentMetadata();
+    expect(documentMeta.robots).toBeUndefined();
+    expect(documentMeta.title).toEqual(meta.title);
+    expect(documentMeta.description).toBe(meta.description);
+    expect(documentMeta.alternates?.canonical).toBeUndefined();
   });
 
   it("does not publish a self-canonical when the listing cannot be loaded", () => {
