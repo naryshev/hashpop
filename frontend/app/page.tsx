@@ -5,8 +5,9 @@ import { loadInitialMarketplaceListings } from "../lib/loadMarketplaceListings";
 import { HOMEPAGE_SEO } from "../lib/seo/homepage";
 import MarketplacePageClient from "./marketplace/marketplace-page-client";
 
-// Document title only. Description, Open Graph, Twitter, and canonicals stay
-// on the root layout (SEO_COPY.rootTitle / rootDescription).
+// Title only. Description, Open Graph, and Twitter stay on the root layout.
+// Next 14 rewrites alternates.canonical "/" to https://hashpop.io (no slash)
+// because the pathname is "/". The link below is the homepage canonical.
 export const metadata: Metadata = {
   title: { absolute: HOMEPAGE_SEO.title },
 };
@@ -28,13 +29,16 @@ export default async function Home() {
   const intro: ReactNode = <HomeIntro />;
   const about: ReactNode = <HomeAbout />;
   return (
-    <Suspense fallback={<ListingsFallback />}>
-      <MarketplacePageClient
-        initialItems={items}
-        initialError={error}
-        intro={intro}
-        about={about}
-      />
-    </Suspense>
+    <>
+      <link rel="canonical" href="https://hashpop.io/" />
+      <Suspense fallback={<ListingsFallback />}>
+        <MarketplacePageClient
+          initialItems={items}
+          initialError={error}
+          intro={intro}
+          about={about}
+        />
+      </Suspense>
+    </>
   );
 }
