@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { helpFaqQuestions } from "../help";
+import { FAQS } from "../../help/faqs";
 import {
   ABOUT_PAGE,
   ABOUT_UNCONFIRMED,
@@ -31,7 +31,9 @@ function normalizeQuestion(value: string): string {
 
 describe("about and help FAQ questions", () => {
   it("fails when /about and /help publish the same question", () => {
-    const help = new Set(helpFaqQuestions().map(normalizeQuestion));
+    const help = new Set(
+      FAQS.flatMap((group) => group.items.map((item) => item.q)).map(normalizeQuestion),
+    );
     const duplicates = publishedAboutFaqs()
       .map((faq) => faq.question)
       .filter((question) => help.has(normalizeQuestion(question)));
