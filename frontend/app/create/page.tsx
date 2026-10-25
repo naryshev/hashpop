@@ -25,7 +25,6 @@ import { activeHederaChain } from "../../lib/hederaChains";
 import { getTransactionExplorerUrl } from "../../lib/explorer";
 
 import { getApiUrl } from "../../lib/apiUrl";
-import { listingDescriptionError } from "../../lib/listingDescription";
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB
 const MAX_MEDIA_SIZE = 15 * 1024 * 1024; // 15MB for video
 const MAX_MEDIA_COUNT = 10; // photos + videos per listing
@@ -358,23 +357,19 @@ function CreatePageContent() {
     return urls;
   };
 
-  // Minimum publish requirements. New listings need a real 50+ character description.
+  // Minimum publish requirements. Description is optional.
   const validation = useMemo(() => {
     const photoCount = mediaItems.length + duplicateMediaCount;
     const variantError = validateListingVariantsDraft(variants);
     return {
       photos: photoCount >= 1 ? null : "Add at least 1 photo.",
       title: title.trim() ? null : "Add a title.",
-      description: listingDescriptionError(description),
       price: price && Number(price) > 0 ? null : "Enter a price greater than 0.",
       category: category.trim() ? null : "Select a category.",
       variants: variantError,
     };
-  }, [mediaItems.length, duplicateMediaCount, title, description, price, category, variants]);
+  }, [mediaItems.length, duplicateMediaCount, title, price, category, variants]);
   const isValid = !Object.values(validation).some(Boolean);
-  const descriptionCount = description.trim().length;
-  const descriptionInvalid =
-    (triedSubmit || descriptionCount > 0) && validation.description != null;
 
   const handleSubmit = async () => {
     setSubmitError(null);
@@ -641,34 +636,17 @@ function CreatePageContent() {
 
                   <label className="block">
                     <span className="flex items-baseline justify-between text-xs font-semibold text-white">
-                      <span>
-                        Description <span className="text-chrome">*</span>
-                      </span>
-                      <span
-                        className={cn(
-                          "font-mono text-[10px] uppercase tracking-wide",
-                          descriptionCount >= 50 ? "text-silver" : "text-rose-400",
-                        )}
-                      >
-                        {descriptionCount}/50
+                      Description
+                      <span className="font-mono text-[10px] uppercase tracking-wide text-silver">
+                        Optional
                       </span>
                     </span>
                     <textarea
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      className={cn(
-                        "input-frost mt-1 w-full min-h-[100px] resize-y text-base",
-                        descriptionInvalid &&
-                          "border-rose-400 focus:border-rose-400 focus:ring-rose-400/40",
-                      )}
+                      className="input-frost mt-1 w-full min-h-[100px] resize-y text-base"
                       placeholder="What makes it worth buying? Condition notes, what's included, any flaws."
-                      aria-invalid={descriptionInvalid ? true : undefined}
                     />
-                    {(triedSubmit || description.trim().length > 0) && validation.description && (
-                      <span className="mt-1 block text-xs text-rose-400" role="alert">
-                        {validation.description}
-                      </span>
-                    )}
                   </label>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -998,6 +976,7 @@ function ListingHealth({
   hasLocation: boolean;
   mediaCount: number;
 }) {
+  const wordCount = description.trim().split(/\s+/).filter(Boolean).length;
   const titleTrimmed = title.trim();
   const checks: { label: string; ok: boolean; hint?: string }[] = [
     {
@@ -1019,8 +998,8 @@ function ListingHealth({
       ok: hasLocation,
     },
     {
-      label: "Description (50+ characters)",
-      ok: listingDescriptionError(description) === null,
+      label: "Description added",
+      ok: wordCount > 0,
     },
   ];
   return (

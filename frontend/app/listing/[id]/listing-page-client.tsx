@@ -47,7 +47,6 @@ import { LocationPicker, type LocationValue } from "../../../components/Location
 import { OffersPanel } from "../../../components/OffersPanel";
 
 import { getApiUrl } from "../../../lib/apiUrl";
-import { listingDescriptionChangeError } from "../../../lib/listingDescription";
 import { listingImageAlt } from "../../../lib/listingImageAlt";
 
 function SellerProfileMeta({ seller }: { seller: string }) {
@@ -588,9 +587,6 @@ export default function ListingPage({
 
   const displayId = formatListingId(id);
   const displayTitle = listing?.title || displayId || "Untitled";
-  const editDescriptionError = listing
-    ? listingDescriptionChangeError(listing.description, editDescription)
-    : null;
   const walletAddressCandidates = [
     address?.toLowerCase(),
     accountId ? accountIdToLongZeroAddress(accountId).toLowerCase() : null,
@@ -692,11 +688,6 @@ export default function ListingPage({
 
   const doSaveEditListing = async () => {
     if (!address || !listing) return;
-    const descriptionError = listingDescriptionChangeError(listing.description, editDescription);
-    if (descriptionError) {
-      setEditError(descriptionError);
-      return;
-    }
     setEditError(null);
     setEditSaving(true);
     let priceUpdateFailed = false;
@@ -1726,13 +1717,7 @@ export default function ListingPage({
                     onChange={(e) => setEditDescription(e.target.value)}
                     className="input-frost mt-1 w-full text-base min-h-[80px] resize-y"
                     placeholder="Condition notes, what’s included, any flaws."
-                    aria-invalid={editDescriptionError ? true : undefined}
                   />
-                  {editDescriptionError ? (
-                    <span className="mt-1 block text-xs text-rose-400" role="alert">
-                      {editDescriptionError}
-                    </span>
-                  ) : null}
                 </label>
                 <div>
                   <span className="text-xs font-semibold text-white">Condition</span>

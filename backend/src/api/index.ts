@@ -8,7 +8,6 @@ import { decodeEvents } from "../indexer/decoder";
 import { saveUpload } from "../storage";
 import { decryptJson, encryptJson, secretBoxConfigured } from "../lib/secretBox";
 import { listingVariantsForDb } from "../listingVariants";
-import { listingDescriptionChangeError, listingDescriptionError } from "../listingDescription";
 import { authenticateAdmin, isAdminAddress, listAdminIdentities } from "../adminAuth";
 import {
   adminListingsWhere,
@@ -574,20 +573,6 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     const subtitleStr = typeof subtitle === "string" && subtitle.trim() ? subtitle.trim() : null;
     const descriptionStr =
       typeof description === "string" && description.trim() ? description.trim() : null;
-    const existingForDescription = fallbackListingId
-      ? await prisma.listing.findUnique({
-          where: { id: fallbackListingId },
-          select: { description: true },
-        })
-      : null;
-    const descriptionWriteError = existingForDescription
-      ? descriptionStr == null
-        ? null
-        : listingDescriptionChangeError(existingForDescription.description, descriptionStr)
-      : listingDescriptionError(descriptionStr ?? "");
-    if (descriptionWriteError) {
-      return res.status(400).json({ error: descriptionWriteError });
-    }
     const categoryStr = typeof category === "string" && category.trim() ? category.trim() : null;
     const conditionStr =
       typeof condition === "string" && condition.trim() ? condition.trim() : null;
@@ -1873,16 +1858,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       } = {};
       if (title !== undefined) update.title = title === "" ? null : title;
       if (subtitle !== undefined) update.subtitle = subtitle === "" ? null : subtitle;
-      if (description !== undefined) {
-        const next = typeof description === "string" ? description.trim() : "";
-        const descriptionWriteError = listingDescriptionChangeError(listing.description, next);
-        if (descriptionWriteError) {
-          return res.status(400).json({ error: descriptionWriteError });
-        }
-        if (next !== (listing.description ?? "").trim()) {
-          update.description = next === "" ? null : next;
-        }
-      }
+      if (description !== undefined) update.description = description === "" ? null : description;
       if (category !== undefined) update.category = category === "" ? null : category;
       if (condition !== undefined) update.condition = condition === "" ? null : condition;
       if (yearOfProduction !== undefined)
