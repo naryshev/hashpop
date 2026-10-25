@@ -174,8 +174,8 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
   // Mobile page header lives here in the shell — OUTSIDE the route-keyed fade
   // wrapper below — so it stays put on page switches while the content still
   // eases in. Marketplace renders its own mobile header (brand row + search).
-  // Cart, Messages, Create, My Hashpop, and profile share that same brand row
-  // (no search or filter). The top inset is hp-brand-safe-top.
+  // Cart, Messages, Offers, Create, My Hashpop, and profile share that same
+  // brand row (no search or filter). The top inset is hp-brand-safe-top.
   // Focused screens (listing, order, activity…) keep their own back-button chrome.
   const MOBILE_HEADER_ROUTES = [
     "/marketplace",
@@ -191,6 +191,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
   const marketplaceBrandHeader =
     pathname === "/cart" ||
     pathname === "/messages" ||
+    pathname === "/offers" ||
     pathname === "/create" ||
     pathname === "/dashboard" ||
     profileRoute;

@@ -114,7 +114,7 @@ describe("DesktopShell marketplace chrome", () => {
     expect(shellHeader?.className).not.toContain(" h-14 ");
   });
 
-  it.each(["/cart", "/messages", "/create", "/dashboard", "/profile/0.0.1234"])(
+  it.each(["/cart", "/messages", "/offers", "/create", "/dashboard", "/profile/0.0.1234"])(
     "uses the marketplace brand header on %s without search or the old mobile bar",
     async (pathname) => {
       nav.pathname = pathname;
