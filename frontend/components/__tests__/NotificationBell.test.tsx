@@ -39,6 +39,19 @@ let mockState: {
   loading: boolean;
 };
 
+async function openNotifications(btn: HTMLButtonElement) {
+  await act(async () => {
+    btn.click();
+  });
+  const deadline = Date.now() + 2000;
+  while (!document.querySelector('[role="dialog"]')) {
+    if (Date.now() > deadline) throw new Error("notifications panel did not open");
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+  }
+}
+
 let root: Root | undefined;
 let host: HTMLElement | undefined;
 
@@ -137,9 +150,7 @@ describe("NotificationBell", () => {
   it("opens a deal-update list with notification empty copy", async () => {
     await renderBell();
     const btn = document.querySelector('button[aria-label="Notifications"]') as HTMLButtonElement;
-    await act(async () => {
-      btn.click();
-    });
+    await openNotifications(btn);
     expect(markSeen).toHaveBeenCalled();
     expect(document.querySelector("h2")?.textContent).toBe("Notifications");
     expect(document.body.textContent).toContain("No notifications yet.");
@@ -150,9 +161,7 @@ describe("NotificationBell", () => {
   it("slides a narrow desktop drawer in from the right", async () => {
     await renderBell("desktop");
     const btn = document.querySelector('button[aria-label="Notifications"]') as HTMLButtonElement;
-    await act(async () => {
-      btn.click();
-    });
+    await openNotifications(btn);
     const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
     expect(dialog.getAttribute("aria-modal")).toBe("true");
     expect(dialog.getAttribute("data-notifications-variant")).toBe("desktop");
@@ -172,9 +181,7 @@ describe("NotificationBell", () => {
   it("opens a full-screen inbox on mobile", async () => {
     await renderBell("mobile");
     const btn = document.querySelector('button[aria-label="Notifications"]') as HTMLButtonElement;
-    await act(async () => {
-      btn.click();
-    });
+    await openNotifications(btn);
     const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
     expect(dialog.getAttribute("data-notifications-variant")).toBe("mobile");
     expect(dialog.getAttribute("data-notifications-motion")).toBe("slide-right");
@@ -215,9 +222,7 @@ describe("NotificationBell", () => {
     };
     await renderBell();
     const btn = document.querySelector('button[aria-label="Notifications"]') as HTMLButtonElement;
-    await act(async () => {
-      btn.click();
-    });
+    await openNotifications(btn);
     expect(document.body.textContent).toContain("New offer");
     expect(document.body.textContent).toContain("12 ℏ on Polaroid");
     expect(document.body.textContent).toContain("just now");
@@ -261,9 +266,7 @@ describe("NotificationBell", () => {
     };
     await renderBell("mobile");
     let btn = document.querySelector('button[aria-label="Notifications, 1"]') as HTMLButtonElement;
-    await act(async () => {
-      btn.click();
-    });
+    await openNotifications(btn);
     const featured = document.querySelector("[data-notification-featured]") as HTMLElement;
     expect(featured?.textContent).toContain("Confirm meetup");
     expect(featured?.querySelector("[data-notification-unread]")).toBeTruthy();
@@ -287,9 +290,7 @@ describe("NotificationBell", () => {
     host?.remove();
     await renderBell("desktop");
     btn = document.querySelector('button[aria-label="Notifications, 1"]') as HTMLButtonElement;
-    await act(async () => {
-      btn.click();
-    });
+    await openNotifications(btn);
     expect(document.querySelector("[data-notification-featured]")).toBeNull();
     expect(document.querySelectorAll("[data-notification-row]")).toHaveLength(2);
   });
@@ -297,9 +298,7 @@ describe("NotificationBell", () => {
   it("closes from the scrim, the close button, and Escape, and traps tab", async () => {
     await renderBell("desktop");
     const btn = document.querySelector('button[aria-label="Notifications"]') as HTMLButtonElement;
-    await act(async () => {
-      btn.click();
-    });
+    await openNotifications(btn);
     const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
     const close = dialog.querySelector('[aria-label="Close notifications"]') as HTMLButtonElement;
     const options = dialog.querySelector(

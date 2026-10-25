@@ -4,7 +4,6 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Funnel, Search as SearchIcon, SlidersHorizontal } from "lucide-react";
 import { cn } from "../lib/utils";
 import { MarketplaceBrandHeader } from "./MarketplaceBrandHeader";
-import { Sheet } from "./ui/Sheet";
 
 const FILTER_DETENTS = ["medium", "large"] as const;
 
@@ -65,6 +64,18 @@ export function MarketplaceMobileHeader({
 }) {
   const mobileSheet = useMobileSheet();
   const filtersActive = filterCount > 0;
+  const wantSheet = mobileSheet && (filterOpen || sortOpen);
+  const [SheetCmp, setSheetCmp] = useState<typeof import("./ui/Sheet").Sheet | null>(null);
+  useEffect(() => {
+    if (!wantSheet || SheetCmp) return;
+    let cancelled = false;
+    void import("./ui/Sheet").then((mod) => {
+      if (!cancelled) setSheetCmp(() => mod.Sheet);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [wantSheet, SheetCmp]);
   return (
     <div data-testid="marketplace-mobile-header" className="mb-3 md:hidden">
       <MarketplaceBrandHeader />
@@ -109,46 +120,50 @@ export function MarketplaceMobileHeader({
         </button>
       </div>
 
-      <Sheet
-        open={filterOpen && mobileSheet}
-        onClose={onCloseFilters}
-        detent="medium"
-        detents={[...FILTER_DETENTS]}
-        title="Filters"
-        ariaLabel="Filters"
-        footer={
-          <div className="flex items-center justify-between gap-3">
-            <button
-              type="button"
-              data-testid="filter-clear"
-              onClick={onClearFilters}
-              className="text-[15px] font-medium text-white/80"
-            >
-              Clear
-            </button>
-            <button
-              type="button"
-              data-testid="filter-show"
-              onClick={onShowResults}
-              className="btn-mint rounded-full px-4 py-2.5 text-[15px] font-semibold"
-            >
-              Show {resultCount} results
-            </button>
-          </div>
-        }
-      >
-        {filterSheet}
-      </Sheet>
+      {SheetCmp ? (
+        <>
+          <SheetCmp
+            open={filterOpen && mobileSheet}
+            onClose={onCloseFilters}
+            detent="medium"
+            detents={[...FILTER_DETENTS]}
+            title="Filters"
+            ariaLabel="Filters"
+            footer={
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  data-testid="filter-clear"
+                  onClick={onClearFilters}
+                  className="text-[15px] font-medium text-white/80"
+                >
+                  Clear
+                </button>
+                <button
+                  type="button"
+                  data-testid="filter-show"
+                  onClick={onShowResults}
+                  className="btn-mint rounded-full px-4 py-2.5 text-[15px] font-semibold"
+                >
+                  Show {resultCount} results
+                </button>
+              </div>
+            }
+          >
+            {filterSheet}
+          </SheetCmp>
 
-      <Sheet
-        open={sortOpen && mobileSheet}
-        onClose={onCloseSort}
-        detent="medium"
-        title="Sort"
-        ariaLabel="Sort"
-      >
-        {sortSheet}
-      </Sheet>
+          <SheetCmp
+            open={sortOpen && mobileSheet}
+            onClose={onCloseSort}
+            detent="medium"
+            title="Sort"
+            ariaLabel="Sort"
+          >
+            {sortSheet}
+          </SheetCmp>
+        </>
+      ) : null}
     </div>
   );
 }

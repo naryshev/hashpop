@@ -3,6 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { listingImageAlt } from "../lib/listingImageAlt";
 import { getListingMediaUrls } from "../lib/listingMedia";
+import { ListingImage } from "./ListingImage";
+
+const MARKET_CARD_SIZES = "(max-width: 768px) 46vw, (max-width: 1280px) 30vw, 320px";
 
 /** Standard height for card media so all marketplace/home cards are the same size */
 const CARD_MEDIA_HEIGHT = "260px";
@@ -30,6 +33,10 @@ type ListingMediaProps = {
    * height. The parent owns the aspect ratio (marketplace media-first tiles).
    */
   bleed?: boolean;
+  /** First above-the-fold photo on the route. One image per page. */
+  priority?: boolean;
+  /** Passed to next/image. Ignored for the raw-img fallback. */
+  sizes?: string;
 };
 
 export function ListingMedia({
@@ -42,6 +49,8 @@ export function ListingMedia({
   cardSize = false,
   compactHeight,
   bleed = false,
+  priority = false,
+  sizes = MARKET_CARD_SIZES,
 }: ListingMediaProps) {
   const [failed, setFailed] = useState<Set<number>>(new Set());
   const [index, setIndex] = useState(0);
@@ -113,11 +122,12 @@ export function ListingMedia({
       return <div className={`${frame} bg-[#0b111b]`} role="img" aria-label="No media" />;
     }
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
+      <ListingImage
         src={urls[0]}
         alt={listingImageAlt(listing.title, 0)}
-        className="absolute inset-0 h-full w-full object-cover"
+        priority={priority}
+        sizes={sizes}
+        className="object-cover"
         onError={() => setFailed(new Set([0]))}
       />
     );

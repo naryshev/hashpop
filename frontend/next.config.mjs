@@ -19,6 +19,34 @@ const nextConfig = {
       { source: "/selling", destination: "/dashboard", permanent: false },
     ];
   },
+  images: {
+    formats: ["image/avif", "image/webp"],
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "**.r2.dev",
+        pathname: "/uploads/**",
+      },
+      {
+        protocol: "https",
+        hostname: "cdn.hashpop.io",
+        pathname: "/**",
+      },
+      {
+        protocol: "http",
+        hostname: "localhost",
+        pathname: "/uploads/**",
+      },
+      {
+        protocol: "http",
+        hostname: "127.0.0.1",
+        pathname: "/uploads/**",
+      },
+    ],
+  },
+  experimental: {
+    optimizePackageImports: ["lucide-react"],
+  },
   transpilePackages: [
     "@hashgraph/sdk",
     "@hashgraph/proto",

@@ -11,7 +11,6 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useHashpackWallet } from "./hashpackWallet";
-import { SignInCard } from "../components/ui/SignInCard";
 
 type OpenOptions = {
   /** Title rendered above the card (e.g. "Sign in to make an offer"). */
@@ -36,9 +35,23 @@ const Ctx = createContext<SignInModalContext | null>(null);
 export function SignInModalProvider({ children }: { children: React.ReactNode }) {
   const { isConnected } = useHashpackWallet();
   const [open, setOpen] = useState(false);
+  const [SignInCard, setSignInCard] = useState<
+    typeof import("../components/ui/SignInCard").SignInCard | null
+  >(null);
   const [title, setTitle] = useState<string | undefined>(undefined);
   const onConnectedRef = useRef<(() => void) | undefined>(undefined);
   const wasOpenRef = useRef(false);
+
+  useEffect(() => {
+    if (!open || SignInCard) return;
+    let cancelled = false;
+    void import("../components/ui/SignInCard").then((mod) => {
+      if (!cancelled) setSignInCard(() => mod.SignInCard);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, SignInCard]);
 
   const openSignIn = useCallback((opts?: OpenOptions) => {
     setTitle(opts?.title);
@@ -129,7 +142,14 @@ export function SignInModalProvider({ children }: { children: React.ReactNode })
               {title && (
                 <p className="mb-3 text-center text-sm font-medium text-white/80">{title}</p>
               )}
-              <SignInCard className="rounded-t-3xl border border-white/10 bg-[#12161f]/95 p-6 pb-[max(env(safe-area-inset-bottom),24px)] shadow-[0_-12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl md:rounded-3xl md:pb-8 sm:p-8" />
+              {SignInCard ? (
+                <SignInCard className="rounded-t-3xl border border-white/10 bg-[#12161f]/95 p-6 pb-[max(env(safe-area-inset-bottom),24px)] shadow-[0_-12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl md:rounded-3xl md:pb-8 sm:p-8" />
+              ) : (
+                <div
+                  aria-hidden
+                  className="min-h-[320px] rounded-t-3xl border border-white/10 bg-[#12161f]/95 md:rounded-3xl"
+                />
+              )}
             </div>
           </div>,
           portalTarget,

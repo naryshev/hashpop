@@ -4,6 +4,7 @@ import { listingHref, encodeListingIdForUrl } from "../../../lib/listingUrl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { ListingImage } from "../../../components/ListingImage";
 import { BuyButton } from "../../../components/BuyButton";
 import { EscrowPanel } from "../../../components/EscrowPanel";
 import { AddressDisplay } from "../../../components/AddressDisplay";
@@ -1489,11 +1490,12 @@ export default function ListingPage({
                         muted
                       />
                     ) : (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
+                      <ListingImage
                         src={mainImageUrl}
                         alt={listingImageAlt(displayTitle, safeMediaIndex)}
-                        className="h-full w-full object-contain"
+                        priority
+                        sizes="(max-width: 1024px) 100vw, 720px"
+                        className="object-contain"
                       />
                     )}
                     {/* Status pill stays on the image (top-left). Seller /

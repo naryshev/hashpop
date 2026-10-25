@@ -20,6 +20,7 @@ import {
 import { useCart } from "../lib/cart";
 import { useUnreadCount } from "../hooks/useUnreadCount";
 import { useHashpackWallet } from "../lib/hashpackWallet";
+import { useHashConnectPreload } from "../lib/useHashConnectPreload";
 import { useSignInModal } from "../lib/signInModal";
 import { useTopBarSlotFilled, useTopBarSlotRef } from "../lib/topBar";
 import { cn } from "../lib/utils";
@@ -106,6 +107,7 @@ function TopNavBtn({
 export function DesktopShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { isConnected, accountId, address } = useHashpackWallet();
+  useHashConnectPreload();
   const { openSignIn } = useSignInModal();
   const { count: cartCount } = useCart();
   const unreadThreads = useUnreadCount();
