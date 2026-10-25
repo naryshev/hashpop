@@ -397,26 +397,54 @@ function normalizeListingId(id: string): string {
   return "0x" + hex.toLowerCase();
 }
 
+export type ItemListedSnapshot = {
+  price: string;
+  status: string;
+  onChainConfirmed: boolean;
+};
+
+/**
+ * ItemListed is replayed on every indexer poll. Writing the same price and
+ * status again bumps Prisma `@updatedAt` to now, which is not a modification.
+ */
+export function itemListedPersistAction(
+  existing: ItemListedSnapshot | null,
+  next: ItemListedSnapshot,
+): "create" | "update" | "skip" {
+  if (!existing) return "create";
+  if (
+    existing.price === next.price &&
+    existing.status === next.status &&
+    existing.onChainConfirmed === next.onChainConfirmed
+  ) {
+    return "skip";
+  }
+  return "update";
+}
+
 async function handleEvent(event: any, prisma: PrismaClient, log: Logger) {
   switch (event.type) {
     case "ItemListed": {
       const listingId = normalizeListingId(event.listingId);
       const seller = (event.seller || "").toLowerCase();
-      await prisma.listing.upsert({
+      const price = chainAmountToHbar(event.price);
+      const next = { price, status: "LISTED", onChainConfirmed: true };
+      const existing = await prisma.listing.findUnique({
         where: { id: listingId },
-        create: {
-          id: listingId,
-          seller,
-          price: chainAmountToHbar(event.price),
-          status: "LISTED",
-          onChainConfirmed: true,
-        },
-        update: {
-          price: chainAmountToHbar(event.price),
-          status: "LISTED",
-          onChainConfirmed: true,
-        },
+        select: { price: true, status: true, onChainConfirmed: true },
       });
+      const action = itemListedPersistAction(existing, next);
+      if (action === "skip") break;
+      if (action === "create") {
+        await prisma.listing.create({
+          data: { id: listingId, seller, ...next },
+        });
+      } else {
+        await prisma.listing.update({
+          where: { id: listingId },
+          data: next,
+        });
+      }
       log.info({ listingId, seller }, "Listing indexed");
       break;
     }
