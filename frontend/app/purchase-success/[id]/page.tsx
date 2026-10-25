@@ -50,6 +50,10 @@ export default function PurchaseSuccessPage() {
   const priceDisplay = listing?.price
     ? formatHbarWithUsd(formatPriceForDisplay(listing.price), usdRate)
     : null;
+  // Unknown (loading, failed fetch, 404, or a listing with no flag) must not
+  // claim a protected payment. Direct sales are requireEscrow === false.
+  const protectedPayment = listing?.requireEscrow === true;
+  const directSale = listing?.requireEscrow === false;
 
   return (
     <main className="min-h-screen flex items-start justify-center px-4 py-12">
@@ -72,35 +76,41 @@ export default function PurchaseSuccessPage() {
             </svg>
           </div>
           <h1 className="text-2xl font-semibold tracking-normal text-white">
-            {listing?.requireEscrow === false
-              ? "Purchase complete"
-              : "Funds locked in a protected payment"}
+            {protectedPayment
+              ? "Funds locked in a protected payment"
+              : directSale
+                ? "Purchase complete"
+                : "Payment sent"}
           </h1>
           <p className="text-silver text-sm mt-2 max-w-sm">
             The seller has been notified.
-            {listing?.requireEscrow !== false && priceDisplay
+            {protectedPayment && priceDisplay
               ? ` ${withHbarGlyph(formatPriceForDisplay(listing?.price ?? "0"))} releases when you confirm delivery.`
               : ""}
           </p>
-          {txHash && (
+          {(txHash || protectedPayment) && (
             <div className="mt-4 flex max-w-full items-center gap-2.5">
-              <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#f59e0b] px-3 py-1 text-[11px] font-extrabold uppercase tracking-wide text-[#2a1503]">
-                <svg
-                  className="h-3 w-3"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2.5}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"
-                  />
-                </svg>
-                Locked
-              </span>
-              <span className="truncate font-mono text-[11px] text-silver/70">tx {txHash}</span>
+              {protectedPayment && (
+                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#f59e0b] px-3 py-1 text-[11px] font-extrabold uppercase tracking-wide text-[#2a1503]">
+                  <svg
+                    className="h-3 w-3"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2.5}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"
+                    />
+                  </svg>
+                  Locked
+                </span>
+              )}
+              {txHash && (
+                <span className="truncate font-mono text-[11px] text-silver/70">tx {txHash}</span>
+              )}
             </div>
           )}
         </div>
@@ -142,13 +152,7 @@ export default function PurchaseSuccessPage() {
           <p className="text-[10px] font-semibold text-white/40 uppercase tracking-widest mb-2">
             What happens next
           </p>
-          {listing?.requireEscrow === false ? (
-            <p className="text-sm text-silver leading-relaxed">
-              <span className="font-semibold text-white">You paid the seller directly.</span> This
-              listing did not offer a protected payment, so the HBAR went to the seller on-chain
-              instead of being held by a smart contract.
-            </p>
-          ) : (
+          {protectedPayment ? (
             <p className="text-sm text-silver leading-relaxed">
               <span className="font-semibold text-white">
                 Your payment is held by an on-chain smart contract.
@@ -157,6 +161,14 @@ export default function PurchaseSuccessPage() {
               automatically. Once shipped, the seller is paid after a short window unless you report
               a problem. You never need to do anything unless something goes wrong.
             </p>
+          ) : directSale ? (
+            <p className="text-sm text-silver leading-relaxed">
+              <span className="font-semibold text-white">You paid the seller directly.</span> This
+              listing did not offer a protected payment, so the HBAR went to the seller on-chain
+              instead of being held by a smart contract.
+            </p>
+          ) : (
+            <p className="text-sm text-silver leading-relaxed">Your payment was sent.</p>
           )}
         </div>
 
@@ -188,7 +200,7 @@ export default function PurchaseSuccessPage() {
           >
             Marketplace
           </Link>
-          {id && (
+          {id && protectedPayment && (
             <Link
               href={listingHref(id)}
               className="btn-mint flex-1 py-3 text-center text-sm font-semibold"
