@@ -372,6 +372,9 @@ function CreatePageContent() {
     };
   }, [mediaItems.length, duplicateMediaCount, title, description, price, category, variants]);
   const isValid = !Object.values(validation).some(Boolean);
+  const descriptionCount = description.trim().length;
+  const descriptionInvalid =
+    (triedSubmit || descriptionCount > 0) && validation.description != null;
 
   const handleSubmit = async () => {
     setSubmitError(null);
@@ -638,17 +641,28 @@ function CreatePageContent() {
 
                   <label className="block">
                     <span className="flex items-baseline justify-between text-xs font-semibold text-white">
-                      Description <span className="text-chrome">*</span>
-                      <span className="font-mono text-[10px] uppercase tracking-wide text-silver">
-                        {description.trim().length}/50
+                      <span>
+                        Description <span className="text-chrome">*</span>
+                      </span>
+                      <span
+                        className={cn(
+                          "font-mono text-[10px] uppercase tracking-wide",
+                          descriptionCount >= 50 ? "text-silver" : "text-rose-400",
+                        )}
+                      >
+                        {descriptionCount}/50
                       </span>
                     </span>
                     <textarea
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      className="input-frost mt-1 w-full min-h-[100px] resize-y text-base"
+                      className={cn(
+                        "input-frost mt-1 w-full min-h-[100px] resize-y text-base",
+                        descriptionInvalid &&
+                          "border-rose-400 focus:border-rose-400 focus:ring-rose-400/40",
+                      )}
                       placeholder="What makes it worth buying? Condition notes, what's included, any flaws."
-                      aria-invalid={validation.description ? true : undefined}
+                      aria-invalid={descriptionInvalid ? true : undefined}
                     />
                     {(triedSubmit || description.trim().length > 0) && validation.description && (
                       <span className="mt-1 block text-xs text-rose-400" role="alert">
