@@ -234,6 +234,18 @@ describe("DesktopShell marketplace chrome", () => {
     expect(document.querySelector('nav[aria-label="Primary navigation"]')).toBeTruthy();
   });
 
+  it("uses the brand row without search on /about at desktop and mobile", async () => {
+    nav.pathname = "/about";
+    await renderShell();
+    const brand = document.querySelector('[data-testid="marketplace-brand-header"]') as HTMLElement;
+    expect(brand).toBeTruthy();
+    expect(brand.parentElement?.parentElement?.className).not.toContain("md:hidden");
+    expect(document.querySelector("header.hp-desktop-bar")).toBeNull();
+    expect(document.querySelector('nav[aria-label="Primary navigation"]')).toBeNull();
+    expect(document.querySelector("input")).toBeNull();
+    expect(document.querySelector('[data-testid="mobile-top-bar"]')).toBeNull();
+  });
+
   it("links the desktop account chip to the profile", async () => {
     wallet.isConnected = true;
     wallet.address = "0xabc";

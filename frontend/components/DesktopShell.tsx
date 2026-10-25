@@ -170,12 +170,13 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
   const showFooter =
     pathname === "/" || pathname === "/marketplace" || pathname.startsWith("/marketplace");
   // `/` and `/marketplace` render the marketplace slim header. Listing, Terms,
-  // and Privacy reuse that same MarketplaceDesktopHeader. Keep this shell bar
-  // off those routes so the icon row, Connect chip, and Sign in pill do not
-  // stack on top.
+  // and Privacy reuse that same MarketplaceDesktopHeader. /about uses the brand
+  // row, without search, on desktop and mobile. Keep this shell bar off those
+  // routes so the icon row, Connect chip, and Sign in pill do not stack on top.
   const marketplaceHome = pathname === "/" || pathname === "/marketplace";
   const sharedMarketplaceHeader =
     pathname.startsWith("/listing/") || pathname === "/terms" || pathname === "/privacy";
+  const aboutPage = pathname === "/about";
 
   // Mobile page header lives here in the shell — OUTSIDE the route-keyed fade
   // wrapper below — so it stays put on page switches while the content still
@@ -191,6 +192,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
     "/offers",
     "/create",
     "/dashboard",
+    "/about",
   ];
   const profileRoute = pathname.startsWith("/profile/");
   const legalRoute = pathname === "/terms" || pathname === "/privacy";
@@ -201,6 +203,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
     pathname === "/offers" ||
     pathname === "/create" ||
     pathname === "/dashboard" ||
+    aboutPage ||
     profileRoute ||
     legalRoute;
   const accountHref = effectiveConnected ? profileHref(address, accountId) : null;
@@ -241,7 +244,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
           MarketplaceDesktopHeader. Sticky so page content scrolls beneath it.
           Height is 0 below md so a wallet webview that ignores `hidden`
           cannot reserve a 56px band above the brand header. */}
-      {!marketplaceHome && !sharedMarketplaceHeader && (
+      {!marketplaceHome && !sharedMarketplaceHeader && !aboutPage && (
         <header className="hp-desktop-bar sticky top-0 z-20 hidden h-0 shrink-0 items-center gap-3 overflow-hidden border-0 border-white/5 bg-[#0b111b]/90 px-0 backdrop-blur-xl md:flex md:h-14 md:overflow-visible md:border-b md:px-3">
           {/* Logo, then the page's search (center slot), then the nav strip. */}
           <Link
@@ -362,8 +365,8 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
           (marketplaceBrandHeader ? (
             // Top inset lives on MarketplaceBrandHeader (hp-brand-safe-top).
             // No bottom margin: Marketplace's mb-3 sits under the search row,
-            // which these routes do not render.
-            <div className="px-3 md:hidden">
+            // which these routes do not render. /about keeps the row on desktop.
+            <div className={aboutPage ? "px-3 md:px-5" : "px-3 md:hidden"}>
               <MarketplaceBrandHeader />
             </div>
           ) : (
