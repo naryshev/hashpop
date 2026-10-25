@@ -7,8 +7,10 @@ import { socialImages } from "../lib/seo/metadata";
 import MarketplacePageClient from "./marketplace/marketplace-page-client";
 
 // Homepage title, description, and social cards. Other routes keep SEO_COPY.
-// Next 14 rewrites alternates.canonical "/" to https://hashpop.io (no slash)
-// because the pathname is "/". The link below is the homepage canonical.
+// Next 14 resolves a root URL to its origin, so metadata canonical and
+// openGraph.url both emit https://hashpop.io with no slash. The tags below
+// are the homepage canonical and og:url, both with the trailing slash.
+const HOMEPAGE_URL = "https://hashpop.io/";
 const images = socialImages();
 
 export const metadata: Metadata = {
@@ -19,7 +21,6 @@ export const metadata: Metadata = {
     siteName: "Hashpop",
     title: HOMEPAGE_SEO.title,
     description: HOMEPAGE_SEO.description,
-    url: "https://hashpop.io/",
     images: images.openGraph,
   },
   twitter: {
@@ -50,7 +51,8 @@ export default async function Home() {
   const about: ReactNode = <HomeAbout />;
   return (
     <>
-      <link rel="canonical" href="https://hashpop.io/" />
+      <link rel="canonical" href={HOMEPAGE_URL} />
+      <meta property="og:url" content={HOMEPAGE_URL} />
       <Suspense fallback={<ListingsFallback />}>
         <MarketplacePageClient
           initialItems={items}

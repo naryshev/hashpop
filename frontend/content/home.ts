@@ -93,6 +93,7 @@ export const HOME_SECTIONS: HomeSection[] = [
       ],
       [
         { kind: "text", text: "Buying close to home? Open " },
+        // Nearby is the mobile dock overlay. It has no route, query, or tab URL.
         { kind: "link", href: "/marketplace", text: "Nearby" },
         {
           kind: "text",
