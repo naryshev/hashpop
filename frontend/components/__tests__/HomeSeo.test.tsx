@@ -27,9 +27,11 @@ describe("homepage SEO copy", () => {
     expect(html).toContain(">About Hashpop</h2>");
     expect(html).toContain(HOMEPAGE_SEO.h1);
     expect(html).toContain("Reputation. Chat. Protected payments. On your wallet.");
-    expect(html).toContain("How protected HBAR payments work");
-    expect(html).toContain("If the listing offers protected payments:");
-    expect(html).not.toMatch(/escrow/i);
+    expect(html).toContain("How HBAR escrow works");
+    expect(html).toContain("and pay in HBAR. If the listing offers escrow:");
+    expect(html).toContain("when the seller offers it, lock the money in on-chain HBAR escrow");
+    expect(html).toContain("Funds lock in escrow.");
+    expect(html).toContain(`>${HOMEPAGE_SEO.h1}</h1>`);
     expect(html).toContain("Get started");
     expect(html).toContain('href="/marketplace"');
     expect(html).toContain('href="/categories"');
