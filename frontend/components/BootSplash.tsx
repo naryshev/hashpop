@@ -62,6 +62,9 @@ export function BootSplash() {
         <img
           src="/hashpop-cart-3d.PNG"
           alt=""
+          width={512}
+          height={374}
+          fetchPriority="high"
           className="hp-splash-logo h-16 w-auto object-contain drop-shadow-[0_0_24px_rgba(0,255,163,0.25)]"
         />
         <div className="h-1 w-40 overflow-hidden rounded-full bg-white/10">

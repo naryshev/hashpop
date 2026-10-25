@@ -6,7 +6,6 @@ import { Map as MapIcon, MessageSquare, Plus, ShoppingCart, Store } from "lucide
 import { useCart } from "../lib/cart";
 import { useUnreadCount } from "../hooks/useUnreadCount";
 import { hrefWithoutNearbyView, isNearbyView } from "../lib/nearbyView";
-import { NearbyMap } from "./NearbyMap";
 import { TabBar, type TabBarItem } from "./ui/TabBar";
 
 /** Reads `?view=nearby` under Suspense so the dock itself can still server-render. */
@@ -36,8 +35,20 @@ export function BottomNav() {
   const { count: cartCount } = useCart();
   const unreadThreads = useUnreadCount();
   const [mapOpen, setMapOpen] = useState(false);
+  const [NearbyMap, setNearbyMap] = useState<typeof import("./NearbyMap").NearbyMap | null>(null);
   const searchRef = useRef("");
   const openNearby = useCallback(() => setMapOpen(true), []);
+
+  useEffect(() => {
+    if (!mapOpen || NearbyMap) return;
+    let cancelled = false;
+    void import("./NearbyMap").then((mod) => {
+      if (!cancelled) setNearbyMap(() => mod.NearbyMap);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [mapOpen, NearbyMap]);
 
   const closeNearby = useCallback(() => {
     setMapOpen(false);
@@ -122,7 +133,7 @@ export function BottomNav() {
       <Suspense fallback={null}>
         <NearbyFromUrl onOpen={openNearby} searchRef={searchRef} />
       </Suspense>
-      <NearbyMap open={mapOpen} onClose={closeNearby} />
+      {NearbyMap ? <NearbyMap open={mapOpen} onClose={closeNearby} /> : null}
     </>
   );
 }

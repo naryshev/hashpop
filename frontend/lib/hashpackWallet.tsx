@@ -16,7 +16,7 @@ import {
 import type { MutableRefObject } from "react";
 import type { HashConnect } from "hashconnect";
 import { revokeWalletAuthSession } from "./walletAuthSession";
-import { activeHederaChain } from "./hederaChains";
+import { ACTIVE_HEDERA_CHAIN_ID } from "./hederaNetwork";
 import {
   INIT_TIMEOUT_MESSAGE,
   INIT_TIMEOUT_MS,
@@ -24,6 +24,9 @@ import {
   bootstrapHashConnect,
   getWalletConnectProjectId,
   isInitTimeoutError,
+  pairingStoreHasActiveSession,
+  scheduleIdle,
+  shouldBootstrapHashConnectOnLoad,
   shouldRetryHashConnectInit,
   withTimeout,
 } from "./hashpackWalletInit";
@@ -83,7 +86,7 @@ let sharedHashconnectInitPromise: Promise<HashConnect> | null = null;
 let sharedHashconnectKey: string | null = null;
 
 function getNetwork(): HederaNetwork {
-  return activeHederaChain.id === 295 ? "mainnet" : "testnet";
+  return ACTIVE_HEDERA_CHAIN_ID === 295 ? "mainnet" : "testnet";
 }
 
 function getMirrorBase(network: HederaNetwork): string {
@@ -514,53 +517,83 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
     };
     wireClientRef.current = wireClient;
 
-    initPromiseRef.current = (async () => {
-      try {
-        // Prune expired/inactive WalletConnect pairings to avoid
-        // "Record was recently deleted" errors during init.
-        clearStalePairings();
+    const beginInit = () => {
+      if (initPromiseRef.current) return initPromiseRef.current;
+      const pending = (async () => {
+        try {
+          // Prune expired/inactive WalletConnect pairings to avoid
+          // "Record was recently deleted" errors during init.
+          clearStalePairings();
 
-        const result = await bootstrapHashConnect({
-          createClient: (forceFresh) => getOrCreateHashConnect(network, projectId, forceFresh),
-          wipeStorage: clearWalletConnectorStorage,
-        });
+          const result = await bootstrapHashConnect({
+            createClient: (forceFresh) => getOrCreateHashConnect(network, projectId, forceFresh),
+            wipeStorage: clearWalletConnectorStorage,
+          });
 
-        if (result.timedOut) {
-          // UI circuit breaker: leave "Loading wallet…" without killing the
-          // in-flight HashConnect. If it later resolves, wire listeners then.
-          if (mounted) {
-            setError(result.error);
-            setIsReady(true);
+          if (result.timedOut) {
+            // UI circuit breaker: leave "Loading wallet…" without killing the
+            // in-flight HashConnect. If it later resolves, wire listeners then.
+            if (mounted) {
+              setError(result.error);
+              setIsReady(true);
+            }
+            if (!result.pending) return null;
+            try {
+              const late = await result.pending;
+              return await wireClient(late);
+            } catch {
+              return null;
+            }
           }
-          if (!result.pending) return null;
-          try {
-            const late = await result.pending;
-            return await wireClient(late);
-          } catch {
+
+          if (!result.client) {
+            if (mounted) {
+              setError(result.error ?? "Failed to initialize HashPack connection.");
+              setIsReady(true);
+            }
             return null;
           }
-        }
 
-        if (!result.client) {
-          if (mounted) {
-            setError(result.error ?? "Failed to initialize HashPack connection.");
-            setIsReady(true);
-          }
+          return await wireClient(result.client);
+        } catch (e) {
+          if (!mounted) return null;
+          const msg = e instanceof Error ? e.message : "Failed to initialize HashPack connection.";
+          setError(msg);
+          setIsReady(true);
           return null;
         }
+      })();
+      initPromiseRef.current = pending;
+      return pending;
+    };
 
-        return await wireClient(result.client);
-      } catch (e) {
-        if (!mounted) return null;
-        const msg = e instanceof Error ? e.message : "Failed to initialize HashPack connection.";
-        setError(msg);
-        setIsReady(true);
-        return null;
-      }
-    })();
+    let pairingRaw: string | null = null;
+    try {
+      pairingRaw = window.localStorage.getItem("wc@2:core:0.3//pairing");
+    } catch {
+      pairingRaw = null;
+    }
+    const bootstrapTiming = shouldBootstrapHashConnectOnLoad({
+      framed: isFramed(),
+      hasSavedSession: !!restored,
+      hasActivePairing: pairingStoreHasActiveSession(pairingRaw),
+    });
+    let cancelIdle = () => {};
+    if (bootstrapTiming === "never") {
+      // Signed-out visitors: HashConnect stays out of the first load.
+      // connect() calls getOrCreateHashConnect on the click that needs it.
+      setIsReady(true);
+    } else if (bootstrapTiming === "idle") {
+      cancelIdle = scheduleIdle(() => {
+        if (mounted) void beginInit();
+      });
+    } else {
+      void beginInit();
+    }
 
     return () => {
       mounted = false;
+      cancelIdle();
       initPromiseRef.current = null;
       // Unregister event listeners to prevent memory leaks and duplicate handlers.
       if (sharedHashconnect) {

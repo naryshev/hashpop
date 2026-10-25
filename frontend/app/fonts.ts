@@ -38,7 +38,8 @@ export const plexMono = localFont({
   display: "swap",
   variable: "--font-mono",
   adjustFontFallback: false,
-  preload: true,
+  // Secondary face. Preloading it competes with the LCP image on mobile.
+  preload: false,
 });
 
 /**
@@ -54,7 +55,7 @@ export const hbarGlyph = localFont({
   display: "swap",
   variable: "--font-hbar",
   adjustFontFallback: false,
-  preload: true,
+  preload: false,
   declarations: [
     { prop: "unicode-range", value: "U+210F" },
     { prop: "size-adjust", value: "90%" },

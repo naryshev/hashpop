@@ -1,58 +1,12 @@
-"use client";
-
-import { useMemo, useState } from "react";
+import { PageReady } from "../../components/PageReady";
+import { SupportTicketTemplate } from "../../components/SupportTicketTemplate";
 
 const DISCORD_INVITE_URL = "https://discord.gg/VYt4WrYM7V";
 
 export default function SupportPage() {
-  const [copied, setCopied] = useState(false);
-
-  const ticketTemplate = useMemo(
-    () =>
-      [
-        "Hashpop Support Ticket",
-        "",
-        "Issue summary:",
-        "- ",
-        "",
-        "What happened (steps):",
-        "1) ",
-        "2) ",
-        "3) ",
-        "",
-        "Expected result:",
-        "- ",
-        "",
-        "Actual result / error:",
-        "- ",
-        "",
-        "Listing ID / Transaction ID (if applicable):",
-        "- ",
-        "",
-        "Wallet address:",
-        "- ",
-        "",
-        "Network (testnet/mainnet):",
-        "- ",
-        "",
-        "Best contact for updates (Discord @name, email, or X):",
-        "- ",
-      ].join("\n"),
-    [],
-  );
-
-  const copyTemplate = async () => {
-    try {
-      await navigator.clipboard.writeText(ticketTemplate);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
-    } catch {
-      setCopied(false);
-    }
-  };
-
   return (
     <main className="min-h-screen">
+      <PageReady />
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6">
         <section className="rounded-2xl border border-white/15 bg-gradient-to-br from-[#5865F2]/30 via-[#0d1222] to-[#0f4f76]/40 p-6 sm:p-8">
           <p className="text-xs uppercase tracking-[0.2em] text-indigo-200/90">Hashpop Support</p>
@@ -127,24 +81,7 @@ export default function SupportPage() {
           </div>
         </section>
 
-        <section className="glass-card p-5 rounded-xl border border-white/10">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-white font-semibold">Ticket details template</h2>
-            <button
-              type="button"
-              onClick={() => void copyTemplate()}
-              className="btn-frost-cta text-xs px-3 py-2"
-            >
-              {copied ? "Copied" : "Copy template"}
-            </button>
-          </div>
-          <p className="text-sm text-silver mt-2">
-            Include as much detail as possible so support can reproduce the issue and update you.
-          </p>
-          <pre className="mt-4 whitespace-pre-wrap text-xs leading-relaxed text-silver bg-black/30 border border-white/10 rounded-lg p-4 overflow-x-auto">
-            {ticketTemplate}
-          </pre>
-        </section>
+        <SupportTicketTemplate />
       </div>
     </main>
   );
