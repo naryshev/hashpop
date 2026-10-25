@@ -261,6 +261,12 @@ a,
       overflow: hidden;
     }
   }
+  /* Desktop line length only. Mobile stays clamped; the block stays in flow. */
+  @media (min-width: 768px) {
+    .home-lede {
+      max-width: 640px;
+    }
+  }
   .home-intro summary::-webkit-details-marker {
     display: none;
   }
