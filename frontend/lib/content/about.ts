@@ -1,16 +1,16 @@
 /**
- * /about copy. Swap wording here. `{ESCROW}` is filled from `BRAND.escrowTerm`.
- * Counsel fallback for that term is "on-chain hold".
+ * /about copy. `{ESCROW}` and `{ESCROW_CAP}` fill from `BRAND.escrowTerm`
+ * and `BRAND.escrowTermCap`. Until legal review those read "protected payments"
+ * and "Protected payments". Counsel fallback for the term is "on-chain hold".
  *
- * Facts Daniel has not confirmed live in `ABOUT_UNCONFIRMED` with
- * `confirmed: false`. They stay out of the page and out of FAQPage JSON-LD
- * until that flag is true. The surrounding answer still publishes.
+ * Entries in `ABOUT_UNCONFIRMED` with `confirmed: false` stay out of the page
+ * and out of FAQPage JSON-LD. A confirmed entry publishes with the answer.
  */
 
 export const BRAND = {
-  escrowTerm: "escrow",
+  escrowTerm: "protected payments",
   /** Sentence-start form of `escrowTerm`. `{ESCROW_CAP}` maps here. */
-  escrowTermCap: "Escrow",
+  escrowTermCap: "Protected payments",
 } as const;
 
 export function applyEscrowTerm(text: string): string {
@@ -32,8 +32,8 @@ export const ABOUT_UNCONFIRMED = [
   },
   {
     id: "hashpop-fee",
-    confirmed: false as const,
-    text: "Hashpop fee — Daniel to confirm the number; put it here plainly.",
+    confirmed: true as const,
+    text: "Hashpop charges no fee on sales with {ESCROW}. Direct sales carry a 2% fee, taken from the seller's proceeds; buyers pay the listed price.",
   },
 ] as const;
 
@@ -86,7 +86,7 @@ const ABOUT_FAQS: { question: string; answer: AboutSpan[] }[] = [
     answer: [
       {
         type: "text",
-        text: "Paying a stranger directly in crypto is risky, and consumer guides are right to warn about it: once it's sent, it's gone. Hashpop changes the order. On listings with {ESCROW}, your HBAR goes into an on-chain contract first; the seller can see it's there, and it only releases when you confirm you got the item. Look for the {ESCROW} badge before you pay. You can also check the seller's completed deals and reviews before you pay. No marketplace can promise zero risk, so start small with new trading partners and read our ",
+        text: "Paying a stranger directly in crypto is risky, and consumer guides are right to warn about it: once it's sent, it's gone. Hashpop changes the order. On listings with {ESCROW}, your HBAR goes into an on-chain contract first; the seller can see it's there, and it only releases when you confirm you got the item. You can also check the seller's completed deals and reviews before you pay. No marketplace can promise zero risk, so start small with new trading partners and read our ",
       },
       { type: "link", href: "/help", text: "help center" },
       { type: "text", text: " if anything feels off." },
@@ -97,7 +97,7 @@ const ABOUT_FAQS: { question: string; answer: AboutSpan[] }[] = [
     answer: [
       {
         type: "text",
-        text: "You pay, the HBAR locks in the contract, the seller ships or meets you, and you confirm to release it. If the item never shows up or isn't as described, don't confirm; open a dispute from the deal instead. ",
+        text: "When a listing offers {ESCROW}, you pay and the HBAR locks in the contract. The seller ships or meets you, and you confirm to release it. If the item never shows up or isn't as described, don't confirm; open a dispute from the deal instead. ",
       },
       {
         type: "unconfirmed",
@@ -144,7 +144,7 @@ const ABOUT_FAQS: { question: string; answer: AboutSpan[] }[] = [
       { type: "link", href: "/marketplace", text: "marketplace" },
       {
         type: "text",
-        text: ", agree on a time in chat, and, if the listing offers {ESCROW}, lock the payment before you go. Meet somewhere public and well lit, check the item in person, then confirm to release. If it's not what was promised, walk away without confirming.",
+        text: ", agree on a time in chat, and, if the listing offers {ESCROW}, lock the payment before you go. Meet somewhere public and well lit and check the item in person. If you locked the payment, confirm to release it once the item checks out. If it's not what was promised, walk away without confirming.",
       },
     ],
   },
@@ -153,7 +153,7 @@ const ABOUT_FAQS: { question: string; answer: AboutSpan[] }[] = [
     answer: [
       {
         type: "text",
-        text: "Yes. Connect your wallet, snap a few photos, write an honest description and set a price in HBAR. You get paid when the buyer confirms. See Selling on Hashpop for what you can and can't list.",
+        text: "Yes. Connect your wallet, snap a few photos, write an honest description and set a price in HBAR. On a direct sale you are paid when the buyer pays. When you offer {ESCROW}, you are paid when the buyer confirms. See Selling on Hashpop for what you can and can't list.",
       },
     ],
   },
@@ -215,11 +215,11 @@ export function aboutFaqPageJsonLd() {
 export const ABOUT_PAGE = {
   title: "About Hashpop – A Hedera Marketplace for Real Stuff",
   description: applyEscrowTerm(
-    "Hashpop is a peer-to-peer Hedera marketplace where you buy and sell items for crypto, paid in HBAR through an on-chain {ESCROW} contract. Reputation, chat and meetups, all on your wallet.",
+    "Hashpop is a peer-to-peer Hedera marketplace where you buy and sell items for crypto, paid in HBAR. Sellers can offer {ESCROW}, which hold the funds in an on-chain contract. Reputation, chat and meetups, all on your wallet.",
   ),
   h1: "Real stuff. Real people. Paid in HBAR.",
   lede: applyEscrowTerm(
-    "Hashpop is a peer-to-peer Hedera marketplace for physical goods. Buy and sell items for crypto with people near you or across the country, with reputation, chat and an optional on-chain {ESCROW} contract, all tied to your wallet.",
+    "Hashpop is a peer-to-peer Hedera marketplace for physical goods. Buy and sell items for crypto with people near you or across the country, with reputation, chat and optional {ESCROW} in an on-chain contract, all tied to your wallet.",
   ),
   byline: "Hashpop",
   updated: "Updated Oct 2026",
@@ -246,13 +246,15 @@ export const ABOUT_PAGE = {
       id: "hold",
       icon: "lock",
       lead: applyEscrowTerm("{ESCROW_CAP} we never hold."),
-      body: "When a listing offers it, payment locks in an on-chain contract until the buyer confirms. Hashpop never has custody of your funds.",
+      body: "When a listing offers them, payment locks in an on-chain contract until the buyer confirms. Hashpop never has custody of your funds.",
     },
     {
       id: "meetups",
       icon: "pin",
       lead: "Meetups with a contract.",
-      body: "Lock the payment before you meet, instead of counting cash or trusting a screenshot.",
+      body: applyEscrowTerm(
+        "When a listing offers {ESCROW}, lock the payment before you meet, instead of counting cash or trusting a screenshot.",
+      ),
     },
   ],
   faqHeading: "Questions people ask before their first deal",

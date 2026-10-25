@@ -40,10 +40,31 @@ describe("about and help FAQ questions", () => {
   });
 });
 
+const FEE_SENTENCE =
+  "Hashpop charges no fee on sales with protected payments. Direct sales carry a 2% fee, taken from the seller's proceeds; buyers pay the listed price.";
+
+function userFacingAboutCopy(): string {
+  return [
+    ABOUT_PAGE.title,
+    ABOUT_PAGE.description,
+    ABOUT_PAGE.h1,
+    ABOUT_PAGE.lede,
+    ...ABOUT_PAGE.why,
+    ...ABOUT_PAGE.pillars.flatMap((pillar) => [pillar.lead, pillar.body]),
+    ABOUT_PAGE.finePrint,
+    ABOUT_PAGE.cta.label,
+    ...publishedAboutFaqs().flatMap((faq) => [faq.question, faq.answerText]),
+    JSON.stringify(aboutFaqPageJsonLd()),
+    String(metadata.description ?? ""),
+    String(metadata.openGraph?.description ?? ""),
+    String(metadata.twitter?.description ?? ""),
+  ].join("\n");
+}
+
 describe("about copy", () => {
-  it("keeps escrow as one swappable term", () => {
-    expect(BRAND.escrowTerm).toBe("escrow");
-    expect(BRAND.escrowTermCap).toBe("Escrow");
+  it("keeps protected payments as one swappable term", () => {
+    expect(BRAND.escrowTerm).toBe("protected payments");
+    expect(BRAND.escrowTermCap).toBe("Protected payments");
     expect(applyEscrowTerm("on-chain {ESCROW} contract")).toBe(
       `on-chain ${BRAND.escrowTerm} contract`,
     );
@@ -52,22 +73,30 @@ describe("about copy", () => {
     );
     expect(ABOUT_PAGE.h1).toBe("Real stuff. Real people. Paid in HBAR.");
     expect(ABOUT_PAGE.lede).toContain(
-      `an optional on-chain ${BRAND.escrowTerm} contract, all tied to your wallet.`,
+      `optional ${BRAND.escrowTerm} in an on-chain contract, all tied to your wallet.`,
     );
     expect(ABOUT_PAGE.pillars.map((pillar) => pillar.lead)).toContain(
       `${BRAND.escrowTermCap} we never hold.`,
     );
-    expect(ABOUT_PAGE.description).toContain(`on-chain ${BRAND.escrowTerm} contract`);
+    const hold = ABOUT_PAGE.pillars.find((pillar) => pillar.id === "hold");
+    expect(hold?.body).toBe(
+      "When a listing offers them, payment locks in an on-chain contract until the buyer confirms. Hashpop never has custody of your funds.",
+    );
+    expect(ABOUT_PAGE.description).toContain(
+      `Sellers can offer ${BRAND.escrowTerm}, which hold the funds in an on-chain contract.`,
+    );
+    expect(userFacingAboutCopy()).not.toMatch(/\bescrow\b/i);
+    expect(userFacingAboutCopy()).not.toContain("Look for the");
   });
 
   it("hides only unconfirmed sentences, and keeps the surrounding answers", () => {
-    expect(ABOUT_UNCONFIRMED.map((fact) => fact.confirmed)).toEqual([false, false, false]);
-    const hidden = ABOUT_UNCONFIRMED.map((fact) => fact.text);
+    expect(ABOUT_UNCONFIRMED.map((fact) => fact.confirmed)).toEqual([false, false, true]);
+    const hidden = ABOUT_UNCONFIRMED.filter((fact) => !fact.confirmed).map((fact) => fact.text);
     expect(hidden).toEqual([
       "Dispute resolution: who decides, timelines, refund path — Daniel to confirm before publishing",
       "List other supported wallets if any.",
-      "Hashpop fee — Daniel to confirm the number; put it here plainly.",
     ]);
+    expect(applyEscrowTerm(ABOUT_UNCONFIRMED[2].text)).toBe(FEE_SENTENCE);
 
     expect(
       renderAboutSpans([
@@ -87,13 +116,13 @@ describe("about copy", () => {
     const faqs = publishedAboutFaqs();
     const byQuestion = Object.fromEntries(faqs.map((faq) => [faq.question, faq.answerText]));
     expect(byQuestion["Who holds my money while a deal is open, and what if it goes wrong?"]).toBe(
-      "You pay, the HBAR locks in the contract, the seller ships or meets you, and you confirm to release it. If the item never shows up or isn't as described, don't confirm; open a dispute from the deal instead. Step-by-step details live in How it works.",
+      "When a listing offers protected payments, you pay and the HBAR locks in the contract. The seller ships or meets you, and you confirm to release it. If the item never shows up or isn't as described, don't confirm; open a dispute from the deal instead. Step-by-step details live in How it works.",
     );
     expect(byQuestion["What wallet do I need?"]).toBe(
       "A Hedera wallet. We support HashPack, the most popular one: install it, add a little HBAR, and connect. There are no passwords to create, and your wallet address is your account.",
     );
     expect(byQuestion["What does it cost?"]).toBe(
-      "Every transaction also pays a small Hedera network fee, which is usually a fraction of a cent. USD values shown on Hashpop are approximate, based on the current HBAR price; all payments are made in HBAR.",
+      `${FEE_SENTENCE} Every transaction also pays a small Hedera network fee, which is usually a fraction of a cent. USD values shown on Hashpop are approximate, based on the current HBAR price; all payments are made in HBAR.`,
     );
 
     const published = JSON.stringify(faqs);
@@ -124,8 +153,11 @@ describe("about FAQPage JSON-LD", () => {
     expect(data.mainEntity.map((entity) => entity.acceptedAnswer.text)).toEqual(
       faqs.map((faq) => faq.answerText),
     );
+    const json = JSON.stringify(data);
+    expect(json).toContain(FEE_SENTENCE);
     for (const fact of ABOUT_UNCONFIRMED) {
-      expect(JSON.stringify(data)).not.toContain(fact.text);
+      if (fact.confirmed) continue;
+      expect(json).not.toContain(fact.text);
     }
   });
 });
@@ -157,7 +189,10 @@ describe("about page HTML", () => {
       expect(dom).toContain(faq.question);
       expect(dom).toContain(faq.answerText);
     }
+    expect(dom).toContain(FEE_SENTENCE);
+    expect(html).toContain(FEE_SENTENCE);
     for (const fact of ABOUT_UNCONFIRMED) {
+      if (fact.confirmed) continue;
       expect(dom).not.toContain(fact.text);
       expect(html).not.toContain(fact.text);
     }
@@ -169,9 +204,10 @@ describe("about metadata", () => {
     expect(metadata.title).toEqual({
       absolute: "About Hashpop – A Hedera Marketplace for Real Stuff",
     });
-    expect(metadata.description).toBe(
-      `Hashpop is a peer-to-peer Hedera marketplace where you buy and sell items for crypto, paid in HBAR through an on-chain ${BRAND.escrowTerm} contract. Reputation, chat and meetups, all on your wallet.`,
-    );
+    expect(metadata.description).toBe(ABOUT_PAGE.description);
+    expect(metadata.openGraph?.description).toBe(ABOUT_PAGE.description);
+    expect(metadata.twitter?.description).toBe(ABOUT_PAGE.description);
+    expect(metadata.description).not.toMatch(/\bescrow\b/i);
     expect(metadata.alternates?.canonical).toBe("https://hashpop.io/about");
   });
 });
