@@ -10,6 +10,17 @@ import { decryptJson, encryptJson, secretBoxConfigured } from "../lib/secretBox"
 import { listingVariantsForDb } from "../listingVariants";
 import { patchListingTitle, syncListingTitle, trimmedOrNull } from "../listingText";
 import { authenticateAdmin, isAdminAddress, listAdminIdentities } from "../adminAuth";
+import { walletOwns, type WalletGuardDeps } from "../walletAuth";
+import { canonicalListingId } from "../listingId";
+import { resolveMirrorBase } from "../mirrorUrl";
+import { createWalletRouteAuth } from "../walletWriteGuard";
+import {
+  createWalletSession,
+  prismaSessionStore,
+  sessionSecretFromEnv,
+  sessionSecretIsDerived,
+  type SessionStore,
+} from "../walletSession";
 import {
   adminListingsWhere,
   computeAdminStats,
@@ -26,42 +37,10 @@ import {
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB
 const MAX_MEDIA_SIZE = 15 * 1024 * 1024; // 15MB for video
 
-function normalizeListingId(id: string): string {
-  if (!id || typeof id !== "string") return id;
-  const hex = id.startsWith("0x") ? id.slice(2) : id;
-  return "0x" + hex.toLowerCase();
-}
-
 function normalizeWalletAddress(address?: string | null): string {
   return String(address || "")
     .trim()
     .toLowerCase();
-}
-
-/**
- * Resolve a URL-borne listing id to the canonical DB key. URLs may carry the
- * canonical bytes32 form (0x + 64 hex) or the short ascii form
- * (e.g. "lst-1717123456-abc") — the ascii form must be re-encoded to bytes32,
- * NOT just prefixed with 0x, or lookups silently miss.
- */
-function resolveListingIdParam(rawId: string): string {
-  const raw = String(rawId || "");
-  return raw.startsWith("0x") && raw.length === 66
-    ? normalizeListingId(raw)
-    : listingIdToBytes32(raw);
-}
-
-/** Convert listing id (0x...64 hex or string) to bytes32 for contract calls. */
-function listingIdToBytes32(id: string): string {
-  if (!id || typeof id !== "string") return "0x" + "0".repeat(64);
-  if (id.startsWith("0x")) {
-    const body = id.slice(2).toLowerCase();
-    if (/^[0-9a-f]*$/.test(body) && body.length > 0 && body.length <= 64) {
-      return "0x" + body.padEnd(64, "0");
-    }
-  }
-  const hex = Buffer.from(id, "utf8").toString("hex").padEnd(64, "0").slice(0, 64);
-  return "0x" + hex;
 }
 
 /** Wei (18 decimals) to HBAR string for storage/display. */
@@ -290,8 +269,54 @@ function mediaFilename(originalname: string): string {
 
 const memoryStorage = multer.memoryStorage();
 
-export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string): Router {
+export function apiRouter(
+  prisma: PrismaClient,
+  log: Logger,
+  uploadsDir: string,
+  deps?: WalletGuardDeps & { sessionStore?: SessionStore; sessionSecret?: string },
+): Router {
   const router = Router();
+  const sessionStore = deps?.sessionStore ?? prismaSessionStore(prisma);
+  const sessionSecret = sessionSecretFromEnv(deps?.sessionSecret);
+  if (deps?.sessionSecret === undefined) {
+    if (!sessionSecret) {
+      log.error("WALLET_SESSION_SECRET and DATABASE_URL are unset; wallet sessions are disabled");
+    } else if (sessionSecretIsDerived()) {
+      log.warn("WALLET_SESSION_SECRET is unset; deriving the wallet session key from DATABASE_URL");
+    }
+  }
+  const requireWallet = createWalletRouteAuth({
+    prisma,
+    log,
+    resolveListingId: canonicalListingId,
+    ...deps,
+    sessionStore,
+    sessionSecret,
+  });
+
+  router.post("/wallet/session", requireWallet("mint-session"), async (req, res) => {
+    if (!req.wallet) return res.status(401).json({ error: "Wallet signature required" });
+    if (!sessionSecret) {
+      return res.status(503).json({ error: "Wallet sessions are not configured" });
+    }
+    try {
+      const issued = await createWalletSession(
+        req.wallet,
+        sessionStore,
+        sessionSecret,
+        deps?.now?.() ?? Date.now(),
+      );
+      return res.json({ token: issued.token, expiresAt: issued.expiresAt });
+    } catch (err) {
+      log.error({ err }, "Failed to issue wallet session");
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  router.delete("/wallet/session", requireWallet("revoke-session"), async (req, res) => {
+    if (req.walletSessionId) await sessionStore.revoke(req.walletSessionId);
+    return res.json({ ok: true });
+  });
 
   async function createSaleIfMissing(params: {
     listingId: string;
@@ -300,7 +325,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     amount: string;
     txHash?: string;
   }): Promise<void> {
-    const listingId = normalizeListingId(params.listingId);
+    const listingId = canonicalListingId(params.listingId);
     const buyer = normalizeWalletAddress(params.buyer);
     const seller = normalizeWalletAddress(params.seller);
     const amount = String(params.amount || "0");
@@ -353,7 +378,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     },
   });
 
-  router.post("/upload-listing-image", (req, res) => {
+  router.post("/upload-listing-image", requireWallet("upload"), (req, res) => {
     upload.single("image")(req, res, async (err: any) => {
       try {
         if (err) {
@@ -380,7 +405,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     });
   });
 
-  router.post("/upload-listing-media", (req, res) => {
+  router.post("/upload-listing-media", requireWallet("upload"), (req, res) => {
     uploadMedia.single("media")(req, res, async (err: any) => {
       try {
         if (err) {
@@ -513,7 +538,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
    * Call this after the frontend tx confirms so the listing shows immediately
    * without waiting for the indexer (Mirror/RPC can be slow or limited on Hedera).
    */
-  router.post("/sync-listing", async (req, res) => {
+  router.post("/sync-listing", requireWallet("sync-listing"), async (req, res) => {
     invalidateListingsCache();
     const {
       txHash,
@@ -552,14 +577,21 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       locationLng?: number;
       variants?: unknown;
     };
-    const fallbackListingId =
-      typeof listingId === "string" && listingId.trim()
-        ? normalizeListingId(listingId.trim())
-        : null;
-    const fallbackSeller =
+    if (!req.wallet) return res.status(401).json({ error: "Wallet signature required" });
+    let fallbackListingId: string | null = null;
+    if (typeof listingId === "string" && listingId.trim()) {
+      fallbackListingId = canonicalListingId(listingId);
+      if (!fallbackListingId) return res.status(400).json({ error: "Invalid listing id" });
+    }
+    const claimedSeller =
       typeof seller === "string" && /^0x[0-9a-fA-F]{40}$/.test(seller.trim())
         ? seller.trim().toLowerCase()
         : null;
+    if (claimedSeller && !walletOwns(req.wallet, claimedSeller)) {
+      return res.status(403).json({ error: "Signed account does not match the acting address" });
+    }
+    // The stored seller is the verified wallet, never an address from the body.
+    const fallbackSeller = req.wallet.evmAddress;
     const fallbackPrice = typeof price === "string" && price.trim() ? price.trim() : null;
     const canFallbackUpsert = !!(fallbackListingId && fallbackSeller && fallbackPrice);
 
@@ -695,7 +727,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
 
     if (isHederaTxId) {
       try {
-        const mirrorBase = process.env.MIRROR_URL || "https://testnet.mirrornode.hedera.com";
+        const mirrorBase = resolveMirrorBase();
         // Mirror node format: replace @ with - and all dots with -
         // e.g. 0.0.12345@1609459200.123456789 → 0-0-12345-1609459200-123456789
         const mirrorTxId = txHash.replace("@", "-").replace(/\./g, "-");
@@ -747,8 +779,12 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       for (const logEntry of receipt.logs) {
         const decoded = decodeEvents(logEntry);
         if (decoded?.type !== "ItemListed") continue;
-        const listingId = normalizeListingId(decoded.listingId);
+        const listingId = canonicalListingId(decoded.listingId);
+        if (!listingId) return res.status(400).json({ error: "Invalid listing id" });
         const seller = (decoded.seller || "").toLowerCase();
+        if (!req.wallet || !walletOwns(req.wallet, seller)) {
+          return res.status(403).json({ error: "Only the seller can sync this listing" });
+        }
         const priceHbar = chainAmountToHbar(decoded.price);
         const updateData: any = {
           status: "LISTED",
@@ -814,22 +850,28 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
   /**
    * Sync a listing price update from tx so the latest on-chain price is reflected immediately.
    */
-  router.post("/sync-price-update", async (req, res) => {
+  router.post("/sync-price-update", requireWallet("sync-price-update"), async (req, res) => {
     invalidateListingsCache();
     const { txHash, listingId, newPrice } = (req.body || {}) as {
       txHash?: string;
       listingId?: string;
       newPrice?: string;
     };
-    const fallbackListingId =
-      typeof listingId === "string" && listingId.trim()
-        ? normalizeListingId(listingId.trim())
-        : null;
+    if (!req.wallet) return res.status(401).json({ error: "Wallet signature required" });
+    let fallbackListingId: string | null = null;
+    if (typeof listingId === "string" && listingId.trim()) {
+      fallbackListingId = canonicalListingId(listingId);
+      if (!fallbackListingId) return res.status(400).json({ error: "Invalid listing id" });
+    }
     const fallbackPrice = typeof newPrice === "string" && newPrice.trim() ? newPrice.trim() : null;
     const canFallbackUpdate = !!(fallbackListingId && fallbackPrice);
 
     const applyFallbackPrice = async () => {
-      if (!canFallbackUpdate) return false;
+      if (!canFallbackUpdate || !req.wallet) return false;
+      const existing = await prisma.listing.findUnique({ where: { id: fallbackListingId! } });
+      if (existing && !walletOwns(req.wallet, existing.seller)) {
+        return false;
+      }
       const result = await prisma.listing.updateMany({
         where: { id: fallbackListingId! },
         data: { price: fallbackPrice! },
@@ -882,18 +924,23 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       for (const logEntry of receipt.logs) {
         const decoded = decodeEvents(logEntry);
         if (decoded?.type !== "PriceUpdated") continue;
-        const listingId = normalizeListingId(decoded.listingId);
+        const syncedId = canonicalListingId(decoded.listingId);
+        if (!syncedId) return res.status(400).json({ error: "Invalid listing id" });
         const newPriceHbar = chainAmountToHbar(decoded.newPrice);
+        const existing = await prisma.listing.findUnique({ where: { id: syncedId } });
+        if (!req.wallet || (existing && !walletOwns(req.wallet, existing.seller))) {
+          return res.status(403).json({ error: "Only the seller can update this listing" });
+        }
         const result = await prisma.listing.updateMany({
-          where: { id: listingId },
+          where: { id: syncedId },
           data: { price: newPriceHbar },
         });
         if (result.count === 0) {
-          log.warn({ listingId, txHash }, "Sync price update: listing missing");
+          log.warn({ listingId: syncedId, txHash }, "Sync price update: listing missing");
           return res.status(404).json({ error: "Listing not found for price update event" });
         }
-        log.info({ listingId, txHash }, "Synced listing price update from tx");
-        return res.json({ ok: true, listingId, price: newPriceHbar });
+        log.info({ listingId: syncedId, txHash }, "Synced listing price update from tx");
+        return res.json({ ok: true, listingId: syncedId, price: newPriceHbar });
       }
       if (await applyFallbackPrice()) {
         return res.json({
@@ -921,7 +968,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
   /**
    * Sync a listing cancellation from tx so dashboard count updates immediately.
    */
-  router.post("/sync-cancel", async (req, res) => {
+  router.post("/sync-cancel", requireWallet("sync-cancel"), async (req, res) => {
     invalidateListingsCache();
     const { txHash } = (req.body || {}) as { txHash?: string };
     if (!txHash || typeof txHash !== "string") {
@@ -938,11 +985,13 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       let evmTxHash = txHash;
       const isHederaTxId = /^\d+\.\d+\.\d+@\d+\.\d+$/.test(txHash);
       if (isHederaTxId) {
-        const network = rpcUrl.includes("mainnet") ? "mainnet" : "testnet";
-        const mirrorBase =
-          network === "mainnet"
-            ? "https://mainnet.mirrornode.hedera.com"
-            : "https://testnet.mirrornode.hedera.com";
+        let mirrorBase: string;
+        try {
+          mirrorBase = resolveMirrorBase();
+        } catch (err) {
+          log.error({ err }, "Mirror URL is not configured");
+          return res.status(503).json({ error: "Mirror node is not configured" });
+        }
         // Convert "0.0.XXXX@seconds.nanos" → "0.0.XXXX-seconds-nanos"
         const [accountPart, timePart] = txHash.split("@");
         const mirrorTxId = `${accountPart}-${(timePart || "").replace(".", "-")}`;
@@ -967,7 +1016,12 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       for (const logEntry of receipt.logs) {
         const decoded = decodeEvents(logEntry);
         if (decoded?.type !== "ListingCancelled") continue;
-        const listingId = normalizeListingId(decoded.listingId);
+        const listingId = canonicalListingId(decoded.listingId);
+        if (!listingId) return res.status(400).json({ error: "Invalid listing id" });
+        const existing = await prisma.listing.findUnique({ where: { id: listingId } });
+        if (!req.wallet || (existing && !walletOwns(req.wallet, existing.seller))) {
+          return res.status(403).json({ error: "Only the seller can cancel this listing" });
+        }
         await prisma.listing.updateMany({
           where: { id: listingId },
           data: { status: "CANCELLED" },
@@ -986,16 +1040,17 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
    * Cancel a listing that was never confirmed on-chain (no blockchain tx needed).
    * Only works when onChainConfirmed is false and the caller is the seller.
    */
-  router.post("/listing/:id/cancel-offchain", async (req, res) => {
+  router.post("/listing/:id/cancel-offchain", requireWallet("listing-edit"), async (req, res) => {
     invalidateListingsCache();
-    const { id } = req.params;
-    const { address, force } = (req.body || {}) as { address?: string; force?: boolean };
-    const seller = address?.trim()?.toLowerCase();
-    if (!seller) return res.status(400).json({ error: "address required" });
+    const id = canonicalListingId(req.params.id ?? "");
+    const { force } = (req.body || {}) as { force?: boolean };
+    if (!req.wallet) return res.status(401).json({ error: "Wallet signature required" });
+    if (!id) return res.status(400).json({ error: "Invalid listing id" });
+    const seller = req.wallet.evmAddress;
     try {
       const listing = await prisma.listing.findUnique({ where: { id } });
       if (!listing) return res.status(404).json({ error: "Listing not found" });
-      if (listing.seller?.toLowerCase() !== seller)
+      if (!walletOwns(req.wallet, listing.seller))
         return res.status(403).json({ error: "Not the seller" });
       // Without force=true, block confirmed listings (must cancel via contract).
       // With force=true, the seller explicitly wants the listing removed from the app
@@ -1020,16 +1075,21 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     }
   });
 
-  router.post("/sync-purchase", async (req, res) => {
+  router.post("/sync-purchase", requireWallet("sync-purchase"), async (req, res) => {
     invalidateListingsCache();
     const { txHash, listingId } = (req.body || {}) as { txHash?: string; listingId?: string };
-    const fallbackListingId =
-      typeof listingId === "string" && listingId.trim()
-        ? normalizeListingId(listingId.trim())
-        : null;
+    if (!req.wallet) return res.status(401).json({ error: "Wallet signature required" });
+    let fallbackListingId: string | null = null;
+    if (typeof listingId === "string" && listingId.trim()) {
+      fallbackListingId = canonicalListingId(listingId);
+      if (!fallbackListingId) return res.status(400).json({ error: "Invalid listing id" });
+    }
 
     const applyFallbackPurchaseStatus = async () => {
-      if (!fallbackListingId) return false;
+      if (!fallbackListingId || !req.wallet) return false;
+      const existing = await prisma.listing.findUnique({ where: { id: fallbackListingId } });
+      // No chain receipt: only the already-recorded buyer may refresh status.
+      if (!existing || !walletOwns(req.wallet, existing.buyer)) return false;
       const updated = await prisma.listing.updateMany({
         where: { id: fallbackListingId },
         data: { status: "LOCKED" },
@@ -1068,8 +1128,12 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       for (const logEntry of receipt.logs) {
         const decoded = decodeEvents(logEntry);
         if (decoded?.type !== "ItemPurchased") continue;
-        const purchasedId = normalizeListingId(decoded.listingId);
+        const purchasedId = canonicalListingId(decoded.listingId);
+        if (!purchasedId) return res.status(400).json({ error: "Invalid listing id" });
         const buyer = normalizeWalletAddress(decoded.buyer);
+        if (!req.wallet || !walletOwns(req.wallet, buyer)) {
+          return res.status(403).json({ error: "Only the buyer can sync this purchase" });
+        }
         const seller = normalizeWalletAddress(decoded.seller);
         const amount = String(decoded.price ?? "0");
 
@@ -1123,14 +1187,22 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
    * Sync escrow completion state from chain.
    * Marks listing SOLD once escrow is COMPLETE.
    */
-  router.post("/sync-escrow-complete", async (req, res) => {
+  router.post("/sync-escrow-complete", requireWallet("sync-escrow-complete"), async (req, res) => {
     invalidateListingsCache();
     const { listingId } = (req.body || {}) as { listingId?: string };
-    const normalizedId =
-      typeof listingId === "string" && listingId.trim()
-        ? normalizeListingId(listingId.trim())
-        : null;
-    if (!normalizedId) return res.status(400).json({ error: "listingId required" });
+    if (typeof listingId !== "string" || !listingId.trim()) {
+      return res.status(400).json({ error: "listingId required" });
+    }
+    const normalizedId = canonicalListingId(listingId);
+    if (!normalizedId) return res.status(400).json({ error: "Invalid listing id" });
+    const listingRow = await prisma.listing.findUnique({ where: { id: normalizedId } });
+    if (!listingRow) return res.status(404).json({ error: "Listing not found" });
+    if (
+      !req.wallet ||
+      (!walletOwns(req.wallet, listingRow.seller) && !walletOwns(req.wallet, listingRow.buyer))
+    ) {
+      return res.status(403).json({ error: "Only the buyer or seller can mark this listing sold" });
+    }
 
     const escrowAddr = process.env.ESCROW_ADDRESS;
     const rpcUrl = process.env.HEDERA_RPC_URL;
@@ -1145,7 +1217,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         IS_ESCROW_V2 ? ESCROW_V2_ABI_VIEW : ESCROW_ABI_VIEW,
         provider,
       );
-      const data = await contract.escrows(listingIdToBytes32(normalizedId));
+      const data = await contract.escrows(normalizedId);
       const buyer = data[0];
       const stateNum = IS_ESCROW_V2 ? data[6] : data[5];
       const isComplete = Number(stateNum) === 2;
@@ -1173,23 +1245,25 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
    * pending offers without waiting for the indexer. Verifies the tx receipt
    * when an RPC URL is available; falls back to a direct upsert otherwise.
    */
-  router.post("/sync-offer", async (req, res) => {
+  router.post("/sync-offer", requireWallet("sync-offer"), async (req, res) => {
     const { txHash, listingId, buyer, amount } = (req.body || {}) as {
       txHash?: string;
       listingId?: string;
       buyer?: string;
       amount?: string;
     };
+    if (!req.wallet) return res.status(401).json({ error: "Wallet signature required" });
+    if (typeof buyer === "string" && buyer.trim() && !walletOwns(req.wallet, buyer)) {
+      return res.status(403).json({ error: "Signed account does not match the acting address" });
+    }
     const normalizedId =
-      typeof listingId === "string" && listingId.trim()
-        ? normalizeListingId(listingId.trim())
-        : null;
-    const buyerAddr =
-      typeof buyer === "string" && /^0x[0-9a-fA-F]{40}$/.test(buyer.trim())
-        ? buyer.trim().toLowerCase()
-        : null;
+      typeof listingId === "string" && listingId.trim() ? canonicalListingId(listingId) : null;
+    if (typeof listingId === "string" && listingId.trim() && !normalizedId) {
+      return res.status(400).json({ error: "Invalid listing id" });
+    }
+    const buyerAddr = req.wallet.evmAddress;
     const amountStr = typeof amount === "string" && amount.trim() ? amount.trim() : null;
-    if (!normalizedId || !buyerAddr || !amountStr) {
+    if (!normalizedId || !amountStr) {
       return res.status(400).json({ error: "listingId, buyer, amount required" });
     }
     const txHashStr = typeof txHash === "string" && txHash.trim() ? txHash.trim() : null;
@@ -1226,7 +1300,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
           for (const logEntry of receipt.logs) {
             const decoded = decodeEvents(logEntry);
             if (decoded?.type !== "OfferMade") continue;
-            const evtListing = normalizeListingId(decoded.listingId);
+            const evtListing = canonicalListingId(decoded.listingId);
             const evtBuyer = normalizeWalletAddress(decoded.buyer);
             const evtAmount = chainAmountToHbar(String(decoded.amount ?? "0"));
             if (evtListing === normalizedId && evtBuyer === buyerAddr && evtAmount) {
@@ -1254,26 +1328,54 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
    * Mirror OfferAccepted / OfferRejected / OfferCancelled events. The seller
    * (accept/reject) or buyer (cancel) calls this after their own tx confirms.
    */
-  router.post("/sync-offer-action", async (req, res) => {
+  router.post("/sync-offer-action", requireWallet("sync-offer-action"), async (req, res) => {
     const { txHash, listingId, buyer, action } = (req.body || {}) as {
       txHash?: string;
       listingId?: string;
       buyer?: string;
       action?: "accept" | "reject" | "cancel";
     };
+    if (!req.wallet) return res.status(401).json({ error: "Wallet signature required" });
+    const normalizedAction = typeof action === "string" ? action.trim().toLowerCase() : "";
+    if (
+      normalizedAction !== "accept" &&
+      normalizedAction !== "reject" &&
+      normalizedAction !== "cancel"
+    ) {
+      return res.status(400).json({ error: "Invalid offer action" });
+    }
     const normalizedId =
-      typeof listingId === "string" && listingId.trim()
-        ? normalizeListingId(listingId.trim())
-        : null;
-    const buyerAddr =
-      typeof buyer === "string" && /^0x[0-9a-fA-F]{40}$/.test(buyer.trim())
-        ? buyer.trim().toLowerCase()
-        : null;
-    if (!normalizedId || !buyerAddr || !action) {
-      return res.status(400).json({ error: "listingId, buyer, action required" });
+      typeof listingId === "string" && listingId.trim() ? canonicalListingId(listingId) : null;
+    if (!normalizedId) return res.status(400).json({ error: "Invalid listing id" });
+    let buyerAddr: string;
+    if (normalizedAction === "cancel") {
+      buyerAddr = req.wallet.evmAddress;
+      if (typeof buyer === "string" && buyer.trim() && !walletOwns(req.wallet, buyer)) {
+        return res.status(403).json({ error: "Signed account does not match the acting address" });
+      }
+      const offer = await prisma.offer.findUnique({
+        where: { listingId_buyer: { listingId: normalizedId, buyer: buyerAddr } },
+      });
+      if (!offer || !walletOwns(req.wallet, offer.buyer)) {
+        return res.status(403).json({ error: "Only the buyer can cancel this offer" });
+      }
+    } else {
+      if (typeof buyer !== "string" || !/^0x[0-9a-fA-F]{40}$/.test(buyer.trim())) {
+        return res.status(400).json({ error: "listingId, buyer, action required" });
+      }
+      buyerAddr = buyer.trim().toLowerCase();
+      const listing = await prisma.listing.findUnique({ where: { id: normalizedId } });
+      if (!listing) return res.status(404).json({ error: "Listing not found" });
+      if (!walletOwns(req.wallet, listing.seller)) {
+        return res.status(403).json({ error: "Only the seller can accept or reject an offer" });
+      }
     }
     const nextStatus =
-      action === "accept" ? "ACCEPTED" : action === "reject" ? "REJECTED" : "CANCELLED";
+      normalizedAction === "accept"
+        ? "ACCEPTED"
+        : normalizedAction === "reject"
+          ? "REJECTED"
+          : "CANCELLED";
     try {
       const updated = await prisma.offer.updateMany({
         where: { listingId: normalizedId, buyer: buyerAddr, status: "ACTIVE" },
@@ -1282,7 +1384,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       // If the seller accepted, the marketplace contract has already moved the
       // listing to LOCKED (escrow) or COMPLETED (direct sale). Mirror that here
       // so the listing page reflects the state without a refresh.
-      if (action === "accept") {
+      if (normalizedAction === "accept") {
         await prisma.listing.updateMany({
           where: { id: normalizedId, status: "LISTED" },
           data: { status: "LOCKED", buyer: buyerAddr },
@@ -1300,14 +1402,27 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
    * render Accept / Reject buttons; the buyer view uses it to display their
    * own pending offer.
    */
-  router.get("/listing/:id/offers", async (req, res) => {
+  router.get("/listing/:id/offers", requireWallet("listing-offers"), async (req, res) => {
     try {
-      const id = resolveListingIdParam(req.params.id ?? "");
-      const offers = await prisma.offer.findMany({
-        where: { listingId: id },
-        orderBy: { createdAt: "desc" },
-      });
-      return res.json({ offers });
+      const id = canonicalListingId(req.params.id ?? "");
+      if (!id) return res.json({ offers: [] });
+      // Buyer addresses and amounts stay off the public listing page. A signed-out
+      // visitor gets an empty list (200, no prompt). The seller sees every offer;
+      // anyone else sees only their own.
+      const wallet = req.wallet;
+      if (!wallet) return res.json({ offers: [] });
+      const [offers, listing] = await Promise.all([
+        prisma.offer.findMany({
+          where: { listingId: id },
+          orderBy: { createdAt: "desc" },
+        }),
+        prisma.listing.findUnique({ where: { id } }),
+      ]);
+      const visible =
+        listing && walletOwns(wallet, listing.seller)
+          ? offers
+          : offers.filter((offer) => walletOwns(wallet, offer.buyer));
+      return res.json({ offers: visible });
     } catch (err) {
       log.error({ err }, "Failed to fetch offers");
       return res.status(500).json({ error: "Internal server error" });
@@ -1319,9 +1434,14 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
    * buyer). Each row inlines a small listing snippet so the My Hashpop pages
    * can render thumbnails / titles without an extra round-trip per row.
    */
-  router.get("/user/:address/offers", async (req, res) => {
+  router.get("/user/:address/offers", requireWallet("user-offers"), async (req, res) => {
     try {
-      const addrLower = (req.params.address ?? "").toLowerCase();
+      if (!req.wallet) return res.status(401).json({ error: "Wallet session required" });
+      const claimed = (req.params.address ?? "").toLowerCase();
+      if (!walletOwns(req.wallet, claimed)) {
+        return res.status(403).json({ error: "Signed account does not match the acting address" });
+      }
+      const addrLower = req.wallet.evmAddress;
       if (!/^0x[0-9a-f]{40}$/.test(addrLower)) {
         return res.status(400).json({ error: "Invalid wallet address" });
       }
@@ -1404,11 +1524,8 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
 
   router.get("/listing/:id", async (req, res) => {
     try {
-      const rawId = req.params.id ?? "";
-      const id =
-        rawId.startsWith("0x") && rawId.length === 66
-          ? normalizeListingId(rawId)
-          : listingIdToBytes32(rawId);
+      const id = canonicalListingId(req.params.id ?? "");
+      if (!id) return res.status(404).json({ error: "Listing not found" });
       const listing = await prisma.listing.findUnique({
         where: { id },
       });
@@ -1463,18 +1580,23 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     }
   });
 
-  router.post("/listing/:id/report", async (req, res) => {
+  router.post("/listing/:id/report", requireWallet("listing-report"), async (req, res) => {
     try {
       if (!listingReportWebhookUrl) {
         return res.status(503).json({ error: "Reporting is not configured yet." });
       }
-      const id = resolveListingIdParam(req.params.id ?? "");
+      const id = canonicalListingId(req.params.id ?? "");
+      if (!id) return res.status(400).json({ error: "Invalid listing id" });
       const { reporterAddress, reason, details } = (req.body || {}) as {
         reporterAddress?: string;
         reason?: string;
         details?: string;
       };
-      const reporter = (reporterAddress || "").trim().toLowerCase();
+      if (!req.wallet) return res.status(401).json({ error: "Wallet signature required" });
+      if (reporterAddress && !walletOwns(req.wallet, reporterAddress)) {
+        return res.status(403).json({ error: "Signed account does not match the acting address" });
+      }
+      const reporter = req.wallet.evmAddress;
       if (!/^0x[0-9a-f]{40}$/.test(reporter)) {
         return res.status(400).json({ error: "Valid reporterAddress is required." });
       }
@@ -1547,19 +1669,19 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
   // Open a dispute on an escrow transaction. Records the dispute (freezing the
   // order in the UI), notifies the counterparty in their message thread, and
   // returns so the client can route the structured ticket to Discord support.
-  router.post("/listing/:id/dispute", async (req, res) => {
+  router.post("/listing/:id/dispute", requireWallet("listing-dispute"), async (req, res) => {
     try {
-      const rawId = req.params.id ?? "";
-      const id =
-        rawId.startsWith("0x") && rawId.length === 66
-          ? normalizeListingId(rawId)
-          : listingIdToBytes32(rawId);
+      const id = canonicalListingId(req.params.id ?? "");
+      if (!id) return res.status(400).json({ error: "Invalid listing id" });
       const { openerAddress, reason } = (req.body || {}) as {
         openerAddress?: string;
         reason?: string;
       };
-      const opener = (openerAddress || "").trim().toLowerCase();
-      if (!opener) return res.status(400).json({ error: "openerAddress is required" });
+      if (!req.wallet) return res.status(401).json({ error: "Wallet signature required" });
+      if (openerAddress && !walletOwns(req.wallet, openerAddress)) {
+        return res.status(403).json({ error: "Signed account does not match the acting address" });
+      }
+      const opener = req.wallet.evmAddress;
       const reasonText = typeof reason === "string" ? reason.trim().slice(0, 1000) : "";
       if (reasonText.length < 5) {
         return res
@@ -1571,7 +1693,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       if (!listing) return res.status(404).json({ error: "Listing not found" });
       const buyer = (listing.buyer || "").toLowerCase();
       const seller = (listing.seller || "").toLowerCase();
-      if (opener !== buyer && opener !== seller) {
+      if (!walletOwns(req.wallet, buyer) && !walletOwns(req.wallet, seller)) {
         return res.status(403).json({ error: "Only the buyer or seller can open a dispute." });
       }
       if ((listing as any).disputeStatus === "OPEN") {
@@ -1588,7 +1710,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         },
       });
 
-      const counterparty = opener === buyer ? seller : buyer;
+      const counterparty = walletOwns(req.wallet, buyer) ? seller : buyer;
       if (counterparty) {
         await prisma.message.create({
           data: {
@@ -1614,76 +1736,105 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
    * lets the buyer sign the transaction, so the seller always has somewhere
    * to ship. Upserts per (listing, buyer).
    */
-  router.post("/listing/:id/shipping-address", async (req, res) => {
-    try {
-      const id = resolveListingIdParam(req.params.id ?? "");
-      const body = (req.body || {}) as Record<string, unknown>;
-      const buyer = normalizeWalletAddress(body.buyerAddress as string | undefined);
-      if (!buyer) return res.status(400).json({ error: "buyerAddress is required" });
+  router.post(
+    "/listing/:id/shipping-address",
+    requireWallet("shipping-write"),
+    async (req, res) => {
+      try {
+        const id = canonicalListingId(req.params.id ?? "");
+        if (!id) return res.status(400).json({ error: "Invalid listing id" });
+        const body = (req.body || {}) as Record<string, unknown>;
+        if (!req.wallet) return res.status(401).json({ error: "Wallet signature required" });
+        const claimedBuyer = body.buyerAddress;
+        if (
+          typeof claimedBuyer === "string" &&
+          claimedBuyer.trim() &&
+          !walletOwns(req.wallet, claimedBuyer)
+        ) {
+          return res
+            .status(403)
+            .json({ error: "Signed account does not match the acting address" });
+        }
+        const buyer = req.wallet.evmAddress;
 
-      const listing = await prisma.listing.findUnique({ where: { id } });
-      if (!listing) return res.status(404).json({ error: "Listing not found" });
-      if (listing.seller.toLowerCase() === buyer) {
-        return res.status(400).json({ error: "You can't buy your own listing." });
+        const listing = await prisma.listing.findUnique({ where: { id } });
+        if (!listing) return res.status(404).json({ error: "Listing not found" });
+        if (listing.seller.toLowerCase() === buyer) {
+          return res.status(400).json({ error: "You can't buy your own listing." });
+        }
+
+        const field = (key: string, max: number) =>
+          String((body[key] as string | undefined) ?? "")
+            .trim()
+            .slice(0, max);
+        const name = field("name", 120);
+        const line1 = field("line1", 200);
+        const line2 = field("line2", 200) || null;
+        const city = field("city", 120);
+        const region = field("region", 120) || null;
+        const postalCode = field("postalCode", 20);
+        const country = field("country", 2).toUpperCase();
+        const phone = field("phone", 30) || null;
+
+        if (name.length < 2) return res.status(400).json({ error: "Full name is required." });
+        if (line1.length < 4) return res.status(400).json({ error: "Street address is required." });
+        if (city.length < 2) return res.status(400).json({ error: "City is required." });
+        if (postalCode.length < 3)
+          return res.status(400).json({ error: "Postal / ZIP code is required." });
+        if (!/^[A-Z]{2}$/.test(country))
+          return res.status(400).json({ error: "Country must be a 2-letter code." });
+
+        // Fail closed: without an encryption key the address is rejected, so
+        // client PII never lands in the database in plaintext.
+        if (!secretBoxConfigured()) {
+          log.error("SHIPPING_ADDRESS_KEY not configured — refusing to store shipping address");
+          return res
+            .status(503)
+            .json({ error: "Checkout is temporarily unavailable. Please try again shortly." });
+        }
+        const payload = encryptJson({
+          name,
+          line1,
+          line2,
+          city,
+          region,
+          postalCode,
+          country,
+          phone,
+        });
+        const saved = await prisma.shippingAddress.upsert({
+          where: { listingId_buyer: { listingId: id, buyer } },
+          create: { listingId: id, buyer, payload },
+          update: { payload },
+        });
+        return res.json({ ok: true, id: saved.id });
+      } catch (err) {
+        log.error({ err }, "Failed to save shipping address");
+        return res.status(500).json({ error: "Internal server error" });
       }
-
-      const field = (key: string, max: number) =>
-        String((body[key] as string | undefined) ?? "")
-          .trim()
-          .slice(0, max);
-      const name = field("name", 120);
-      const line1 = field("line1", 200);
-      const line2 = field("line2", 200) || null;
-      const city = field("city", 120);
-      const region = field("region", 120) || null;
-      const postalCode = field("postalCode", 20);
-      const country = field("country", 2).toUpperCase();
-      const phone = field("phone", 30) || null;
-
-      if (name.length < 2) return res.status(400).json({ error: "Full name is required." });
-      if (line1.length < 4) return res.status(400).json({ error: "Street address is required." });
-      if (city.length < 2) return res.status(400).json({ error: "City is required." });
-      if (postalCode.length < 3)
-        return res.status(400).json({ error: "Postal / ZIP code is required." });
-      if (!/^[A-Z]{2}$/.test(country))
-        return res.status(400).json({ error: "Country must be a 2-letter code." });
-
-      // Fail closed: without an encryption key the address is rejected, so
-      // client PII never lands in the database in plaintext.
-      if (!secretBoxConfigured()) {
-        log.error("SHIPPING_ADDRESS_KEY not configured — refusing to store shipping address");
-        return res
-          .status(503)
-          .json({ error: "Checkout is temporarily unavailable. Please try again shortly." });
-      }
-      const payload = encryptJson({ name, line1, line2, city, region, postalCode, country, phone });
-      const saved = await prisma.shippingAddress.upsert({
-        where: { listingId_buyer: { listingId: id, buyer } },
-        create: { listingId: id, buyer, payload },
-        update: { payload },
-      });
-      return res.json({ ok: true, id: saved.id });
-    } catch (err) {
-      log.error({ err }, "Failed to save shipping address");
-      return res.status(500).json({ error: "Internal server error" });
-    }
-  });
+    },
+  );
 
   /**
    * GET /api/listing/:id/shipping-address?requester=… — a buyer reads back
    * their own saved address; the seller reads the address of the actual
    * buyer (once one exists) so they know where to ship. Nobody else sees it.
    */
-  router.get("/listing/:id/shipping-address", async (req, res) => {
+  router.get("/listing/:id/shipping-address", requireWallet("shipping-read"), async (req, res) => {
     try {
-      const id = resolveListingIdParam(req.params.id ?? "");
-      const requester = normalizeWalletAddress(String(req.query.requester ?? ""));
-      if (!requester) return res.status(400).json({ error: "requester is required" });
+      const id = canonicalListingId(req.params.id ?? "");
+      if (!id) return res.status(400).json({ error: "Invalid listing id" });
+      const claimed = normalizeWalletAddress(String(req.query.requester ?? ""));
+      if (!req.wallet) return res.status(401).json({ error: "Wallet session required" });
+      if (claimed && !walletOwns(req.wallet, claimed)) {
+        return res.status(403).json({ error: "Signed account does not match the acting address" });
+      }
+      const requester = req.wallet.evmAddress;
 
       const listing = await prisma.listing.findUnique({ where: { id } });
       if (!listing) return res.status(404).json({ error: "Listing not found" });
 
-      const isSeller = listing.seller.toLowerCase() === requester;
+      const isSeller = walletOwns(req.wallet, listing.seller);
       let buyer = requester;
       if (isSeller) {
         const listingBuyer = (listing.buyer || "").toLowerCase();
@@ -1726,8 +1877,8 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       return res.status(503).json({ error: "Escrow/RPC not configured" });
     }
     try {
-      const rawId = req.params.listingId ?? "";
-      const listingIdBytes32 = listingIdToBytes32(rawId);
+      const listingIdBytes32 = canonicalListingId(req.params.listingId ?? "");
+      if (!listingIdBytes32) return res.status(404).json({ error: "Listing not found" });
 
       // Purchases/dashboard fan this endpoint out once per listing — cache
       // the on-chain view briefly and bound the RPC read so a slow relay
@@ -1799,10 +1950,11 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     }
   });
 
-  router.patch("/listing/:id", async (req, res) => {
+  router.patch("/listing/:id", requireWallet("listing-edit"), async (req, res) => {
     invalidateListingsCache();
     try {
-      const id = resolveListingIdParam(req.params.id ?? "");
+      const id = canonicalListingId(req.params.id ?? "");
+      if (!id) return res.status(400).json({ error: "Invalid listing id" });
       const {
         title,
         subtitle,
@@ -1840,9 +1992,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       };
       const listing = await prisma.listing.findUnique({ where: { id } });
       if (!listing) return res.status(404).json({ error: "Listing not found" });
-      const sellerLower =
-        sellerAddress && typeof sellerAddress === "string" ? sellerAddress.toLowerCase() : "";
-      if (sellerLower !== listing.seller.toLowerCase()) {
+      if (!req.wallet || !walletOwns(req.wallet, listing.seller)) {
         return res.status(403).json({ error: "Only the seller can edit this listing" });
       }
       const titlePatch = patchListingTitle(title);
@@ -1989,10 +2139,14 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     }
   });
 
-  router.get("/user/:address/purchases", async (req, res) => {
+  router.get("/user/:address/purchases", requireWallet("user-purchases"), async (req, res) => {
     try {
-      const { address } = req.params;
-      const addrLower = address?.toLowerCase() ?? "";
+      if (!req.wallet) return res.status(401).json({ error: "Wallet session required" });
+      const claimed = req.params.address?.toLowerCase() ?? "";
+      if (!walletOwns(req.wallet, claimed)) {
+        return res.status(403).json({ error: "Signed account does not match the acting address" });
+      }
+      const addrLower = req.wallet.evmAddress;
       const sales = await prisma.sale.findMany({
         where: {
           OR: [{ buyer: addrLower }, { seller: addrLower }],
@@ -2060,10 +2214,14 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     }
   });
 
-  router.get("/wishlist", async (req, res) => {
+  router.get("/wishlist", requireWallet("wishlist-read"), async (req, res) => {
     try {
-      const address = (req.query.address as string)?.trim()?.toLowerCase();
-      if (!address) return res.status(400).json({ error: "address required" });
+      if (!req.wallet) return res.status(401).json({ error: "Wallet session required" });
+      const claimed = (req.query.address as string)?.trim();
+      if (claimed && !walletOwns(req.wallet, claimed)) {
+        return res.status(403).json({ error: "Signed account does not match the acting address" });
+      }
+      const address = req.wallet.evmAddress;
       const items = await prisma.wishlistItem.findMany({
         where: { userAddress: address },
         orderBy: { createdAt: "desc" },
@@ -2075,13 +2233,17 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     }
   });
 
-  router.post("/wishlist", async (req, res) => {
+  router.post("/wishlist", requireWallet("wishlist-write"), async (req, res) => {
     try {
       const { address, itemId } = (req.body || {}) as {
         address?: string;
         itemId?: string;
       };
-      const userAddress = address?.trim()?.toLowerCase();
+      if (!req.wallet) return res.status(401).json({ error: "Wallet signature required" });
+      if (address && !walletOwns(req.wallet, address)) {
+        return res.status(403).json({ error: "Signed account does not match the acting address" });
+      }
+      const userAddress = req.wallet.evmAddress;
       const id = itemId?.trim();
       const type = "listing";
       if (!userAddress || !id)
@@ -2100,9 +2262,14 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     }
   });
 
-  router.delete("/wishlist", async (req, res) => {
+  router.delete("/wishlist", requireWallet("wishlist-write"), async (req, res) => {
     try {
-      const address = (req.query.address as string)?.trim()?.toLowerCase();
+      if (!req.wallet) return res.status(401).json({ error: "Wallet signature required" });
+      const claimedAddress = (req.query.address as string)?.trim();
+      if (claimedAddress && !walletOwns(req.wallet, claimedAddress)) {
+        return res.status(403).json({ error: "Signed account does not match the acting address" });
+      }
+      const address = req.wallet.evmAddress;
       const itemId = (req.query.itemId as string)?.trim();
       if (!address || !itemId)
         return res.status(400).json({ error: "address and itemId required" });
@@ -2116,13 +2283,14 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     }
   });
 
-  router.post("/user/register", async (req, res) => {
+  router.post("/user/register", requireWallet("user-register"), async (req, res) => {
     try {
       const { address } = req.body as { address?: string };
-      if (!address || typeof address !== "string") {
-        return res.status(400).json({ error: "address required" });
+      if (!req.wallet) return res.status(401).json({ error: "Wallet signature required" });
+      if (typeof address === "string" && address.trim() && !walletOwns(req.wallet, address)) {
+        return res.status(403).json({ error: "Signed account does not match the acting address" });
       }
-      const addrLower = address.toLowerCase();
+      const addrLower = req.wallet.evmAddress;
       await prisma.user.upsert({
         where: { id: addrLower },
         update: {},
@@ -2139,7 +2307,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     }
   });
 
-  router.post("/user/public-key", async (req, res) => {
+  router.post("/user/public-key", requireWallet("user-public-key"), async (req, res) => {
     try {
       const {
         address: rawAddr,
@@ -2150,20 +2318,14 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         publicKey?: string;
         signature?: string;
       };
-      if (!rawAddr || !publicKey || !signature) {
+      if (!publicKey || !signature) {
         return res.status(400).json({ error: "address, publicKey, and signature required" });
       }
-      const addr = rawAddr.trim().toLowerCase();
-      const expectedMessage = `hashpop.pubkey:${publicKey}`;
-      let recoveredAddress: string;
-      try {
-        recoveredAddress = ethers.verifyMessage(expectedMessage, signature).toLowerCase();
-      } catch {
-        return res.status(400).json({ error: "Invalid signature" });
-      }
-      if (recoveredAddress !== addr) {
+      if (!req.wallet) return res.status(401).json({ error: "Wallet signature required" });
+      if (rawAddr && !walletOwns(req.wallet, rawAddr)) {
         return res.status(403).json({ error: "Signature does not match address" });
       }
+      const addr = req.wallet.evmAddress;
       await prisma.user.upsert({
         where: { id: addr },
         update: { publicKey },
@@ -2188,7 +2350,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     }
   });
 
-  router.post("/messages", async (req, res) => {
+  router.post("/messages", requireWallet("messages-write"), async (req, res) => {
     try {
       const { fromAddress, toAddress, body, listingId, encrypted, nonce } = (req.body || {}) as {
         fromAddress?: string;
@@ -2198,7 +2360,11 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         encrypted?: boolean;
         nonce?: string;
       };
-      const from = fromAddress?.trim().toLowerCase();
+      if (!req.wallet) return res.status(401).json({ error: "Wallet signature required" });
+      if (fromAddress && !walletOwns(req.wallet, fromAddress)) {
+        return res.status(403).json({ error: "Signed account does not match the acting address" });
+      }
+      const from = req.wallet.evmAddress;
       const to = toAddress?.trim().toLowerCase();
       const text = typeof body === "string" ? body.trim() : "";
       if (!from || !to)
@@ -2210,10 +2376,8 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       let normalizedListingId: string | null = null;
 
       if (listingInput) {
-        normalizedListingId =
-          listingInput.startsWith("0x") && listingInput.length === 66
-            ? normalizeListingId(listingInput)
-            : listingIdToBytes32(listingInput);
+        normalizedListingId = canonicalListingId(listingInput);
+        if (!normalizedListingId) return res.status(400).json({ error: "Invalid listing id" });
         const listing = await prisma.listing.findUnique({ where: { id: normalizedListingId } });
         if (!listing) return res.status(404).json({ error: "Listing not found" });
       }
@@ -2235,10 +2399,14 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     }
   });
 
-  router.get("/messages/inbox", async (req, res) => {
+  router.get("/messages/inbox", requireWallet("messages-inbox"), async (req, res) => {
     try {
-      const address = (req.query.address as string)?.trim()?.toLowerCase();
-      if (!address) return res.status(400).json({ error: "address required" });
+      if (!req.wallet) return res.status(401).json({ error: "Wallet session required" });
+      const claimed = (req.query.address as string)?.trim();
+      if (claimed && !walletOwns(req.wallet, claimed)) {
+        return res.status(403).json({ error: "Signed account does not match the acting address" });
+      }
+      const address = req.wallet.evmAddress;
       const messages = await prisma.message.findMany({
         where: {
           OR: [{ fromAddress: address }, { toAddress: address }],
@@ -2276,19 +2444,22 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     }
   });
 
-  router.get("/messages/thread", async (req, res) => {
+  router.get("/messages/thread", requireWallet("messages-thread"), async (req, res) => {
     try {
-      const address = (req.query.address as string)?.trim()?.toLowerCase();
+      if (!req.wallet) return res.status(401).json({ error: "Wallet session required" });
+      const claimed = (req.query.address as string)?.trim();
+      if (claimed && !walletOwns(req.wallet, claimed)) {
+        return res.status(403).json({ error: "Signed account does not match the acting address" });
+      }
+      const address = req.wallet.evmAddress;
       const other = (req.query.other as string)?.trim()?.toLowerCase();
       const listingIdRaw = (req.query.listingId as string)?.trim() || "";
-      if (!address || !other) return res.status(400).json({ error: "address and other required" });
+      if (!other) return res.status(400).json({ error: "address and other required" });
 
       let listingId: string | null = null;
       if (listingIdRaw) {
-        listingId =
-          listingIdRaw.startsWith("0x") && listingIdRaw.length === 66
-            ? normalizeListingId(listingIdRaw)
-            : listingIdToBytes32(listingIdRaw);
+        listingId = canonicalListingId(listingIdRaw);
+        if (!listingId) return res.status(400).json({ error: "Invalid listing id" });
       }
 
       const where: Record<string, unknown> = {
@@ -2314,7 +2485,7 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     }
   });
 
-  router.post("/ratings", async (req, res) => {
+  router.post("/ratings", requireWallet("ratings"), async (req, res) => {
     try {
       const {
         reviewerAddress,
@@ -2336,7 +2507,11 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         signature?: string;
       };
 
-      const reviewer = reviewerAddress?.trim().toLowerCase();
+      if (!req.wallet) return res.status(401).json({ error: "Wallet signature required" });
+      if (reviewerAddress && !walletOwns(req.wallet, reviewerAddress)) {
+        return res.status(403).json({ error: "Signed account does not match the acting address" });
+      }
+      const reviewer = req.wallet.evmAddress;
       const rated = ratedAddress?.trim().toLowerCase();
       const saleRef = saleId?.trim();
       const ratingScore = Number(score);
@@ -2351,21 +2526,6 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       if (!Number.isInteger(ratingScore) || ratingScore < 1 || ratingScore > 5) {
         return res.status(400).json({ error: "score must be an integer between 1 and 5" });
       }
-      if (!signature || typeof signature !== "string") {
-        return res.status(400).json({ error: "signature is required" });
-      }
-
-      const message = `hashpop.rate:${saleRef}:${rated}:${ratingScore}`;
-      let recovered = "";
-      try {
-        recovered = ethers.verifyMessage(message, signature).toLowerCase();
-      } catch {
-        return res.status(400).json({ error: "Invalid signature format" });
-      }
-      if (recovered !== reviewer) {
-        return res.status(401).json({ error: "Signature does not match reviewerAddress" });
-      }
-
       const sale = await prisma.sale.findUnique({ where: { id: saleRef } });
       if (!sale) return res.status(404).json({ error: "Sale not found" });
       const participants = [sale.buyer.toLowerCase(), sale.seller.toLowerCase()];
@@ -2511,17 +2671,19 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     }
   });
 
-  router.get("/user/:address/profile", async (req, res) => {
+  router.get("/user/:address/profile", requireWallet("profile-read"), async (req, res) => {
     try {
       const addrLower = req.params.address.toLowerCase();
       const u = await prisma.user.findUnique({ where: { address: addrLower } });
+      const owner = !!req.wallet && walletOwns(req.wallet, addrLower);
+      const publicKyc = { status: u?.kycStatus ?? "UNVERIFIED" };
       if (!u) {
         return res.json({
           address: addrLower,
           displayName: null,
           bio: null,
           avatarUrl: null,
-          kyc: { status: "UNVERIFIED" },
+          kyc: publicKyc,
         });
       }
       res.json({
@@ -2529,20 +2691,22 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
         displayName: u.displayName,
         bio: u.bio,
         avatarUrl: u.avatarUrl,
-        kyc: {
-          status: u.kycStatus ?? "UNVERIFIED",
-          submittedAt: u.kycSubmittedAt,
-          legalName: u.kycLegalName,
-          dateOfBirth: u.kycDateOfBirth,
-          country: u.kycCountry,
-          idType: u.kycIdType,
-          idNumber: u.kycIdNumber,
-          addressLine1: u.kycAddressLine1,
-          addressLine2: u.kycAddressLine2,
-          city: u.kycCity,
-          region: u.kycRegion,
-          postalCode: u.kycPostalCode,
-        },
+        kyc: owner
+          ? {
+              status: u.kycStatus ?? "UNVERIFIED",
+              submittedAt: u.kycSubmittedAt,
+              legalName: u.kycLegalName,
+              dateOfBirth: u.kycDateOfBirth,
+              country: u.kycCountry,
+              idType: u.kycIdType,
+              idNumber: u.kycIdNumber,
+              addressLine1: u.kycAddressLine1,
+              addressLine2: u.kycAddressLine2,
+              city: u.kycCity,
+              region: u.kycRegion,
+              postalCode: u.kycPostalCode,
+            }
+          : publicKyc,
       });
     } catch (err) {
       log.error({ err }, "Failed to fetch profile");
@@ -2550,9 +2714,12 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     }
   });
 
-  router.patch("/user/:address/profile", async (req, res) => {
+  router.patch("/user/:address/profile", requireWallet("profile-write"), async (req, res) => {
     try {
       const addrLower = req.params.address.toLowerCase();
+      if (!req.wallet || !walletOwns(req.wallet, addrLower)) {
+        return res.status(403).json({ error: "Only the account owner can edit this profile" });
+      }
       const body = req.body ?? {};
       const trim = (v: unknown): string | null => {
         if (typeof v !== "string") return null;
@@ -2622,7 +2789,12 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
   async function resolveAccountId(address: string): Promise<string | null> {
     if (/^0\.0\.\d+$/.test(address)) return address;
     if (!/^0x[0-9a-f]{40}$/.test(address)) return null;
-    const mirrorUrl = process.env.MIRROR_URL || "https://testnet.mirrornode.hedera.com";
+    let mirrorUrl: string;
+    try {
+      mirrorUrl = resolveMirrorBase();
+    } catch {
+      return null;
+    }
     try {
       const r = await fetch(`${mirrorUrl}/api/v1/accounts/${address}`, {
         signal: AbortSignal.timeout(4000),
@@ -2646,8 +2818,18 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
   ): Promise<Map<string, { name: string | null; avatarUrl: string | null }>> {
     const out = new Map<string, { name: string | null; avatarUrl: string | null }>();
     if (accountIds.length === 0) return out;
-    const mirrorUrl = process.env.MIRROR_URL || "https://testnet.mirrornode.hedera.com";
-    const network = mirrorUrl.includes("mainnet") ? "mainnet" : "testnet";
+    let mirrorUrl: string;
+    try {
+      mirrorUrl = resolveMirrorBase();
+    } catch (err) {
+      log.error({ err }, "Mirror URL is not configured");
+      return out;
+    }
+    const network = mirrorUrl.includes("previewnet")
+      ? "previewnet"
+      : mirrorUrl.includes("mainnet")
+        ? "mainnet"
+        : "testnet";
     try {
       const r = await fetch("https://api.hashpack.app/user-profile/get-multiple", {
         method: "POST",
@@ -2937,7 +3119,8 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
       return res.status(400).json({ error: "action must be hide, flag, clear, or remove" });
     }
     try {
-      const id = resolveListingIdParam(req.params.id ?? "");
+      const id = canonicalListingId(req.params.id ?? "");
+      if (!id) return res.status(404).json({ error: "Listing not found" });
       const listing = await prisma.listing.findUnique({ where: { id } });
       if (!listing) return res.status(404).json({ error: "Listing not found" });
       const reason = (req.body as { reason?: string } | undefined)?.reason;
@@ -2966,11 +3149,8 @@ export function apiRouter(prisma: PrismaClient, log: Logger, uploadsDir: string)
     const auth = await authenticateAdmin(req);
     if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
     try {
-      const rawId = req.params.id ?? "";
-      const id =
-        rawId.startsWith("0x") && rawId.length === 66
-          ? normalizeListingId(rawId)
-          : listingIdToBytes32(rawId);
+      const id = canonicalListingId(req.params.id ?? "");
+      if (!id) return res.status(404).json({ error: "Listing not found" });
       const listing = await prisma.listing.findUnique({ where: { id } });
       if (!listing) return res.status(404).json({ error: "Listing not found" });
       await prisma.$transaction([

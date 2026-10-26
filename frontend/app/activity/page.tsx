@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { ConnectWalletButton } from "@/components/ConnectWalletButton";
 import { useHashpackWallet } from "@/lib/hashpackWallet";
+import { useSessionFetch } from "@/lib/walletRequestAuth";
 import { getApiUrl } from "@/lib/apiUrl";
 import { formatPriceForDisplay, withHbarGlyph } from "@/lib/formatPrice";
 import { listingHref } from "@/lib/listingUrl";
@@ -119,6 +120,7 @@ function timeStamp(d: Date | null): string {
 
 export default function ActivityPage() {
   const { address, accountId } = useHashpackWallet();
+  const sessionFetch = useSessionFetch();
   const userKey = address ?? accountId ?? "";
   const [events, setEvents] = useState<ActivityEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -147,9 +149,11 @@ export default function ActivityPage() {
     const lower = userKey.toLowerCase();
 
     Promise.allSettled([
-      fetch(`${api}/api/user/${lower}/purchases`, { signal: ac.signal }).then((r) => r.json()),
-      fetch(`${api}/api/user/${lower}/offers`, { signal: ac.signal }).then((r) => r.json()),
-      fetch(`${api}/api/messages/inbox?address=${lower}`, { signal: ac.signal }).then((r) =>
+      sessionFetch(`${api}/api/user/${lower}/purchases`, { signal: ac.signal }).then((r) =>
+        r.json(),
+      ),
+      sessionFetch(`${api}/api/user/${lower}/offers`, { signal: ac.signal }).then((r) => r.json()),
+      sessionFetch(`${api}/api/messages/inbox?address=${lower}`, { signal: ac.signal }).then((r) =>
         r.json(),
       ),
       fetch(`${api}/api/ratings/${lower}`, { signal: ac.signal }).then((r) => r.json()),
@@ -302,7 +306,7 @@ export default function ActivityPage() {
       });
 
     return () => ac.abort();
-  }, [userKey]);
+  }, [userKey, sessionFetch]);
 
   const counts = useMemo(() => {
     const c: Record<Kind, number> = { sale: 0, purchase: 0, offer: 0, message: 0, review: 0 };

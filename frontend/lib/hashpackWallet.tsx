@@ -15,6 +15,7 @@ import {
 } from "react";
 import type { MutableRefObject } from "react";
 import type { HashConnect } from "hashconnect";
+import { revokeWalletAuthSession } from "./walletAuthSession";
 import { activeHederaChain } from "./hederaChains";
 import {
   INIT_TIMEOUT_MESSAGE,
@@ -463,6 +464,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
 
       const disconnectHandler = () => {
         if (!mounted) return;
+        void revokeWalletAuthSession();
         resetWalletState(true);
       };
 
@@ -742,6 +744,7 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
 
   const disconnect = useCallback(async () => {
     try {
+      await revokeWalletAuthSession();
       if (hashconnect) {
         await hashconnect.disconnect();
       }
@@ -787,6 +790,21 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
   );
 
   return <HashpackWalletContext.Provider value={value}>{children}</HashpackWalletContext.Provider>;
+}
+
+/**
+ * The same lazy HashConnect bootstrap the provider uses. Call this only when
+ * a write needs a signer and the context client is not ready yet — it does
+ * not run at import time.
+ */
+export async function ensureHashpackClient(): Promise<HashConnect | null> {
+  const projectId = getWalletConnectProjectId();
+  if (!projectId) return null;
+  try {
+    return await getOrCreateHashConnect(getNetwork(), projectId);
+  } catch {
+    return null;
+  }
 }
 
 export function useHashpackWallet(): HashpackWalletContextValue {

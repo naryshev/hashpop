@@ -1,5 +1,6 @@
 import { createPublicKey, verify as cryptoVerify } from "node:crypto";
 import { ethers } from "ethers";
+import { resolveMirrorBase } from "./mirrorUrl";
 
 export const ADMIN_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -216,13 +217,15 @@ export function verifyHederaSignedMessage(
 }
 
 const accountKeyCache = new Map<string, { at: number; key: AccountKey | null }>();
-const ACCOUNT_KEY_TTL_MS = 10 * 60 * 1000;
+const ACCOUNT_KEY_TTL_MS = 5 * 60 * 1000;
 const ACCOUNT_KEY_MISS_TTL_MS = 30 * 1000;
+const MIRROR_FETCH_TIMEOUT_MS = 2_500;
 
 export async function fetchAccountKey(
   address: string,
-  mirrorBase = process.env.MIRROR_URL || "https://testnet.mirrornode.hedera.com",
+  mirrorBase?: string,
 ): Promise<AccountKey | null> {
+  const base = mirrorBase ?? resolveMirrorBase();
   const id = address.trim().toLowerCase();
   const cached = accountKeyCache.get(id);
   const now = Date.now();
@@ -230,8 +233,8 @@ export async function fetchAccountKey(
     const ttl = cached.key ? ACCOUNT_KEY_TTL_MS : ACCOUNT_KEY_MISS_TTL_MS;
     if (now - cached.at < ttl) return cached.key;
   }
-  const url = `${mirrorBase.replace(/\/$/, "")}/api/v1/accounts/${encodeURIComponent(id)}`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(8_000) });
+  const url = `${base.replace(/\/$/, "")}/api/v1/accounts/${encodeURIComponent(id)}`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(MIRROR_FETCH_TIMEOUT_MS) });
   if (!res.ok) {
     accountKeyCache.set(id, { at: now, key: null });
     return null;

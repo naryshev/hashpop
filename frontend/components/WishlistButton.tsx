@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useHashpackWallet } from "../lib/hashpackWallet";
+import { useAuthorizedFetch, useSessionFetch } from "../lib/walletRequestAuth";
 
 import { getApiUrl } from "../lib/apiUrl";
 import { material } from "../lib/materials";
@@ -29,18 +30,20 @@ export function WishlistButton({
   surface = "default",
 }: WishlistButtonProps) {
   const { address } = useHashpackWallet();
+  const authedFetch = useAuthorizedFetch();
+  const sessionFetch = useSessionFetch();
   const [inWishlist, setInWishlist] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!address || !itemId) return;
-    fetch(`${getApiUrl()}/api/wishlist?address=${encodeURIComponent(address)}`)
+    sessionFetch(`${getApiUrl()}/api/wishlist?address=${encodeURIComponent(address)}`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((data: { items?: { itemId: string }[] }) => {
         setInWishlist((data.items || []).some((i) => i.itemId === itemId));
       })
       .catch(() => {});
-  }, [address, itemId]);
+  }, [address, itemId, sessionFetch]);
 
   const toggle = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -49,13 +52,13 @@ export function WishlistButton({
     setLoading(true);
     try {
       if (inWishlist) {
-        await fetch(
+        await authedFetch(
           `${getApiUrl()}/api/wishlist?address=${encodeURIComponent(address)}&itemId=${encodeURIComponent(itemId)}`,
           { method: "DELETE" },
         );
         setInWishlist(false);
       } else {
-        await fetch(`${getApiUrl()}/api/wishlist`, {
+        await authedFetch(`${getApiUrl()}/api/wishlist`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ address, itemId, itemType }),

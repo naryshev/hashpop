@@ -11,6 +11,7 @@ import { startIndexer } from "./indexer";
 import { startSettlementEngine } from "./settlement";
 import { apiRouter } from "./api";
 import { relayRouter } from "./relay";
+import { resolveMirrorBase } from "./mirrorUrl";
 
 const app = express();
 const uploadsDir = path.join(process.cwd(), "uploads");
@@ -80,11 +81,20 @@ app.use((req, res, next) => {
   const origin = getAllowedOrigin(req.headers.origin as string | undefined);
   if (origin) res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-admin-token");
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, x-admin-token, x-hashpop-account, x-hashpop-issued-at, x-hashpop-nonce, x-hashpop-signature, x-hashpop-session",
+  );
   if (req.method === "OPTIONS") return res.sendStatus(204);
   next();
 });
-app.use(express.json());
+app.use(
+  express.json({
+    verify: (req, _res, buf) => {
+      (req as express.Request).rawBody = buf;
+    },
+  }),
+);
 app.use("/uploads", express.static(uploadsDir));
 app.use("/api", apiRouter(prisma, log, uploadsDir));
 app.use("/api/relay", relayRouter(log));
@@ -92,6 +102,15 @@ app.use("/api/relay", relayRouter(log));
 app.get("/health", (_, res) => res.json({ ok: true, timestamp: new Date().toISOString() }));
 
 const port = Number(process.env.PORT || 4000);
+
+// Never guess a network. Without one, signed wallet requests and the mirror
+// indexer fail closed (401/503), but public browsing keeps serving instead of
+// the whole backend crash-looping on boot.
+try {
+  log.info({ mirror: resolveMirrorBase() }, "Mirror node configured");
+} catch (err) {
+  log.error({ err }, "Mirror node is not configured; wallet-signed requests will fail");
+}
 
 // Auto-apply pending Prisma migrations on startup
 try {

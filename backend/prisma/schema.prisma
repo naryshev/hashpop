@@ -195,3 +195,47 @@ model Offer {
 // Phase 2a stores listing moderation on Listing.moderationStatus.
 // User watch/restrict (2b) and populated escrow disputes (2c) stay out.
 
+/// One-time nonces for HashPack-signed write requests. Rows expire with the signature window.
+model AuthNonce {
+  nonce     String   @id
+  accountId String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
+/// HashPack session issued after one signature. Disconnect deletes the row.
+model WalletSession {
+  id        String   @id
+  accountId String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+  @@index([accountId])
+}
+
+/// Who called a protected route. Rows cover verified writes and rejected 401/403s.
+/// No signatures, session tokens, or message bodies.
+model WalletAuditLog {
+  id              String   @id @default(cuid())
+  method          String
+  path            String
+  resourceId      String?
+  /// Verified Hedera account, or the claimed account when verification failed.
+  accountId       String
+  evmAddress      String?
+  /// False when `accountId` is only what the caller claimed.
+  accountVerified Boolean  @default(false)
+  /// allowed, unauthorized, forbidden, or error.
+  outcome         String
+  ip              String?
+  userAgent       String?
+  createdAt       DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([accountId])
+  @@index([outcome])
+}
+
