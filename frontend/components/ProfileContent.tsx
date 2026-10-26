@@ -309,7 +309,7 @@ export function ProfileContent({
       setActive(listingsOk ? (listingsBody.active ?? []) : []);
       setArchived(listingsOk ? (listingsBody.archived ?? []) : []);
       setReviews(ratingsBody?.ratings ?? []);
-      setSales(purchasesOk ? (purchasesBody.purchases ?? []) : []);
+      setSales(purchasesOk ? (purchasesBody?.purchases ?? []) : []);
       setCatalogReady(listingsOk && purchasesOk);
       setOfferIds(
         new Set(

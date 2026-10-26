@@ -5,7 +5,11 @@ import { getApiUrl } from "./apiUrl";
 import { extractHashpackSignature } from "./hashpackSignature";
 import { ensureHashpackClient, useHashpackWallet } from "./hashpackWallet";
 import { canonicalRequestPath, canonicalWalletAuthMessage, sha256Hex } from "./walletAuthMessage";
-import { readWalletAuthToken, writeWalletAuthToken } from "./walletAuthSession";
+import {
+  clearWalletAuthToken,
+  readWalletAuthToken,
+  writeWalletAuthToken,
+} from "./walletAuthSession";
 
 export type WalletMessageSigner = {
   signMessages: (accountId: string, message: string) => Promise<unknown>;
@@ -101,6 +105,35 @@ export async function ensureWalletAuthSession(
   return job;
 }
 
+/**
+ * Send with the 24h session token. When the server rejects the token (expired
+ * early, revoked, key rotated, DB reset) drop it, mint a new one with one
+ * HashPack prompt, and retry once. A second 401 is returned to the caller.
+ */
+export async function fetchWithWalletSession(
+  url: string,
+  init: RequestInit,
+  auth: { accountId: string; signer: WalletMessageSigner },
+): Promise<Response> {
+  const send = async () => {
+    const headers = new Headers(init.headers);
+    headers.set("x-hashpop-session", await ensureWalletAuthSession(auth.accountId, auth.signer));
+    return fetch(url, { ...init, headers });
+  };
+  const sentToken = readWalletAuthToken(auth.accountId);
+  const res = await send();
+  if (res.status !== 401) return res;
+  // Only retry when the body can be sent again (strings, FormData, none).
+  if (init.body != null && typeof init.body !== "string" && !(init.body instanceof FormData)) {
+    return res;
+  }
+  // Another request may already have replaced the token; only clear ours.
+  if (!sentToken || readWalletAuthToken(auth.accountId) === sentToken) {
+    clearWalletAuthToken();
+  }
+  return send();
+}
+
 async function signerFor(hashconnect: unknown): Promise<WalletMessageSigner | null> {
   return (
     (hashconnect as WalletMessageSigner | null) ??
@@ -112,13 +145,10 @@ export function useSessionFetch() {
   const { hashconnect, accountId } = useHashpackWallet();
   return useCallback(
     async (url: string, init?: RequestInit) => {
-      const headers = new Headers(init?.headers);
-      if (accountId) {
-        const signer = await signerFor(hashconnect);
-        if (!signer) throw new Error("Connect your wallet to continue.");
-        headers.set("x-hashpop-session", await ensureWalletAuthSession(accountId, signer));
-      }
-      return fetch(url, { ...init, headers });
+      if (!accountId) return fetch(url, init);
+      const signer = await signerFor(hashconnect);
+      if (!signer) throw new Error("Connect your wallet to continue.");
+      return fetchWithWalletSession(url, init ?? {}, { accountId, signer });
     },
     [hashconnect, accountId],
   );
@@ -139,9 +169,7 @@ export function useAuthorizedFetch() {
       if (requiresFreshSignature(method, url)) {
         return authorizedFetch(url, init, { accountId, signer });
       }
-      const headers = new Headers(init?.headers);
-      headers.set("x-hashpop-session", await ensureWalletAuthSession(accountId, signer));
-      return fetch(url, { ...init, method, headers });
+      return fetchWithWalletSession(url, { ...init, method }, { accountId, signer });
     },
     [hashconnect, accountId],
   );

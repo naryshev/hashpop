@@ -103,9 +103,13 @@ app.get("/health", (_, res) => res.json({ ok: true, timestamp: new Date().toISOS
 
 const port = Number(process.env.PORT || 4000);
 
-if (process.env.NODE_ENV === "production") {
-  // Fail the process instead of silently talking to testnet.
-  resolveMirrorBase();
+// Never guess a network. Without one, signed wallet requests and the mirror
+// indexer fail closed (401/503), but public browsing keeps serving instead of
+// the whole backend crash-looping on boot.
+try {
+  log.info({ mirror: resolveMirrorBase() }, "Mirror node configured");
+} catch (err) {
+  log.error({ err }, "Mirror node is not configured; wallet-signed requests will fail");
 }
 
 // Auto-apply pending Prisma migrations on startup

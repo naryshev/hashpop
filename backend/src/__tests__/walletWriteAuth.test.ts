@@ -22,7 +22,12 @@ import {
 } from "../walletAuth";
 import { canonicalListingId } from "../listingId";
 import { resolveMirrorBase } from "../mirrorUrl";
-import { memorySessionStore, WALLET_SESSION_TTL_MS } from "../walletSession";
+import {
+  memorySessionStore,
+  sessionSecretFromEnv,
+  sessionSecretIsDerived,
+  WALLET_SESSION_TTL_MS,
+} from "../walletSession";
 
 const OWNER = `0x${"11".repeat(20)}`;
 const BUYER = `0x${"22".repeat(20)}`;
@@ -117,13 +122,17 @@ const userRow = {
 };
 
 const listingUpserts: Array<{ where?: { id?: string }; create?: { seller?: string } }> = [];
+const listingUpdates: Array<Record<string, unknown>> = [];
 const offerStatusWrites: Array<{ where?: { buyer?: string }; data?: { status?: string } }> = [];
 
 const prisma = {
   listing: {
     findUnique: async () => ({ ...listingRow }),
     findMany: async () => [],
-    update: async ({ data }: { data: Record<string, unknown> }) => ({ ...listingRow, ...data }),
+    update: async ({ data }: { data: Record<string, unknown> }) => {
+      listingUpdates.push(data);
+      return { ...listingRow, ...data };
+    },
     updateMany: async () => ({ count: 1 }),
     upsert: async (args: { where?: { id?: string }; create?: { seller?: string } }) => {
       listingUpserts.push(args);
@@ -1011,6 +1020,158 @@ describe("route matching, listing ids, and offer actions", () => {
       "x-hashpop-session": minted.json.token,
     });
     expect(uploaded.status).toBe(400);
+  });
+});
+
+describe("regressions from Ship's #125 bypass report", () => {
+  async function mintFor(accountId: string, key: typeof ownerKeys.privateKey): Promise<string> {
+    const path = "/api/wallet/session";
+    const headers = authHeaders({ method: "POST", path, body: {}, accountId, privateKey: key });
+    const res = await call("POST", path, {}, headers);
+    expect(res.status).toBe(200);
+    return res.json.token as string;
+  }
+
+  it.each([`/api/LISTING/${LISTING}`, `/api/listing/${LISTING}/`, `/api/Listing/${LISTING}/`])(
+    "bypass 1: PATCH %s without a signature is 401 and writes nothing",
+    async (path) => {
+      const before = listingUpdates.length;
+      const res = await call("PATCH", path, { sellerAddress: OWNER, title: "forged" });
+      expect(res.status).toBe(401);
+      expect(listingUpdates.length).toBe(before);
+    },
+  );
+
+  it.each([
+    `/api/MESSAGES/INBOX?address=${OWNER}`,
+    `/api/messages/inbox/?address=${OWNER}`,
+    `/api/Wishlist/?address=${OWNER}`,
+    `/api/USER/${OWNER}/PURCHASES/`,
+    `/api/user/${OWNER}/Offers`,
+    `/api/LISTING/${LISTING}/Shipping-Address/?requester=${OWNER}`,
+  ])("bypass 1+4: a wrong-account session on %s is still 403", async (path) => {
+    const token = await mintFor(BUYER_ACCOUNT, buyerKeys.privateKey);
+    const res = await call("GET", path, undefined, { "x-hashpop-session": token });
+    expect(res.status).toBe(403);
+    expect(res.json.conversations ?? res.json.items ?? res.json.address).toBeUndefined();
+  });
+
+  it.each([LISTING.slice(2), LISTING.slice(2).toUpperCase(), `0X${LISTING.slice(2)}`])(
+    "bypass 2: a non-seller PATCH on listing id %s is 403 and writes nothing",
+    async (id) => {
+      const path = `/api/listing/${id}`;
+      const body = { sellerAddress: BUYER, title: "overwrite" };
+      const headers = authHeaders({
+        method: "PATCH",
+        path,
+        body,
+        accountId: BUYER_ACCOUNT,
+        privateKey: buyerKeys.privateKey,
+      });
+      const before = listingUpdates.length;
+      const res = await call("PATCH", path, body, headers);
+      expect(res.status).toBe(403);
+      expect(listingUpdates.length).toBe(before);
+    },
+  );
+
+  it("bypass 2: a non-seller cannot overwrite via sync-price-update with an unprefixed id", async () => {
+    const path = "/api/sync-price-update";
+    const body = { listingId: LISTING.slice(2), newPrice: "0.01" };
+    const headers = authHeaders({
+      method: "POST",
+      path,
+      body,
+      accountId: BUYER_ACCOUNT,
+      privateKey: buyerKeys.privateKey,
+    });
+    const before = listingUpdates.length;
+    const res = await call("POST", path, body, headers);
+    expect(res.status).toBe(403);
+    expect(listingUpdates.length).toBe(before);
+  });
+
+  it.each([
+    { action: "delete" },
+    { action: "" },
+    { action: ["cancel"] },
+    { action: "cancel;accept" },
+    {},
+  ])("bypass 3: offer action %j is rejected with 400", async (extra) => {
+    const path = "/api/sync-offer-action";
+    const body = { listingId: LISTING, buyer: BUYER, ...extra };
+    const headers = authHeaders({ method: "POST", path, body });
+    const before = offerStatusWrites.length;
+    const res = await call("POST", path, body, headers);
+    expect(res.status).toBe(400);
+    expect(offerStatusWrites.length).toBe(before);
+  });
+
+  it("bypass 3: cancel is only accepted when the caller owns the stored offer", async () => {
+    const path = "/api/sync-offer-action";
+    const body = { listingId: LISTING, buyer: BUYER, action: "cancel" };
+    const token = await mintFor(BUYER_ACCOUNT, buyerKeys.privateKey);
+    // The stored offer belongs to OWNER, so BUYER naming itself must not cancel it.
+    const before = offerStatusWrites.length;
+    const res = await call("POST", path, body, { "x-hashpop-session": token });
+    expect(res.status).toBe(403);
+    expect(offerStatusWrites.length).toBe(before);
+  });
+
+  it("bypass 4: the shipping address read ignores ?requester and needs a session", async () => {
+    const path = `/api/listing/${LISTING}/shipping-address?requester=${BUYER}`;
+    const anon = await call("GET", path);
+    expect(anon.status).toBe(401);
+    const token = await mintFor(OWNER_ACCOUNT, ownerKeys.privateKey);
+    const res = await call("GET", path, undefined, { "x-hashpop-session": token });
+    expect(res.status).toBe(403);
+  });
+
+  it("never takes the acting account from the body when the session is valid", async () => {
+    const token = await mintFor(BUYER_ACCOUNT, buyerKeys.privateKey);
+    const res = await call(
+      "POST",
+      "/api/messages",
+      { fromAddress: OWNER, toAddress: BUYER, body: "spoof" },
+      { "x-hashpop-session": token },
+    );
+    expect(res.status).toBe(403);
+  });
+});
+
+describe("deploy fallbacks", () => {
+  it("reads the mirror network from HEDERA_RPC_URL when MIRROR_URL and HEDERA_NETWORK are unset", () => {
+    expect(resolveMirrorBase({ HEDERA_RPC_URL: "https://testnet.hashio.io/api" })).toBe(
+      "https://testnet.mirrornode.hedera.com",
+    );
+    expect(resolveMirrorBase({ HEDERA_RPC_URL: "https://mainnet.hashio.io/api" })).toBe(
+      "https://mainnet.mirrornode.hedera.com",
+    );
+    expect(
+      resolveMirrorBase({
+        HEDERA_NETWORK: "mainnet",
+        HEDERA_RPC_URL: "https://testnet.hashio.io/api",
+      }),
+    ).toBe("https://mainnet.mirrornode.hedera.com");
+    expect(() =>
+      resolveMirrorBase({ NODE_ENV: "production", HEDERA_RPC_URL: "https://rpc.example/api" }),
+    ).toThrow(/MIRROR_URL/);
+    expect(() =>
+      resolveMirrorBase({ HEDERA_RPC_URL: "https://mainnet-testnet.example/api" }),
+    ).toThrow(/MIRROR_URL/);
+  });
+
+  it("derives a stable session key from DATABASE_URL only when WALLET_SESSION_SECRET is unset", () => {
+    const db = { DATABASE_URL: "postgresql://u:p@db:5432/hashpop" };
+    const derived = sessionSecretFromEnv(undefined, db);
+    expect(derived).toMatch(/^[0-9a-f]{64}$/);
+    expect(derived).not.toContain("postgresql");
+    expect(sessionSecretFromEnv(undefined, db)).toBe(derived);
+    expect(sessionSecretIsDerived(db)).toBe(true);
+    expect(sessionSecretFromEnv(undefined, { ...db, WALLET_SESSION_SECRET: "set" })).toBe("set");
+    expect(sessionSecretIsDerived({ ...db, WALLET_SESSION_SECRET: "set" })).toBe(false);
+    expect(sessionSecretFromEnv(undefined, {})).toBe("");
+    expect(sessionSecretFromEnv("", db)).toBe("");
   });
 });
 

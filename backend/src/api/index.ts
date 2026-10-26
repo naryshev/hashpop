@@ -18,6 +18,7 @@ import {
   createWalletSession,
   prismaSessionStore,
   sessionSecretFromEnv,
+  sessionSecretIsDerived,
   type SessionStore,
 } from "../walletSession";
 import {
@@ -277,6 +278,13 @@ export function apiRouter(
   const router = Router();
   const sessionStore = deps?.sessionStore ?? prismaSessionStore(prisma);
   const sessionSecret = sessionSecretFromEnv(deps?.sessionSecret);
+  if (deps?.sessionSecret === undefined) {
+    if (!sessionSecret) {
+      log.error("WALLET_SESSION_SECRET and DATABASE_URL are unset; wallet sessions are disabled");
+    } else if (sessionSecretIsDerived()) {
+      log.warn("WALLET_SESSION_SECRET is unset; deriving the wallet session key from DATABASE_URL");
+    }
+  }
   const requireWallet = createWalletRouteAuth({
     prisma,
     log,

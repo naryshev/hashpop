@@ -50,9 +50,29 @@ function signPayload(payload: string, secret: string): string {
   return createHmac("sha256", secret).update(payload).digest("base64url");
 }
 
-export function sessionSecretFromEnv(explicit?: string): string {
-  const value = (explicit ?? process.env.WALLET_SESSION_SECRET ?? "").trim();
-  return value;
+/**
+ * HMAC key for session tokens. `WALLET_SESSION_SECRET` wins. Without it the
+ * key is derived from `DATABASE_URL`, which is already a server-only secret
+ * (anyone holding it can read the session table directly), so a deploy that
+ * has not set the new variable yet keeps sessions working instead of locking
+ * every signed-in user out. Set `WALLET_SESSION_SECRET` to decouple them.
+ * Returns "" only when neither is set; then minting answers 503.
+ */
+export function sessionSecretFromEnv(
+  explicit?: string,
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  const value = (explicit ?? env.WALLET_SESSION_SECRET ?? "").trim();
+  if (value) return value;
+  if (explicit !== undefined) return "";
+  const databaseUrl = env.DATABASE_URL?.trim();
+  if (!databaseUrl) return "";
+  return createHmac("sha256", "hashpop.wallet-session.v1").update(databaseUrl).digest("hex");
+}
+
+/** True when the session key is the DATABASE_URL-derived fallback. */
+export function sessionSecretIsDerived(env: NodeJS.ProcessEnv = process.env): boolean {
+  return !env.WALLET_SESSION_SECRET?.trim() && Boolean(env.DATABASE_URL?.trim());
 }
 
 export function issueWalletSessionToken(

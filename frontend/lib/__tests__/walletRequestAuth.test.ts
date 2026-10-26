@@ -2,7 +2,12 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { canonicalRequestPath, canonicalWalletAuthMessage } from "../walletAuthMessage";
-import { authorizedFetch, requiresFreshSignature } from "../walletRequestAuth";
+import {
+  authorizedFetch,
+  fetchWithWalletSession,
+  requiresFreshSignature,
+} from "../walletRequestAuth";
+import { readWalletAuthToken, writeWalletAuthToken } from "../walletAuthSession";
 
 const libDir = path.resolve(process.cwd(), "lib");
 
@@ -96,5 +101,72 @@ describe("wallet write signatures", () => {
     expect(wallet).not.toMatch(/import\s+(?!type\b)[^;]*from\s+["']hashconnect["']/);
     expect(wallet).toContain('import("hashconnect")');
     expect(wallet).toContain("export async function ensureHashpackClient");
+  });
+});
+
+describe("wallet session recovery", () => {
+  it("drops a rejected session token, mints one new token, and retries once", async () => {
+    writeWalletAuthToken({ token: "stale", accountId: "0.0.5", expiresAt: Date.now() + 3_600_000 });
+    const signMessages = vi.fn(async () => ({ signature: new Uint8Array([9]) }));
+    const sent: Array<{ url: string; session: string | null }> = [];
+    const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+      const headers = new Headers(init?.headers);
+      sent.push({ url: input, session: headers.get("x-hashpop-session") });
+      if (input.endsWith("/api/wallet/session")) {
+        return new Response(
+          JSON.stringify({ token: "fresh", expiresAt: Date.now() + 86_400_000 }),
+          {
+            status: 200,
+          },
+        );
+      }
+      return new Response("{}", {
+        status: headers.get("x-hashpop-session") === "fresh" ? 200 : 401,
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const res = await fetchWithWalletSession(
+        "http://localhost:4000/api/messages",
+        { method: "POST", body: JSON.stringify({ body: "hi" }) },
+        { accountId: "0.0.5", signer: { signMessages } },
+      );
+      expect(res.status).toBe(200);
+      expect(signMessages).toHaveBeenCalledTimes(1);
+      expect(sent.map((call) => call.session)).toEqual(["stale", null, "fresh"]);
+      expect(readWalletAuthToken("0.0.5")).toBe("fresh");
+    } finally {
+      vi.unstubAllGlobals();
+      window.localStorage.clear();
+    }
+  });
+
+  it("returns the second 401 instead of looping", async () => {
+    writeWalletAuthToken({ token: "stale", accountId: "0.0.5", expiresAt: Date.now() + 3_600_000 });
+    const signMessages = vi.fn(async () => ({ signature: new Uint8Array([9]) }));
+    const fetchMock = vi.fn(async (input: string) => {
+      if (input.endsWith("/api/wallet/session")) {
+        return new Response(
+          JSON.stringify({ token: "also-bad", expiresAt: Date.now() + 86_400_000 }),
+          {
+            status: 200,
+          },
+        );
+      }
+      return new Response("{}", { status: 401 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const res = await fetchWithWalletSession(
+        "http://localhost:4000/api/messages/inbox",
+        {},
+        { accountId: "0.0.5", signer: { signMessages } },
+      );
+      expect(res.status).toBe(401);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.unstubAllGlobals();
+      window.localStorage.clear();
+    }
   });
 });
