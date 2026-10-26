@@ -1,0 +1,20 @@
+-- One-time backfill. ItemListed re-polls rewrote every listing, and Prisma
+-- @updatedAt moved updatedAt to the last poll. After unchanged replays stop
+-- writing, that timestamp freezes at the last pre-deploy poll, so sitemap
+-- lastmod would show the deploy time.
+--
+-- Sets updatedAt = createdAt on every existing row. A real edit made before
+-- this migration is indistinguishable from a poll touch, because each poll
+-- overwrote updatedAt. Edits after this migration still bump updatedAt.
+--
+-- Railway applies this automatically, once. The service start command is
+-- `npm start` (`prisma db push --accept-data-loss && node dist/index.js`).
+-- `db push` does not run this file. On process start, backend/src/index.ts
+-- runs `npx prisma migrate deploy` with its working directory set to
+-- backend/. Prisma records the migration in `_prisma_migrations`, so a later
+-- restart does not run the UPDATE again. The Vercel frontend does not run
+-- it. If `migrate deploy` fails, startup logs a warning and continues, and
+-- this UPDATE has not been applied. Do not execute this SQL by hand a second
+-- time: that would set updatedAt back to createdAt and erase edits made
+-- after the backfill.
+UPDATE "Listing" SET "updatedAt" = "createdAt";

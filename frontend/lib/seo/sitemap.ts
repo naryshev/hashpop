@@ -1,12 +1,14 @@
 import { CATEGORY_GROUPS } from "../categories";
+import { countActiveListingsInCategory, isActiveListingStatus } from "../marketplaceCategory";
 import { absoluteUrl } from "./host";
 import { listingCanonicalPath } from "./metadata";
 
 /**
  * Indexable routes that are not account-specific.
- * `/` redirects to `/marketplace`, so the marketplace URL is the canonical entry.
+ * `/` is the homepage. `/about` is the about page. `/marketplace` stays beside them.
  */
 export const PUBLIC_SITEMAP_PATHS = [
+  "/",
   "/marketplace",
   "/categories",
   "/privacy",
@@ -19,11 +21,16 @@ export const PUBLIC_SITEMAP_PATHS = [
 /** Second guard on top of GET /api/listings (backend take: 100). */
 export const SITEMAP_LISTING_CAP = 500;
 
-/** Public category URLs are marketplace filters, matching the categories page. */
-export function categorySitemapPaths(): string[] {
+/**
+ * `/marketplace?category=` URLs for catalog categories whose active listing
+ * count is greater than zero. The count comes from `listings` (the public
+ * feed at request time), not a fixed set of categories.
+ */
+export function categorySitemapPaths(listings: SitemapListing[] = []): string[] {
   const paths: string[] = [];
   for (const group of CATEGORY_GROUPS) {
     for (const category of group.categories) {
+      if (countActiveListingsInCategory(listings, category) === 0) continue;
       paths.push(`/marketplace?category=${encodeURIComponent(category)}`);
     }
   }
@@ -33,7 +40,9 @@ export function categorySitemapPaths(): string[] {
 export type SitemapListing = {
   id: string;
   status?: string | null;
+  category?: string | null;
   createdAt?: string | null;
+  updatedAt?: string | null;
 };
 
 export type SitemapEntry = {
@@ -50,17 +59,47 @@ function lastModified(value?: string | null): string | undefined {
   return date.toISOString();
 }
 
+/**
+ * The indexer re-upserts ItemListed on each poll, and Prisma `@updatedAt`
+ * moves to the current time even when the row did not change. A timestamp
+ * this close to sitemap generation is that touch, not a modification.
+ */
+const UPDATED_AT_TOUCH_MS = 60_000;
+
+/**
+ * Real updatedAt from the feed. createdAt when updatedAt is missing or is
+ * only the current time. Omit lastmod when neither field is a timestamp.
+ * Never synthesize "now".
+ */
+function listingLastModified(listing: SitemapListing, now: number): string | undefined {
+  const updated = lastModified(listing.updatedAt);
+  const created = lastModified(listing.createdAt);
+  if (updated && Math.abs(Date.parse(updated) - now) >= UPDATED_AT_TOUCH_MS) return updated;
+  return created;
+}
+
+function staticChangeFrequency(path: string): "daily" | "weekly" {
+  return path === "/" || path === "/marketplace" ? "daily" : "weekly";
+}
+
+function staticPriority(path: string): number {
+  if (path === "/") return 1;
+  if (path === "/marketplace") return 0.9;
+  return 0.6;
+}
+
 export function buildSitemap(
   listings: SitemapListing[],
-  options?: { categoryPaths?: string[]; listingCap?: number },
+  options?: { categoryPaths?: string[]; listingCap?: number; now?: number },
 ): SitemapEntry[] {
-  const categoryPaths = options?.categoryPaths ?? categorySitemapPaths();
+  const now = options?.now ?? Date.now();
+  const categoryPaths = options?.categoryPaths ?? categorySitemapPaths(listings);
   const listingCap = options?.listingCap ?? SITEMAP_LISTING_CAP;
   const staticEntries: SitemapEntry[] = [
     ...PUBLIC_SITEMAP_PATHS.map((path) => ({
       url: absoluteUrl(path),
-      changeFrequency: path === "/marketplace" ? ("daily" as const) : ("weekly" as const),
-      priority: path === "/marketplace" ? 1 : 0.6,
+      changeFrequency: staticChangeFrequency(path),
+      priority: staticPriority(path),
     })),
     ...categoryPaths.map((path) => ({
       url: absoluteUrl(path),
@@ -73,8 +112,8 @@ export function buildSitemap(
   for (const listing of listings) {
     const id = listing.id?.trim();
     if (!id) continue;
-    if ((listing.status ?? "").trim().toUpperCase() !== "LISTED") continue;
-    const modified = lastModified(listing.createdAt);
+    if (!isActiveListingStatus(listing.status)) continue;
+    const modified = listingLastModified(listing, now);
     listingEntries.push({
       url: absoluteUrl(listingCanonicalPath(id)),
       ...(modified ? { lastModified: modified } : {}),
