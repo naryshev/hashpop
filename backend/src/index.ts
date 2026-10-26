@@ -1,7 +1,6 @@
 import "dotenv/config";
 import path from "path";
 import fs from "fs";
-import { execSync } from "child_process";
 import express from "express";
 import pino from "pino";
 import pg from "pg";
@@ -11,6 +10,7 @@ import { startIndexer } from "./indexer";
 import { startSettlementEngine } from "./settlement";
 import { apiRouter } from "./api";
 import { relayRouter } from "./relay";
+import { runStartupMigrations } from "./startupMigrations";
 
 const app = express();
 const uploadsDir = path.join(process.cwd(), "uploads");
@@ -93,28 +93,24 @@ app.get("/health", (_, res) => res.json({ ok: true, timestamp: new Date().toISOS
 
 const port = Number(process.env.PORT || 4000);
 
-// Auto-apply pending Prisma migrations on startup
-try {
-  log.info("Applying pending database migrations…");
-  execSync("npx prisma migrate deploy", {
+void (async () => {
+  await runStartupMigrations({
     cwd: path.join(__dirname, ".."),
-    stdio: "pipe",
-    env: { ...process.env },
+    env: process.env,
+    log,
+    query: async (sql, params) => {
+      const result = await pool.query(sql, params as never[]);
+      return result.rows as Array<Record<string, unknown>>;
+    },
   });
-  log.info("Database migrations applied");
-} catch (err: any) {
-  log.warn(
-    { err: err.stderr?.toString() || err.message },
-    "Migration failed — continuing with existing schema",
-  );
-}
 
-app.listen(port, () => {
-  log.info({ port }, "Backend server started");
-  startIndexer(prisma, log).catch((err) => log.error({ err }, "Indexer failed"));
-  try {
-    startSettlementEngine(prisma, log);
-  } catch (err) {
-    log.error({ err }, "Settlement engine failed to start");
-  }
-});
+  app.listen(port, () => {
+    log.info({ port }, "Backend server started");
+    startIndexer(prisma, log).catch((err) => log.error({ err }, "Indexer failed"));
+    try {
+      startSettlementEngine(prisma, log);
+    } catch (err) {
+      log.error({ err }, "Settlement engine failed to start");
+    }
+  });
+})();

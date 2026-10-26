@@ -4,6 +4,7 @@ import { ethers } from "ethers";
 import { PrismaClient } from "../generated/prisma/client";
 import type { Logger } from "pino";
 import { fetchMirrorEvents } from "../mirror";
+import { advanceMirrorCursor, mirrorTimestampFromEvent } from "../mirror/cursor";
 import { decodeEvents } from "./decoder";
 import {
   fetchItemListedLogsFromRpc,
@@ -15,23 +16,34 @@ import {
 const POLL_INTERVAL = 8000; // 8 seconds
 const RECONCILE_INTERVAL = 60_000; // 1 minute — recheck unconfirmed listings against contract
 const RECONCILE_BATCH = 50; // listings per reconciliation pass
-let lastProcessedTimestamp = 0;
+const FINALIZED_LISTING_STATUSES = ["SOLD", "REFUNDED"] as const;
+let lastProcessedTimestamp = "0";
+
+function isFinalizedListingStatus(status: string | null | undefined): boolean {
+  return status === "SOLD" || status === "REFUNDED";
+}
 
 const STATE_FILE = path.join(process.cwd(), ".indexer-state.json");
 
-function loadIndexerState(): { lastProcessedTimestamp: number; lastProcessedBlock: number } {
+function loadIndexerState(): { lastProcessedTimestamp: string; lastProcessedBlock: number } {
   try {
     const raw = fs.readFileSync(STATE_FILE, "utf8");
     const data = JSON.parse(raw);
-    const ts = typeof data.lastProcessedTimestamp === "number" ? data.lastProcessedTimestamp : 0;
+    const ts = data.lastProcessedTimestamp;
+    const cursor =
+      typeof ts === "string" && ts.trim()
+        ? ts.trim()
+        : typeof ts === "number" && ts > 0
+          ? String(ts)
+          : "0";
     const block = typeof data.lastProcessedBlock === "number" ? data.lastProcessedBlock : 0;
-    return { lastProcessedTimestamp: Math.max(0, ts), lastProcessedBlock: Math.max(0, block) };
+    return { lastProcessedTimestamp: cursor, lastProcessedBlock: Math.max(0, block) };
   } catch {
-    return { lastProcessedTimestamp: 0, lastProcessedBlock: 0 };
+    return { lastProcessedTimestamp: "0", lastProcessedBlock: 0 };
   }
 }
 
-function saveIndexerState(ts: number, block: number): void {
+function saveIndexerState(ts: string, block: number): void {
   try {
     fs.writeFileSync(
       STATE_FILE,
@@ -277,6 +289,10 @@ async function backfillHistoricalEvents(
     let processed = 0;
     for (const event of events) {
       try {
+        lastProcessedTimestamp = advanceMirrorCursor(
+          lastProcessedTimestamp,
+          mirrorTimestampFromEvent(event),
+        );
         const decoded = decodeEvents(event);
         if (!decoded) continue;
         await handleEvent(decoded, prisma, log);
@@ -346,18 +362,17 @@ async function processEvents(
 ): Promise<number> {
   const events = await fetchMirrorEvents(marketplaceAddr, lastProcessedTimestamp);
 
-  if (events.length === 0 && lastProcessedTimestamp === 0) {
+  if (events.length === 0 && lastProcessedTimestamp === "0") {
     log.debug("Mirror returned 0 marketplace logs");
   }
 
   let processed = 0;
   for (const event of events) {
     try {
-      let ts =
-        typeof event.timestamp === "string" ? parseFloat(event.timestamp) : Number(event.timestamp);
-      if (ts > 1e15) ts = ts / 1e9;
-      if (!Number.isNaN(ts) && isFinite(ts))
-        lastProcessedTimestamp = Math.max(lastProcessedTimestamp, ts);
+      lastProcessedTimestamp = advanceMirrorCursor(
+        lastProcessedTimestamp,
+        mirrorTimestampFromEvent(event),
+      );
 
       const decoded = decodeEvents(event);
       if (!decoded) continue;
@@ -397,11 +412,22 @@ function normalizeListingId(id: string): string {
   return "0x" + hex.toLowerCase();
 }
 
-async function handleEvent(event: any, prisma: PrismaClient, log: Logger) {
+export async function handleEvent(event: any, prisma: PrismaClient, log: Logger) {
   switch (event.type) {
     case "ItemListed": {
       const listingId = normalizeListingId(event.listingId);
       const seller = (event.seller || "").toLowerCase();
+      const existing = await prisma.listing.findUnique({
+        where: { id: listingId },
+        select: { status: true },
+      });
+      if (isFinalizedListingStatus(existing?.status)) {
+        log.debug(
+          { listingId, status: existing?.status },
+          "Indexer left finalized listing unchanged",
+        );
+        break;
+      }
       await prisma.listing.upsert({
         where: { id: listingId },
         create: {
@@ -441,8 +467,15 @@ async function handleEvent(event: any, prisma: PrismaClient, log: Logger) {
       // Check DB listing to determine if escrow or direct sale
       const dbListing = await prisma.listing.findUnique({
         where: { id: purchListingId },
-        select: { requireEscrow: true },
+        select: { requireEscrow: true, status: true },
       });
+      if (isFinalizedListingStatus(dbListing?.status)) {
+        log.debug(
+          { listingId: purchListingId, status: dbListing?.status },
+          "Indexer left finalized listing unchanged",
+        );
+        break;
+      }
       const nextStatus = dbListing?.requireEscrow ? "LOCKED" : "SOLD";
       await prisma.listing.update({
         where: { id: purchListingId },
@@ -453,7 +486,10 @@ async function handleEvent(event: any, prisma: PrismaClient, log: Logger) {
 
     case "ListingCancelled":
       await prisma.listing.updateMany({
-        where: { id: normalizeListingId(event.listingId) },
+        where: {
+          id: normalizeListingId(event.listingId),
+          status: { notIn: [...FINALIZED_LISTING_STATUSES] },
+        },
         data: { status: "CANCELLED" },
       });
       break;
