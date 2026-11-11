@@ -98,6 +98,10 @@ npx prisma generate
 npx prisma migrate deploy
 ```
 
+On Railway this is automatic. `npm start` runs only `node dist/index.js`; there is no `db push`. `backend/src/index.ts` runs `npx prisma migrate deploy` on every boot (with the one-time baseline described above for a database that `db push` created), before the server listens. Prisma records applied migrations in `_prisma_migrations`, so each migration runs once. A failed `migrate deploy` is logged with its full output and the process still starts, which means that migration was not applied. The Vercel frontend does not run migrations.
+
+`20261025_reset_repolled_listing_updated_at` sets `Listing.updatedAt = Listing.createdAt` for every existing row. It runs on the next Railway deploy or restart that includes it, and it does not run again after Prisma records it. Do not execute that SQL by hand a second time.
+
 ## 4) Frontend Deployment (Vercel)
 
 Create a Vercel project with:

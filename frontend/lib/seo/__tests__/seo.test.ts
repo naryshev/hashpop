@@ -356,17 +356,44 @@ describe("robots.txt", () => {
 });
 
 describe("sitemap.xml", () => {
-  it("includes key public routes and public listings, not private routes", () => {
+  it("lists https://hashpop.io/ first at priority 1 and includes /about", () => {
+    const entries = buildSitemap([]);
+    expect(entries[0]).toMatchObject({
+      url: "https://hashpop.io/",
+      priority: 1,
+      changeFrequency: "daily",
+    });
+    const about = entries.find((entry) => entry.url === "https://hashpop.io/about");
+    expect(about).toMatchObject({ priority: 0.6, changeFrequency: "weekly" });
+  });
+
+  it("includes the homepage at priority 1, existing static pages, and only active listing URLs", () => {
     const entries = buildSitemap([
       {
         id: "lst-9",
         status: "LISTED",
+        category: "Watches",
         createdAt: "2026-09-01T00:00:00.000Z",
+        updatedAt: "2026-10-02T15:04:05.000Z",
       },
-      { id: "lst-sold", status: "SOLD", createdAt: "2026-09-01T00:00:00.000Z" },
-      { id: "", status: "LISTED" },
+      {
+        id: "lst-mens",
+        status: " listed ",
+        category: "mens clothing",
+        createdAt: "2026-08-01T00:00:00.000Z",
+      },
+      {
+        id: "lst-sold",
+        status: "SOLD",
+        category: "Laptops",
+        createdAt: "2026-09-01T00:00:00.000Z",
+        updatedAt: "2026-09-02T00:00:00.000Z",
+      },
+      { id: "", status: "LISTED", category: "Books" },
     ]);
     const urls = entries.map((entry) => entry.url);
+    const home = entries.find((entry) => entry.url === "https://hashpop.io/");
+    expect(home).toMatchObject({ priority: 1, changeFrequency: "daily" });
     expect(urls).toContain("https://hashpop.io/marketplace");
     expect(urls).toContain("https://hashpop.io/categories");
     expect(urls).toContain("https://hashpop.io/privacy");
@@ -375,17 +402,91 @@ describe("sitemap.xml", () => {
     const about = entries.find((entry) => entry.url === "https://hashpop.io/about");
     expect(about?.changeFrequency).toBe("weekly");
     expect(about?.priority).toBe(0.6);
+    expect(urls).toContain("https://hashpop.io/help");
+    expect(urls).toContain("https://hashpop.io/support");
     expect(urls).toContain("https://hashpop.io/marketplace?category=Watches");
     expect(urls).toContain(
       `https://hashpop.io/marketplace?category=${encodeURIComponent("Men's Clothing")}`,
     );
+    expect(urls).not.toContain("https://hashpop.io/marketplace?category=Laptops");
+    expect(urls).not.toContain("https://hashpop.io/marketplace?category=Books");
+    expect(urls.filter((url) => url.includes("category="))).toHaveLength(2);
     expect(urls).toContain("https://hashpop.io/listing/lst-9");
+    expect(urls).toContain("https://hashpop.io/listing/lst-mens");
     expect(urls.some((url) => url.includes("/admin"))).toBe(false);
     expect(urls.some((url) => url.includes("lst-sold"))).toBe(false);
+    expect(PUBLIC_SITEMAP_PATHS).toContain("/");
     expect(PUBLIC_SITEMAP_PATHS).toContain("/marketplace");
     expect(PUBLIC_SITEMAP_PATHS).not.toContain("/admin");
-    const listing = entries.find((entry) => entry.url.endsWith("/listing/lst-9"));
-    expect(listing?.lastModified).toBe("2026-09-01T00:00:00.000Z");
+    expect(entries.find((entry) => entry.url.endsWith("/listing/lst-9"))?.lastModified).toBe(
+      "2026-10-02T15:04:05.000Z",
+    );
+    expect(entries.find((entry) => entry.url.endsWith("/listing/lst-mens"))?.lastModified).toBe(
+      "2026-08-01T00:00:00.000Z",
+    );
+    const marketplace = entries.find((entry) => entry.url === "https://hashpop.io/marketplace");
+    expect(marketplace).toMatchObject({ priority: 0.9, changeFrequency: "daily" });
+    const watches = entries.find((entry) => entry.url.endsWith("category=Watches"));
+    expect(watches).toMatchObject({ priority: 0.5, changeFrequency: "weekly" });
+  });
+
+  it("falls back to static URLs when there are no listings", () => {
+    const entries = buildSitemap([]);
+    const urls = entries.map((entry) => entry.url);
+    expect(urls[0]).toBe("https://hashpop.io/");
+    expect(entries[0]?.priority).toBe(1);
+    for (const path of PUBLIC_SITEMAP_PATHS) {
+      expect(urls).toContain(`https://hashpop.io${path === "/" ? "/" : path}`);
+    }
+    expect(urls.some((url) => url.includes("category="))).toBe(false);
+    expect(urls.some((url) => url.includes("/listing/"))).toBe(false);
+  });
+
+  it("uses createdAt when updatedAt is missing or invalid", () => {
+    const entries = buildSitemap([
+      {
+        id: "lst-bad",
+        status: "LISTED",
+        category: "Books",
+        createdAt: "2026-07-04T00:00:00.000Z",
+        updatedAt: "not-a-date",
+      },
+      {
+        id: "lst-none",
+        status: "LISTED",
+        createdAt: "not-a-date",
+        updatedAt: "",
+      },
+    ]);
+    expect(entries.find((entry) => entry.url.endsWith("/listing/lst-bad"))?.lastModified).toBe(
+      "2026-07-04T00:00:00.000Z",
+    );
+    expect(
+      entries.find((entry) => entry.url.endsWith("/listing/lst-none"))?.lastModified,
+    ).toBeUndefined();
+    expect(entries.some((entry) => entry.url.endsWith("category=Books"))).toBe(true);
+  });
+
+  it("uses createdAt when updatedAt is only the current time, and omits lastmod when both are missing", () => {
+    const now = Date.parse("2026-10-25T19:44:34.097Z");
+    const entries = buildSitemap(
+      [
+        {
+          id: "lst-touched",
+          status: "LISTED",
+          createdAt: "2026-09-15T21:54:28.821Z",
+          updatedAt: "2026-10-25T19:44:34.097Z",
+        },
+        { id: "lst-blank", status: "LISTED" },
+      ],
+      { now },
+    );
+    expect(entries.find((entry) => entry.url.endsWith("/listing/lst-touched"))?.lastModified).toBe(
+      "2026-09-15T21:54:28.821Z",
+    );
+    const blank = entries.find((entry) => entry.url.endsWith("/listing/lst-blank"));
+    expect(blank?.lastModified).toBeUndefined();
+    expect(JSON.stringify(blank)).not.toContain("2026-10-25T19:44:34");
   });
 
   it("caps listed URLs when the catalog is huge", () => {
