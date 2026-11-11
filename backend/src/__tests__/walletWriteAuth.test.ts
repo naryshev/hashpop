@@ -1,4 +1,4 @@
-import { generateKeyPairSync, randomUUID, sign as signEd25519 } from "node:crypto";
+import { createHmac, generateKeyPairSync, randomUUID, sign as signEd25519 } from "node:crypto";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -21,11 +21,15 @@ import {
   type NonceStore,
 } from "../walletAuth";
 import { canonicalListingId } from "../listingId";
-import { resolveMirrorBase } from "../mirrorUrl";
+import { logMirrorChoice, resolveMirrorBase, resolveMirrorChoice } from "../mirrorUrl";
 import {
+  authenticateWalletSession,
+  createWalletSession,
+  logSessionSecretState,
   memorySessionStore,
+  resolveSessionSecret,
   sessionSecretFromEnv,
-  sessionSecretIsDerived,
+  WALLET_SESSION_SECRET_MIN_BYTES,
   WALLET_SESSION_TTL_MS,
 } from "../walletSession";
 
@@ -1161,17 +1165,128 @@ describe("deploy fallbacks", () => {
     ).toThrow(/MIRROR_URL/);
   });
 
-  it("derives a stable session key from DATABASE_URL only when WALLET_SESSION_SECRET is unset", () => {
+  it("lets an explicit MIRROR_URL beat HEDERA_NETWORK and HEDERA_RPC_URL", () => {
+    const env = {
+      NODE_ENV: "production",
+      MIRROR_URL: "https://testnet.mirrornode.hedera.com/",
+      HEDERA_NETWORK: "mainnet",
+      HEDERA_RPC_URL: "https://mainnet.hashio.io/api",
+    };
+    expect(resolveMirrorBase(env)).toBe("https://testnet.mirrornode.hedera.com");
+    expect(resolveMirrorChoice(env)).toEqual({
+      url: "https://testnet.mirrornode.hedera.com",
+      source: "MIRROR_URL",
+    });
+    expect(
+      resolveMirrorChoice({
+        MIRROR_URL: "https://mainnet.mirrornode.hedera.com",
+        HEDERA_RPC_URL: "https://testnet.hashio.io/api",
+      }).url,
+    ).toBe("https://mainnet.mirrornode.hedera.com");
+    expect(resolveMirrorChoice({ HEDERA_RPC_URL: "https://mainnet.hashio.io/api" })).toEqual({
+      url: "https://mainnet.mirrornode.hedera.com",
+      source: "HEDERA_RPC_URL",
+    });
+    expect(resolveMirrorChoice({ MIRROR_URL: "  ", HEDERA_NETWORK: "testnet" }).source).toBe(
+      "HEDERA_NETWORK",
+    );
+  });
+
+  it("logs the mirror it chose and warns when it was inferred", () => {
+    const log = { info: vi.fn(), warn: vi.fn() };
+    logMirrorChoice(log, {
+      MIRROR_URL: "https://mainnet.mirrornode.hedera.com",
+      HEDERA_RPC_URL: "https://testnet.hashio.io/api",
+    });
+    expect(log.info).toHaveBeenCalledWith(
+      { mirror: "https://mainnet.mirrornode.hedera.com", source: "MIRROR_URL" },
+      expect.stringContaining("MIRROR_URL"),
+    );
+    expect(log.warn).not.toHaveBeenCalled();
+    logMirrorChoice(log, { HEDERA_RPC_URL: "https://testnet.hashio.io/api" });
+    expect(log.warn).toHaveBeenCalledWith(
+      { mirror: "https://testnet.mirrornode.hedera.com", source: "HEDERA_RPC_URL" },
+      expect.stringContaining("inferred mirror https://testnet.mirrornode.hedera.com"),
+    );
+  });
+
+  it("never derives the session key from DATABASE_URL", () => {
     const db = { DATABASE_URL: "postgresql://u:p@db:5432/hashpop" };
-    const derived = sessionSecretFromEnv(undefined, db);
-    expect(derived).toMatch(/^[0-9a-f]{64}$/);
-    expect(derived).not.toContain("postgresql");
-    expect(sessionSecretFromEnv(undefined, db)).toBe(derived);
-    expect(sessionSecretIsDerived(db)).toBe(true);
-    expect(sessionSecretFromEnv(undefined, { ...db, WALLET_SESSION_SECRET: "set" })).toBe("set");
-    expect(sessionSecretIsDerived({ ...db, WALLET_SESSION_SECRET: "set" })).toBe(false);
-    expect(sessionSecretFromEnv(undefined, {})).toBe("");
-    expect(sessionSecretFromEnv("", db)).toBe("");
+    const derived = createHmac("sha256", "hashpop.wallet-session.v1")
+      .update(db.DATABASE_URL)
+      .digest("hex");
+    expect(sessionSecretFromEnv(undefined, { ...db, NODE_ENV: "production" })).toBe("");
+    const dev = sessionSecretFromEnv(undefined, { ...db, NODE_ENV: "development" });
+    expect(dev).not.toBe(derived);
+    expect(dev).not.toContain("postgresql");
+    expect(dev).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("fails closed in production when WALLET_SESSION_SECRET is unset or short", () => {
+    const strong = "s".repeat(WALLET_SESSION_SECRET_MIN_BYTES);
+    expect(WALLET_SESSION_SECRET_MIN_BYTES).toBe(32);
+    expect(resolveSessionSecret(undefined, { NODE_ENV: "production" })).toEqual({
+      status: "disabled",
+      secret: "",
+      reason: "unset",
+    });
+    expect(
+      resolveSessionSecret(undefined, { NODE_ENV: "production", WALLET_SESSION_SECRET: "short" }),
+    ).toEqual({ status: "disabled", secret: "", reason: "short" });
+    expect(
+      resolveSessionSecret(undefined, {
+        NODE_ENV: "production",
+        WALLET_SESSION_SECRET: "x".repeat(31),
+      }).status,
+    ).toBe("disabled");
+    expect(
+      resolveSessionSecret(undefined, { NODE_ENV: "production", WALLET_SESSION_SECRET: strong }),
+    ).toEqual({ status: "configured", secret: strong });
+    expect(sessionSecretFromEnv("", {})).toBe("");
+    expect(sessionSecretFromEnv("explicit", { NODE_ENV: "production" })).toBe("explicit");
+  });
+
+  it("keeps a warned dev fallback outside production", () => {
+    const unset = resolveSessionSecret(undefined, {});
+    expect(unset.status).toBe("dev-fallback");
+    expect(unset.secret).toMatch(/^[0-9a-f]{64}$/);
+    expect(resolveSessionSecret(undefined, {}).secret).toBe(unset.secret);
+    expect(resolveSessionSecret(undefined, { WALLET_SESSION_SECRET: "short" })).toEqual({
+      status: "dev-fallback",
+      secret: "short",
+      reason: "short",
+    });
+    const log = { error: vi.fn(), warn: vi.fn() };
+    logSessionSecretState(unset, log);
+    expect(log.warn).toHaveBeenCalledTimes(1);
+    expect(log.error).not.toHaveBeenCalled();
+    logSessionSecretState(resolveSessionSecret(undefined, { NODE_ENV: "production" }), log);
+    expect(log.error).toHaveBeenCalledTimes(1);
+    expect(log.error.mock.calls[0][0]).toMatch(/DISABLED/);
+    logSessionSecretState({ status: "configured", secret: "k".repeat(32) }, log);
+    expect(log.warn).toHaveBeenCalledTimes(1);
+    expect(log.error).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses sessions with 503 when production has no session secret", async () => {
+    const prev = { secret: process.env.WALLET_SESSION_SECRET, env: process.env.NODE_ENV };
+    delete process.env.WALLET_SESSION_SECRET;
+    process.env.NODE_ENV = "production";
+    try {
+      const store = memorySessionStore();
+      const wallet = { accountId: "0.0.1001", evmAddress: OWNER, aliases: [OWNER] };
+      const forged = await createWalletSession(wallet, store, "anything", Date.now());
+      const auth = await authenticateWalletSession(
+        { headers: { "x-hashpop-session": forged.token } },
+        { secret: sessionSecretFromEnv(), store, now: Date.now() },
+      );
+      expect(auth).toEqual({ ok: false, status: 503, error: "Wallet sessions are not configured" });
+    } finally {
+      if (prev.secret === undefined) delete process.env.WALLET_SESSION_SECRET;
+      else process.env.WALLET_SESSION_SECRET = prev.secret;
+      if (prev.env === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = prev.env;
+    }
   });
 });
 

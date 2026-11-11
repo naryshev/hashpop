@@ -11,7 +11,7 @@ import { startIndexer } from "./indexer";
 import { startSettlementEngine } from "./settlement";
 import { apiRouter } from "./api";
 import { relayRouter } from "./relay";
-import { resolveMirrorBase } from "./mirrorUrl";
+import { logMirrorChoice } from "./mirrorUrl";
 
 const app = express();
 const uploadsDir = path.join(process.cwd(), "uploads");
@@ -107,7 +107,7 @@ const port = Number(process.env.PORT || 4000);
 // indexer fail closed (401/503), but public browsing keeps serving instead of
 // the whole backend crash-looping on boot.
 try {
-  log.info({ mirror: resolveMirrorBase() }, "Mirror node configured");
+  logMirrorChoice(log);
 } catch (err) {
   log.error({ err }, "Mirror node is not configured; wallet-signed requests will fail");
 }

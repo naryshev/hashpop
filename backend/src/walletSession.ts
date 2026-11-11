@@ -50,29 +50,77 @@ function signPayload(payload: string, secret: string): string {
   return createHmac("sha256", secret).update(payload).digest("base64url");
 }
 
+/** Minimum length of `WALLET_SESSION_SECRET`, in bytes. */
+export const WALLET_SESSION_SECRET_MIN_BYTES = 32;
+
+export type SessionSecretState =
+  | { status: "configured"; secret: string }
+  | { status: "dev-fallback"; secret: string; reason: "unset" | "short" }
+  | { status: "disabled"; secret: ""; reason: "unset" | "short" };
+
+// One random key per process for local dev, so the guard and the router agree.
+let devFallbackKey: string | null = null;
+function devKey(): string {
+  devFallbackKey ??= randomBytes(32).toString("hex");
+  return devFallbackKey;
+}
+
 /**
- * HMAC key for session tokens. `WALLET_SESSION_SECRET` wins. Without it the
- * key is derived from `DATABASE_URL`, which is already a server-only secret
- * (anyone holding it can read the session table directly), so a deploy that
- * has not set the new variable yet keeps sessions working instead of locking
- * every signed-in user out. Set `WALLET_SESSION_SECRET` to decouple them.
- * Returns "" only when neither is set; then minting answers 503.
+ * HMAC key for session tokens. Only `WALLET_SESSION_SECRET` (32+ bytes) is a
+ * real key. Nothing is ever derived from `DATABASE_URL`: anyone holding the DB
+ * URL could then forge sessions for any wallet.
+ *
+ * - production (`NODE_ENV=production`): unset or short fails closed. Sessions
+ *   are disabled; minting answers 503 and session tokens are refused.
+ *   Per-request HashPack signatures keep working.
+ * - elsewhere: a short secret is used as-is, an unset one becomes a random
+ *   per-process key (sessions reset on restart). Both log a warning.
+ *
+ * `explicit` (tests and callers that already resolved the key) skips the env.
  */
+export function resolveSessionSecret(
+  explicit?: string,
+  env: NodeJS.ProcessEnv = process.env,
+): SessionSecretState {
+  if (explicit !== undefined) {
+    const value = explicit.trim();
+    return value
+      ? { status: "configured", secret: value }
+      : { status: "disabled", secret: "", reason: "unset" };
+  }
+  const value = (env.WALLET_SESSION_SECRET ?? "").trim();
+  if (Buffer.byteLength(value, "utf8") >= WALLET_SESSION_SECRET_MIN_BYTES) {
+    return { status: "configured", secret: value };
+  }
+  const reason = value ? "short" : "unset";
+  if (env.NODE_ENV === "production") return { status: "disabled", secret: "", reason };
+  return { status: "dev-fallback", secret: value || devKey(), reason };
+}
+
+/** The session key, or "" when sessions are disabled. */
 export function sessionSecretFromEnv(
   explicit?: string,
   env: NodeJS.ProcessEnv = process.env,
 ): string {
-  const value = (explicit ?? env.WALLET_SESSION_SECRET ?? "").trim();
-  if (value) return value;
-  if (explicit !== undefined) return "";
-  const databaseUrl = env.DATABASE_URL?.trim();
-  if (!databaseUrl) return "";
-  return createHmac("sha256", "hashpop.wallet-session.v1").update(databaseUrl).digest("hex");
+  return resolveSessionSecret(explicit, env).secret;
 }
 
-/** True when the session key is the DATABASE_URL-derived fallback. */
-export function sessionSecretIsDerived(env: NodeJS.ProcessEnv = process.env): boolean {
-  return !env.WALLET_SESSION_SECRET?.trim() && Boolean(env.DATABASE_URL?.trim());
+/** Boot-time log line for the session key state. Never logs the key. */
+export function logSessionSecretState(
+  state: SessionSecretState,
+  log: { error: (msg: string) => void; warn: (msg: string) => void },
+): void {
+  if (state.status === "disabled") {
+    log.error(
+      `WALLET_SESSION_SECRET is ${state.reason === "short" ? `shorter than ${WALLET_SESSION_SECRET_MIN_BYTES} bytes` : "unset"} in production; wallet sessions are DISABLED (mint returns 503, session tokens are refused). Set a random ${WALLET_SESSION_SECRET_MIN_BYTES}+ byte WALLET_SESSION_SECRET.`,
+    );
+  } else if (state.status === "dev-fallback") {
+    log.warn(
+      state.reason === "short"
+        ? `WALLET_SESSION_SECRET is shorter than ${WALLET_SESSION_SECRET_MIN_BYTES} bytes; using it outside production only`
+        : "WALLET_SESSION_SECRET is unset; using a random per-process dev key (sessions reset on restart)",
+    );
+  }
 }
 
 export function issueWalletSessionToken(
@@ -174,7 +222,7 @@ export async function authenticateWalletSession(
 ): Promise<WalletAuthResult & { sessionId?: string }> {
   const token = headerValue(req.headers[WALLET_SESSION_HEADER])?.trim() ?? "";
   if (!token) return { ok: false, status: 401, error: "Wallet session required" };
-  if (!opts.secret) return { ok: false, status: 401, error: "Wallet session required" };
+  if (!opts.secret) return { ok: false, status: 503, error: "Wallet sessions are not configured" };
   const verified = readWalletSessionToken(token, opts.secret, opts.now);
   if (!verified.ok) return verified;
   let row: SessionRow | null = null;
