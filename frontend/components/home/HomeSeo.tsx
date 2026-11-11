@@ -1,8 +1,4 @@
-import {
-  HOME_SECTION_LABEL,
-  HOME_SECTIONS,
-  type HomeRun,
-} from "../../content/home";
+import { HOME_SECTION_LABEL, HOME_SECTIONS, type HomeRun } from "../../content/home";
 import { material } from "../../lib/materials";
 import { HOMEPAGE_SEO } from "../../lib/seo/homepage";
 

@@ -117,33 +117,38 @@ describe("DesktopShell marketplace chrome", () => {
     "/terms",
     "/privacy",
     "/no-such-page",
-  ])("uses the new marketplace desktop header (never the old compact bar) on %s", async (pathname) => {
-    nav.pathname = pathname;
-    await renderShell();
-    const headers = document.querySelectorAll("header");
-    expect(headers).toHaveLength(1);
-    const header = document.querySelector(
-      '[data-testid="marketplace-desktop-header"]',
-    ) as HTMLElement;
-    expect(header).toBeTruthy();
-    expect(header.className).toContain("hp-desktop-bar");
-    expect(header.className).toContain("md:h-[72px]");
-    expect(document.querySelector('[data-testid="marketplace-desktop-brand"]')).toBeTruthy();
-    expect(document.querySelector('nav[aria-label="Primary navigation"]')).toBeNull();
-    expect(document.body.textContent).not.toContain("Search listings");
-    expect(document.body.textContent).not.toContain("Sign in");
-    const input = header.querySelector('input[aria-label="Search marketplace"]') as HTMLInputElement;
-    expect(input.placeholder).toBe("Search marketplace…");
-    expect(document.querySelector('[data-testid="marketplace-desktop-create"]')?.textContent).toBe(
-      "Create",
-    );
-    expect(document.querySelector('[data-testid="marketplace-desktop-cart"]')).toBeTruthy();
-    // Signed out, the avatar is the sign-in control.
-    const profile = document.querySelector(
-      '[data-testid="marketplace-desktop-profile"]',
-    ) as HTMLElement;
-    expect(profile.getAttribute("aria-label")).toBe("Sign in");
-  });
+  ])(
+    "uses the new marketplace desktop header (never the old compact bar) on %s",
+    async (pathname) => {
+      nav.pathname = pathname;
+      await renderShell();
+      const headers = document.querySelectorAll("header");
+      expect(headers).toHaveLength(1);
+      const header = document.querySelector(
+        '[data-testid="marketplace-desktop-header"]',
+      ) as HTMLElement;
+      expect(header).toBeTruthy();
+      expect(header.className).toContain("hp-desktop-bar");
+      expect(header.className).toContain("md:h-[72px]");
+      expect(document.querySelector('[data-testid="marketplace-desktop-brand"]')).toBeTruthy();
+      expect(document.querySelector('nav[aria-label="Primary navigation"]')).toBeNull();
+      expect(document.body.textContent).not.toContain("Search listings");
+      expect(document.body.textContent).not.toContain("Sign in");
+      const input = header.querySelector(
+        'input[aria-label="Search marketplace"]',
+      ) as HTMLInputElement;
+      expect(input.placeholder).toBe("Search marketplace…");
+      expect(
+        document.querySelector('[data-testid="marketplace-desktop-create"]')?.textContent,
+      ).toBe("Create");
+      expect(document.querySelector('[data-testid="marketplace-desktop-cart"]')).toBeTruthy();
+      // Signed out, the avatar is the sign-in control.
+      const profile = document.querySelector(
+        '[data-testid="marketplace-desktop-profile"]',
+      ) as HTMLElement;
+      expect(profile.getAttribute("aria-label")).toBe("Sign in");
+    },
+  );
 
   it.each([
     "/cart",
