@@ -8,13 +8,16 @@
 -- overwrote updatedAt. Edits after this migration still bump updatedAt.
 --
 -- Railway applies this automatically, once. The service start command is
--- `npm start` (`prisma db push --accept-data-loss && node dist/index.js`).
--- `db push` does not run this file. On process start, backend/src/index.ts
--- runs `npx prisma migrate deploy` with its working directory set to
--- backend/. Prisma records the migration in `_prisma_migrations`, so a later
--- restart does not run the UPDATE again. The Vercel frontend does not run
--- it. If `migrate deploy` fails, startup logs a warning and continues, and
--- this UPDATE has not been applied. Do not execute this SQL by hand a second
--- time: that would set updatedAt back to createdAt and erase edits made
--- after the backfill.
+-- `npm start` (`node dist/index.js`); nothing runs `prisma db push`. On
+-- process start, backend/src/startupMigrations.ts runs `npx prisma migrate
+-- deploy` with its working directory set to backend/. On a database that
+-- `db push` created (no `_prisma_migrations`), deploy fails with P3005, boot
+-- marks only the five hard-coded historical migrations as applied, and the
+-- retry executes this file. It is never in that baseline list, so it is
+-- applied, not just marked applied. Prisma records it in `_prisma_migrations`,
+-- so a later restart does not run the UPDATE again. The Vercel frontend does
+-- not run it. If `migrate deploy` fails, startup logs the error and
+-- continues, and this UPDATE has not been applied. Do not execute this SQL by
+-- hand a second time: that would set updatedAt back to createdAt and erase
+-- edits made after the backfill.
 UPDATE "Listing" SET "updatedAt" = "createdAt";
