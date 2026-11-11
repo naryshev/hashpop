@@ -15,7 +15,9 @@ const FALLBACK_RPC_BY_CHAIN: Record<295 | 296, string> = {
 
 /** RPC URL the public client uses: NEXT_PUBLIC_HEDERA_RPC, or Hashio for the active chain. */
 export function hederaRpcUrl(): string {
-  return process.env.NEXT_PUBLIC_HEDERA_RPC?.trim() || FALLBACK_RPC_BY_CHAIN[ACTIVE_HEDERA_CHAIN_ID];
+  return (
+    process.env.NEXT_PUBLIC_HEDERA_RPC?.trim() || FALLBACK_RPC_BY_CHAIN[ACTIVE_HEDERA_CHAIN_ID]
+  );
 }
 
 /** Origin for a preconnect hint. Null if the configured RPC URL is unparseable. */
