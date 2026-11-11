@@ -10,6 +10,7 @@ import { getTransactionErrorMessage } from "../lib/transactionError";
 import { AddressDisplay } from "./AddressDisplay";
 import { useRobustContractWrite } from "../hooks/useRobustContractWrite";
 import { useHashpackWallet } from "../lib/hashpackWallet";
+import { useAuthorizedFetch, useSessionFetch } from "../lib/walletRequestAuth";
 import { activeHederaChain } from "../lib/hederaChains";
 import { CARRIERS, carrierTrackingUrl } from "../lib/trackingUrl";
 import { ESCROW_V2, EscrowView, orderStatusLine, phaseFor, StatusLine } from "../lib/orderStatus";
@@ -123,6 +124,8 @@ export function EscrowPanel({
   onEscrowUpdated?: () => void;
 }) {
   const { address } = useHashpackWallet();
+  const authedFetch = useAuthorizedFetch();
+  const sessionFetch = useSessionFetch();
   const chainId = activeHederaChain.id;
   const [escrow, setEscrow] = useState<EscrowView | null>(null);
   const [loading, setLoading] = useState(true);
@@ -194,19 +197,19 @@ export function EscrowPanel({
       setShipTo(null);
       return;
     }
-    fetch(
+    sessionFetch(
       `${getApiUrl()}/api/listing/${encodeURIComponent(listingId)}/shipping-address?requester=${encodeURIComponent(address)}`,
     )
       .then((r) => (r.ok ? r.json() : null))
       .then((data: { address?: ShipToAddress } | null) => setShipTo(data?.address ?? null))
       .catch(() => setShipTo(null));
-  }, [isSeller, escrow, address, listingId]);
+  }, [isSeller, escrow, address, listingId, sessionFetch]);
 
   const saveTracking = async (): Promise<boolean> => {
     setTrackingSaving(true);
     setTrackingSaveError(null);
     try {
-      const res = await fetch(`${getApiUrl()}/api/listing/${encodeURIComponent(listingId)}`, {
+      const res = await authedFetch(`${getApiUrl()}/api/listing/${encodeURIComponent(listingId)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -259,7 +262,7 @@ export function EscrowPanel({
       functionName: "confirmReceipt",
       args: [idBytes],
     });
-    await fetch(`${getApiUrl()}/api/sync-escrow-complete`, {
+    await authedFetch(`${getApiUrl()}/api/sync-escrow-complete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ listingId }),

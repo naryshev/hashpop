@@ -20,6 +20,7 @@ import { glassChip, listingCta, material } from "../../lib/materials";
 import { cn } from "../../lib/utils";
 import { getTransactionErrorMessage } from "../../lib/transactionError";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
+import { useAuthorizedFetch } from "../../lib/walletRequestAuth";
 import { ConnectWalletButton } from "../../components/ConnectWalletButton";
 import { activeHederaChain } from "../../lib/hederaChains";
 import { getTransactionExplorerUrl } from "../../lib/explorer";
@@ -65,6 +66,7 @@ function CreatePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { address } = useHashpackWallet();
+  const authedFetch = useAuthorizedFetch();
   const chainId = activeHederaChain.id;
 
   const imageUrlRef = useRef<string | null>(null);
@@ -324,7 +326,7 @@ function CreatePageContent() {
       const form = new FormData();
       if (isVideo) {
         form.append("media", item.file);
-        const res = await fetch(`${getApiUrl()}/api/upload-listing-media`, {
+        const res = await authedFetch(`${getApiUrl()}/api/upload-listing-media`, {
           method: "POST",
           body: form,
         });
@@ -342,7 +344,7 @@ function CreatePageContent() {
           );
         }
         form.append("media", compressed);
-        const res = await fetch(`${getApiUrl()}/api/upload-listing-media`, {
+        const res = await authedFetch(`${getApiUrl()}/api/upload-listing-media`, {
           method: "POST",
           body: form,
         });

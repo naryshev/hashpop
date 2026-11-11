@@ -13,6 +13,7 @@ import { usdPriceFromHbar } from "../lib/hbarUsd";
 import { listingIdToBytes32 } from "../lib/bytes32";
 import { useRobustContractWrite } from "../hooks/useRobustContractWrite";
 import { useHashpackWallet } from "../lib/hashpackWallet";
+import { useAuthorizedFetch } from "../lib/walletRequestAuth";
 import { activeHederaChain } from "../lib/hederaChains";
 import { parseUnits } from "viem";
 import { readListingCompat } from "../lib/marketplaceRead";
@@ -61,6 +62,7 @@ export function BuyButton({
   const idBytes = useMemo(() => listingIdToBytes32(listingId), [listingId]);
 
   const { address } = useHashpackWallet();
+  const authedFetch = useAuthorizedFetch();
   const chainId = activeHederaChain.id;
   const isWrongNetwork = false;
   const [onChainListing, setOnChainListing] = useState<
@@ -201,7 +203,7 @@ export function BuyButton({
         value: latestPrice,
       });
       setLastTxId(txHash);
-      await fetch(`${getApiUrl()}/api/sync-purchase`, {
+      await authedFetch(`${getApiUrl()}/api/sync-purchase`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ txHash, listingId }),

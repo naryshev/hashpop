@@ -9,6 +9,7 @@ import { getApiUrl } from "../lib/apiUrl";
 import { getTransactionErrorMessage } from "../lib/transactionError";
 import { activeHederaChain } from "../lib/hederaChains";
 import { useHashpackWallet } from "../lib/hashpackWallet";
+import { useAuthorizedFetch } from "../lib/walletRequestAuth";
 import { hbarAmountPlain } from "../lib/formatPrice";
 import { formatHbarWithUsd } from "../lib/hbarUsd";
 import { useHbarUsd } from "../hooks/useHbarUsd";
@@ -29,6 +30,7 @@ type Props = {
  */
 export function OfferModal({ open, onClose, listingId, askingPriceHbar, onOfferSubmitted }: Props) {
   const { address } = useHashpackWallet();
+  const authedFetch = useAuthorizedFetch();
   const { send, isPending } = useRobustContractWrite();
   const chainId = activeHederaChain.id;
   const usdRate = useHbarUsd();
@@ -92,7 +94,7 @@ export function OfferModal({ open, onClose, listingId, askingPriceHbar, onOfferS
       });
       // Best-effort mirror to backend so the seller sees the pending offer
       // immediately without waiting for the indexer to catch up.
-      await fetch(`${getApiUrl()}/api/sync-offer`, {
+      await authedFetch(`${getApiUrl()}/api/sync-offer`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

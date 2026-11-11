@@ -7,6 +7,7 @@ import { useParams, useRouter } from "next/navigation";
 import { getApiUrl } from "@/lib/apiUrl";
 import { listingHref } from "@/lib/listingUrl";
 import { useHashpackWallet } from "@/lib/hashpackWallet";
+import { useAuthorizedFetch, useSessionFetch } from "@/lib/walletRequestAuth";
 import { useHbarUsd } from "@/hooks/useHbarUsd";
 import { useRobustContractWrite } from "@/hooks/useRobustContractWrite";
 import { escrowAbi, escrowAddress } from "@/lib/contracts";
@@ -81,6 +82,8 @@ export default function PurchaseDetailPage() {
   const params = useParams();
   const id = (params?.id as string) || "";
   const { address } = useHashpackWallet();
+  const authedFetch = useAuthorizedFetch();
+  const sessionFetch = useSessionFetch();
   const usdRate = useHbarUsd();
   const chainId = activeHederaChain.id;
 
@@ -150,7 +153,7 @@ export default function PurchaseDetailPage() {
     setTrackingSaving(true);
     setTrackingError(null);
     try {
-      const res = await fetch(
+      const res = await authedFetch(
         `${getApiUrl()}/api/listing/${encodeURIComponent(listing?.id ?? id)}`,
         {
           method: "PATCH",
@@ -184,13 +187,13 @@ export default function PurchaseDetailPage() {
       setShipTo(null);
       return;
     }
-    fetch(
+    sessionFetch(
       `${getApiUrl()}/api/listing/${encodeURIComponent(canonicalId)}/shipping-address?requester=${encodeURIComponent(address)}`,
     )
       .then((r) => (r.ok ? r.json() : null))
       .then((data: { address?: ShipToAddress } | null) => setShipTo(data?.address ?? null))
       .catch(() => setShipTo(null));
-  }, [canonicalId, address]);
+  }, [canonicalId, address, sessionFetch]);
 
   useEffect(() => {
     refreshShipTo();
@@ -316,7 +319,7 @@ export default function PurchaseDetailPage() {
       functionName: "confirmReceipt",
       args: [idBytes],
     });
-    await fetch(`${getApiUrl()}/api/sync-escrow-complete`, {
+    await authedFetch(`${getApiUrl()}/api/sync-escrow-complete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ listingId: id }),

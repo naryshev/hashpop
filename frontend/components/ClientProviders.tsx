@@ -8,6 +8,7 @@ import { ProfilesProvider } from "../lib/profiles";
 import { TopBarProvider } from "../lib/topBar";
 import { BottomNav } from "./BottomNav";
 import { WalletAccountSync } from "./WalletAccountSync";
+import { WalletAuthSessionKeeper } from "../lib/walletRequestAuth";
 import { DesktopShell } from "./DesktopShell";
 import { PwaInstallPrompt } from "./PwaInstallPrompt";
 import { HashpackRestoreOverlay } from "./HashpackRestoreOverlay";
@@ -23,6 +24,7 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
             <ProfilesProvider>
               <TopBarProvider>
                 <WalletAccountSync />
+                <WalletAuthSessionKeeper />
                 <DesktopShell>{children}</DesktopShell>
                 {/* Mobile floating nav; desktop nav lives in DesktopShell. */}
                 <BottomNav />

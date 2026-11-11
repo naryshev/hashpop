@@ -19,6 +19,7 @@ import { AddressDisplay } from "./AddressDisplay";
 import { TrustStrip } from "./TrustStrip";
 import { getApiUrl } from "../lib/apiUrl";
 import { useHashpackWallet } from "../lib/hashpackWallet";
+import { useAuthorizedFetch, useSessionFetch } from "../lib/walletRequestAuth";
 import { compressImage } from "../lib/compressImage";
 import { useHbarUsd } from "../hooks/useHbarUsd";
 import { useCancelListing } from "../hooks/useCancelListing";
@@ -183,8 +184,8 @@ function saleToTile(sale: SaleRow): GridTile {
   };
 }
 
-async function readJson<T>(res: Response): Promise<T | null> {
-  if (!res.ok) return null;
+async function readJson<T>(res: Response | null): Promise<T | null> {
+  if (!res?.ok) return null;
   return (await res.json()) as T;
 }
 
@@ -198,6 +199,8 @@ export function ProfileContent({
   const router = useRouter();
   const address = profileAddressKey(addressParam);
   const { address: connectedAddress, accountId } = useHashpackWallet();
+  const authedFetch = useAuthorizedFetch();
+  const sessionFetch = useSessionFetch();
   const usdRate = useHbarUsd();
   const {
     cancel,
@@ -248,13 +251,13 @@ export function ProfileContent({
 
   useEffect(() => {
     if (!cancelSuccess || !cancelHash) return;
-    fetch(`${getApiUrl()}/api/sync-cancel`, {
+    authedFetch(`${getApiUrl()}/api/sync-cancel`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ txHash: cancelHash }),
     }).catch(() => {});
     setReloadKey((key) => key + 1);
-  }, [cancelSuccess, cancelHash]);
+  }, [cancelSuccess, cancelHash, authedFetch]);
 
   useEffect(() => {
     if (!address) return;
@@ -268,12 +271,18 @@ export function ProfileContent({
       const [statsRes, profileRes, listingsRes, ratingsRes, purchasesRes, wishlistRes, offersRes] =
         await Promise.all([
           fetch(`${api}/api/user/${encodeURIComponent(address)}`),
-          fetch(`${api}/api/user/${encodeURIComponent(address)}/profile`),
+          sessionFetch(`${api}/api/user/${encodeURIComponent(address)}/profile`),
           fetch(`${api}/api/user/${encodeURIComponent(address)}/listings`),
           fetch(`${api}/api/ratings/${encodeURIComponent(address)}`),
-          fetch(`${api}/api/user/${encodeURIComponent(address)}/purchases`),
-          fetch(`${api}/api/wishlist?address=${encodeURIComponent(address)}`),
-          fetch(`${api}/api/user/${encodeURIComponent(address)}/offers`),
+          isSelf
+            ? sessionFetch(`${api}/api/user/${encodeURIComponent(address)}/purchases`)
+            : Promise.resolve(null),
+          isSelf
+            ? sessionFetch(`${api}/api/wishlist?address=${encodeURIComponent(address)}`)
+            : Promise.resolve(null),
+          isSelf
+            ? sessionFetch(`${api}/api/user/${encodeURIComponent(address)}/offers`)
+            : Promise.resolve(null),
         ]);
       if (cancelled) return;
 
@@ -292,14 +301,15 @@ export function ProfileContent({
       if (cancelled) return;
 
       const listingsOk = listingsRes.ok && listingsBody != null;
-      const purchasesOk = purchasesRes.ok && purchasesBody != null;
+      const purchasesOk =
+        !isSelf || (purchasesRes != null && purchasesRes.ok && purchasesBody != null);
       setStats(statsBody);
       setStatsLoaded(true);
       setProfile(profileBody);
       setActive(listingsOk ? (listingsBody.active ?? []) : []);
       setArchived(listingsOk ? (listingsBody.archived ?? []) : []);
       setReviews(ratingsBody?.ratings ?? []);
-      setSales(purchasesOk ? (purchasesBody.purchases ?? []) : []);
+      setSales(purchasesOk ? (purchasesBody?.purchases ?? []) : []);
       setCatalogReady(listingsOk && purchasesOk);
       setOfferIds(
         new Set(
@@ -311,7 +321,7 @@ export function ProfileContent({
         ),
       );
 
-      if (!wishlistRes.ok || !wishlistBody) {
+      if (!isSelf || !wishlistRes || !wishlistRes.ok || !wishlistBody) {
         setLikesAvailable(false);
         setLikes([]);
       } else {
@@ -340,7 +350,7 @@ export function ProfileContent({
     return () => {
       cancelled = true;
     };
-  }, [address, reloadKey]);
+  }, [address, reloadKey, isSelf, sessionFetch]);
 
   useEffect(() => {
     if (!isSelf || !loaded) {
@@ -495,7 +505,7 @@ export function ProfileContent({
     setSaving(true);
     setSaveError(null);
     try {
-      const res = await fetch(`${getApiUrl()}/api/user/${address}/profile`, {
+      const res = await authedFetch(`${getApiUrl()}/api/user/${address}/profile`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -538,7 +548,7 @@ export function ProfileContent({
       const compressed = await compressImage(file);
       const form = new FormData();
       form.append("media", compressed);
-      const res = await fetch(`${getApiUrl()}/api/upload-listing-media`, {
+      const res = await authedFetch(`${getApiUrl()}/api/upload-listing-media`, {
         method: "POST",
         body: form,
       });
@@ -575,7 +585,7 @@ export function ProfileContent({
     setDelistError(null);
     try {
       for (const id of selected) {
-        const res = await fetch(
+        const res = await authedFetch(
           `${getApiUrl()}/api/listing/${encodeURIComponent(id)}/cancel-offchain`,
           {
             method: "POST",

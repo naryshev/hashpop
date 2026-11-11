@@ -4,6 +4,7 @@ import { encodeListingIdForUrl, listingHref } from "../../lib/listingUrl";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useHashpackWallet } from "../../lib/hashpackWallet";
+import { useSessionFetch } from "../../lib/walletRequestAuth";
 import { formatHbarWithUsd } from "../../lib/hbarUsd";
 import { useHbarUsd } from "../../hooks/useHbarUsd";
 import { formatPriceForDisplay } from "../../lib/formatPrice";
@@ -105,6 +106,7 @@ function StepBadge({ tone, children }: { tone: Step["tone"]; children: React.Rea
 
 export default function PurchasesPage() {
   const { address } = useHashpackWallet();
+  const sessionFetch = useSessionFetch();
   const usdRate = useHbarUsd();
   const [items, setItems] = useState<PurchaseRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -163,12 +165,12 @@ export default function PurchasesPage() {
       return;
     }
     setLoading(true);
-    fetch(`${getApiUrl()}/api/user/${address}/purchases`)
+    sessionFetch(`${getApiUrl()}/api/user/${address}/purchases`)
       .then((r) => (r.ok ? r.json() : Promise.reject(r)))
       .then((data: { purchases?: PurchaseRow[] }) => setItems(data.purchases ?? []))
       .catch(() => setItems([]))
       .finally(() => setLoading(false));
-  }, [address]);
+  }, [address, sessionFetch]);
 
   // Pull authoritative escrow state from chain for any escrow-backed listing.
   useEffect(() => {

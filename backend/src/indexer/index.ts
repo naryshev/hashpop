@@ -4,6 +4,7 @@ import { ethers } from "ethers";
 import { PrismaClient } from "../generated/prisma/client";
 import type { Logger } from "pino";
 import { fetchMirrorEvents } from "../mirror";
+import { canonicalListingId } from "../listingId";
 import { decodeEvents } from "./decoder";
 import {
   fetchItemListedLogsFromRpc,
@@ -391,16 +392,18 @@ async function processEvents(
   return processed;
 }
 
-function normalizeListingId(id: string): string {
-  if (!id || typeof id !== "string") return id;
-  const hex = id.startsWith("0x") ? id.slice(2) : id;
-  return "0x" + hex.toLowerCase();
+function normalizeListingId(id: string): string | null {
+  return canonicalListingId(id);
 }
 
 async function handleEvent(event: any, prisma: PrismaClient, log: Logger) {
+  const listingId = normalizeListingId(event.listingId);
+  if (!listingId) {
+    log.warn({ type: event?.type }, "Skipping event with a malformed listing id");
+    return;
+  }
   switch (event.type) {
     case "ItemListed": {
-      const listingId = normalizeListingId(event.listingId);
       const seller = (event.seller || "").toLowerCase();
       await prisma.listing.upsert({
         where: { id: listingId },
@@ -422,7 +425,7 @@ async function handleEvent(event: any, prisma: PrismaClient, log: Logger) {
     }
 
     case "ItemPurchased": {
-      const purchListingId = normalizeListingId(event.listingId);
+      const purchListingId = listingId;
       const buyer = normalizeAddress(event.buyer);
       const seller = normalizeAddress(event.seller);
       const amount = event.price.toString();
@@ -453,14 +456,13 @@ async function handleEvent(event: any, prisma: PrismaClient, log: Logger) {
 
     case "ListingCancelled":
       await prisma.listing.updateMany({
-        where: { id: normalizeListingId(event.listingId) },
+        where: { id: listingId },
         data: { status: "CANCELLED" },
       });
       break;
 
     case "PriceUpdated":
       {
-        const listingId = normalizeListingId(event.listingId);
         const result = await prisma.listing.updateMany({
           where: { id: listingId },
           data: { price: weiToHbar(event.newPrice) },

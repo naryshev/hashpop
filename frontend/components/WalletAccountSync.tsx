@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useHashpackWallet } from "../lib/hashpackWallet";
+import { useAuthorizedFetch } from "../lib/walletRequestAuth";
 
 import { getApiUrl } from "../lib/apiUrl";
 
@@ -12,6 +13,7 @@ import { getApiUrl } from "../lib/apiUrl";
  */
 export function WalletAccountSync() {
   const { address, accountId } = useHashpackWallet();
+  const authedFetch = useAuthorizedFetch();
   const queryClient = useQueryClient();
   const registered = useRef<Set<string>>(new Set());
   const previousWalletKey = useRef<string | null>(null);
@@ -33,7 +35,7 @@ export function WalletAccountSync() {
     const addrLower = address.toLowerCase();
     if (registered.current.has(addrLower)) return;
 
-    fetch(`${getApiUrl()}/api/user/register`, {
+    authedFetch(`${getApiUrl()}/api/user/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ address: addrLower }),
@@ -43,7 +45,7 @@ export function WalletAccountSync() {
         registered.current.add(addrLower);
       })
       .catch(() => {});
-  }, [address]);
+  }, [address, authedFetch]);
 
   return null;
 }

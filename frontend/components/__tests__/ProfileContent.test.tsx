@@ -301,7 +301,7 @@ describe("ProfileContent", () => {
     expect(host!.textContent).not.toContain("completed deals");
   });
 
-  it("hides own-only actions on a public profile and keeps Likes when wishlist data exists", async () => {
+  it("hides own-only actions and another user's likes on a public profile", async () => {
     active = [];
     await renderProfile(PUBLIC);
     expect(host!.querySelector('[data-testid="profile-earnings"]')).toBeNull();
@@ -311,7 +311,7 @@ describe("ProfileContent", () => {
     expect(host!.querySelector('[aria-label="Message"]')).toBeTruthy();
     expect(host!.querySelector('[aria-label="Share profile"]')).toBeTruthy();
     expect(host!.querySelector('[aria-label="More"]')).toBeTruthy();
-    expect(host!.querySelector('[data-testid="profile-tab-likes"]')).toBeTruthy();
+    expect(host!.querySelector('[data-testid="profile-tab-likes"]')).toBeNull();
     expect(host!.querySelector('[data-testid="profile-tab-reviews"]')).toBeTruthy();
     expect(host!.querySelector('[data-testid="profile-tab-purchased"]')).toBeNull();
     expect(host!.querySelector('a[aria-label="New listing"]')).toBeNull();

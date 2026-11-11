@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getApiUrl } from "../lib/apiUrl";
 import { useHashpackWallet } from "../lib/hashpackWallet";
+import { useSessionFetch } from "../lib/walletRequestAuth";
 import {
   countUnreadThreads,
   readLastReadMap,
@@ -18,6 +19,7 @@ const POLL_MS = 15_000;
  */
 export function useUnreadCount(): number {
   const { address } = useHashpackWallet();
+  const sessionFetch = useSessionFetch();
   const [count, setCount] = useState(0);
 
   useEffect(() => {
@@ -30,7 +32,7 @@ export function useUnreadCount(): number {
 
     const refresh = async () => {
       try {
-        const res = await fetch(
+        const res = await sessionFetch(
           `${getApiUrl()}/api/messages/inbox?address=${encodeURIComponent(address)}`,
         );
         if (!res.ok) return;
@@ -51,7 +53,7 @@ export function useUnreadCount(): number {
       clearInterval(iv);
       window.removeEventListener(THREADS_READ_EVENT, onRead);
     };
-  }, [address]);
+  }, [address, sessionFetch]);
 
   return count;
 }

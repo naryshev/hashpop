@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import type { BoxKeyPair } from "tweetnacl";
 import { useHashpackWallet } from "./hashpackWallet";
+import { useAuthorizedFetch } from "./walletRequestAuth";
 import { deriveEncryptionKeypair, encodeBase64, KEY_DERIVATION_MESSAGE } from "./chatEncryption";
 import { getApiUrl } from "./apiUrl";
 
@@ -20,6 +21,7 @@ type EncryptionKeyState = {
  */
 export function useEncryptionKey(): EncryptionKeyState {
   const { hashconnect, accountId, address } = useHashpackWallet();
+  const authedFetch = useAuthorizedFetch();
   const keypairRef = useRef<BoxKeyPair | null>(null);
   const [keypair, setKeypair] = useState<BoxKeyPair | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -70,7 +72,7 @@ export function useEncryptionKey(): EncryptionKeyState {
             ? proofResult[0]
             : (proofResult?.signedMessages?.[0] ?? proofResult);
 
-          await fetch(`${getApiUrl()}/api/user/public-key`, {
+          await authedFetch(`${getApiUrl()}/api/user/public-key`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -94,7 +96,7 @@ export function useEncryptionKey(): EncryptionKeyState {
 
     initPromiseRef.current = promise;
     return promise;
-  }, [hashconnect, accountId, address]);
+  }, [hashconnect, accountId, address, authedFetch]);
 
   return { keypair, isLoading, error, ensureKeypair };
 }

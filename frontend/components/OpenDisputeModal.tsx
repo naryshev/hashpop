@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle } from "lucide-react";
 import { getApiUrl } from "../lib/apiUrl";
+import { useAuthorizedFetch } from "../lib/walletRequestAuth";
 
 const DISCORD_INVITE_URL = "https://discord.gg/VYt4WrYM7V";
 
@@ -27,6 +28,7 @@ export function OpenDisputeModal({
   onClose,
   onOpened,
 }: Props) {
+  const authedFetch = useAuthorizedFetch();
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +57,7 @@ export function OpenDisputeModal({
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch(
+      const res = await authedFetch(
         `${getApiUrl()}/api/listing/${encodeURIComponent(listingId)}/dispute`,
         {
           method: "POST",
