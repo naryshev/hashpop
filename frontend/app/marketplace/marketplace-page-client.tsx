@@ -35,6 +35,9 @@ import { LISTINGS_UNAVAILABLE_COPY, type ListingItem } from "../../lib/loadMarke
 
 export type { ListingItem };
 
+/** Desktop first row is 2 cards at md and 3 at xl; 4 covers that row. */
+const FIRST_ROW_IMAGE_PRIORITY = 4;
+
 function parsePostedWithinDays(value: string): number | null {
   if (!value) return null;
   const daysMap: Record<string, number> = {
@@ -535,7 +538,7 @@ export default function MarketplacePageClient({
                       item={item}
                       density="compact"
                       variant="softTrust"
-                      priority={index === 0}
+                      priority={index < FIRST_ROW_IMAGE_PRIORITY}
                     />
                   ))}
                 </div>
@@ -543,12 +546,13 @@ export default function MarketplacePageClient({
                   data-testid="listing-grid"
                   className="hidden gap-4 md:grid md:grid-cols-2 xl:grid-cols-3"
                 >
-                  {filteredItems.map((item) => (
+                  {filteredItems.map((item, index) => (
                     <ListingCard
                       key={`${item.itemType}-${item.id}`}
                       item={item}
                       density="regular"
                       variant="softTrust"
+                      priority={index < FIRST_ROW_IMAGE_PRIORITY}
                     />
                   ))}
                 </div>

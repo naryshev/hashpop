@@ -372,7 +372,7 @@ export function ListingCard({
   item: ListingCardItem;
   density?: "compact" | "regular" | "nearby";
   variant?: ListingCardVariant;
-  /** Mark the route's LCP photo. Only the first visible card should set this. */
+  /** Mark first-row card photos as the LCP image. Other cards stay lazy. */
   priority?: boolean;
 }) {
   if (variant === "softTrust" || variant === "mediaTrust") {

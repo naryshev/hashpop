@@ -19,7 +19,7 @@ export function isOptimizableListingSrc(src: string): boolean {
 
 /**
  * Listing photo. `fill` expects a positioned parent (the card media box or
- * the listing hero). `priority` is only for the single LCP image.
+ * the listing hero). `priority` marks a first-row or hero LCP image.
  */
 export function ListingImage({
   src,
