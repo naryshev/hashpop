@@ -2,7 +2,8 @@ import { getApiUrl } from "../apiUrl";
 import { buildSitemap, type SitemapEntry, type SitemapListing } from "./sitemap";
 
 export type PublicListingsResult =
-  { ok: true; listings: SitemapListing[] } | { ok: false; listings: [] };
+  | { ok: true; listings: SitemapListing[] }
+  | { ok: false; listings: [] };
 
 /**
  * GET /api/listings — the same public feed the marketplace SSR uses.
