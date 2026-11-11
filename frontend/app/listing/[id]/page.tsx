@@ -10,20 +10,25 @@ import {
 } from "../../../lib/seo/metadata";
 import ListingPageClient, { type Listing } from "./listing-page-client";
 
-export const revalidate = HBAR_USD_REVALIDATE_SECONDS;
+// Next 15+ only accepts a literal here (Next 14 silently ignored the imported
+// constant). Keep in sync with HBAR_USD_REVALIDATE_SECONDS in lib/hbarUsd.ts;
+// the page stays dynamic because the listing fetch uses cache: "no-store".
+export const revalidate = 60;
 
 type ListingPageProps = {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 };
 
-export async function generateMetadata({ params }: ListingPageProps): Promise<Metadata> {
+export async function generateMetadata(props: ListingPageProps): Promise<Metadata> {
+  const params = await props.params;
   const result = await fetchPublicListing(params.id);
   if (result.status === "not_found") return listingNotFoundMetadata();
   if (result.status === "unavailable") return listingUnavailableMetadata();
   return listingMetadata(params.id, result.listing);
 }
 
-export default async function ListingPage({ params }: ListingPageProps) {
+export default async function ListingPage(props: ListingPageProps) {
+  const params = await props.params;
   const result = await fetchPublicListing(params.id);
   if (result.status === "not_found") notFound();
   if (result.status === "unavailable") {

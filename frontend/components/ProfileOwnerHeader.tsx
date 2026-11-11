@@ -204,8 +204,8 @@ function GearMenu({
   onClose,
   children,
 }: {
-  anchorRef: RefObject<HTMLButtonElement>;
-  menuRef: RefObject<HTMLDivElement>;
+  anchorRef: RefObject<HTMLButtonElement | null>;
+  menuRef: RefObject<HTMLDivElement | null>;
   onClose: () => void;
   children: ReactNode;
 }) {

@@ -3,11 +3,12 @@ import { SEO_COPY } from "../../../lib/seo/copy";
 import { staticPageMetadata } from "../../../lib/seo/metadata";
 
 type ProfileLayoutProps = {
-  params: { address: string };
+  params: Promise<{ address: string }>;
   children: React.ReactNode;
 };
 
-export function generateMetadata({ params }: ProfileLayoutProps): Metadata {
+export async function generateMetadata(props: ProfileLayoutProps): Promise<Metadata> {
+  const params = await props.params;
   let address = params.address;
   try {
     address = decodeURIComponent(params.address);
