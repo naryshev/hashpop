@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronDown, Lock, MapPin, MessageCircle, Shield, type LucideIcon } from "lucide-react";
+import { HomeAbout } from "../../components/home/HomeSeo";
 import { ABOUT_PAGE, aboutFaqPageJsonLd, publishedAboutFaqs } from "../../lib/content/about";
 import { serializeJsonLd } from "../../lib/seo/jsonld";
 import { staticPageMetadata } from "../../lib/seo/metadata";
@@ -78,6 +79,8 @@ export default function AboutPage() {
           })}
         </ul>
       </section>
+
+      <HomeAbout />
 
       <section className="mt-12">
         <h2 className="font-sans text-[22px] font-semibold leading-7 tracking-normal text-white">

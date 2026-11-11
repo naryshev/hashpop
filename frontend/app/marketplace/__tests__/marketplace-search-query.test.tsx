@@ -59,7 +59,7 @@ async function renderPage() {
     root = createRoot(host);
   }
   await act(async () => {
-    root?.render(createElement(MarketplacePageClient, { initialItems: [], initialError: null }));
+    root?.render(createElement(MarketplacePageClient, { initialItems: [], initialError: false }));
   });
 }
 

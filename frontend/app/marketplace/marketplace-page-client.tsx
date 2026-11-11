@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Fuse from "fuse.js";
 import { ListingCard } from "../../components/ListingCard";
@@ -69,15 +69,9 @@ function parseSortMode(value: string | null): SortMode {
 export default function MarketplacePageClient({
   initialItems,
   initialError,
-  intro = null,
-  about = null,
 }: {
   initialItems: ListingItem[];
   initialError: boolean;
-  /** Server-rendered homepage intro. Omitted on /marketplace. */
-  intro?: ReactNode;
-  /** Server-rendered homepage about section. Omitted on /marketplace. */
-  about?: ReactNode;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -482,7 +476,6 @@ export default function MarketplacePageClient({
             <div className="max-h-[calc(100dvh-5.5rem)] overflow-y-auto">{renderBrowseRail()}</div>
           </aside>
           <div className="min-w-0">
-            {intro}
             <MarketplaceDesktopToolbar
               resultCount={filteredItems.length}
               sortMode={sortMode}
@@ -546,7 +539,6 @@ export default function MarketplacePageClient({
             )}
           </div>
         </div>
-        {about}
       </div>
       <MarketplaceFilterDrawer open={desktopFilterOpen} onClose={() => setDesktopFilterOpen(false)}>
         {renderBrowseRail()}
