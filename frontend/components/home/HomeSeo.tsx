@@ -1,5 +1,4 @@
 import {
-  HOME_LEDE,
   HOME_SECTION_LABEL,
   HOME_SECTIONS,
   type HomeRun,
@@ -39,7 +38,7 @@ export function HomeMarketplaceHeading() {
 }
 
 /**
- * The "About Hashpop" block (lede plus the three cards). Rendered on /about,
+ * The "About Hashpop" block (heading plus the three cards). Rendered on /about,
  * no longer on the home page. Single-column to fit the /about reading width.
  */
 export function HomeAbout() {
@@ -48,9 +47,6 @@ export function HomeAbout() {
       <h2 className="font-sans text-[22px] font-semibold leading-7 tracking-normal text-white">
         {HOME_SECTION_LABEL}
       </h2>
-      <p className="mt-4 font-sans text-[16px] font-normal leading-[26px] text-white/85">
-        {HOME_LEDE}
-      </p>
       <div className="mt-4 grid grid-cols-1 gap-3">
         {HOME_SECTIONS.map((section) => (
           <article key={section.id} className={`${material.regular} rounded-glass-lg p-4 md:p-5`}>

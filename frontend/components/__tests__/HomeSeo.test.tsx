@@ -39,9 +39,6 @@ describe("homepage SEO copy", () => {
     expect(html).toContain("Reputation. Chat. Protected payments. On your wallet.");
     expect(html).toContain("How protected HBAR payments work");
     expect(html).toContain("and pay in HBAR. If the listing offers protected payments:");
-    expect(html).toContain(
-      "when the seller offers it, lock the money in a protected on-chain HBAR payment",
-    );
     expect(html).toContain("Funds lock in an on-chain contract.");
     expect(html).not.toMatch(/escrow/i);
     expect(html).toContain(`>${HOMEPAGE_SEO.h1}</h1>`);
@@ -49,7 +46,8 @@ describe("homepage SEO copy", () => {
     expect(html).toContain('href="/marketplace"');
     expect(html).toContain('href="/categories"');
     expect(html).toContain('href="/help"');
-    expect(html).toContain("Hashpop is a peer-to-peer marketplace");
+    // /about shows a single intro (ABOUT_PAGE.lede); this block has no lede.
+    expect(html).not.toContain("Hashpop is a peer-to-peer marketplace");
     expect(html).toContain("Buying close to home? Open ");
     expect(html).toMatch(/<a[^>]*href="\/marketplace\?view=nearby"[^>]*>Nearby<\/a>/);
     expect(html).toContain("makes the next one easier.");

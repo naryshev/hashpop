@@ -75,8 +75,8 @@ describe("about copy", () => {
       `${BRAND.escrowTermCap} we never hold.`,
     );
     expect(ABOUT_PAGE.h1).toBe("Real stuff. Real people. Paid in HBAR.");
-    expect(ABOUT_PAGE.lede).toContain(
-      `optional ${BRAND.escrowTerm} in an on-chain contract, all tied to your wallet.`,
+    expect(ABOUT_PAGE.lede).toBe(
+      `Hashpop is a peer-to-peer marketplace for physical goods, built on Hedera. Sign in with your HashPack wallet, chat with the other side, and buy or sell for HBAR with people near you or across the country. When the seller offers ${BRAND.escrowTerm}, the HBAR waits in an on-chain contract until the deal is done. Your reputation stays with your wallet, and no platform holds your funds or your identity.`,
     );
     expect(ABOUT_PAGE.pillars.map((pillar) => pillar.lead)).toContain(
       `${BRAND.escrowTermCap} we never hold.`,
