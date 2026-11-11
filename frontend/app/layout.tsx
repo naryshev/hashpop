@@ -6,6 +6,8 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
+import { preconnect } from "react-dom";
+import { getApiUrl } from "../lib/apiUrl";
 import { SEO_COPY } from "../lib/seo/copy";
 import { serializeJsonLd, siteJsonLd } from "../lib/seo/jsonld";
 import { socialImages } from "../lib/seo/metadata";
@@ -66,7 +68,24 @@ const BOOT_ERROR_CATCHER = `
 })();
 `;
 
+/**
+ * Origin of the backend API, for an early connection hint. Every page calls
+ * the API from the browser right after hydration; opening the connection
+ * while the HTML is still parsing saves the DNS/TLS round trips. Returns null
+ * for a same-origin or non-https API (local dev).
+ */
+function apiPreconnectOrigin(): string | null {
+  try {
+    const url = new URL(getApiUrl());
+    return url.protocol === "https:" ? url.origin : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const apiOrigin = apiPreconnectOrigin();
+  if (apiOrigin) preconnect(apiOrigin, { crossOrigin: "anonymous" });
   return (
     <html
       lang="en"
