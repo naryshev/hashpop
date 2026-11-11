@@ -63,5 +63,16 @@
   "dependencies": {
     "@openzeppelin/contracts": "^5.0.0",
     "turbo": "^2.8.11"
+  },
+  "overrides": {
+    "ws@>=8.0.0 <8.21.0": "^8.21.0"
+  },
+  "allowScripts": {
+    "@prisma/engines@7.10.1": true,
+    "prisma@7.10.1": true,
+    "keccak@3.0.4": true,
+    "secp256k1@4.0.4": true,
+    "protobufjs@7.6.5": true,
+    "unrs-resolver@1.11.1": true
   }
 }
