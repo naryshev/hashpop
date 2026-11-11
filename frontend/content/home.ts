@@ -82,7 +82,7 @@ export const HOME_SECTIONS: HomeSection[] = [
       [
         {
           kind: "text",
-          text: "Connect a Hedera wallet like HashPack, browse by ",
+          text: "Connect your HashPack wallet, browse by ",
         },
         { kind: "link", href: "/categories", text: "category" },
         {

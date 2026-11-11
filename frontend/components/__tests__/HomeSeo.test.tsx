@@ -43,6 +43,8 @@ describe("homepage SEO copy", () => {
     expect(html).not.toMatch(/escrow/i);
     expect(html).toContain(`>${HOMEPAGE_SEO.h1}</h1>`);
     expect(html).toContain("Get started");
+    expect(html).toContain("Connect your HashPack wallet, browse by ");
+    expect(html).not.toContain("wallet like HashPack");
     expect(html).toContain('href="/marketplace"');
     expect(html).toContain('href="/categories"');
     expect(html).toContain('href="/help"');
