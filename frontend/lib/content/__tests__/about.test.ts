@@ -75,8 +75,8 @@ describe("about copy", () => {
       `${BRAND.escrowTermCap} we never hold.`,
     );
     expect(ABOUT_PAGE.h1).toBe("Real stuff. Real people. Paid in HBAR.");
-    expect(ABOUT_PAGE.lede).toContain(
-      `optional ${BRAND.escrowTerm} in an on-chain contract, all tied to your wallet.`,
+    expect(ABOUT_PAGE.lede).toBe(
+      `Hashpop is a peer-to-peer marketplace for physical goods, built on Hedera. Sign in with your HashPack wallet, chat with the other side, and buy or sell for HBAR with people near you or across the country. When the seller offers ${BRAND.escrowTerm}, the HBAR waits in an on-chain contract until the deal is done. Your reputation stays with your wallet, and no platform holds your funds or your identity.`,
     );
     expect(ABOUT_PAGE.pillars.map((pillar) => pillar.lead)).toContain(
       `${BRAND.escrowTermCap} we never hold.`,
@@ -138,7 +138,7 @@ describe("about copy", () => {
       "When a listing offers protected payments, you pay and the HBAR locks in the contract. The seller ships or meets you, and you confirm to release it. If the item never shows up or isn't as described, don't confirm; open a dispute from the deal instead. Step-by-step details live in How it works.",
     );
     expect(byQuestion["What wallet do I need?"]).toBe(
-      "A Hedera wallet. We support HashPack, the most popular one: install it, add a little HBAR, and connect. There are no passwords to create, and your wallet address is your account.",
+      "HashPack, a wallet for Hedera. Install it, add a little HBAR, and connect. There are no passwords to create, and your wallet address is your account.",
     );
     expect(byQuestion["What does it cost?"]).toBe(
       `${FEE_SENTENCE} Every transaction pays a small Hedera network fee, which is usually a fraction of a cent. USD values shown on Hashpop are approximate, based on the current HBAR price; all payments are made in HBAR.`,

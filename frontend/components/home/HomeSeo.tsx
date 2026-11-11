@@ -1,16 +1,9 @@
-import {
-  HOME_CTA,
-  HOME_LEDE,
-  HOME_SECTION_LABEL,
-  HOME_SECTIONS,
-  type HomeRun,
-} from "../../content/home";
+import { HOME_SECTION_LABEL, HOME_SECTIONS, type HomeRun } from "../../content/home";
 import { material } from "../../lib/materials";
 import { HOMEPAGE_SEO } from "../../lib/seo/homepage";
 
 /**
- * Server-rendered homepage copy. No client JS: the mobile "More" control is
- * a native <details> element, and the full lede stays in the DOM.
+ * Server-rendered Hashpop intro copy. No client JS.
  */
 
 function HomeRunText({ run }: { run: HomeRun }) {
@@ -27,37 +20,35 @@ function HomeRunText({ run }: { run: HomeRun }) {
   return run.text;
 }
 
-export function HomeIntro() {
+/**
+ * Homepage H1. The home page shows only the marketplace (filters + grid), so
+ * the heading is visually hidden but stays in the server HTML for SEO and
+ * screen readers. The visible intro and About cards live on /about.
+ */
+export function HomeMarketplaceHeading() {
   return (
-    <div data-testid="home-intro" className="home-intro mb-3 md:mb-4">
-      <h1 className="font-display text-[22px] font-semibold leading-[28px] tracking-normal text-white md:text-[34px] md:leading-[41px]">
-        {HOMEPAGE_SEO.h1}
-      </h1>
-      <p className="lede home-lede mt-1 font-sans text-[15px] font-normal leading-5 text-white/70">
-        {HOME_LEDE}
-      </p>
-      <details className="md:hidden">
-        <summary className="mt-1 cursor-pointer list-none font-sans text-[15px] font-medium leading-5 text-chrome [&::-webkit-details-marker]:hidden">
-          <span className="home-more-label">More</span>
-          <span className="home-less-label">Less</span>
-        </summary>
-      </details>
-    </div>
+    <h1 data-testid="home-h1" className="sr-only">
+      {HOMEPAGE_SEO.h1}
+    </h1>
   );
 }
 
+/**
+ * The "About Hashpop" block (heading plus the three cards). Rendered on /about,
+ * no longer on the home page. Single-column to fit the /about reading width.
+ */
 export function HomeAbout() {
   return (
-    <section data-testid="home-about" className="mt-6">
-      <h2 className="mb-3 font-display text-[20px] font-semibold leading-[26px] tracking-normal text-white">
+    <section data-testid="home-about" className="mt-12">
+      <h2 className="font-sans text-[22px] font-semibold leading-7 tracking-normal text-white">
         {HOME_SECTION_LABEL}
       </h2>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3 md:gap-4">
+      <div className="mt-4 grid grid-cols-1 gap-3">
         {HOME_SECTIONS.map((section) => (
           <article key={section.id} className={`${material.regular} rounded-glass-lg p-4 md:p-5`}>
-            <h2 className="font-display text-[20px] font-semibold leading-[26px] tracking-normal text-white">
+            <h3 className="font-display text-[20px] font-semibold leading-[26px] tracking-normal text-white">
               {section.title}
-            </h2>
+            </h3>
             {section.paragraphs?.map((paragraph, index) => (
               <p
                 key={index}
@@ -87,14 +78,6 @@ export function HomeAbout() {
           </article>
         ))}
       </div>
-      <p className="mt-5">
-        <a
-          href={HOME_CTA.href}
-          className="cta btn-mint inline-flex h-11 items-center rounded-full px-5 text-[15px] font-semibold"
-        >
-          {HOME_CTA.label}
-        </a>
-      </p>
     </section>
   );
 }

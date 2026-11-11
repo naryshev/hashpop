@@ -115,7 +115,7 @@ const ABOUT_FAQS: { question: string; answer: AboutSpan[] }[] = [
     answer: [
       {
         type: "text",
-        text: "A Hedera wallet. We support HashPack, the most popular one: install it, add a little HBAR, and connect. There are no passwords to create, and your wallet address is your account.",
+        text: "HashPack, a wallet for Hedera. Install it, add a little HBAR, and connect. There are no passwords to create, and your wallet address is your account.",
       },
       {
         type: "unconfirmed",
@@ -222,7 +222,7 @@ export const ABOUT_PAGE = {
   ),
   h1: "Real stuff. Real people. Paid in HBAR.",
   lede: applyEscrowTerm(
-    "Hashpop is a peer-to-peer Hedera marketplace for physical goods. Buy and sell items for crypto with people near you or across the country, with reputation, chat and optional {ESCROW} in an on-chain contract, all tied to your wallet.",
+    "Hashpop is a peer-to-peer marketplace for physical goods, built on Hedera. Sign in with your HashPack wallet, chat with the other side, and buy or sell for HBAR with people near you or across the country. When the seller offers {ESCROW}, the HBAR waits in an on-chain contract until the deal is done. Your reputation stays with your wallet, and no platform holds your funds or your identity.",
   ),
   byline: "Hashpop",
   updated: "Updated Oct 2026",

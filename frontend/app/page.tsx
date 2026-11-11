@@ -1,6 +1,6 @@
-import { Suspense, type ReactNode } from "react";
+import { Suspense } from "react";
 import type { Metadata } from "next";
-import { HomeAbout, HomeIntro } from "../components/home/HomeSeo";
+import { HomeMarketplaceHeading } from "../components/home/HomeSeo";
 import { loadInitialMarketplaceListings } from "../lib/loadMarketplaceListings";
 import { HOMEPAGE_SEO } from "../lib/seo/homepage";
 import { socialImages } from "../lib/seo/metadata";
@@ -47,19 +47,15 @@ function ListingsFallback() {
 
 export default async function Home() {
   const { items, error } = await loadInitialMarketplaceListings();
-  const intro: ReactNode = <HomeIntro />;
-  const about: ReactNode = <HomeAbout />;
   return (
     <>
       <link rel="canonical" href={HOMEPAGE_URL} />
       <meta property="og:url" content={HOMEPAGE_URL} />
+      {/* Home shows only the marketplace (filters + grid). The H1 stays in the
+          server HTML, visually hidden; the About copy lives on /about. */}
+      <HomeMarketplaceHeading />
       <Suspense fallback={<ListingsFallback />}>
-        <MarketplacePageClient
-          initialItems={items}
-          initialError={error}
-          intro={intro}
-          about={about}
-        />
+        <MarketplacePageClient initialItems={items} initialError={error} />
       </Suspense>
     </>
   );

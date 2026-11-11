@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { HomeAbout, HomeIntro } from "../home/HomeSeo";
+import { HomeAbout, HomeMarketplaceHeading } from "../home/HomeSeo";
 import { homeCopyWordCount } from "../../content/home";
 import { HOMEPAGE_SEO } from "../../lib/seo/homepage";
 import { SEO_COPY } from "../../lib/seo/copy";
@@ -20,37 +20,41 @@ describe("homepage SEO copy", () => {
     );
   });
 
-  it("server-renders one h1, the section h2s, and the three links", () => {
+  it("keeps a visually hidden homepage h1", () => {
+    const html = renderToStaticMarkup(createElement(HomeMarketplaceHeading));
+    expect(html.match(/<h1[\s>]/g)).toHaveLength(1);
+    expect(html).toContain('class="sr-only"');
+    expect(html).toContain(`>${HOMEPAGE_SEO.h1}</h1>`);
+  });
+
+  it("server-renders the About block (for /about) with its headings and links", () => {
     const html =
-      renderToStaticMarkup(createElement(HomeIntro)) +
+      renderToStaticMarkup(createElement(HomeMarketplaceHeading)) +
       renderToStaticMarkup(createElement(HomeAbout));
     expect(html.match(/<h1[\s>]/g)).toHaveLength(1);
-    expect(html.match(/<h2[\s>]/g)).toHaveLength(4);
+    expect(html.match(/<h2[\s>]/g)).toHaveLength(1);
+    expect(html.match(/<h3[\s>]/g)).toHaveLength(3);
     expect(html).toContain(">About Hashpop</h2>");
     expect(html).toContain(HOMEPAGE_SEO.h1);
     expect(html).toContain("Reputation. Chat. Protected payments. On your wallet.");
     expect(html).toContain("How protected HBAR payments work");
     expect(html).toContain("and pay in HBAR. If the listing offers protected payments:");
-    expect(html).toContain(
-      "when the seller offers it, lock the money in a protected on-chain HBAR payment",
-    );
     expect(html).toContain("Funds lock in an on-chain contract.");
     expect(html).not.toMatch(/escrow/i);
     expect(html).toContain(`>${HOMEPAGE_SEO.h1}</h1>`);
     expect(html).toContain("Get started");
+    expect(html).toContain("Connect your HashPack wallet, browse by ");
+    expect(html).not.toContain("wallet like HashPack");
     expect(html).toContain('href="/marketplace"');
     expect(html).toContain('href="/categories"');
     expect(html).toContain('href="/help"');
-    expect(html).toContain("Browse the marketplace");
-    expect(html).toContain("<details");
-    expect(html).toContain("Hashpop is a peer-to-peer marketplace");
+    // /about shows a single intro (ABOUT_PAGE.lede); this block has no lede.
+    expect(html).not.toContain("Hashpop is a peer-to-peer marketplace");
     expect(html).toContain("Buying close to home? Open ");
     expect(html).toMatch(/<a[^>]*href="\/marketplace\?view=nearby"[^>]*>Nearby<\/a>/);
     expect(html).toContain("makes the next one easier.");
     const nearby = html.indexOf("Buying close to home?");
-    const cta = html.indexOf("Browse the marketplace");
     expect(nearby).toBeGreaterThan(html.indexOf("Get started"));
-    expect(nearby).toBeLessThan(cta);
     expect(homeCopyWordCount()).toBeGreaterThan(250);
     expect(homeCopyWordCount()).toBeLessThan(360);
   });
