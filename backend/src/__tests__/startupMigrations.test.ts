@@ -231,3 +231,23 @@ describe("db-push schema drift migration", () => {
     expect(sql).not.toContain("20261025_reset_repolled");
   });
 });
+
+describe("wallet write auth migration on a db-push database", () => {
+  const sql = readFileSync(
+    path.join(__dirname, "../../prisma/migrations/20261025_wallet_write_auth/migration.sql"),
+    "utf8",
+  );
+
+  // Production got AuthNonce, WalletSession and WalletAuditLog from db push when
+  // #125 deployed. After the P3005 baseline this file runs for real, so every
+  // statement has to tolerate those tables already existing.
+  it("runs, not baselined, and tolerates tables db push already created", () => {
+    expect(BASELINE_MIGRATIONS).not.toContain("20261025_wallet_write_auth");
+    for (const table of ["AuthNonce", "WalletSession", "WalletAuditLog"]) {
+      expect(sql).toContain(`CREATE TABLE IF NOT EXISTS "${table}"`);
+    }
+    expect(sql).not.toMatch(/CREATE TABLE\s+"/);
+    expect(sql).not.toMatch(/CREATE (UNIQUE )?INDEX\s+"/);
+    expect(sql).not.toMatch(/ADD COLUMN\s+"/);
+  });
+});
