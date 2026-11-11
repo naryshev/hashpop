@@ -115,7 +115,7 @@ const ABOUT_FAQS: { question: string; answer: AboutSpan[] }[] = [
     answer: [
       {
         type: "text",
-        text: "A Hedera wallet. We support HashPack, the most popular one: install it, add a little HBAR, and connect. There are no passwords to create, and your wallet address is your account.",
+        text: "HashPack, a wallet for Hedera. Install it, add a little HBAR, and connect. There are no passwords to create, and your wallet address is your account.",
       },
       {
         type: "unconfirmed",
