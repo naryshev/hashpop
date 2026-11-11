@@ -43,6 +43,7 @@
     "eslint-config-next": "16.4.6",
     "jsdom": "^29.0.0",
     "postcss": "^8.4.47",
+    "turbo": "^2.8.11",
     "typescript": "^5.5.4",
     "vitest": "^4.1.0"
   }

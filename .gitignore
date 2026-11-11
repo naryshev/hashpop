@@ -54,3 +54,6 @@ docker-compose.override.yml
 /key.pub
 *.pem
 id_*
+
+# Vercel local state and build cache (npm cache lives in .vercel/cache/npm on Vercel)
+.vercel/
