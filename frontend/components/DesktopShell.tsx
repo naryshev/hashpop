@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Footer } from "./Footer";
 import { MarketplaceBrandHeader } from "./MarketplaceBrandHeader";
 import { MarketplaceDesktopHeader } from "./MarketplaceDesktopHeader";
+import { useHashConnectPreload } from "../lib/useHashConnectPreload";
 
 /**
  * Site chrome for every consumer route. Desktop (≥768) always shows the
@@ -16,6 +17,7 @@ import { MarketplaceDesktopHeader } from "./MarketplaceDesktopHeader";
  */
 export function DesktopShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  useHashConnectPreload();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
 

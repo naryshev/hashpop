@@ -4,3 +4,5 @@ dist
 coverage
 *.sol
 prisma/migrations
+# Lighthouse JSON is stored as emitted. Prettier's rewrite is noise in CI.
+docs/pr-perf/**/*.json

@@ -14,6 +14,7 @@ import { listingIdToBytes32 } from "../lib/bytes32";
 import { useRobustContractWrite } from "../hooks/useRobustContractWrite";
 import { useHashpackWallet } from "../lib/hashpackWallet";
 import { useAuthorizedFetch } from "../lib/walletRequestAuth";
+import { useHashConnectPreload } from "../lib/useHashConnectPreload";
 import { activeHederaChain } from "../lib/hederaChains";
 import { parseUnits } from "viem";
 import { readListingCompat } from "../lib/marketplaceRead";
@@ -63,6 +64,7 @@ export function BuyButton({
 
   const { address } = useHashpackWallet();
   const authedFetch = useAuthorizedFetch();
+  useHashConnectPreload();
   const chainId = activeHederaChain.id;
   const isWrongNetwork = false;
   const [onChainListing, setOnChainListing] = useState<

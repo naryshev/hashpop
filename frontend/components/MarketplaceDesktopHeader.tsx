@@ -47,6 +47,8 @@ export function MarketplaceDesktopHeader({
           src="/hashpop-cart-3d.PNG"
           alt=""
           data-testid="marketplace-cart-mark"
+          fetchPriority="low"
+          decoding="async"
           className="h-9 w-auto object-contain"
         />
         <HashpopWordmark size="header" />

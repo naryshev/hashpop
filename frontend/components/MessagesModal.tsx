@@ -1,15 +1,29 @@
 "use client";
 
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
-import { MessagesPageContent } from "./MessagesContent";
 
 /**
  * Desktop messages overlay. Renders the full conversations experience inside
  * a centered modal so chatting never navigates away from the marketplace.
  */
 export function MessagesModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [Content, setContent] = useState<
+    typeof import("./MessagesContent").MessagesPageContent | null
+  >(null);
+
+  useEffect(() => {
+    if (!open || Content) return;
+    let cancelled = false;
+    void import("./MessagesContent").then((mod) => {
+      if (!cancelled) setContent(() => mod.MessagesPageContent);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, Content]);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -51,7 +65,13 @@ export function MessagesModal({ open, onClose }: { open: boolean; onClose: () =>
             </div>
           }
         >
-          <MessagesPageContent embedded />
+          {Content ? (
+            <Content embedded />
+          ) : (
+            <div className="flex h-full items-center justify-center text-sm text-silver">
+              Loading messages…
+            </div>
+          )}
         </Suspense>
       </div>
     </div>,

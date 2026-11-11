@@ -1,11 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDockBadgeCount } from "@/lib/dockBadge";
 import { DockBadge } from "./ui/DockBadge";
-import { NotificationsPanel } from "./NotificationsPanel";
 import { useDealNotifications, markDealUpdatesSeen } from "../hooks/useDealNotifications";
 
 export type NotificationBellProps = {
@@ -25,6 +24,19 @@ export function NotificationBell({
 }: NotificationBellProps) {
   const { items, unseen, loading } = useDealNotifications();
   const [open, setOpen] = useState(false);
+  const [Panel, setPanel] = useState<
+    typeof import("./NotificationsPanel").NotificationsPanel | null
+  >(null);
+  useEffect(() => {
+    if (!open || Panel) return;
+    let cancelled = false;
+    void import("./NotificationsPanel").then((mod) => {
+      if (!cancelled) setPanel(() => mod.NotificationsPanel);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, Panel]);
   // Snapshot of ids that were unread at open. Marking seen clears the bell
   // immediately; the dots stay until this panel visit ends or mark-all-read.
   const [unreadIds, setUnreadIds] = useState<ReadonlySet<string>>(() => new Set());
@@ -78,15 +90,17 @@ export function NotificationBell({
           )}
         </span>
       </button>
-      <NotificationsPanel
-        open={open}
-        onClose={() => setOpen(false)}
-        variant={variant === "desktop" ? "desktop" : "mobile"}
-        items={items}
-        loading={loading}
-        unreadIds={unreadIds}
-        onMarkAllRead={markAllRead}
-      />
+      {Panel ? (
+        <Panel
+          open={open}
+          onClose={() => setOpen(false)}
+          variant={variant === "desktop" ? "desktop" : "mobile"}
+          items={items}
+          loading={loading}
+          unreadIds={unreadIds}
+          onMarkAllRead={markAllRead}
+        />
+      ) : null}
     </>
   );
 }
