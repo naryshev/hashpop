@@ -16,7 +16,7 @@ export const ROBOTS_ALLOW = [
   "/profile/",
 ] as const;
 
-/** Research checklist. Other account tools are noindexed in middleware. */
+/** Research checklist. Other account tools are noindexed in proxy.ts (formerly middleware). */
 export const ROBOTS_DISALLOW = [
   "/messages",
   "/cart",

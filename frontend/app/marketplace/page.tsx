@@ -6,11 +6,10 @@ import { marketplaceMetadata } from "../../lib/seo/metadata";
 import { fetchPublicListings } from "../../lib/seo/publicListings";
 import MarketplacePageClient from "./marketplace-page-client";
 
-export async function generateMetadata({
-  searchParams,
-}: {
-  searchParams?: { category?: string | string[] };
+export async function generateMetadata(props: {
+  searchParams?: Promise<{ category?: string | string[] }>;
 }): Promise<Metadata> {
+  const searchParams = await props.searchParams;
   const base = marketplaceMetadata();
   const raw = searchParams?.category;
   const category = Array.isArray(raw) ? raw[0] : raw;

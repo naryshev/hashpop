@@ -64,25 +64,27 @@ describe("listing page HTTP outcome", () => {
     fetchPublicListing.mockResolvedValue({ status: "not_found" });
     // generateMetadata must not throw. A second notFound() there drops the
     // friendly 404 markup and leaves only the error digest.
-    const meta = await generateMetadata({ params: { id: "missing" } });
+    const meta = await generateMetadata({ params: Promise.resolve({ id: "missing" }) });
     expect(meta.robots).toMatchObject({ index: false });
     expect(meta.alternates?.canonical).toBeUndefined();
     expect(
       meta.openGraph && "url" in meta.openGraph ? meta.openGraph.url : undefined,
     ).toBeUndefined();
-    await expect(ListingPage({ params: { id: "missing" } })).rejects.toThrow("NEXT_NOT_FOUND");
+    await expect(ListingPage({ params: Promise.resolve({ id: "missing" }) })).rejects.toThrow(
+      "NEXT_NOT_FOUND",
+    );
     expect(clientSpy).not.toHaveBeenCalled();
   });
 
   it("does not 404 a transient failure and withholds a self-canonical", async () => {
     fetchPublicListing.mockResolvedValue({ status: "unavailable" });
-    const meta = await generateMetadata({ params: { id: "lst-1" } });
+    const meta = await generateMetadata({ params: Promise.resolve({ id: "lst-1" }) });
     expect(meta.robots).toMatchObject({ index: false, follow: false });
     expect(meta.alternates?.canonical).toBeUndefined();
     expect(
       meta.openGraph && "url" in meta.openGraph ? meta.openGraph.url : undefined,
     ).toBeUndefined();
-    const page = await ListingPage({ params: { id: "lst-1" } });
+    const page = await ListingPage({ params: Promise.resolve({ id: "lst-1" }) });
     expect(findClient(page)?.props).toMatchObject({
       initialListing: null,
       initialOutcome: "unavailable",
@@ -91,10 +93,10 @@ describe("listing page HTTP outcome", () => {
 
   it("keeps a real listing indexable with its canonical", async () => {
     fetchPublicListing.mockResolvedValue(found);
-    const meta = await generateMetadata({ params: { id: "lst-1" } });
+    const meta = await generateMetadata({ params: Promise.resolve({ id: "lst-1" }) });
     expect(meta.alternates?.canonical).toBe("https://hashpop.io/listing/lst-1");
     expect(meta.robots).toBeUndefined();
-    const page = await ListingPage({ params: { id: "lst-1" } });
+    const page = await ListingPage({ params: Promise.resolve({ id: "lst-1" }) });
     expect(findClient(page)?.props).toMatchObject({
       initialOutcome: "ready",
       initialListing: found.listing,

@@ -10,10 +10,10 @@ import { apexRedirectUrl, isNoIndexPath } from "./lib/seo/host";
  * deployments (`*.vercel.app`) and local dev — is not redirected.
  *
  * Ship also sets the same www → apex rule as a Vercel domain redirect so it
- * applies at the edge, including for static assets, before this middleware.
+ * applies at the edge, including for static assets, before this proxy (Next 16 renamed middleware to proxy).
  * This handler is the application-level guarantee.
  */
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const host = request.headers.get("host") ?? request.headers.get("x-forwarded-host");
   const destination = apexRedirectUrl(host, request.nextUrl.pathname, request.nextUrl.search);
   if (destination) {

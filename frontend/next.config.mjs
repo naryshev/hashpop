@@ -9,10 +9,6 @@ const nextConfig = {
   // no X-Frame-Options, no frame-ancestors. This is what working Hedera
   // dapps (e.g. SaucerSwap) serve. Clickjacking protection is intentionally
   // traded away — being embeddable by wallets is the product requirement.
-  // SWC minifier produces duplicate variable declarations when processing
-  // @hashgraph/sdk and @hashgraph/proto (protobuf Long.js patterns).
-  // Terser handles these edge cases correctly.
-  swcMinify: false,
   async redirects() {
     return [
       { source: "/area51", destination: "/admin", permanent: false },
@@ -21,6 +17,11 @@ const nextConfig = {
   },
   images: {
     formats: ["image/avif", "image/webp"],
+    // Next 16 refuses to optimize images whose host resolves to a private IP.
+    // Local dev serves uploads from localhost/127.0.0.1 (patterns below), so
+    // allow that in development only, matching Next 14. Production is unchanged
+    // (R2 and cdn.hashpop.io resolve to public IPs).
+    dangerouslyAllowLocalIP: process.env.NODE_ENV === "development",
     remotePatterns: [
       {
         protocol: "https",
