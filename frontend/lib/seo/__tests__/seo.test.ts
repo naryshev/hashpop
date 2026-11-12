@@ -35,6 +35,8 @@ describe("SEO copy", () => {
       "Buy and sell real stuff on Hedera with wallet reputation, encrypted deal chat, and optional protected payments in HBAR. Meetups with a contract.",
     );
     expect(SEO_COPY.marketplaceTitle).toBe("Marketplace · Hashpop");
+    expect(SEO_COPY.marketplaceH1).toBe("Browse listings settled in HBAR");
+    expect(SEO_COPY.marketplaceH1).not.toMatch(/escrow/i);
     expect(SEO_COPY.marketplaceDescription).toBe(
       "Browse listings settled in HBAR — optional protected payments, wallet chat, and portable reputation. Meet locally with a contract or ship.",
     );

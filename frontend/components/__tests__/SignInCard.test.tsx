@@ -117,4 +117,39 @@ describe("SignInCard HashPack approval states", () => {
     expect(host?.textContent).toContain("Install HashPack");
     expect(host?.textContent).not.toContain("HashPack could not approve");
   });
+
+  it("shows a QR button after the HashPack-not-detected timeout and opens the pairing QR on click", async () => {
+    wallet.notDetected = true;
+    await renderCard();
+    expect(host?.textContent).toContain("HashPack not detected");
+    expect(host?.textContent).toContain("with a QR code");
+    expect(host?.textContent).toContain("Install HashPack");
+    const qrButton = [...(host?.querySelectorAll("button") ?? [])].find((node) =>
+      node.textContent?.includes("Connect via QR code instead"),
+    );
+    expect(qrButton).toBeTruthy();
+    expect(host?.textContent).not.toContain("Open HashPack → Scan QR to pair");
+    await act(async () => {
+      qrButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(host?.textContent).toContain("Open HashPack → Scan QR to pair");
+    expect(host?.textContent).toContain("Or paste the pairing string into HashPack");
+    expect(host?.textContent).toContain(wallet.pairingUri);
+    expect(host?.querySelector("svg")).toBeTruthy();
+  });
+
+  it("offers the HashPack QR pairing path before a connect timeout when a pairing URI is ready", async () => {
+    await renderCard();
+    expect(host?.textContent).not.toContain("HashPack not detected");
+    const qrButton = [...(host?.querySelectorAll("button") ?? [])].find((node) =>
+      node.textContent?.includes("Scan QR code with HashPack"),
+    );
+    expect(qrButton).toBeTruthy();
+    await act(async () => {
+      qrButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(host?.textContent).toContain("Open HashPack → Scan QR to pair");
+    expect(host?.textContent).toContain(wallet.pairingUri);
+    expect(host?.querySelector("svg")).toBeTruthy();
+  });
 });

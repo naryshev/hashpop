@@ -9,6 +9,7 @@ export const SEO_COPY = {
   rootDescription:
     "Buy and sell real stuff on Hedera with wallet reputation, encrypted deal chat, and optional protected payments in HBAR. Meetups with a contract.",
   marketplaceTitle: "Marketplace · Hashpop",
+  marketplaceH1: "Browse listings settled in HBAR",
   marketplaceDescription:
     "Browse listings settled in HBAR — optional protected payments, wallet chat, and portable reputation. Meet locally with a contract or ship.",
   marketplaceOgDescription:

@@ -159,14 +159,30 @@ export function SignInCard({ onConnected, className }: SignInCardProps) {
             {pairingUri && (
               <button
                 type="button"
-                onClick={() => setShowQr(true)}
+                onClick={() => setShowQr((v) => !v)}
                 className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-medium text-slate-300 transition hover:bg-white/10 hover:text-white"
               >
-                <QrCode size={13} />
-                Connect via QR code instead
+                {showQr ? (
+                  <>
+                    <ChevronUp size={13} />
+                    Hide QR code
+                  </>
+                ) : (
+                  <>
+                    <QrCode size={13} />
+                    Connect via QR code instead
+                  </>
+                )}
               </button>
             )}
           </div>
+          {showQr && pairingUri ? (
+            <QrPairingPanel
+              pairingUri={pairingUri}
+              copied={copied}
+              onCopy={handleCopyPairingString}
+            />
+          ) : null}
         </div>
       )}
 
@@ -190,7 +206,7 @@ export function SignInCard({ onConnected, className }: SignInCardProps) {
         </p>
       )}
 
-      {canShowQr && (
+      {canShowQr && !notDetected && (
         <div className="mt-4">
           <button
             type="button"
@@ -210,55 +226,13 @@ export function SignInCard({ onConnected, className }: SignInCardProps) {
             )}
           </button>
 
-          {showQr && (
-            <div className="mt-4 flex flex-col items-center gap-4">
-              <div className="rounded-2xl bg-white p-4 shadow-lg">
-                <QRCodeSVG
-                  value={pairingUri}
-                  size={200}
-                  bgColor="#ffffff"
-                  fgColor="#0b111b"
-                  level="M"
-                  imageSettings={{
-                    src: "/hashpop-cart-3d.PNG",
-                    height: 36,
-                    width: 36,
-                    excavate: true,
-                  }}
-                />
-              </div>
-              <p className="text-center text-xs text-slate-400">Open HashPack → Scan QR to pair</p>
-
-              <div className="w-full">
-                <p className="mb-1.5 text-center text-xs font-medium text-slate-400">
-                  Or paste the pairing string into HashPack
-                </p>
-                <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#0d1220] px-3 py-2">
-                  <span className="flex-1 truncate font-mono text-[10px] text-slate-400 select-all">
-                    {pairingUri}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleCopyPairingString}
-                    title="Copy pairing string"
-                    className="flex shrink-0 items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-slate-300 transition hover:bg-white/10 hover:text-white"
-                  >
-                    {copied ? (
-                      <>
-                        <Check size={12} className="text-emerald-400" />
-                        <span className="text-emerald-400">Copied</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy size={12} />
-                        Copy
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+          {showQr && pairingUri ? (
+            <QrPairingPanel
+              pairingUri={pairingUri}
+              copied={copied}
+              onCopy={handleCopyPairingString}
+            />
+          ) : null}
         </div>
       )}
 
@@ -277,6 +251,66 @@ export function SignInCard({ onConnected, className }: SignInCardProps) {
       {error && !nicknameRequired ? (
         <p className="mt-3 text-center text-xs text-amber-300">{error}</p>
       ) : null}
+    </div>
+  );
+}
+
+function QrPairingPanel({
+  pairingUri,
+  copied,
+  onCopy,
+}: {
+  pairingUri: string;
+  copied: boolean;
+  onCopy: () => void;
+}) {
+  return (
+    <div className="mt-4 flex flex-col items-center gap-4">
+      <div className="rounded-2xl bg-white p-4 shadow-lg">
+        <QRCodeSVG
+          value={pairingUri}
+          size={200}
+          bgColor="#ffffff"
+          fgColor="#0b111b"
+          level="M"
+          imageSettings={{
+            src: "/hashpop-cart-3d.PNG",
+            height: 36,
+            width: 36,
+            excavate: true,
+          }}
+        />
+      </div>
+      <p className="text-center text-xs text-slate-400">Open HashPack → Scan QR to pair</p>
+
+      <div className="w-full">
+        <p className="mb-1.5 text-center text-xs font-medium text-slate-400">
+          Or paste the pairing string into HashPack
+        </p>
+        <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#0d1220] px-3 py-2">
+          <span className="flex-1 truncate font-mono text-[10px] text-slate-400 select-all">
+            {pairingUri}
+          </span>
+          <button
+            type="button"
+            onClick={onCopy}
+            title="Copy pairing string"
+            className="flex shrink-0 items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-slate-300 transition hover:bg-white/10 hover:text-white"
+          >
+            {copied ? (
+              <>
+                <Check size={12} className="text-emerald-400" />
+                <span className="text-emerald-400">Copied</span>
+              </>
+            ) : (
+              <>
+                <Copy size={12} />
+                Copy
+              </>
+            )}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
