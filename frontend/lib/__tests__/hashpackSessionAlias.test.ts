@@ -4,6 +4,7 @@ import {
   HASHPACK_NICKNAME_REQUIRED_MESSAGE,
   classifyDesktopConnectTimeout,
   isHashPackExtensionAnnounce,
+  pairingUriAfterDesktopTimeout,
 } from "../hashpackSessionAlias";
 
 describe("buildHashpackDappMetadata", () => {
@@ -60,5 +61,19 @@ describe("HASHPACK_NICKNAME_REQUIRED_MESSAGE", () => {
     expect(message).not.toContain("nickname is empty");
     expect(message).not.toContain("that nickname is empty");
     expect(message).not.toContain("wc:");
+  });
+});
+
+describe("pairingUriAfterDesktopTimeout", () => {
+  const uri = "wc:abc@2?relay-protocol=irn&symKey=deadbeef";
+
+  it("keeps the pairing URI when no extension answered so the QR fallback can render", () => {
+    expect(pairingUriAfterDesktopTimeout("not-detected", uri)).toBe(uri);
+    expect(pairingUriAfterDesktopTimeout("not-detected", null)).toBeNull();
+  });
+
+  it("clears the pairing URI after a failed extension approval, which burns the proposal", () => {
+    expect(pairingUriAfterDesktopTimeout("nickname-required", uri)).toBeNull();
+    expect(pairingUriAfterDesktopTimeout("nickname-required", null)).toBeNull();
   });
 });

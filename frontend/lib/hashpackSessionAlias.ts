@@ -40,3 +40,16 @@ export type DesktopConnectTimeout = "not-detected" | "nickname-required";
 export function classifyDesktopConnectTimeout(extensionSeen: boolean): DesktopConnectTimeout {
   return extensionSeen ? "nickname-required" : "not-detected";
 }
+
+/**
+ * After a desktop connect timeout, only a failed extension approval burns the
+ * WalletConnect proposal (HashPack deletes it from its in-memory map). When
+ * no extension answered, the URI minted for this attempt is still valid and
+ * must be kept so the sign-in card can offer a QR / pairing-string fallback.
+ */
+export function pairingUriAfterDesktopTimeout(
+  outcome: DesktopConnectTimeout,
+  currentUri: string | null,
+): string | null {
+  return outcome === "nickname-required" ? null : currentUri;
+}

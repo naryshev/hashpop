@@ -44,6 +44,7 @@ import {
   HASHPACK_NICKNAME_REQUIRED_MESSAGE,
   classifyDesktopConnectTimeout,
   isHashPackExtensionAnnounce,
+  pairingUriAfterDesktopTimeout,
 } from "./hashpackSessionAlias";
 
 type HederaNetwork = "mainnet" | "testnet";
@@ -774,12 +775,20 @@ export function HashpackWalletProvider({ children }: { children: React.ReactNode
           };
         });
         if (!paired) {
-          // HashPack deletes the proposal after a failed approve, so the URI
-          // we just handed the extension cannot be approved on a retry.
-          mobilePairingUriRef.current = null;
-          mobilePairingUriAtRef.current = 0;
-          setPairingUri(null);
-          if (classifyDesktopConnectTimeout(extensionSeen) === "nickname-required") {
+          const outcome = classifyDesktopConnectTimeout(extensionSeen);
+          // A failed approve burns the proposal; a missing extension does not.
+          // Keep the URI in the not-detected case so the sign-in card can
+          // offer a QR / pairing-string fallback.
+          const uriToKeep = pairingUriAfterDesktopTimeout(
+            outcome,
+            mobilePairingUriRef.current,
+          );
+          if (!uriToKeep) {
+            mobilePairingUriRef.current = null;
+            mobilePairingUriAtRef.current = 0;
+            setPairingUri(null);
+          }
+          if (outcome === "nickname-required") {
             setNicknameRequired(true);
             setError(HASHPACK_NICKNAME_REQUIRED_MESSAGE);
           } else {
