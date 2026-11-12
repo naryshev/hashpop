@@ -1,4 +1,4 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "cd .. && env -u npm_config_cache_dir npm_config_cache=\"$PWD/.vercel/cache/npm\" npm ci --workspace=hashpop-frontend --prefer-offline --no-audit --no-fund"
+  "installCommand": "cd .. && env -u npm_config_cache_dir npm ci --workspace=hashpop-frontend --prefer-offline --no-audit --no-fund"
 }
